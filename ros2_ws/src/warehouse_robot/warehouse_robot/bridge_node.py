@@ -47,14 +47,22 @@ LIPO_CURVE = [(3.27, 0), (3.61, 5), (3.69, 10), (3.71, 15), (3.73, 20), (3.75, 2
               (3.95, 70), (3.98, 75), (4.02, 80), (4.08, 85), (4.11, 90), (4.15, 95), (4.20, 100)]
 
 
-def battery_percent(cell_voltage):
-    """셀 전압을 LIPO_CURVE로 선형 보간해서 0~100%."""
+def lipo_capacity(cell_voltage):
+    """셀 전압을 LIPO_CURVE로 선형 보간한 남은 용량(0~100%)."""
     if cell_voltage <= LIPO_CURVE[0][0]:
         return 0.0
     for (v0, p0), (v1, p1) in zip(LIPO_CURVE, LIPO_CURVE[1:]):
         if cell_voltage <= v1:
             return p0 + (p1 - p0) * (cell_voltage - v0) / (v1 - v0)
     return 100.0
+
+
+def battery_percent(voltage, cells=3, empty_voltage=11.0):
+    """팩 전압 → 표시용 %. empty_voltage 를 0% 로 본다 (TurtleBot3 는 11V 아래에서 충전 경고).
+    그 위는 LiPo 방전 곡선 모양을 유지한 채 0~100% 로 다시 맞춘다."""
+    lo = lipo_capacity(empty_voltage / cells)
+    cap = lipo_capacity(voltage / cells)
+    return max(0.0, min(100.0, (cap - lo) / (100.0 - lo) * 100.0))
 
 
 class ServerConnection:
@@ -133,6 +141,7 @@ class BridgeNode(Node):
         self.declare_parameter('tf_timeout', 0.5)          # 위치 TF가 이보다 오래되면 즉시 정지 (s)
         self.declare_parameter('rotate_timeout', 15.0)     # 제자리 회전이 이보다 길면 정지 후 재계획/실패 (s)
         self.declare_parameter('battery_cells', 3)         # LiPo 셀 수 (TurtleBot3: 3셀 11.1V)
+        self.declare_parameter('battery_empty_v', 11.0)    # 0% 로 볼 전압 (TurtleBot3 충전 경고 전압)
         self.declare_parameter('mode', 'map')              # map: 기존 맵+AMCL / slam: 맵 만들기
 
         p = lambda name: self.get_parameter(name).value  # noqa: E731
@@ -150,6 +159,7 @@ class BridgeNode(Node):
         self.progress_timeout = p('progress_timeout')
         self.tf_timeout = p('tf_timeout')
         self.battery_cells = p('battery_cells')
+        self.battery_empty_v = p('battery_empty_v')
         self.rotate_timeout = p('rotate_timeout')
         self.mode = p('mode')
         self.map_dirty = False      # SLAM 모드: 서버로 보낼 새 맵이 있음
@@ -358,7 +368,7 @@ class BridgeNode(Node):
         # 주행 중 전압이 출렁이므로 최근 30초 중앙값 사용
         voltage = float(np.median([v for _, v in self.battery_history]))
         self.server.send({'type': 'battery', 'voltage': voltage,
-                          'percentage': battery_percent(voltage / self.battery_cells)})
+                          'percentage': battery_percent(voltage, self.battery_cells, self.battery_empty_v)})
 
     def send_path(self, poses):
         pts = [[p.pose.position.x, p.pose.position.y] for p in poses]

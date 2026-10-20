@@ -28,4 +28,5 @@ warehouse_bridge:
     tf_timeout: 0.5           # 로봇 위치 TF가 이보다 오래되면 즉시 정지 (s)
     rotate_timeout: 15.0      # 제자리 회전이 이보다 길면 정지 후 재계획/실패 (s)
     battery_cells: 3          # 배터리 % 계산용 LiPo 셀 수 (TurtleBot3 11.1V = 3셀)
+    battery_empty_v: 11.0     # 이 전압을 0% 로 표시 (TurtleBot3 는 11V 아래에서 충전 경고)
     follow_frame: odom        # FollowPath 경로 좌표계 (odom: controller_server가 map->odom TF 없이 주행)
