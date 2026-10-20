@@ -7,6 +7,7 @@
 발행:  astar/plan (nav_msgs/Path)  - RViz 확인용
 """
 import math
+import os
 import time
 from collections import deque
 
@@ -132,8 +133,9 @@ class AStarPlannerNode(Node):
         self.get_logger().warn(f'부딪힌 자리 ({msg.point.x:.2f}, {msg.point.y:.2f}) 를 장애물로 기억')
 
     def planners_for(self, start, goal):
-        """(맵만 쓰는 플래너, 기억한 장애물까지 더한 플래너 또는 None, 더한 칸 수).
+        """(맵 + 부딪힌 자리 플래너, 여기에 LiDAR 장애물까지 더한 플래너 또는 None, LiDAR 로 더한 칸 수).
 
+        부딪힌 자리(LiDAR 에 안 보이는 낮은 물체)는 LiDAR 장애물 때문에 경로가 없어 다시 계획할 때도 빼지 않는다.
         SLAM 모드(allow_unknown)에서 출발/목표가 아직 맵 밖이면 맵을 미탐색 칸으로 넓힌다.
         """
         now = time.monotonic()
@@ -143,27 +145,42 @@ class AStarPlannerNode(Node):
         while self.bump_points and now - self.bump_points[0][0] > self.get_parameter('bump_memory').value:
             self.bump_points.popleft()
         info = self.map_msg.info
-        base = self.planner
-        data, w, h, ox, oy = self.map_msg.data, info.width, info.height, base.origin_x, base.origin_y
+        data, w, h, ox, oy = self.map_msg.data, info.width, info.height, self.planner.origin_x, self.planner.origin_y
         if self.get_parameter('allow_unknown').value:
             data, w, h, ox, oy = pad_grid(data, w, h, info.resolution, ox, oy, [start, goal])
-            if w != info.width or h != info.height:
-                base = self.make_planner(data, w, h, ox, oy)
-        remembered = list(self.scan_points) + list(self.bump_points)
-        if not remembered:
-            return base, None, 0
-        xs = np.concatenate([p[1] for p in remembered])
-        ys = np.concatenate([p[2] for p in remembered])
-        rows = np.floor((ys - oy) / info.resolution).astype(int)
-        cols = np.floor((xs - ox) / info.resolution).astype(int)
-        inside = (rows >= 0) & (rows < h) & (cols >= 0) & (cols < w)
         grid = np.asarray(data, dtype=np.int16).reshape(h, w).copy()
-        before = grid.copy()
-        grid[rows[inside], cols[inside]] = 100
-        cells = int(np.count_nonzero(grid != before))
+
+        def mark(points):
+            if not points:
+                return 0
+            xs = np.concatenate([p[1] for p in points])
+            ys = np.concatenate([p[2] for p in points])
+            rows = np.floor((ys - oy) / info.resolution).astype(int)
+            cols = np.floor((xs - ox) / info.resolution).astype(int)
+            inside = (rows >= 0) & (rows < h) & (cols >= 0) & (cols < w)
+            before = grid[rows[inside], cols[inside]].copy()
+            grid[rows[inside], cols[inside]] = 100
+            return int(np.count_nonzero(before != 100))
+
+        changed = mark(list(self.bump_points)) or (w, h) != (info.width, info.height)
+        base = self.make_planner(grid.ravel(), w, h, ox, oy) if changed else self.planner
+        cells = mark(list(self.scan_points))
         if not cells:
             return base, None, 0
+        self.last_grid = (grid.copy(), ox, oy, info.resolution)
         return base, self.make_planner(grid.ravel(), w, h, ox, oy), cells
+
+    def dump_grid(self, start, goal):
+        """진단용: LiDAR 장애물 때문에 경로가 없었을 때의 격자를 logs/astar_fail.npz 로 남긴다."""
+        home = os.environ.get('WAREHOUSE_HOME')
+        if not home or not hasattr(self, 'last_grid'):
+            return
+        grid, ox, oy, res = self.last_grid
+        try:
+            np.savez_compressed(os.path.join(home, 'logs', 'astar_fail.npz'), grid=grid, origin=(ox, oy),
+                                resolution=res, start=start, goal=goal)
+        except OSError:
+            pass
 
     def on_get_plan(self, request, response):
         response.plan.header.frame_id = self.frame_id
@@ -184,6 +201,7 @@ class AStarPlannerNode(Node):
             except PlanningError as e:
                 # 기억한 장애물 때문에 막히면(사람이 지나간 자리 등) 맵만으로 다시 계획
                 self.get_logger().warn(f'맵에 없는 장애물 {extra}칸 포함 경로 없음 ({e}), 맵만으로 다시 계획')
+                self.dump_grid(start, goal)
         if points is None:
             try:
                 points = base.plan(start, goal, goal_tolerance=tolerance)

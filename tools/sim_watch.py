@@ -12,6 +12,7 @@
 import argparse
 import math
 import re
+import signal
 import time
 import xml.etree.ElementTree as ET
 
@@ -80,6 +81,10 @@ def main():
     boxes = [b for w in args.world for b in load_boxes(w)]
 
     rclpy.init()
+    # Ctrl-C/kill 로 끝내도 요약을 출력하도록 rclpy 의 신호 처리를 덮어쓴다
+    stop = []
+    signal.signal(signal.SIGINT, lambda *_: stop.append(1))
+    signal.signal(signal.SIGTERM, lambda *_: stop.append(1))
     node = Node('sim_watch', parameter_overrides=[rclpy.parameter.Parameter('use_sim_time', value=True)])
     buf = Buffer()
     TransformListener(buf, node)
@@ -94,37 +99,41 @@ def main():
     contacts = 0
     in_contact = False
     max_tilt = 0.0
-    while time.time() - t0 < args.seconds:
-        rclpy.spin_once(node, timeout_sec=0.02)
-        if 'odom' not in d:
-            continue
-        o = d['odom'].pose.pose
-        truth = (o.position.x, o.position.y, yaw_q(o.orientation))
-        if boxes:
-            gaps = [rect_gap(truth, b) for b in boxes]
-            gap = min(gaps)
-            if gap < min_gap:
-                min_gap = gap
-                min_at = (truth, boxes[gaps.index(gap)])
-            if gap <= 0.005 and not in_contact:
-                contacts += 1
-                print(f'[watch] {time.time() - t0:5.0f}s 충돌! 위치 ({truth[0]:.2f}, {truth[1]:.2f})', flush=True)
-            in_contact = gap <= 0.005
-        if 'imu' in d:
-            q = d['imu'].orientation
-            max_tilt = max(max_tilt, math.degrees(math.acos(max(-1, min(1, 1 - 2 * (q.x * q.x + q.y * q.y))))))
-        err = yerr = None
-        if buf.can_transform('map', 'base_footprint', rclpy.time.Time()):
-            t = buf.lookup_transform('map', 'base_footprint', rclpy.time.Time()).transform
-            est = (t.translation.x, t.translation.y, yaw_q(t.rotation))
-            err = math.hypot(est[0] - truth[0], est[1] - truth[1])
-            yerr = abs(math.degrees(math.atan2(math.sin(est[2] - truth[2]), math.cos(est[2] - truth[2]))))
-            worst_err, worst_yaw = max(worst_err, err), max(worst_yaw, yerr)
-        if time.time() - last >= args.every:
-            last = time.time()
-            print(f'[watch] {last - t0:5.0f}s 정답 ({truth[0]:.2f}, {truth[1]:.2f}) '
-                  f'추정 오차 {err if err is None else round(err, 3)} m / {yerr if yerr is None else round(yerr, 1)}° '
-                  f'벽 여유 {"-" if not boxes else f"{gap:.3f} m"}', flush=True)
+    try:
+        loop_until = t0 + args.seconds
+        while time.time() < loop_until and not stop:
+            rclpy.spin_once(node, timeout_sec=0.02)
+            if 'odom' not in d:
+                continue
+            o = d['odom'].pose.pose
+            truth = (o.position.x, o.position.y, yaw_q(o.orientation))
+            if boxes:
+                gaps = [rect_gap(truth, b) for b in boxes]
+                gap = min(gaps)
+                if gap < min_gap:
+                    min_gap = gap
+                    min_at = (truth, boxes[gaps.index(gap)])
+                if gap <= 0.005 and not in_contact:
+                    contacts += 1
+                    print(f'[watch] {time.time() - t0:5.0f}s 충돌! 위치 ({truth[0]:.2f}, {truth[1]:.2f})', flush=True)
+                in_contact = gap <= 0.005
+            if 'imu' in d:
+                q = d['imu'].orientation
+                max_tilt = max(max_tilt, math.degrees(math.acos(max(-1, min(1, 1 - 2 * (q.x * q.x + q.y * q.y))))))
+            err = yerr = None
+            if buf.can_transform('map', 'base_footprint', rclpy.time.Time()):
+                t = buf.lookup_transform('map', 'base_footprint', rclpy.time.Time()).transform
+                est = (t.translation.x, t.translation.y, yaw_q(t.rotation))
+                err = math.hypot(est[0] - truth[0], est[1] - truth[1])
+                yerr = abs(math.degrees(math.atan2(math.sin(est[2] - truth[2]), math.cos(est[2] - truth[2]))))
+                worst_err, worst_yaw = max(worst_err, err), max(worst_yaw, yerr)
+            if time.time() - last >= args.every:
+                last = time.time()
+                print(f'[watch] {last - t0:5.0f}s 정답 ({truth[0]:.2f}, {truth[1]:.2f}) '
+                      f'추정 오차 {err if err is None else round(err, 3)} m / {yerr if yerr is None else round(yerr, 1)}° '
+                      f'벽 여유 {"-" if not boxes else f"{gap:.3f} m"}', flush=True)
+    except KeyboardInterrupt:
+        pass  # Ctrl-C 로 끝내도 요약은 출력
     print(f'[watch] 요약: 최대 위치 오차 {worst_err:.3f} m, 최대 방향 오차 {worst_yaw:.1f}°, '
           f'충돌 {contacts}회, 최소 벽 여유 {min_gap:.3f} m, 최대 기울기 {max_tilt:.1f}°', flush=True)
     if min_at:

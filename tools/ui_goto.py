@@ -54,7 +54,7 @@ def main():
             state = m['robot']['state']
             if m['robot']['message']:
                 print(f'[{elapsed:5.1f}s] 상태 {state}: {m["robot"]["message"]}', flush=True)
-        if pose and int(elapsed) != last_print:
+        if pose and 'x' in pose and int(elapsed) != last_print:
             last_print = int(elapsed)
             print(f'[{elapsed:5.1f}s] 위치 ({pose["x"]:.2f}, {pose["y"]:.2f})', flush=True)
         if state in ('IDLE', 'ERROR') and elapsed > 1:
