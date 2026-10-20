@@ -26,7 +26,7 @@ import numpy as np
 import rclpy
 import websocket
 from action_msgs.msg import GoalStatus
-from geometry_msgs.msg import PoseStamped, PoseWithCovarianceStamped, Twist
+from geometry_msgs.msg import PointStamped, PoseStamped, PoseWithCovarianceStamped, Twist
 from nav2_msgs.action import FollowPath, NavigateToPose
 from nav_msgs.msg import OccupancyGrid, Path
 from nav_msgs.srv import GetPlan
@@ -35,6 +35,7 @@ from rclpy.node import Node
 from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy, qos_profile_sensor_data
 from rclpy.time import Time
 from sensor_msgs.msg import BatteryState, Imu, LaserScan
+from std_srvs.srv import Empty
 from tf2_ros import Buffer, TransformException, TransformListener
 
 from .astar_planner_node import quaternion_from_yaw, yaw_from_quaternion
@@ -140,6 +141,11 @@ class BridgeNode(Node):
         self.declare_parameter('progress_timeout', 15.0)   # 이 시간 동안 5cm도 못 가면 실패 (s)
         self.declare_parameter('tf_timeout', 0.5)          # 위치 TF가 이보다 오래되면 즉시 정지 (s)
         self.declare_parameter('rotate_timeout', 15.0)     # 제자리 회전이 이보다 길면 정지 후 재계획/실패 (s)
+        # 부딪힘 감지 (LiDAR 보다 낮은 장애물 등): 기울기가 이 각도를 넘거나, 앞으로 가는데 이 시간 동안
+        # 3cm 도 못 가면 멈추고 뒤로 물러난 뒤, 부딪힌 자리를 플래너에 장애물로 알리고 재계획
+        self.declare_parameter('bump_tilt_deg', 6.0)
+        self.declare_parameter('stall_timeout', 2.5)       # s
+        self.declare_parameter('backoff_distance', 0.15)   # m
         self.declare_parameter('battery_cells', 3)         # LiPo 셀 수 (TurtleBot3: 3셀 11.1V)
         self.declare_parameter('battery_empty_v', 11.0)    # 0% 로 볼 전압 (TurtleBot3 충전 경고 전압)
         self.declare_parameter('mode', 'map')              # map: 기존 맵+AMCL / slam: 맵 만들기
@@ -161,6 +167,9 @@ class BridgeNode(Node):
         self.battery_cells = p('battery_cells')
         self.battery_empty_v = p('battery_empty_v')
         self.rotate_timeout = p('rotate_timeout')
+        self.bump_tilt = math.radians(p('bump_tilt_deg'))
+        self.stall_timeout = p('stall_timeout')
+        self.backoff_distance = p('backoff_distance')
         self.mode = p('mode')
         self.map_dirty = False      # SLAM 모드: 서버로 보낼 새 맵이 있음
         self.last_map_sent = 0.0
@@ -181,7 +190,12 @@ class BridgeNode(Node):
         self.tipped_since = None  # 넘어진 상태가 시작된 시각
         self.create_subscription(Imu, 'imu', self.on_imu, qos_profile_sensor_data)
         self.initial_pose_pub = self.create_publisher(PoseWithCovarianceStamped, 'initialpose', 1)
+        self.nomotion_client = self.create_client(Empty, 'request_nomotion_update')  # AMCL
+        self.nomotion_left = 0
+        self.create_timer(0.3, self.nomotion_step)
         self.cmd_vel_pub = self.create_publisher(Twist, 'cmd_vel', 1)
+        self.bump_pub = self.create_publisher(PointStamped, 'astar/obstacle', 10)  # 부딪힌 자리 → A* 플래너
+        self.level_scan_pub = self.create_publisher(LaserScan, 'scan_level', qos_profile_sensor_data)
 
         self.plan_client = self.create_client(GetPlan, 'astar/get_plan')
         self.follow_client = ActionClient(self, FollowPath, 'follow_path')
@@ -230,8 +244,11 @@ class BridgeNode(Node):
                     self.save_map(str(msg['name']))
                 elif kind == 'reset':
                     self.reset_robot()
+                elif kind == '_relocalized':
+                    self.on_relocalized(msg)
                 elif kind == 'initial_pose':
-                    self.publish_initial_pose(float(msg['x']), float(msg['y']), float(msg['yaw']))
+                    self.publish_initial_pose(float(msg['x']), float(msg['y']), float(msg['yaw']),
+                                              bool(msg.get('precise')))
                 else:
                     self.get_logger().warn(f'알 수 없는 메시지: {kind}')
             except (KeyError, ValueError) as e:
@@ -564,6 +581,10 @@ class BridgeNode(Node):
     # 내장 추종기 (controller=builtin) ------------------------------
     def on_scan(self, msg):
         self.scan = msg
+        # AMCL 에는 수평일 때의 스캔만 넘긴다 (config/amcl_waffle_pi.yaml 의 scan_topic: scan_level).
+        # 부딪혀 기울어지면 LiDAR 가 바닥을 벽처럼 보고, 그 스캔으로 AMCL 위치가 수십 cm 튄다
+        if self.tilt < math.radians(4):
+            self.level_scan_pub.publish(msg)
 
     def on_imu(self, msg):
         """기울기가 35도를 넘은 채 0.5초 지나면 넘어진 것으로 보고 정지."""
@@ -588,8 +609,9 @@ class BridgeNode(Node):
     def tipped(self):
         return self.tipped_since is not None and time.monotonic() - self.tipped_since > 0.5
 
-    def front_clearance(self, half_angle=math.radians(25)):
-        """앞쪽 ±half_angle 안에서 가장 가까운 물체까지 거리. 스캔이 없거나 오래되면 0 (= 막힘)."""
+    def front_clearance(self, half_angle=math.radians(25), center=0.0):
+        """center(앞=0, 뒤=pi) 방향 ±half_angle 안에서 가장 가까운 물체까지 거리 (LiDAR 기준).
+        스캔이 없거나 오래되면 0 (= 막힘)."""
         s = self.scan
         if s is None:
             return 0.0
@@ -598,7 +620,7 @@ class BridgeNode(Node):
             return 0.0
         r = np.asarray(s.ranges)
         ang = s.angle_min + np.arange(len(r)) * s.angle_increment
-        ang = np.arctan2(np.sin(ang), np.cos(ang))
+        ang = np.arctan2(np.sin(ang - center), np.cos(ang - center))
         ok = np.isfinite(r) & (r > s.range_min) & (np.abs(ang) <= half_angle)
         return float(r[ok].min()) if ok.any() else math.inf
 
@@ -624,15 +646,25 @@ class BridgeNode(Node):
         if f['gen'] != self.generation or self.goal is None:
             self.stop_following()
             return
+        now = time.monotonic()
+        if 'backoff' in f:
+            self.backoff_step(f, now)
+            return
         pose = self.pose_with_age()
         # map->base TF 스탬프는 odom 쪽(Pi) 스탬프를 따른다. AMCL은 미래 스탬프라 나이가 음수일 수 있음
         if pose is None or pose[3] > self.tf_timeout:
+            if pose is not None and self.tilt > self.bump_tilt:
+                # 기울어진 동안은 AMCL 에 스캔을 안 넘기므로 map TF 가 멈춘다 → 넘어짐이 아니라 부딪힘으로 처리
+                self.start_backoff(f, *pose[:3], now,
+                                   f'차체가 {math.degrees(self.tilt):.0f}도 기울었습니다 (낮은 장애물에 올라탐).')
+                return
             self.stop_following()
             self.report('failed', '로봇 위치 정보가 갱신되지 않아 정지했습니다.')
             return
         x, y, yaw, _ = pose
+        if self.tilt < math.radians(2):
+            f['level_pose'] = (x, y, yaw)   # 부딪힌 자리는 기울기 시작 전 위치/방향으로 계산 (밀리면서 돌아가므로)
         v, w, state = f['pp'].compute(x, y, yaw)
-        now = time.monotonic()
 
         if state == 'done':
             self.stop_following()
@@ -643,6 +675,12 @@ class BridgeNode(Node):
             self.fail_or_retry('경로에서 벗어났습니다.')
             return
 
+        # 기울었으면(낮은 장애물에 올라탐) 앞이 막힌 것(LiDAR 가 바닥을 봄)보다 먼저 처리한다.
+        # 기울어진 채로 기다리면 기울어진 스캔 때문에 AMCL 위치가 크게 틀어진다
+        if self.tilt > self.bump_tilt:
+            self.start_backoff(f, x, y, yaw, now,
+                               f'차체가 {math.degrees(self.tilt):.0f}도 기울었습니다 (낮은 장애물에 올라탐).')
+            return
         if v > 0.0:
             clearance = self.front_clearance()
             if clearance < self.stop_distance:
@@ -654,9 +692,15 @@ class BridgeNode(Node):
                     self.fail_or_retry('앞이 막혀 진행할 수 없습니다.')
                     return
                 f['mark_time'] = now  # 기다리는 동안은 진행 없음으로 치지 않음
+                f.pop('drive_since', None)
                 self.cmd_vel_pub.publish(Twist())
                 return
             f['blocked_since'] = None
+
+        stall = self.detect_stall(f, x, y, v, state, now)
+        if stall:
+            self.start_backoff(f, x, y, yaw, now, stall)
+            return
 
         # 제자리 회전 중이 아닌데 오래 진행이 없으면 실패
         # 제자리 회전이 끝나지 않는 경우(방향 맞추기 실패, 미끄러짐 등) 차단
@@ -680,6 +724,91 @@ class BridgeNode(Node):
         cmd.angular.z = w
         self.cmd_vel_pub.publish(cmd)
 
+    def start_backoff(self, f, x, y, yaw, now, reason):
+        """x, y, yaw: 부딪힌 때의 map 좌표 (부딪힌 자리 계산용). 물러난 거리는 odom 으로 잰다
+        (기울어진 동안은 map TF 가 갱신되지 않으므로)."""
+        self.get_logger().warn(f'부딪힘 감지: {reason} 뒤로 물러납니다')
+        x, y, yaw = f.get('level_pose', (x, y, yaw))
+        f['backoff'] = {'x': x, 'y': y, 'yaw': yaw, 'until': now + 5.0, 'reason': f'부딪힘 감지: {reason}',
+                        'odom': self.odom_xy()}
+        self.cmd_vel_pub.publish(Twist())
+
+    def odom_xy(self):
+        try:
+            t = self.tf_buffer.lookup_transform('odom', self.base_frame, Time()).transform.translation
+            return t.x, t.y
+        except TransformException:
+            return None
+
+    def detect_stall(self, f, x, y, v, state, now):
+        """앞으로 가라고 하는데 못 가고 있으면 이유 문자열, 아니면 None."""
+        if v >= 0.05 and state != 'rotating':
+            t0, x0, y0 = f.setdefault('drive_since', (now, x, y))
+            if math.hypot(x - x0, y - y0) > 0.03:
+                f['drive_since'] = (now, x, y)
+            elif now - t0 > self.stall_timeout:
+                return f'{self.stall_timeout:.1f}초 동안 앞으로 가지 못했습니다 (부딪힘/끼임).'
+        else:
+            f.pop('drive_since', None)
+        return None
+
+    def backoff_step(self, f, now):
+        """부딪힌 뒤 천천히 뒤로 물러난다. 다 물러나면 부딪힌 자리를 플래너에 알리고 재계획."""
+        b = f['backoff']
+        # LiDAR 는 로봇 뒤 끝에서 0.13 m 앞에 있으므로 뒤쪽 0.3 m 안에 물체가 있으면 더 물러나지 않음
+        rear_blocked = self.front_clearance(math.radians(30), center=math.pi) < 0.3
+        cur, start = self.odom_xy(), b['odom']
+        moved = math.hypot(cur[0] - start[0], cur[1] - start[1]) if cur and start else 0.0
+        if moved >= self.backoff_distance or now > b['until'] or rear_blocked:
+            self.stop_following()
+            # 로봇 앞 끝(base 에서 약 0.07 m) 앞쪽이 부딪힌 물체 (플래너가 bump_radius 반경을 막음)
+            pt = PointStamped()
+            pt.header.frame_id = self.global_frame
+            pt.header.stamp = self.get_clock().now().to_msg()
+            pt.point.x = b['x'] + 0.25 * math.cos(b['yaw'])
+            pt.point.y = b['y'] + 0.25 * math.sin(b['yaw'])
+            self.bump_pub.publish(pt)
+            self.relocalize_then_retry(b['reason'])
+            return
+        cmd = Twist()
+        cmd.linear.x = -0.05
+        self.cmd_vel_pub.publish(cmd)
+
+    def relocalize_then_retry(self, reason):
+        """맵 모드: 부딪힌 뒤 스캔 매칭(tools/localize.py)으로 위치를 다시 맞추고 재계획한다.
+        부딪혀 기울어진 동안의 스캔(바닥을 봄) 때문에 AMCL 위치가 수십 cm 틀어지기 때문."""
+        pose = self.current_pose()
+        tool = os.path.join(os.environ.get('WAREHOUSE_HOME', ''), 'tools', 'localize.py')
+        if self.mode != 'map' or pose is None or not os.path.isfile(tool) or self.goal is None:
+            self.fail_or_retry(reason)
+            return
+        gen = self.generation
+        self.get_logger().info('부딪힌 뒤 위치 다시 맞추는 중 (스캔 매칭)')
+        cmd = ['python3', tool, f'{pose[0]:.3f}', f'{pose[1]:.3f}', f'{math.degrees(pose[2]):.1f}',
+               '--range', '0.5', '--yaw-range', '30', '--dry-run']
+
+        def run():
+            result = None
+            try:
+                r = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+                for line in r.stdout.splitlines():
+                    if line.startswith('RESULT'):
+                        result = [float(v) for v in line.split()[1:5]]
+            except Exception as e:  # 시간 초과 등
+                self.get_logger().warn(f'위치 다시 맞추기 실패: {e}')
+            self.server.inbox.put({'type': '_relocalized', 'gen': gen, 'result': result, 'reason': reason})
+        threading.Thread(target=run, daemon=True).start()
+
+    def on_relocalized(self, msg):
+        if msg['gen'] != self.generation or self.goal is None:
+            return  # 그 사이 취소/새 목표
+        r = msg['result']
+        if r and r[3] >= 0.8:   # 스캔 점 80% 이상이 벽과 20cm 이내로 맞을 때만 믿는다
+            self.publish_initial_pose(r[0], r[1], r[2], precise=True)
+        else:
+            self.get_logger().warn(f'스캔 매칭 결과가 좋지 않아 AMCL 위치를 그대로 씁니다 ({r})')
+        self.fail_or_retry(msg['reason'])
+
     def goal_error(self):
         """현재 위치와 목표 사이 거리(m). 위치를 모르면 None."""
         pose = self.current_pose()
@@ -688,15 +817,27 @@ class BridgeNode(Node):
         return math.hypot(pose[0] - self.goal['x'], pose[1] - self.goal['y'])
 
     # ---------------------------------------------------------- 기타
-    def publish_initial_pose(self, x, y, yaw):
+    def publish_initial_pose(self, x, y, yaw, precise=False):
+        """precise: 스캔 매칭으로 찾은 위치 → 표준편차 5cm/3°, 아니면(웹에서 찍은 위치) 20cm/15°.
+        예전 값(50cm)은 입자가 너무 퍼져서 출발 후 몇 초 동안 위치가 20cm 넘게 틀렸다."""
         msg = PoseWithCovarianceStamped()
         msg.header = self.make_pose(x, y, yaw).header
         msg.pose.pose = self.make_pose(x, y, yaw).pose
-        msg.pose.covariance[0] = 0.25
-        msg.pose.covariance[7] = 0.25
-        msg.pose.covariance[35] = 0.0685
+        sxy, syaw = (0.05, math.radians(3)) if precise else (0.2, math.radians(15))
+        msg.pose.covariance[0] = sxy ** 2
+        msg.pose.covariance[7] = sxy ** 2
+        msg.pose.covariance[35] = syaw ** 2
         self.initial_pose_pub.publish(msg)
-        self.get_logger().info(f'초기 위치 지정 ({x:.2f}, {y:.2f}, {math.degrees(yaw):.0f}°)')
+        # 멈춘 채로도 스캔으로 몇 번 보정하게 한다 (AMCL 은 움직여야만 갱신하므로)
+        self.nomotion_left = 10
+        self.get_logger().info(f'초기 위치 지정 ({x:.2f}, {y:.2f}, {math.degrees(yaw):.0f}°)'
+                               f'{" - 스캔 매칭 결과" if precise else ""}')
+
+    def nomotion_step(self):
+        if self.nomotion_left <= 0 or not self.nomotion_client.service_is_ready():
+            return
+        self.nomotion_left -= 1
+        self.nomotion_client.call_async(Empty.Request())
 
     def publish_stop(self):
         if self.stop_count > 0:

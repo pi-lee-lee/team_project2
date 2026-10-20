@@ -11,6 +11,8 @@ astar_planner:
     scan_memory: 20.0         # 장애물 기억 시간 (s)
     scan_max_range: 2.0       # 이보다 먼 LiDAR 점은 무시 (m)
     scan_wall_margin: 0.15    # 맵 벽에서 이 거리 안의 점은 벽으로 보고 무시 (m)
+    bump_memory: 300.0        # 부딪힌 자리(LiDAR 에 안 보이는 낮은 물체)를 장애물로 기억하는 시간 (s)
+    bump_radius: 0.2          # 부딪힌 자리(로봇 앞 0.25 m) 주변을 막는 반경 (m)
 
 warehouse_bridge:
   ros__parameters:
@@ -31,6 +33,9 @@ warehouse_bridge:
     progress_timeout: 15.0    # 이 시간 동안 5cm도 못 가면 실패 (s)
     tf_timeout: 0.5           # 로봇 위치 TF가 이보다 오래되면 즉시 정지 (s)
     rotate_timeout: 15.0      # 제자리 회전이 이보다 길면 정지 후 재계획/실패 (s)
+    bump_tilt_deg: 6.0        # 주행 중 기울기가 이보다 크면 부딪힘(낮은 장애물에 올라탐)으로 보고 정지, 뒤로 물러남 (도)
+    stall_timeout: 2.5        # 앞으로 가라고 했는데 이 시간 동안 3cm 도 못 가면 부딪힘/끼임으로 봄 (s)
+    backoff_distance: 0.15    # 부딪힌 뒤 뒤로 물러나는 거리 (m). 이후 부딪힌 자리를 피해 재계획
     battery_cells: 3          # 배터리 % 계산용 LiPo 셀 수 (TurtleBot3 11.1V = 3셀)
     battery_empty_v: 11.0     # 이 전압을 0% 로 표시 (TurtleBot3 는 11V 아래에서 충전 경고)
     follow_frame: odom        # FollowPath 경로 좌표계 (odom: controller_server가 map->odom TF 없이 주행)

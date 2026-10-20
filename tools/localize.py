@@ -170,7 +170,7 @@ def main():
         print('경고: 맞는 정도가 낮습니다. 기준 위치나 탐색 범위를 바꿔 다시 시도하세요.')
     if not args.dry_run:
         ws = websocket.create_connection(args.server, timeout=2)
-        ws.send(json.dumps({'action': 'set_initial_pose', 'x': x, 'y': y, 'yaw': yaw}))
+        ws.send(json.dumps({'action': 'set_initial_pose', 'x': x, 'y': y, 'yaw': yaw, 'precise': True}))
         print('초기 위치 지정 요청을 보냈습니다.')
     node.destroy_node()
     rclpy.try_shutdown()

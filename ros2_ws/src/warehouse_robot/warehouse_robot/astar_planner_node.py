@@ -2,6 +2,7 @@
 
 구독:  map (nav_msgs/OccupancyGrid, transient local)
        scan (sensor_msgs/LaserScan) - 맵에 없는 장애물(새로 놓인 상자, 사람 등)을 잠시 기억해 경로 계획에 반영
+       astar/obstacle (geometry_msgs/PointStamped) - 브리지가 부딪힘을 감지한 자리 (LiDAR 에 안 보이는 낮은 물체)
 서비스: astar/get_plan (nav_msgs/srv/GetPlan)
 발행:  astar/plan (nav_msgs/Path)  - RViz 확인용
 """
@@ -11,13 +12,13 @@ from collections import deque
 
 import numpy as np
 import rclpy
-from geometry_msgs.msg import PoseStamped
+from geometry_msgs.msg import PointStamped, PoseStamped
 from nav_msgs.msg import OccupancyGrid, Path
 from nav_msgs.srv import GetPlan
 from rclpy.node import Node
 from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy, qos_profile_sensor_data
 from rclpy.time import Time
-from sensor_msgs.msg import LaserScan
+from sensor_msgs.msg import Imu, LaserScan
 from tf2_ros import Buffer, TransformException, TransformListener
 
 from .astar import GridPlanner, PlanningError, pad_grid, path_yaws
@@ -47,12 +48,16 @@ class AStarPlannerNode(Node):
         self.declare_parameter('scan_memory', 20.0)      # s
         self.declare_parameter('scan_max_range', 2.0)    # m, 이보다 먼 점은 무시
         self.declare_parameter('scan_wall_margin', 0.15)  # m, 맵 벽에서 이 거리 안의 점은 벽으로 보고 무시
+        self.declare_parameter('bump_memory', 300.0)     # s, 부딪힌 자리를 장애물로 기억하는 시간
+        self.declare_parameter('bump_radius', 0.2)      # m, 부딪힌 자리 주변을 이 반경만큼 막음
 
         self.planner = None
         self.map_msg = None
         self.frame_id = 'map'
         self.scan_points = deque()   # (시각, xs, ys) map 좌표
+        self.bump_points = deque()   # (시각, xs, ys) 부딪힌 자리 주변 점
         self.last_scan_time = 0.0
+        self.tilt = 0.0   # 기울어진 동안의 스캔은 바닥을 보므로 기억하지 않는다
 
         map_qos = QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL,
                              reliability=ReliabilityPolicy.RELIABLE)
@@ -62,8 +67,10 @@ class AStarPlannerNode(Node):
         self.create_service(GetPlan, 'astar/get_plan', self.on_get_plan)
         self.tf_buffer = Buffer()
         self.tf_listener = TransformListener(self.tf_buffer, self)
+        self.create_subscription(PointStamped, 'astar/obstacle', self.on_bump, 10)
         if self.get_parameter('scan_obstacles').value:
             self.create_subscription(LaserScan, 'scan', self.on_scan, qos_profile_sensor_data)
+            self.create_subscription(Imu, 'imu', self.on_imu, qos_profile_sensor_data)
         self.get_logger().info(f'A* 플래너 시작, 맵 대기 중 ({topic})')
 
     def make_planner(self, data, width=None, height=None, origin_x=None, origin_y=None):
@@ -84,10 +91,14 @@ class AStarPlannerNode(Node):
         self.planner = self.make_planner(msg.data)
         self.get_logger().info(f'맵 수신: {info.width}x{info.height}, {info.resolution:.3f} m/px')
 
+    def on_imu(self, msg):
+        q = msg.orientation
+        self.tilt = math.acos(max(-1.0, min(1.0, 1.0 - 2.0 * (q.x * q.x + q.y * q.y))))
+
     def on_scan(self, msg):
         """0.5초마다 LiDAR 점을 map 좌표로 바꿔, 맵의 벽이 아닌 점만 기억한다."""
         now = time.monotonic()
-        if self.planner is None or now - self.last_scan_time < 0.5:
+        if self.planner is None or now - self.last_scan_time < 0.5 or self.tilt > math.radians(4):
             return
         self.last_scan_time = now
         try:
@@ -112,6 +123,14 @@ class AStarPlannerNode(Node):
         keep[inside] = pl.dist[rows[inside], cols[inside]] > self.get_parameter('scan_wall_margin').value
         self.scan_points.append((now, xs[keep], ys[keep]))
 
+    def on_bump(self, msg):
+        r = self.get_parameter('bump_radius').value
+        a = np.linspace(0, 2 * math.pi, 16, endpoint=False)
+        xs = np.concatenate([[msg.point.x], msg.point.x + r * np.cos(a), msg.point.x + r / 2 * np.cos(a)])
+        ys = np.concatenate([[msg.point.y], msg.point.y + r * np.sin(a), msg.point.y + r / 2 * np.sin(a)])
+        self.bump_points.append((time.monotonic(), xs, ys))
+        self.get_logger().warn(f'부딪힌 자리 ({msg.point.x:.2f}, {msg.point.y:.2f}) 를 장애물로 기억')
+
     def planners_for(self, start, goal):
         """(맵만 쓰는 플래너, 기억한 장애물까지 더한 플래너 또는 None, 더한 칸 수).
 
@@ -121,6 +140,8 @@ class AStarPlannerNode(Node):
         memory = self.get_parameter('scan_memory').value
         while self.scan_points and now - self.scan_points[0][0] > memory:
             self.scan_points.popleft()
+        while self.bump_points and now - self.bump_points[0][0] > self.get_parameter('bump_memory').value:
+            self.bump_points.popleft()
         info = self.map_msg.info
         base = self.planner
         data, w, h, ox, oy = self.map_msg.data, info.width, info.height, base.origin_x, base.origin_y
@@ -128,10 +149,11 @@ class AStarPlannerNode(Node):
             data, w, h, ox, oy = pad_grid(data, w, h, info.resolution, ox, oy, [start, goal])
             if w != info.width or h != info.height:
                 base = self.make_planner(data, w, h, ox, oy)
-        if not self.scan_points:
+        remembered = list(self.scan_points) + list(self.bump_points)
+        if not remembered:
             return base, None, 0
-        xs = np.concatenate([p[1] for p in self.scan_points])
-        ys = np.concatenate([p[2] for p in self.scan_points])
+        xs = np.concatenate([p[1] for p in remembered])
+        ys = np.concatenate([p[2] for p in remembered])
         rows = np.floor((ys - oy) / info.resolution).astype(int)
         cols = np.floor((xs - ox) / info.resolution).astype(int)
         inside = (rows >= 0) & (rows < h) & (cols >= 0) & (cols < w)

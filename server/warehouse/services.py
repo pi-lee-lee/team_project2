@@ -437,11 +437,13 @@ def reset_error(robot_name):
 
 
 @transaction.atomic
-def set_initial_pose(robot_name, x, y, yaw):
+def set_initial_pose(robot_name, x, y, yaw, precise=False):
+    """precise: 스캔 매칭으로 찾은 위치 (자동 위치 추정) → AMCL 불확실성을 작게 준다."""
     out = Outbox()
     robot = get_robot(robot_name)
     require_online(robot)
-    out.to_robot(robot, {'type': 'initial_pose', 'x': float(x), 'y': float(y), 'yaw': float(yaw)})
+    out.to_robot(robot, {'type': 'initial_pose', 'x': float(x), 'y': float(y), 'yaw': float(yaw),
+                         'precise': bool(precise)})
     log(out, robot, f'초기 위치 지정 ({x:.2f}, {y:.2f}, {math.degrees(yaw):.0f}°)')
     return out
 
