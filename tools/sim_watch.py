@@ -99,6 +99,7 @@ def main():
     contacts = 0
     in_contact = False
     max_tilt = 0.0
+    max_tilt_at = None
     try:
         loop_until = t0 + args.seconds
         while time.time() < loop_until and not stop:
@@ -119,7 +120,9 @@ def main():
                 in_contact = gap <= 0.005
             if 'imu' in d:
                 q = d['imu'].orientation
-                max_tilt = max(max_tilt, math.degrees(math.acos(max(-1, min(1, 1 - 2 * (q.x * q.x + q.y * q.y))))))
+                tilt = math.degrees(math.acos(max(-1, min(1, 1 - 2 * (q.x * q.x + q.y * q.y)))))
+            if tilt > max_tilt:
+                max_tilt, max_tilt_at = tilt, (time.time() - t0, truth)
             err = yerr = None
             if buf.can_transform('map', 'base_footprint', rclpy.time.Time()):
                 t = buf.lookup_transform('map', 'base_footprint', rclpy.time.Time()).transform
@@ -136,6 +139,9 @@ def main():
         pass  # Ctrl-C 로 끝내도 요약은 출력
     print(f'[watch] 요약: 최대 위치 오차 {worst_err:.3f} m, 최대 방향 오차 {worst_yaw:.1f}°, '
           f'충돌 {contacts}회, 최소 벽 여유 {min_gap:.3f} m, 최대 기울기 {max_tilt:.1f}°', flush=True)
+    if max_tilt_at and max_tilt > 5:
+        s_, (x, y, yaw) = max_tilt_at
+        print(f'[watch] 가장 기울었던 때: {s_:.0f}s, 로봇 ({x:.2f}, {y:.2f}, {math.degrees(yaw):.0f}°) {max_tilt:.0f}°', flush=True)
     if min_at:
         (x, y, yaw), b = min_at
         print(f'[watch] 가장 가까웠던 때: 로봇 ({x:.2f}, {y:.2f}, {math.degrees(yaw):.0f}°), '

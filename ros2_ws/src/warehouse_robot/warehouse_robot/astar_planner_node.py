@@ -1,7 +1,7 @@
 """직접 구현한 A*를 ROS 2 서비스로 제공하는 노드.
 
 구독:  map (nav_msgs/OccupancyGrid, transient local)
-       scan (sensor_msgs/LaserScan) - 맵에 없는 장애물(새로 놓인 상자, 사람 등)을 잠시 기억해 경로 계획에 반영
+       scan_level (sensor_msgs/LaserScan, 브리지가 기울지 않았을 때만 발행) - 맵에 없는 장애물(새로 놓인 상자, 사람 등)을 잠시 기억해 경로 계획에 반영
        astar/obstacle (geometry_msgs/PointStamped) - 브리지가 부딪힘을 감지한 자리 (LiDAR 에 안 보이는 낮은 물체)
 서비스: astar/get_plan (nav_msgs/srv/GetPlan)
 발행:  astar/plan (nav_msgs/Path)  - RViz 확인용
@@ -19,7 +19,8 @@ from nav_msgs.srv import GetPlan
 from rclpy.node import Node
 from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy, qos_profile_sensor_data
 from rclpy.time import Time
-from sensor_msgs.msg import Imu, LaserScan
+from sensor_msgs.msg import LaserScan
+from std_srvs.srv import Empty
 from tf2_ros import Buffer, TransformException, TransformListener
 
 from .astar import GridPlanner, PlanningError, pad_grid, path_yaws
@@ -49,8 +50,8 @@ class AStarPlannerNode(Node):
         self.declare_parameter('scan_memory', 20.0)      # s
         self.declare_parameter('scan_max_range', 2.0)    # m, 이보다 먼 점은 무시
         self.declare_parameter('scan_wall_margin', 0.15)  # m, 맵 벽에서 이 거리 안의 점은 벽으로 보고 무시
-        self.declare_parameter('bump_memory', 300.0)     # s, 부딪힌 자리를 장애물로 기억하는 시간
-        self.declare_parameter('bump_radius', 0.2)      # m, 부딪힌 자리 주변을 이 반경만큼 막음
+        self.declare_parameter('bump_memory', 120.0)     # s, 부딪힌 자리를 장애물로 기억하는 시간
+        self.declare_parameter('bump_radius', 0.15)      # m, 부딪힌 자리 주변을 이 반경만큼 막음
 
         self.planner = None
         self.map_msg = None
@@ -58,7 +59,6 @@ class AStarPlannerNode(Node):
         self.scan_points = deque()   # (시각, xs, ys) map 좌표
         self.bump_points = deque()   # (시각, xs, ys) 부딪힌 자리 주변 점
         self.last_scan_time = 0.0
-        self.tilt = 0.0   # 기울어진 동안의 스캔은 바닥을 보므로 기억하지 않는다
 
         map_qos = QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL,
                              reliability=ReliabilityPolicy.RELIABLE)
@@ -69,9 +69,9 @@ class AStarPlannerNode(Node):
         self.tf_buffer = Buffer()
         self.tf_listener = TransformListener(self.tf_buffer, self)
         self.create_subscription(PointStamped, 'astar/obstacle', self.on_bump, 10)
+        self.create_service(Empty, 'astar/clear_obstacles', self.on_clear)
         if self.get_parameter('scan_obstacles').value:
-            self.create_subscription(LaserScan, 'scan', self.on_scan, qos_profile_sensor_data)
-            self.create_subscription(Imu, 'imu', self.on_imu, qos_profile_sensor_data)
+            self.create_subscription(LaserScan, 'scan_level', self.on_scan, qos_profile_sensor_data)
         self.get_logger().info(f'A* 플래너 시작, 맵 대기 중 ({topic})')
 
     def make_planner(self, data, width=None, height=None, origin_x=None, origin_y=None):
@@ -92,14 +92,14 @@ class AStarPlannerNode(Node):
         self.planner = self.make_planner(msg.data)
         self.get_logger().info(f'맵 수신: {info.width}x{info.height}, {info.resolution:.3f} m/px')
 
-    def on_imu(self, msg):
-        q = msg.orientation
-        self.tilt = math.acos(max(-1.0, min(1.0, 1.0 - 2.0 * (q.x * q.x + q.y * q.y))))
-
     def on_scan(self, msg):
         """0.5초마다 LiDAR 점을 map 좌표로 바꿔, 맵의 벽이 아닌 점만 기억한다."""
         now = time.monotonic()
-        if self.planner is None or now - self.last_scan_time < 0.5 or self.tilt > math.radians(4):
+        # SLAM 모드(allow_unknown)는 SLAM 맵 자체가 몇 초마다 장애물을 반영하므로 기억하지 않는다.
+        # (맵이 계속 자라는 중이라 벽 밖 점이 전부 '맵에 없는 장애물'로 쌓여 통로가 막혔음: 998칸)
+        if self.get_parameter('allow_unknown').value:
+            return
+        if self.planner is None or now - self.last_scan_time < 0.5:
             return
         self.last_scan_time = now
         try:
@@ -123,6 +123,12 @@ class AStarPlannerNode(Node):
         keep = np.zeros(len(xs), dtype=bool)
         keep[inside] = pl.dist[rows[inside], cols[inside]] > self.get_parameter('scan_wall_margin').value
         self.scan_points.append((now, xs[keep], ys[keep]))
+
+    def on_clear(self, request, response):
+        self.scan_points.clear()
+        self.bump_points.clear()
+        self.get_logger().info('기억한 장애물(LiDAR/부딪힌 자리)을 모두 지웠습니다')
+        return response
 
     def on_bump(self, msg):
         r = self.get_parameter('bump_radius').value
@@ -162,8 +168,10 @@ class AStarPlannerNode(Node):
             grid[rows[inside], cols[inside]] = 100
             return int(np.count_nonzero(before != 100))
 
-        changed = mark(list(self.bump_points)) or (w, h) != (info.width, info.height)
-        base = self.make_planner(grid.ravel(), w, h, ox, oy) if changed else self.planner
+        plain = (self.make_planner(grid.ravel(), w, h, ox, oy) if (w, h) != (info.width, info.height)
+                 else self.planner)
+        base = self.make_planner(grid.ravel(), w, h, ox, oy) if mark(list(self.bump_points)) else plain
+        self.plain_planner = plain   # 부딪힌 자리를 빼고 맵만 (실패 메시지 구분용)
         cells = mark(list(self.scan_points))
         if not cells:
             return base, None, 0
@@ -206,7 +214,10 @@ class AStarPlannerNode(Node):
             try:
                 points = base.plan(start, goal, goal_tolerance=tolerance)
             except PlanningError as e:
-                self.get_logger().warn(f'경로 계획 실패: {e}')
+                # 부딪혔던 자리를 지나는 경로는 쓰지 않는다 (맵만으로 다시 계획하면 같은 물체에 계속 부딪혔음).
+                # 기억은 bump_memory 초 뒤 또는 웹 '상태 초기화'(astar/clear_obstacles)로 지워진다
+                self.get_logger().warn(f'경로 계획 실패: {e}'
+                                       f'{" (부딪혔던 자리 때문일 수 있음)" if base is not self.plain_planner else ""}')
                 return response
 
         for (x, y), yaw in zip(points, path_yaws(points, yaw_from_quaternion(g.orientation))):

@@ -157,6 +157,7 @@ def main():
             rclpy.spin_once(node, timeout_sec=0.05)
 
     blacklist = []
+    reached = []   # 도착한 목표. 같은 곳에 두 번 도착해도 프론티어가 안 사라지면(그 자리에서 볼 수 없는 곳) 제외
     start = time.time()
     visited = ok_count = 0
     while time.time() - start < args.max_minutes * 60:
@@ -181,6 +182,10 @@ def main():
         ok, message = goto(ws, gx, gy, gyaw, args.goal_timeout)
         if ok:
             ok_count += 1
+            if any(math.hypot(gx - rx, gy - ry) < 0.4 for rx, ry in reached):
+                blacklist.append((gx, gy))
+                print(f'[explore]   같은 곳에 다시 왔지만 프론티어가 남음: 이 근처는 제외', flush=True)
+            reached.append((gx, gy))
         elif ok is None:
             print(f'[explore]   요청 거절: {message} (잠시 뒤 다시 시도)', flush=True)
             spin(3.0)

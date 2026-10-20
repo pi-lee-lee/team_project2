@@ -11,8 +11,8 @@ astar_planner:
     scan_memory: 20.0         # 장애물 기억 시간 (s)
     scan_max_range: 2.0       # 이보다 먼 LiDAR 점은 무시 (m)
     scan_wall_margin: 0.15    # 맵 벽에서 이 거리 안의 점은 벽으로 보고 무시 (m)
-    bump_memory: 300.0        # 부딪힌 자리(LiDAR 에 안 보이는 낮은 물체)를 장애물로 기억하는 시간 (s)
-    bump_radius: 0.2          # 부딪힌 자리(로봇 앞 0.25 m) 주변을 막는 반경 (m)
+    bump_memory: 120.0        # 부딪힌 자리(LiDAR 에 안 보이는 낮은 물체)를 장애물로 기억하는 시간 (s)
+    bump_radius: 0.15         # 부딪힌 자리(로봇 앞 0.25 m) 주변을 막는 반경 (m). 크면 좁은 통로가 통째로 막힘
 
 warehouse_bridge:
   ros__parameters:

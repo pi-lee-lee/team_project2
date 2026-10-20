@@ -43,7 +43,7 @@ def main():
         except websocket.WebSocketTimeoutException:
             continue
         elapsed = time.time() - t0
-        if m['type'] == 'pose':
+        if m['type'] == 'pose' and 'x' in m:
             pose = m
         elif m['type'] == 'log':
             print(f'[{elapsed:5.1f}s] {m["log"]["message"]}', flush=True)
