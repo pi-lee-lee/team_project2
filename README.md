@@ -204,6 +204,24 @@ SIGINT → SIGTERM → SIGKILL 순서로 보내고 남은 프로세스가 없는
 | 실패 시 | "재시도" / "건너뛰기" / "작업 취소" / "홈 복귀" |
 | 비상정지 | "비상정지" → 즉시 정지, 작업 취소. "오류 해제"로 대기 상태로 |
 
+### LED 배달 (서빙 로봇처럼)
+
+1. **받는 사람** (관제 화면, 휴대폰 가능): "LED 요청" 카드에서 LED(A/B/C)를 고르고 → 지도에서 받을 자리를 클릭
+2. 로봇이 그 LED 가 놓인 위치로 이동 → **로봇 위 태블릿** 에 "B 을(를) 실어 주세요"
+3. 사람이 LED 를 실으면 카메라가 인식(`cargo/detected` = `B`) → 바로 요청한 자리로 출발. 다른 LED 를 실으면 "요청한 것은 B 입니다" 안내
+4. 도착하면 "B 을(를) 꺼내 주세요" → 꺼내서 카메라에 아무것도 안 보이면(`''`) 완료 → 홈이 있으면 홈으로
+5. 카메라가 20초 안에 인식하지 못하거나 인식 노드가 없으면 태블릿에 "실었어요" / "꺼냈어요" 버튼 (관제 화면 "적재 완료"/"수령 완료" 와 같음)
+
+- **한 번에 한 건만** 받습니다. 진행 중이면 새 요청은 "다른 요청을 처리 중입니다" 로 거절, 로봇에 물건이 실려 있어도 거절
+- **로봇 위 화면**: 같은 와이파이에서 태블릿/휴대폰으로 `http://192.168.0.188:8000/robot` (큰 안내, LED 색, 수동 확인 버튼, 정지 버튼)
+- 위치마다 **카메라 인식 라벨** 을 정할 수 있음 (위치 추가/수정 폼, 비우면 위치 이름). 라벨이 `red`/`green`/`blue`/`빨강` 등이면 화면에 그 색으로 표시
+- 카메라 인식 결과 연결 방법 (학습 모델로 바꿀 때도 같음):
+  - 인식 노드가 **`cargo/detected` (`std_msgs/String`)** 에 지금 보이는 라벨을 발행 (`''` = 비어 있음). 라벨은 위치의 인식 라벨과 같게 (대소문자 무시)
+  - 브리지가 1초(`cargo_stable_sec`) 동안 같은 값일 때만 서버에 알림 → 서버가 적재/수령을 자동 확인
+  - 임시 인식 노드: `ros2 run warehouse_robot cargo_detector --ros-args -p image_topic:=camera/image_raw/compressed`
+    (색 덩어리로 판단, 기본 A 빨강 / B 초록 / C 파랑, `hsv_<라벨>` 로 HSV 범위, `roi` 로 적재 칸만, `publish_debug:=true` 면 `cargo/debug` 영상)
+  - 카메라 없이 시험: `python3 tools/cargo_sim.py B` (실림), `python3 tools/cargo_sim.py ''` (꺼냄)
+
 지도 표시: 빨간 원 = 로봇, 초록 선 = A* 경로, 주황 화살표 = 이동 목표, 빨강/초록 축 = 맵 원점(0,0)
 
 - 지도는 방 범위에 맞춰 **고정** (확대/축소/끌어서 이동 없음, 창 크기가 바뀌면 다시 맞춤).
@@ -315,6 +333,7 @@ dpkg -l ros-humble-tf2 ros-humble-tf2-ros | grep ^ii   # 0.25.24 확인
 | `python3 tools/tf_rates.py [초]` | TF별 수신 빈도와 지연 측정 |
 | `python3 tools/sim_watch.py --world worlds/maze_room.world [--world 상자.sdf] [--seconds N]` | (sim) Gazebo 정답 위치와 비교한 위치 오차, 충돌, 벽 여유, 기울기 기록. Ctrl-C 로 끝내도 요약 출력 |
 | `python3 tools/explore.py` | (SLAM) 프론티어 자동 탐색. 웹 "자동 탐색" 과 같음 |
+| `python3 tools/cargo_sim.py <라벨>` | 카메라 없이 LED 인식 결과 흉내 (`''` = 비어 있음) |
 | `python3 tools/collect_travel.py [--count 30]` | 빈 곳으로 무작위 이동을 반복해 이동 시간 학습 기록 모으기 |
 | `python3 tools/ui_goto.py x y [yaw]` / `--home` | 웹과 같은 방식으로 이동(또는 홈 복귀) 명령을 보내고 진행 출력 (시간 초과 시 비상정지) |
 | `python3 tools/clean_map.py ~/maps/maze_map.yaml` | 맵 정리 → `maze_map_clean.yaml/.pgm` + 비교 이미지 `_preview.png` (원본 유지) |
