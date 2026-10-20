@@ -133,6 +133,15 @@ class TaskStep(models.Model):
     y = models.FloatField()
     yaw = models.FloatField()
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default=STATUS_PENDING)
+    # 이동 기록 (이동 시간 학습용, planning.py). 출발할 때 채우고 도착하면 finished_at
+    start_x = models.FloatField(null=True, blank=True)
+    start_y = models.FloatField(null=True, blank=True)
+    start_yaw = models.FloatField(null=True, blank=True)
+    plan_length = models.FloatField(null=True, blank=True)   # 출발 시 A* 경로 길이 (m)
+    plan_turn = models.FloatField(null=True, blank=True)     # 출발 시 경로의 총 회전량 (rad)
+    predicted_sec = models.FloatField(null=True, blank=True)  # 출발 시 예측한 이동 시간
+    started_at = models.DateTimeField(null=True, blank=True)
+    finished_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         ordering = ['order']
@@ -143,7 +152,9 @@ class TaskStep(models.Model):
 
     def to_dict(self):
         return {'id': self.id, 'order': self.order, 'action': self.action, 'name': self.name,
-                'x': self.x, 'y': self.y, 'yaw': self.yaw, 'status': self.status}
+                'x': self.x, 'y': self.y, 'yaw': self.yaw, 'status': self.status,
+                'predicted_sec': self.predicted_sec,
+                'started_at': self.started_at.isoformat() if self.started_at else None}
 
 
 class EventLog(models.Model):

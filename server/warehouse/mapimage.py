@@ -63,3 +63,37 @@ def read_pgm(path):
         pixels = bytes(min(255, p * 255 // maxval) for p in pixels)
     rows = [pixels[r * width:(r + 1) * width] for r in range(height)]
     return width, height, rows
+
+
+def decode_png(png):
+    """encode_png 로 만든 8bit 회색조 PNG 를 (width, height, rows) 로 되돌린다 (행 0 = 위쪽).
+    필터 0(None) 만 쓰는 이 프로젝트의 PNG 전용."""
+    pos = 8
+    width = height = None
+    idat = b''
+    while pos < len(png):
+        length = struct.unpack('>I', png[pos:pos + 4])[0]
+        tag = png[pos + 4:pos + 8]
+        body = png[pos + 8:pos + 8 + length]
+        if tag == b'IHDR':
+            width, height, depth, color = struct.unpack('>IIBB', body[:10])
+            if depth != 8 or color != 0:
+                raise ValueError('8bit 회색조 PNG 만 지원합니다.')
+        elif tag == b'IDAT':
+            idat += body
+        pos += 12 + length
+    raw = zlib.decompress(idat)
+    stride = width + 1
+    rows = []
+    for r in range(height):
+        if raw[r * stride] != 0:
+            raise ValueError('필터가 있는 PNG 는 지원하지 않습니다.')
+        rows.append(raw[r * stride + 1:(r + 1) * stride])
+    return width, height, rows
+
+
+def gray_to_occupancy(value):
+    """map_saver 회색조 → OccupancyGrid 값 (-1 미탐색, 0~100)."""
+    if value == 205:
+        return -1
+    return round((254 - min(value, 254)) * 100 / 254)

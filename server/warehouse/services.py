@@ -14,6 +14,8 @@ import zlib
 from django.db import transaction
 from django.utils import timezone
 
+from . import planning
+from .live import LIVE
 from .mapimage import encode_png, grid_to_rows
 from .models import EventLog, Location, Map, Robot, Task, TaskStep
 
@@ -97,6 +99,8 @@ def require_online(robot):
 def send_goal(out, robot, step):
     step.status = TaskStep.STATUS_MOVING
     step.save(update_fields=['status'])
+    # 이동 시간 학습용 기록 (출발 위치, 경로 길이/회전량, 예측 시간)
+    planning.record_start(active_map(), step, LIVE.get(robot.name, {}).get('pose'))
     out.to_robot(robot, {'type': 'goto', 'goal_id': step.goal_id,
                          'x': step.x, 'y': step.y, 'yaw': step.yaw})
     set_state(robot, Robot.STATE_MOVING, f'{step.name}(으)로 이동 중')
@@ -270,6 +274,7 @@ def handle_nav_status(name, goal_id, status, message=''):
         return out  # 이미 취소됐거나 지난 목표에 대한 응답
 
     if status == 'succeeded':
+        planning.record_arrival(step)
         if step.action == TaskStep.ACTION_LOAD:
             step.status = TaskStep.STATUS_ARRIVED
             step.save(update_fields=['status'])
@@ -557,3 +562,33 @@ def log_runner(job, ok, message):
     from channels.layers import get_channel_layer
     entry = EventLog.objects.create(robot=get_robot(), message=f'{job} {"완료" if ok else "실패"}: {message}'[:255])
     async_to_sync(get_channel_layer().group_send)('ui', {'type': 'send.msg', 'msg': {'type': 'log', 'log': entry.to_dict()}})
+
+
+# ---------------------------------------------------------------- 방문 순서 최적화 (planning.py)
+
+def plan_order(robot_name, location_ids, with_home):
+    """선택한 위치들을 가장 빨리 도는 순서와 예상 시간. DB 를 바꾸지 않는다."""
+    robot = get_robot(robot_name)
+    m = active_map()
+    if m is None:
+        raise ServiceError('맵이 없습니다.')
+    by_id = {l.id: l for l in Location.objects.filter(map=m, id__in=location_ids)}
+    locations = [by_id[i] for i in location_ids if i in by_id]
+    if not locations:
+        raise ServiceError('위치를 선택하세요.')
+    home = home_location() if with_home else None
+    if with_home and home is None:
+        raise ServiceError('홈 위치가 등록되어 있지 않습니다.')
+    try:
+        r = planning.optimize(m, LIVE.get(robot.name, {}).get('pose'), locations, home)
+    except planning.PlanError as e:
+        raise ServiceError(str(e))
+    names = [l.name for l in r['order']] + ([home.name] if home else [])
+    return {'type': 'plan_order', 'order': [l.id for l in r['order']], 'names': names,
+            'legs': r['legs'], 'total': r['total'], 'original_total': r['original_total'],
+            'model': {k: r['model'][k] for k in ('summary', 'n', 'outliers', 'mae', 'learned')}}
+
+
+def travel_model_info():
+    info = planning.travel_model()
+    return {'type': 'travel_model', **{k: info[k] for k in ('summary', 'n', 'outliers', 'mae', 'learned', 'w')}}

@@ -25,7 +25,10 @@ function connect() {
   const proto = location.protocol === 'https:' ? 'wss' : 'ws';
   const ws = new WebSocket(`${proto}://${location.host}/ws/ui/`);
   S.ws = ws;
-  ws.onopen = () => setWsStatus(true);
+  ws.onopen = () => {
+    setWsStatus(true);
+    ws.send(JSON.stringify({ action: 'travel_model' }));  // 이동 시간 모델 요약
+  };
   ws.onclose = () => {
     setWsStatus(false);
     // 서버가 끊기면 로봇 상태를 알 수 없으므로 화면에서 지운다
@@ -113,6 +116,12 @@ function handle(msg) {
       }
       renderRunner();
       break;
+    case 'plan_order':
+      showPlan(msg);
+      break;
+    case 'travel_model':
+      showModel(msg);
+      break;
     case 'runner_info':
       setRunner(msg);
       break;
@@ -148,6 +157,11 @@ function clearPose() {
 setInterval(() => {
   if (S.pose && Date.now() - (S.poseAt || 0) > 2000) clearPose();
 }, 500);
+
+// 이동 중이면 "약 N초 남음" 을 갱신
+setInterval(() => {
+  if (S.task && S.task.status === 'running' && S.task.steps.some((st) => st.status === 'moving')) renderPanel();
+}, 2000);
 
 function renderHealth() {
   const h = S.health || {};
@@ -597,7 +611,12 @@ function renderPanel() {
     for (const s of S.task.steps) {
       const li = document.createElement('li');
       li.className = s.status;
-      li.textContent = `${s.name} - ${STEP_LABEL[s.status] || s.status}`;
+      let eta = '';
+      if (s.status === 'moving' && s.predicted_sec != null && s.started_at) {
+        const left = s.predicted_sec - (Date.now() - new Date(s.started_at).getTime()) / 1000;
+        eta = left > 0 ? ` · 약 ${fmtSec(left)} 남음` : ' · 예상보다 지연';
+      }
+      li.textContent = `${s.name} - ${STEP_LABEL[s.status] || s.status}${eta}`;
       ol.appendChild(li);
     }
     if (S.task.status !== 'running') {
@@ -727,13 +746,57 @@ $('#btn-estop').addEventListener('click', () => send('estop'));
 $('#btn-reset-robot').addEventListener('click', () => {
   if (confirm('작업을 취소하고 로봇 상태를 초기화할까요?\n(시뮬레이션이면 로봇이 출발 위치로 돌아갑니다)')) send('reset_robot');
 });
-$('#btn-start').addEventListener('click', () => {
-  // 목록 순서대로 방문
+// 선택한 위치 id (목록 순서). 같은 위치들로 "순서 최적화" 를 했으면 그 순서
+function selectedIds() {
   const ids = S.locations.filter((l) => S.selected.has(l.id)).map((l) => l.id);
+  const p = S.plan;
+  if (p && p.withHome === $('#with-home').checked && p.order.length === ids.length
+      && p.order.every((id) => S.selected.has(id))) return p.order;
+  return ids;
+}
+
+function fmtSec(sec) {
+  if (sec == null) return '-';
+  sec = Math.round(sec);
+  return sec >= 60 ? `${Math.floor(sec / 60)}분 ${sec % 60}초` : `${sec}초`;
+}
+
+function clearPlan() {
+  S.plan = null;
+  $('#plan-result').hidden = true;
+}
+
+$('#btn-start').addEventListener('click', () => {
+  const ids = selectedIds();
   if (!ids.length) { toast('이동할 위치를 선택하세요.'); return; }
   send('start_task', { location_ids: ids, with_home: $('#with-home').checked });
   S.selected.clear();
+  clearPlan();
 });
+
+$('#btn-plan').addEventListener('click', () => {
+  const ids = S.locations.filter((l) => S.selected.has(l.id)).map((l) => l.id);
+  if (!ids.length) { toast('최적화할 위치를 선택하세요.'); return; }
+  send('plan_order', { location_ids: ids, with_home: $('#with-home').checked });
+});
+$('#with-home').addEventListener('change', clearPlan);
+
+function showPlan(msg) {
+  S.plan = { order: msg.order, withHome: $('#with-home').checked };
+  const saved = msg.original_total != null ? msg.original_total - msg.total : null;
+  $('#plan-route').textContent = msg.names.join(' → ');
+  $('#plan-time').textContent = `예상 ${fmtSec(msg.total)}`
+    + (saved != null && saved > 0.5 ? ` · 선택 순서(${fmtSec(msg.original_total)})보다 ${fmtSec(saved)} 단축` : ' · 선택 순서가 이미 최적');
+  $('#plan-legs').textContent = msg.legs.map((l) => `${l.length}m ${fmtSec(l.sec)}`).join(' / ');
+  $('#plan-result').hidden = false;
+  showModel(msg.model);
+}
+
+function showModel(m) {
+  $('#travel-model').textContent = m.learned
+    ? `이동 시간 모델: ${m.summary} · 기록 ${m.n}개${m.outliers ? ` (이상치 ${m.outliers}개 제외)` : ''}, 평균 오차 ${m.mae.toFixed(1)}초`
+    : `이동 시간 모델: 기본값 (${m.summary}) · 학습할 이동 기록이 아직 부족합니다`;
+}
 
 window.addEventListener('resize', resizeCanvas);
 resizeCanvas();

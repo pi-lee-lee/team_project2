@@ -311,6 +311,14 @@ button[hidden] { display: none; }
 
 .check { display: flex; align-items: center; gap: 6px; margin-top: 10px; color: #374151; font-size: 13px; }
 
+/* 순서 최적화 결과 */
+.plan { margin-top: 10px; padding: 10px 12px; border-radius: 8px; background: var(--primary-soft); border: 1px solid #c7d7fe; }
+.plan-route { font-weight: 700; color: #1e3a8a; }
+.plan-time { margin-top: 3px; font-size: 13px; color: #1d4ed8; }
+.plan-legs { margin-top: 3px; font-size: 11px; }
+.model-note { margin: 8px 0 0; font-size: 11px; color: var(--muted); }
+.model-note:empty { display: none; }
+
 /* ---------------------------------------------------------------- 폼 */
 #loc-form label, .fields label { display: block; margin-bottom: 8px; font-size: 12px; color: var(--muted); }
 #loc-form input, #loc-form select, .fields select {

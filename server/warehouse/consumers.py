@@ -14,8 +14,8 @@ logger = logging.getLogger(__name__)
 
 UI_GROUP = 'ui'
 
-# 위치·경로처럼 자주 오는 값은 DB에 저장하지 않고 메모리에만 둔다 (단일 프로세스 전제)
-LIVE = {}  # robot_name -> {'pose': {...}, 'path': [...]}
+# 위치·경로처럼 자주 오는 값은 DB에 저장하지 않고 메모리에만 둔다 (live.py)
+from .live import LIVE  # noqa: E402
 
 
 def robot_group(name):
@@ -162,6 +162,18 @@ class UIConsumer(AsyncJsonWebsocketConsumer):
         robot = msg.get('robot')
         if action in ('runner_start', 'runner_stop', 'auto_localize', 'list_maps', 'explore_start', 'explore_stop'):
             await self.handle_runner(action, msg)
+            return
+        if action in ('plan_order', 'travel_model'):
+            # 계산 결과는 요청한 화면에만 돌려준다 (DB 를 바꾸지 않음)
+            try:
+                if action == 'plan_order':
+                    reply = await database_sync_to_async(services.plan_order)(
+                        robot, [int(i) for i in msg.get('location_ids', [])], bool(msg.get('with_home', True)))
+                else:
+                    reply = await database_sync_to_async(services.travel_model_info)()
+                await self.send_json(reply)
+            except services.ServiceError as e:
+                await self.send_json({'type': 'error', 'message': str(e)})
             return
         if action == 'set_home_here':
             # 로봇의 현재 위치는 DB가 아니라 메모리(LIVE)에 있으므로 여기서 꺼내 넘긴다

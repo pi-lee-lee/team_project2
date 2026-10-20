@@ -90,7 +90,16 @@
       <div class="card-head"><h2>위치</h2></div>
       <ul id="locations"></ul>
       <label class="check"><input type="checkbox" id="with-home" checked> 마지막에 홈으로 복귀</label>
-      <button id="btn-start" class="primary wide">▶ 선택한 위치로 작업 시작</button>
+      <div id="plan-result" class="plan" hidden>
+        <div class="plan-route" id="plan-route"></div>
+        <div class="plan-time" id="plan-time"></div>
+        <div class="plan-legs muted" id="plan-legs"></div>
+      </div>
+      <div class="btn-row two" style="margin-top:10px">
+        <button id="btn-plan" class="outline" title="선택한 위치를 가장 빨리 도는 순서와 예상 시간 (학습한 이동 시간 모델)">⇅ 순서 최적화</button>
+        <button id="btn-start" class="primary">▶ 작업 시작</button>
+      </div>
+      <p id="travel-model" class="model-note"></p>
     </section>
 
     <section class="card" id="loc-form-card" hidden>
