@@ -240,11 +240,11 @@ def handle_map(name, msg):
     return out
 
 
-def save_map(name, resolution, origin_x, origin_y, width, height, png):
+def save_map(name, resolution, origin_x, origin_y, width, height, png, activate=True):
     m, _ = Map.objects.update_or_create(name=name, defaults=dict(
         resolution=resolution, origin_x=origin_x, origin_y=origin_y,
         width=width, height=height, png=png))
-    if not m.is_active:
+    if activate and not m.is_active:
         Map.objects.exclude(pk=m.pk).update(is_active=False)
         m.is_active = True
         m.save(update_fields=['is_active'])
@@ -505,6 +505,7 @@ def delete_location(location_id):
 # ---------------------------------------------------------------- 맵 만들기 (SLAM 모드)
 
 MAP_NAME_RE = re.compile(r'^[A-Za-z0-9_-]{1,50}$')
+PENDING_SAVE = {}  # robot_name -> 저장 요청한 맵 이름
 
 
 @transaction.atomic
@@ -515,6 +516,7 @@ def request_save_map(robot_name, name):
     if not MAP_NAME_RE.match(name):
         raise ServiceError('맵 이름은 영문/숫자/_/- 만 쓸 수 있습니다 (예: office_1f).')
     out.to_robot(robot, {'type': 'save_map', 'name': name})
+    PENDING_SAVE[robot.name] = name
     log(out, robot, f'맵 저장 요청: {name}')
     return out
 
@@ -524,7 +526,39 @@ def map_saved(robot_name, ok, message):
     out = Outbox()
     robot = get_robot(robot_name)
     log(out, robot, ('맵 저장 완료: ' if ok else '맵 저장 실패: ') + message[:200])
+    name = PENDING_SAVE.pop(robot.name, None)
+    if ok and name:
+        copied = carry_over_locations(name)
+        if copied is not None:
+            log(out, robot, f'SLAM 중 등록한 위치 {copied}개를 맵 "{name}" 으로 옮겼습니다')
     return out
+
+
+def carry_over_locations(name):
+    """저장한 SLAM 맵 파일을 DB 맵으로 등록하고(활성화는 안 함), slam_live 에 등록한 위치를 복사한다.
+    같은 SLAM 좌표계에서 저장한 맵이므로 좌표를 그대로 쓸 수 있다 (--straighten 으로 돌린 맵은 제외)."""
+    import os
+    from .management.commands.import_map import parse_yaml
+    from .mapimage import read_pgm
+    path = os.path.expanduser(f'~/maps/{name}_clean.yaml')
+    if not os.path.exists(path):
+        path = os.path.expanduser(f'~/maps/{name}.yaml')
+    if not os.path.exists(path):
+        return None
+    conf = parse_yaml(path)
+    width, height, rows = read_pgm(os.path.join(os.path.dirname(path), conf['image'].strip('\'"')))
+    origin = [float(v) for v in conf['origin'].strip('[]').split(',')]
+    m = save_map(name, float(conf['resolution']), origin[0], origin[1], width, height,
+                 encode_png(rows, width, height), activate=False)
+    src = Map.objects.filter(name='slam_live').first()
+    if src is None:
+        return 0
+    copied = 0
+    for loc in src.locations.all():
+        _, created = Location.objects.update_or_create(
+            map=m, name=loc.name, defaults=dict(kind=loc.kind, x=loc.x, y=loc.y, yaw=loc.yaw))
+        copied += 1
+    return copied
 
 
 # ---------------------------------------------------------------- 상태 초기화

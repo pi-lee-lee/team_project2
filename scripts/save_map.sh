@@ -41,5 +41,14 @@ if ! python3 "$WAREHOUSE_HOME/tools/$TOOL" "$MAP_DIR/$NAME.yaml" "${SEED_ARGS[@]
   echo "[save_map] 정리 실패, 원본 맵을 사용하세요: $MAP_DIR/$NAME.yaml"
   FINAL="$MAP_DIR/$NAME.yaml"
 fi
+# 시뮬레이션에서 만든 맵은 어느 월드에서 만들었는지 남긴다 (기존 맵 모드에서 같은 월드로 띄우기 위함)
+if [ "$WAREHOUSE_ROBOT" = sim ] && [ -n "$WAREHOUSE_WORLD" ]; then
+  for f in "$MAP_DIR/$NAME.yaml" "$FINAL"; do
+    [ -f "$f" ] || continue
+    # 파일 끝에 줄바꿈이 없으면 붙어서 마지막 값이 망가지므로 먼저 줄바꿈을 보장
+    [ -n "$(tail -c1 "$f")" ] && echo >> "$f"
+    grep -q '^# world:' "$f" || echo "# world: $WAREHOUSE_WORLD" >> "$f"
+  done
+fi
 echo "[save_map] 완료: $FINAL"
 echo "[save_map] 이 맵으로 실행: scripts/run.sh --robot $WAREHOUSE_ROBOT --mode map --map $FINAL"

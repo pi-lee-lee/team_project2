@@ -83,6 +83,8 @@ def main():
     ap.add_argument('--dry-run', action='store_true', help='찾기만 하고 지정하지 않음')
     ap.add_argument('--global', dest='global_search', action='store_true',
                     help='맵 전체에서 찾기 (로봇 위치를 모를 때)')
+    ap.add_argument('--fallback-global', action='store_true',
+                    help='기준 위치 주변에서 잘 안 맞으면(20cm 이내 80% 미만) 맵 전체에서 다시 찾기')
     args = ap.parse_args()
 
     rclpy.init()
@@ -148,6 +150,17 @@ def main():
                 if best is None or s < best[0]:
                     best = (s, x0 + dx, y0 + dy, yaw, float(np.mean(d < 0.1)), float(np.mean(d < 0.2)))
 
+    if args.fallback_global and not args.global_search and best is not None and best[5] < 0.8:
+        # 맵 좌표계가 예상과 다를 때 (예: Cartographer 맵은 원점이 로봇 출발 위치) 기준 위치가 틀린다
+        print(f'기준 위치 주변이 잘 맞지 않아(20cm 이내 {best[5] * 100:.0f}%) 맵 전체에서 다시 찾습니다.')
+        grid_v = np.array(grid.data, dtype=np.int16).reshape(info.height, info.width)
+        found = global_search(lx, ly, dist, (grid_v == 0) & (dist > 0.2), info)
+        if found:
+            s0, gx, gy, gyaw = found[0]
+            d = score_points(dist, info, lx * math.cos(gyaw) - ly * math.sin(gyaw) + gx,
+                             lx * math.sin(gyaw) + ly * math.cos(gyaw) + gy)
+            if float(np.mean(d < 0.2)) > best[5]:
+                best = (s0, gx, gy, gyaw, float(np.mean(d < 0.1)), float(np.mean(d < 0.2)))
     _, x, y, yaw, p10, p20 = best
     yaw = math.atan2(math.sin(yaw), math.cos(yaw))
     print(f'가장 잘 맞는 위치: x={x:.3f} y={y:.3f} yaw={math.degrees(yaw):.1f}°  '

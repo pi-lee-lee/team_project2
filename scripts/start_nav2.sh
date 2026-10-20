@@ -20,6 +20,8 @@ for arg in "$@"; do
 done
 # NAV2_PARAMS 로 다른 Nav2 설정 파일을 쓸 수 있음
 PARAMS="${NAV2_PARAMS:-$(ros2 pkg prefix turtlebot3_navigation2)/share/turtlebot3_navigation2/param/humble/waffle_pi.yaml}"
+# 위치 추정(AMCL)은 이 프로젝트 설정을 쓴다 (TurtleBot3 기본값은 작은 방에서 10cm 넘게 어긋남, config/amcl_waffle_pi.yaml 참고)
+LOC_PARAMS="${NAV2_PARAMS:-$WAREHOUSE_HOME/config/amcl_waffle_pi.yaml}"
 LAUNCH="$(ros2 pkg prefix nav2_bringup)/share/nav2_bringup/launch"
 
 if [ "$NAV_ONLY" = 0 ]; then
@@ -33,7 +35,7 @@ if [ "$NAV_ONLY" = 0 ]; then
     exit 1
   fi
   echo "[start_nav2] 위치 추정: 맵 $MAP, 시뮬레이션 시간 $WAREHOUSE_SIM_TIME, 도메인 $ROS_DOMAIN_ID"
-  ros2 launch "$LAUNCH/localization_launch.py" map:="$MAP" params_file:="$PARAMS" \
+  ros2 launch "$LAUNCH/localization_launch.py" map:="$MAP" params_file:="$LOC_PARAMS" \
     use_sim_time:="$WAREHOUSE_SIM_TIME" use_composition:=False &
   LOC_PID=$!
 fi

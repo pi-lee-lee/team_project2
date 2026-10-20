@@ -41,7 +41,7 @@ while [ $# -gt 0 ]; do
     --map) MAP="$2"; shift ;;
     --name) NAME="$2"; shift ;;
     --slam) ENGINE="$2"; shift ;;
-    --world) WORLD="$2"; shift ;;
+    --world) WORLD="$2"; WORLD_SET=1; shift ;;
     --gui) GUI=--gui ;;
     --nav2) NAV2=1 ;;
     --planner) PLANNER="$2"; shift ;;
@@ -66,6 +66,15 @@ if [ "$MODE" = map ]; then
   [ -n "$MAP" ] || { echo "--mode map 에는 --map <yaml> 이 필요합니다"; exit 1; }
   MAP="$(realpath "$MAP")"
   [ -f "$MAP" ] || { echo "맵 파일 없음: $MAP"; exit 1; }
+  # 시뮬레이션: --world 를 안 주면 맵 파일에 기록된 월드(# world: ...)로 띄운다.
+  # 다른 월드에서 그 맵으로 위치를 추정하면 AMCL 좌표가 완전히 꼬인다.
+  MAP_WORLD=$(sed -n 's/^# world: *//p' "$MAP" | head -1)
+  if [ "$ROBOT" = sim ] && [ -z "$WORLD_SET" ] && [ -n "$MAP_WORLD" ]; then
+    WORLD="$MAP_WORLD"
+    echo "맵에 기록된 월드 사용: $WORLD"
+  elif [ "$ROBOT" = sim ] && [ -n "$MAP_WORLD" ] && [ "$MAP_WORLD" != "$WORLD" ]; then
+    echo "경고: 맵은 '$MAP_WORLD' 월드에서 만들어졌는데 '$WORLD' 월드로 띄웁니다 (위치 추정이 맞지 않을 수 있음)"
+  fi
   if [ -z "$NAME" ]; then
     NAME="$(basename "$MAP" .yaml)"
     NAME="${NAME%_straight}"; NAME="${NAME%_clean}"
@@ -149,7 +158,9 @@ sleep 8
 # 5) 시뮬레이션 + 기존 맵: 출발 위치를 알고 있으므로 초기 위치 자동 지정
 if [ "$ROBOT" = sim ] && [ "$MODE" = map ]; then
   echo "5) 초기 위치 자동 지정 ($SPAWN_X, $SPAWN_Y)"
-  python3 "$HOME_DIR/tools/localize.py" "$SPAWN_X" "$SPAWN_Y" 0 --range 0.3 --yaw-range 20 2>&1 | grep -v -i warn | sed 's/^/   /' || true
+  # 맵 좌표계가 월드와 다를 수 있으므로(Cartographer 맵 등) 잘 안 맞으면 맵 전체에서 다시 찾는다
+  python3 "$HOME_DIR/tools/localize.py" "$SPAWN_X" "$SPAWN_Y" 0 --range 0.3 --yaw-range 20 --fallback-global 2>&1 \
+    | grep -v -i warn | sed 's/^/   /' || true
 elif [ "$MODE" = map ]; then
   echo "5) 웹에서 '초기 위치 지정'을 하거나: python3 tools/localize.py <x> <y> <방향°>"
 else
