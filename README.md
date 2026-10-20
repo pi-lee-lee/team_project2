@@ -150,6 +150,10 @@ scripts/stop_ros.sh --all
 4. `scripts/run.sh --robot ... --mode map --map ~/maps/<이름>_clean.yaml`
 
 SLAM 모드에서는 서버에 맵을 **`slam_live`** 라는 별도 이름으로 보내므로, 저장된 맵과 등록 위치(홈 등)를 덮어쓰지 않습니다.
+맵을 저장하면 SLAM 중 등록한 위치가 새 맵(같은 이름)으로 복사됩니다. 다만 SLAM 은 한 바퀴 돌아오면 지도를 다시 맞추므로(루프 클로저)
+**위치 등록은 저장 후 기존 맵(AMCL) 모드에서 하는 것을 권장**합니다.
+시뮬레이션에서 저장한 맵에는 만든 월드가 `# world: <이름>` 으로 기록되고, `--world` 없이 그 맵을 쓰면 같은 월드로 실행됩니다
+(다른 월드에서 쓰면 AMCL 좌표가 맞지 않음).
 웹 상단에 모드("맵 만들기 (SLAM)" / "맵 사용 (AMCL)")가 표시되고, SLAM 모드에서는 "초기 위치 지정"이 비활성화됩니다.
 
 ### 개별 실행 (필요할 때)
@@ -190,16 +194,18 @@ SIGINT → SIGTERM → SIGKILL 순서로 보내고 남은 프로세스가 없는
 | **위치 자동 찾기** | AMCL 모드에서 로봇 위치를 모를 때. 맵 전체에서 LiDAR 스캔과 가장 잘 맞는 위치를 찾아 초기 위치로 지정 (`tools/localize.py --global`, 수 초). 대칭인 방이면 "비슷한 다른 위치" 경고 |
 | **여기로 이동** | 버튼 → 지도에서 지점 클릭 (드래그하면 도착 후 바라볼 방향 지정, 클릭만 하면 진행 방향) |
 | 위치 추가 | "위치 추가" → 지도 클릭+드래그 → 이름/종류(물류 위치·홈) 저장 |
-| 작업 실행 | 위치 목록에서 체크 → "선택한 위치로 작업 시작" (목록 순서대로 방문, 마지막에 홈 복귀 선택) |
+| 작업 실행 | 위치 목록에서 체크 → "▶ 작업 시작" (목록 순서대로 방문, 마지막에 홈 복귀 선택). 이동 중에는 "약 N초 남음" 표시 |
+| 순서 최적화 (실험) | 위치를 체크한 뒤 "⇅ 순서 최적화" → 이동 시간 합이 가장 작은 순서와 예상 시간. 이후 "작업 시작" 은 그 순서로 방문. 이동 기록이 쌓이면 시간 모델이 학습됨 (`server/warehouse/planning.py`) |
 | 적재 확인 | 물류 위치 도착 시 "적재 완료" → 다음 위치로 이동 |
 | 홈 지정 | 로봇을 홈에 두고 "현재 위치를 홈으로" (홈이 없으면 "홈 복귀" 버튼이 비활성화됨) |
-| 상태 초기화 | 작업 취소 + 정지. 시뮬레이션이면 로봇을 출발 위치에 바로 세움(넘어졌을 때). `scripts/reset_robot.sh` 와 같음 |
+| 상태 초기화 | 작업 취소 + 정지 + A* 가 기억한 장애물(LiDAR/부딪힌 자리) 삭제. 시뮬레이션이면 로봇을 출발 위치에 바로 세움(넘어졌을 때). `scripts/reset_robot.sh` 와 같음 |
 | 실패 시 | "재시도" / "건너뛰기" / "작업 취소" / "홈 복귀" |
 | 비상정지 | "비상정지" → 즉시 정지, 작업 취소. "오류 해제"로 대기 상태로 |
 
 지도 표시: 빨간 원 = 로봇, 초록 선 = A* 경로, 주황 화살표 = 이동 목표, 빨강/초록 축 = 맵 원점(0,0)
 
-- 지도는 방 범위에 맞춰 **고정** (확대/축소/끌어서 이동 없음, 창 크기가 바뀌면 다시 맞춤)
+- 지도는 방 범위에 맞춰 **고정** (확대/축소/끌어서 이동 없음, 창 크기가 바뀌면 다시 맞춤).
+  SLAM 중 맵이 커져도 화면 범위는 실제 좌표로 유지되어 로봇/위치가 밀리지 않음 (보이는 범위를 벗어날 때만 넓힘)
 - 로봇 카드의 상태 점: 브리지 / LiDAR / 오도메트리 / 위치 추정 (초록 = 정상)
 - 로봇이 사라지면 화면에서도 사라짐: 브리지 종료 → "연결 끊김", Pi 꺼짐(LiDAR·오도메트리 2초 이상 없음) → "로봇(Pi) 응답 없음",
   위치가 2초 넘게 안 오면 로봇 표시와 경로를 지움
@@ -235,17 +241,26 @@ SIGINT → SIGTERM → SIGKILL 순서로 보내고 남은 프로세스가 없는
 
 | 파라미터 | 기본값 | 설명 |
 |---|---|---|
-| `astar_planner.robot_radius` | 0.22 | Waffle Pi 반경. 이 안쪽은 통과 불가 |
+| `astar_planner.robot_radius` | 0.25 | Waffle Pi 반경(뒤쪽 모서리까지). 이 안쪽은 통과 불가 |
 | `astar_planner.inflation_radius` | 0.55 | 이 거리까지 벽에서 멀어지도록 비용 부여 |
 | `warehouse_bridge.controller` | builtin | builtin: 내장 추종기 / nav2: Nav2 controller_server |
 | `warehouse_bridge.max_speed` | 0.15 | 최고 속도 (m/s) |
 | `warehouse_bridge.stop_distance` | 0.35 | 앞쪽 ±25° 안에 이 거리 이내 물체가 있으면 정지 후 대기 |
-| `warehouse_bridge.blocked_timeout` | 10.0 | 막힌 채로 이 시간이 지나면 재계획 |
+| `astar_planner.scan_obstacles` / `scan_memory` | true / 20.0 | AMCL 모드: LiDAR 로 본, 맵에 없는 장애물을 이 시간(초) 기억해 피함 (SLAM 모드는 SLAM 맵이 대신함) |
+| `astar_planner.bump_memory` / `bump_radius` | 120.0 / 0.15 | 부딪힌 자리를 장애물로 기억하는 시간(초)과 반경(m) |
+| `warehouse_bridge.blocked_timeout` | 5.0 | 막힌 채로 이 시간이 지나면 장애물을 피하는 경로로 재계획 |
+| `warehouse_bridge.bump_tilt_deg` | 6.0 | 평소보다 이만큼 더 기울면 부딪힘(낮은 물체에 올라탐)으로 보고 정지 후 빠져나옴 |
+| `warehouse_bridge.stall_timeout` / `backoff_distance` | 2.5 / 0.15 | 앞으로 가는데 이 시간 동안 못 나아가면 부딪힘 / 빠져나오는 거리(m) |
 | `warehouse_bridge.progress_timeout` | 15.0 | 이 시간 동안 5cm도 못 가면 실패 |
 | `warehouse_bridge.tf_timeout` | 0.5 | 위치 TF가 이보다 오래되면 즉시 정지 |
 | `warehouse_bridge.max_retries` | 2 | 실패 시 현재 위치에서 다시 계획하는 횟수 |
 
 `colcon build --symlink-install` 로 빌드했으므로 yaml 수정 후 브리지만 다시 실행하면 적용됩니다.
+
+위치 추정/SLAM 설정은 이 프로젝트 파일을 씁니다.
+- `config/amcl_waffle_pi.yaml` (`start_nav2.sh`): TurtleBot3 기본값보다 빔 수↑(180), 측정 모델을 날카롭게(sigma 0.1), 5cm 마다 갱신. `NAV2_PARAMS` 로 바꿀 수 있음
+- `config/slam_toolbox.yaml` (`start_slam.sh`): 기본값에서 `scan_topic` 만 `/scan_level`
+- AMCL/slam_toolbox/A* 는 브리지가 발행하는 **`scan_level`** (차체가 평소보다 3° 넘게 기울지 않았을 때의 스캔. 3초 넘게 기울어 있으면 다시 전달)을 씁니다. **브리지 없이 AMCL/SLAM 만 띄우면 스캔을 못 받으니** 그때는 `scan_topic` 을 `scan` 으로 바꾸세요.
 
 ## 8. 문제 해결
 
@@ -256,7 +271,11 @@ SIGINT → SIGTERM → SIGKILL 순서로 보내고 남은 프로세스가 없는
 | Pi 로그에 `Failed to read ... no status packet`, `stack smashing detected` 후 `turtlebot3_node` 종료 | OpenCR 통신 끊김. 로봇을 들거나 옮길 때 발생한 적 있음. bringup 재실행 |
 | 웹에 "로봇(Pi) 응답 없음" | Pi bringup 종료, 전원 꺼짐, Wi-Fi 끊김, 배터리 방전. `ssh test@192.168.0.181` 로 접속 확인 |
 | "로봇 위치 정보가 갱신되지 않아 정지했습니다" | 위치 TF(Pi의 odom 또는 AMCL)가 끊김. Pi bringup과 `start_nav2.sh` 상태 확인, `tools/tf_rates.py` 로 측정 |
-| "앞이 막혀 진행할 수 없습니다" | 앞쪽 0.35m 안 장애물이 10초 넘게 있음 (재시도 2회 후) |
+| "앞이 막혀 진행할 수 없습니다" | 앞쪽 0.35m 안 장애물이 5초 넘게 있고, 피해 가는 재계획(2회)도 막힘 |
+| "부딪힘 감지: ... 두 번 부딪혀 멈췄습니다" | LiDAR(높이 약 13cm)에 안 보이는 낮은 물체에 같은 이동에서 두 번 부딪힘. 바닥을 확인하고 치운 뒤 다시 지시. 기억한 자리는 "상태 초기화" 로 지움 |
+| "차체가 N도 기운 채 장애물에 걸려 있습니다" | 로봇이 물체에 걸쳐 있어 출발하지 않음. 로봇을 내려놓은 뒤 다시 지시 |
+| "경로를 찾을 수 없습니다" (벽 근처 목표) | 목표가 벽에서 0.25m 안이면 0.3m 안의 가장 가까운 빈 곳으로 감. 그보다 좁은 틈(폭 약 0.5m 미만)은 갈 수 없음. 장애물을 기억 중이면 "상태 초기화" 후 다시 시도. 원인 확인은 `logs/astar_fail.npz` |
+| AMCL 위치가 맞지 않음 (sim) | 맵을 만든 월드와 다른 월드로 실행했을 수 있음. 맵 yaml 의 `# world:` 확인 |
 | A*가 방 밖(회색 영역)으로 경로를 만듦 | 맵 yaml의 `free_thresh` 가 0.196보다 크면(예: 0.25) map_server가 미탐색(205)을 빈 칸으로 읽음. `tools/clean_map.py` 로 만든 맵은 0.196 사용 |
 | 시뮬레이션에서 로봇이 생성되지 않음 (`Service /spawn_entity unavailable`) | Gazebo 기본 모델 경로 누락 → 인터넷 모델 저장소 대기. `scripts/env.sh` 가 `/usr/share/gazebo/setup.sh` 를 읽도록 수정됨 |
 | SLAM 중 "경로를 찾을 수 없습니다" (바로 앞인데) | SLAM 초반 맵은 대부분 미탐색. SLAM 모드는 `allow_unknown:=true` 로 실행됨 (`start_bridge.sh`) |
@@ -292,6 +311,9 @@ dpkg -l ros-humble-tf2 ros-humble-tf2-ros | grep ^ii   # 0.25.24 확인
 | `python3 tools/localize.py [x y 방향°] [--dry-run]` | 스캔으로 위치를 찾아 초기 위치 지정 (`--dry-run`: 찾기만) |
 | `python3 tools/localize.py --global` | 맵 전체에서 찾기 (10cm·5° 로 넓게 → 상위 5곳을 2.5cm·1° 로 정밀). 웹 "위치 자동 찾기" 와 같음 |
 | `python3 tools/tf_rates.py [초]` | TF별 수신 빈도와 지연 측정 |
+| `python3 tools/sim_watch.py --world worlds/maze_room.world [--world 상자.sdf] [--seconds N]` | (sim) Gazebo 정답 위치와 비교한 위치 오차, 충돌, 벽 여유, 기울기 기록. Ctrl-C 로 끝내도 요약 출력 |
+| `python3 tools/explore.py` | (SLAM) 프론티어 자동 탐색. 웹 "자동 탐색" 과 같음 |
+| `python3 tools/collect_travel.py [--count 30]` | 빈 곳으로 무작위 이동을 반복해 이동 시간 학습 기록 모으기 |
 | `python3 tools/ui_goto.py x y [yaw]` / `--home` | 웹과 같은 방식으로 이동(또는 홈 복귀) 명령을 보내고 진행 출력 (시간 초과 시 비상정지) |
 | `python3 tools/clean_map.py ~/maps/maze_map.yaml` | 맵 정리 → `maze_map_clean.yaml/.pgm` + 비교 이미지 `_preview.png` (원본 유지) |
 | `python3 tools/straighten_map.py ~/maps/maze_map.yaml` | 정리 + 기울기 보정 + 벽 직선화 → `maze_map_straight.yaml/.pgm` (원본 유지) |

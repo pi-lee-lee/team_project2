@@ -63,7 +63,7 @@ browser ⇄ /ws/ui/ ⇄ Django (daphne, :8000) ⇄ /ws/robot/tb3/ ⇄ bridge_nod
 - Parameters: `config/params.yaml`; launch args (map_name, mode, use_sim_time, allow_unknown, planner, controller, server_url) come from `scripts/start_bridge.sh`.
 
 **Scripts / environment**
-- `run.sh` orchestrates `start_server.sh` → Pi bringup over SSH or `start_sim.sh` → `start_slam.sh` or `start_nav2.sh` (map_server+AMCL; `config/nav2_waffle_pi.yaml`) → `start_bridge.sh`.
+- `run.sh` orchestrates `start_server.sh` → Pi bringup over SSH or `start_sim.sh` → `start_slam.sh` or `start_nav2.sh` (map_server+AMCL; `config/amcl_waffle_pi.yaml`, Nav2 driving nodes use TB3's waffle_pi.yaml) → `start_bridge.sh`.
 - `env.sh`: real robot = `ROS_DOMAIN_ID=44`, sim = 77 (so they never mix). PC uses Cyclone DDS (`rmw_cyclonedds_cpp`); the Pi stays on Fast DDS.
 - `tools/`: standalone diagnostics — `localize.py` (scan-matching initial pose), `tf_rates.py`, `ui_goto.py` (drive via the server WebSocket like the UI), `clean_map.py` / `straighten_map.py` (map cleanup; output saved with `free_thresh: 0.196` so map_server doesn't read unknown as free).
 - Maps live outside the repo in `~/maps/` (current: `~/maps/backup/backup2/maze_map_straight.yaml`, DB name `maze_map`).
@@ -73,4 +73,7 @@ browser ⇄ /ws/ui/ ⇄ Django (daphne, :8000) ⇄ /ws/robot/tb3/ ⇄ bridge_nod
 - Nav2 nodes stalling on TF was a **tf2/tf2_ros 0.25.23 ABBA deadlock**, fixed in 0.25.24 — not a DDS issue. Nav2 planner/controller modes require ≥0.25.24 (`dpkg -l ros-humble-tf2 ros-humble-tf2-ros`).
 - `ros2 topic list` showing only `/parameter_events`, `/rosout` → domain mismatch; `source scripts/env.sh` and `ros2 daemon stop`. Stale nodes in `ros2 node list` → check with `--no-daemon`.
 - Map yaml `free_thresh` > 0.196 makes map_server treat unknown (205) as free, letting A* plan outside the room.
+- AMCL, slam_toolbox (`config/slam_toolbox.yaml`) and the A* obstacle memory subscribe to **`scan_level`**, which `bridge_node` republishes from `/scan` only while the robot isn't tilted (relative to its usual tilt; passes again after 3 s). Without the bridge running, localization/SLAM get no scans.
+- A* planner remembers LiDAR obstacles not in the map (AMCL mode only, 20 s) and bump points from the bridge (`astar/obstacle`, 120 s); `astar/clear_obstacles` (called by web "상태 초기화") clears them. Diagnose planning failures with `logs/astar_fail.npz`.
+- Sim maps record their world as `# world: <name>` in the yaml; `run.sh` uses it when `--world` is omitted.
 - `ros2_ws/build|install|log`, `server/.venv`, `logs/` and `server/.env` are committed (no `.gitignore`); don't hand-edit build/install outputs.
