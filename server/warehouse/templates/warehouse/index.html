@@ -7,86 +7,94 @@
   <link rel="stylesheet" href="{% static 'warehouse/style.css' %}?v={{ static_version }}">
 </head>
 <body>
-<header>
-  <h1>창고 로봇 관제</h1>
-  <span><span id="run-mode" class="badge" hidden></span> <span id="ws-status" class="badge off">서버 연결 안 됨</span></span>
+<header class="topbar">
+  <div class="brand">
+    <span class="logo">◆</span>
+    <div>
+      <h1>창고 로봇 관제</h1>
+      <p class="sub">TurtleBot3 Waffle Pi · A* 경로 계획</p>
+    </div>
+  </div>
+  <div class="top-status">
+    <span id="run-mode" class="badge" hidden></span>
+    <span id="ws-status" class="badge off">서버 연결 안 됨</span>
+  </div>
 </header>
 
 <main>
-  <section id="map-panel">
+  <!-- 지도 -->
+  <section id="map-panel" class="panel">
     <div id="map-toolbar">
-      <button data-mode="view" class="mode active">보기</button>
-      <button data-mode="goto" class="mode">여기로 이동</button>
-      <button data-mode="add" class="mode">위치 추가</button>
-      <button data-mode="initpose" class="mode">초기 위치 지정</button>
+      <div class="segmented" role="group" aria-label="지도 모드">
+        <button data-mode="view" class="mode active"><span class="ico">◉</span>보기</button>
+        <button data-mode="goto" class="mode"><span class="ico">➤</span>여기로 이동</button>
+        <button data-mode="add" class="mode"><span class="ico">＋</span>위치 추가</button>
+        <button data-mode="initpose" class="mode"><span class="ico">⌖</span>초기 위치 지정</button>
+      </div>
       <span id="mode-hint">모드를 고르세요</span>
     </div>
     <div id="canvas-wrap">
       <canvas id="map"></canvas>
       <div id="no-map" hidden>아직 맵이 없습니다 — 로봇 주변 8m 격자(1칸 = 1m)를 표시합니다. SLAM 이 첫 맵을 만들면 맵 크기에 맞춰 바뀝니다.</div>
+      <button id="btn-estop" class="estop" title="즉시 정지하고 진행 중인 작업을 취소">■ 비상정지</button>
+      <div class="legend">
+        <span><i class="lgd robot"></i>로봇</span>
+        <span><i class="lgd path"></i>경로</span>
+        <span><i class="lgd loc"></i>위치</span>
+        <span><i class="lgd home"></i>홈</span>
+        <span><i class="lgd goal"></i>목표</span>
+      </div>
     </div>
     <div id="cursor-pos">&nbsp;</div>
   </section>
 
+  <!-- 오른쪽 패널 -->
   <aside>
-    <div class="card" id="runner-card">
-      <h2>실행 모드</h2>
-      <p id="runner-current" class="muted">-</p>
-      <div class="grid2">
-        <label>로봇
-          <select id="runner-robot">
-            <option value="sim">시뮬레이션 (Gazebo)</option>
-            <option value="real">실물 TurtleBot3</option>
-          </select>
-        </label>
-        <label>맵 (AMCL)
-          <select id="runner-map"></select>
-        </label>
+    <section class="card robot-card">
+      <div class="card-head">
+        <h2>로봇 <span id="robot-name" class="muted"></span></h2>
+        <span id="robot-state" class="badge">-</span>
       </div>
-      <div class="buttons">
-        <button id="btn-run-amcl" class="primary" title="선택한 맵으로 map_server + AMCL 실행 (시뮬레이션은 초기 위치 자동)">저장된 맵으로 위치 추정 (AMCL)</button>
-        <button id="btn-run-slam" title="SLAM 으로 새 맵 만들기">맵 만들기 (SLAM)</button>
-        <button id="btn-auto-localize" title="맵 전체에서 LiDAR 스캔과 가장 잘 맞는 위치를 찾아 초기 위치로 지정">위치 자동 찾기</button>
-        <button id="btn-explore" title="SLAM 모드: 미탐색 경계(프론티어)로 자동으로 이동하며 맵 만들기 (최대 30분)">자동 탐색</button>
-        <button id="btn-explore-stop" class="danger" hidden>탐색 중지</button>
-        <button id="btn-run-stop" title="ROS 노드와 시뮬레이션 정지 (웹 서버는 유지)">전체 정지</button>
+      <div class="battery-row" id="battery-row">
+        <div class="battery-bar"><div id="battery-fill"></div></div>
+        <span id="battery"></span>
       </div>
-      <p id="runner-busy" class="muted"></p>
-    </div>
-
-    <div class="card">
-      <h2>로봇 <span id="robot-name"></span></h2>
-      <div class="row"><span id="robot-state" class="badge">-</span><span id="battery"></span></div>
       <div id="health" class="health"></div>
       <p id="robot-message"></p>
-      <div class="buttons">
-        <button id="btn-confirm" class="primary">적재 완료</button>
-        <button id="btn-retry">재시도</button>
-        <button id="btn-skip">건너뛰기</button>
-        <button id="btn-cancel">작업 취소</button>
-        <button id="btn-home">홈 복귀</button>
-        <button id="btn-set-home" title="로봇이 지금 있는 위치와 방향을 홈으로 저장">현재 위치를 홈으로</button>
-        <button id="btn-save-map" class="primary" hidden title="지금까지 만든 맵을 ~/maps 에 저장하고 반듯하게 정리">맵 저장</button>
-        <button id="btn-reset">오류 해제</button>
-        <button id="btn-reset-robot" title="작업 취소, 정지, 시뮬레이션이면 로봇을 출발 위치에 바로 세움">상태 초기화</button>
-        <button id="btn-estop" class="danger">비상정지</button>
+    </section>
+
+    <section class="card">
+      <div class="card-head"><h2>주행 제어</h2></div>
+      <div class="btn-row two">
+        <button id="btn-confirm" class="primary lg">✓ 적재 완료</button>
+        <button id="btn-home" class="outline lg">⌂ 홈 복귀</button>
       </div>
-    </div>
+      <div class="btn-row three">
+        <button id="btn-retry">↻ 재시도</button>
+        <button id="btn-skip">⤼ 건너뛰기</button>
+        <button id="btn-cancel">✕ 작업 취소</button>
+      </div>
+      <div class="btn-row three">
+        <button id="btn-set-home" class="ghost" title="로봇이 지금 있는 위치와 방향을 홈으로 저장">홈으로 지정</button>
+        <button id="btn-reset" class="ghost">오류 해제</button>
+        <button id="btn-reset-robot" class="ghost" title="작업 취소, 정지, 시뮬레이션이면 로봇을 출발 위치에 바로 세움">⟲ 상태 초기화</button>
+      </div>
+    </section>
 
-    <div class="card">
-      <h2>현재 작업</h2>
-      <ol id="task-steps"><li class="muted">없음</li></ol>
-    </div>
+    <section class="card">
+      <div class="card-head"><h2>현재 작업</h2></div>
+      <ol id="task-steps" class="timeline"><li class="muted">없음</li></ol>
+    </section>
 
-    <div class="card">
-      <h2>위치</h2>
+    <section class="card">
+      <div class="card-head"><h2>위치</h2></div>
       <ul id="locations"></ul>
       <label class="check"><input type="checkbox" id="with-home" checked> 마지막에 홈으로 복귀</label>
-      <button id="btn-start" class="primary wide">선택한 위치로 작업 시작</button>
-    </div>
+      <button id="btn-start" class="primary wide">▶ 선택한 위치로 작업 시작</button>
+    </section>
 
-    <div class="card" id="loc-form-card" hidden>
-      <h2 id="loc-form-title">위치 추가</h2>
+    <section class="card" id="loc-form-card" hidden>
+      <div class="card-head"><h2 id="loc-form-title">위치 추가</h2></div>
       <form id="loc-form">
         <input type="hidden" name="id">
         <label>이름 <input name="name" required maxlength="100"></label>
@@ -101,17 +109,45 @@
           <label>y(m) <input name="y" type="number" step="0.01" required></label>
           <label>방향(°) <input name="yaw_deg" type="number" step="1" value="0"></label>
         </div>
-        <div class="buttons">
+        <div class="btn-row two">
           <button type="submit" class="primary">저장</button>
-          <button type="button" id="loc-form-cancel">닫기</button>
+          <button type="button" id="loc-form-cancel" class="outline">닫기</button>
         </div>
       </form>
-    </div>
+    </section>
 
-    <div class="card">
-      <h2>기록</h2>
+    <details class="card collapsible" id="runner-card" open>
+      <summary class="card-head"><h2>실행 모드</h2><span class="chev">▾</span></summary>
+      <p id="runner-current" class="muted">-</p>
+      <div class="grid2 fields">
+        <label>로봇
+          <select id="runner-robot">
+            <option value="sim">시뮬레이션 (Gazebo)</option>
+            <option value="real">실물 TurtleBot3</option>
+          </select>
+        </label>
+        <label>맵 (AMCL)
+          <select id="runner-map"></select>
+        </label>
+      </div>
+      <div class="btn-row two">
+        <button id="btn-run-amcl" class="primary" title="선택한 맵으로 map_server + AMCL 실행 (시뮬레이션은 초기 위치 자동)">위치 추정 (AMCL)</button>
+        <button id="btn-run-slam" class="outline" title="SLAM 으로 새 맵 만들기">맵 만들기 (SLAM)</button>
+      </div>
+      <div class="btn-row two">
+        <button id="btn-auto-localize" title="맵 전체에서 LiDAR 스캔과 가장 잘 맞는 위치를 찾아 초기 위치로 지정">⌖ 위치 자동 찾기</button>
+        <button id="btn-explore" title="SLAM 모드: 미탐색 경계(프론티어)로 자동으로 이동하며 맵 만들기 (최대 30분)">✦ 자동 탐색</button>
+        <button id="btn-explore-stop" class="danger" hidden>■ 탐색 중지</button>
+        <button id="btn-save-map" class="primary" hidden title="지금까지 만든 맵을 ~/maps 에 저장하고 정리">맵 저장</button>
+      </div>
+      <button id="btn-run-stop" class="ghost wide" title="ROS 노드와 시뮬레이션 정지 (웹 서버는 유지)">전체 정지</button>
+      <p id="runner-busy" class="busy"></p>
+    </details>
+
+    <details class="card collapsible" open>
+      <summary class="card-head"><h2>기록</h2><span class="chev">▾</span></summary>
       <ul id="logs"></ul>
-    </div>
+    </details>
   </aside>
 </main>
 

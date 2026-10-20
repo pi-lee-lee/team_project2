@@ -160,7 +160,11 @@ def robot_connected(name, active_goal_id):
     out = Outbox()
     robot = get_robot(name)
     robot.last_seen = timezone.now()
-    robot.save(update_fields=['last_seen'])
+    # 이전 연결(예: 어제 실물 로봇)의 배터리 값이 남아 보이지 않도록 지운다.
+    # 브리지가 /battery_state 를 받으면 다시 채운다 (시뮬레이션은 배터리 정보가 없어 비어 있음)
+    robot.battery_voltage = None
+    robot.battery_percentage = None
+    robot.save(update_fields=['last_seen', 'battery_voltage', 'battery_percentage'])
 
     task = active_task(robot)
     step = task.current_step() if task else None

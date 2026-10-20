@@ -162,7 +162,7 @@ function renderHealth() {
   initBtn.disabled = slam;
   initBtn.title = slam ? 'SLAM 모드에서는 SLAM이 위치를 잡으므로 필요 없습니다' : '';
   if (slam && S.mode === 'initpose') setMode('view');
-  const item = (label, ok) => `<span class="dot ${ok ? 'ok' : 'bad'}"></span>${label}`;
+  const item = (label, ok) => `<span class="chip ${ok ? 'ok' : 'bad'}"><span class="dot ${ok ? 'ok' : 'bad'}"></span>${label}</span>`;
   $('#health').innerHTML = [
     item('브리지', h.bridge),
     item('LiDAR', h.bridge && h.scan_ok),
@@ -568,6 +568,12 @@ function renderPanel() {
     : '';
   bat.className = r && r.battery_percentage != null && r.battery_percentage < 20 ? 'low' : '';
   bat.title = bat.className ? '배터리가 부족합니다. 충전하세요.' : '';
+  // 배터리 막대: 값이 없으면(시뮬레이션 등) 줄 자체를 숨김
+  const pct = r && r.battery_percentage != null && state !== 'OFFLINE' ? r.battery_percentage : null;
+  $('#battery-row').classList.toggle('empty', pct == null && !bat.textContent);
+  const fill = $('#battery-fill');
+  fill.style.width = `${Math.max(0, Math.min(100, pct || 0))}%`;
+  fill.className = pct == null ? '' : pct < 20 ? 'low' : pct < 50 ? 'mid' : '';
 
   const online = state !== 'OFFLINE';
   const running = S.task && S.task.status === 'running';
