@@ -8,7 +8,7 @@ import logging
 from channels.db import database_sync_to_async
 from channels.generic.websocket import AsyncJsonWebsocketConsumer
 
-from . import services
+from . import runner, services
 
 logger = logging.getLogger(__name__)
 
@@ -114,10 +114,35 @@ class UIConsumer(AsyncJsonWebsocketConsumer):
         snap['pose'] = live.get('pose')
         snap['path'] = live.get('path', [])
         snap['health'] = live.get('health', {'bridge': False})
+        snap['runner'] = {'maps': runner.list_maps(), 'mode': runner.current_mode(), 'busy': runner.busy()}
         await self.send_json(snap)
 
     async def disconnect(self, code):
         await self.channel_layer.group_discard(UI_GROUP, self.channel_name)
+
+    async def handle_runner(self, action, msg):
+        """실행 모드 전환 (서버가 scripts/run.sh 등을 실행)."""
+        try:
+            if action == 'list_maps':
+                await self.send_json({'type': 'runner_info', 'maps': runner.list_maps(),
+                                      'mode': runner.current_mode(), 'busy': runner.busy()})
+                return
+            if action in ('runner_start', 'runner_stop'):
+                # 노드를 다시 띄우기 전에 주행 중이면 멈춘다
+                robot = await database_sync_to_async(services.get_robot)()
+                if robot.state == 'MOVING':
+                    await dispatch(self.channel_layer, await database_sync_to_async(services.estop)(None))
+            if action == 'runner_start':
+                await database_sync_to_async(runner.start_mode)(
+                    str(msg.get('robot')), str(msg.get('mode')), msg.get('map') or None)
+            elif action == 'runner_stop':
+                await database_sync_to_async(runner.stop_all)()
+            elif action == 'auto_localize':
+                if LIVE.get(services.DEFAULT_ROBOT, {}).get('mode') != 'map':
+                    raise runner.RunnerError('위치 자동 찾기는 "저장된 맵으로 위치 추정(AMCL)" 모드에서 쓸 수 있습니다.')
+                await database_sync_to_async(runner.auto_localize)()
+        except runner.RunnerError as e:
+            await self.send_json({'type': 'error', 'message': str(e)})
 
     async def send_msg(self, event):
         await self.send_json(event['msg'])
@@ -125,6 +150,9 @@ class UIConsumer(AsyncJsonWebsocketConsumer):
     async def receive_json(self, msg, **kwargs):
         action = msg.get('action')
         robot = msg.get('robot')
+        if action in ('runner_start', 'runner_stop', 'auto_localize', 'list_maps'):
+            await self.handle_runner(action, msg)
+            return
         if action == 'set_home_here':
             # 로봇의 현재 위치는 DB가 아니라 메모리(LIVE)에 있으므로 여기서 꺼내 넘긴다
             pose = LIVE.get(robot or services.DEFAULT_ROBOT, {}).get('pose')

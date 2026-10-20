@@ -541,3 +541,13 @@ def reset_done(robot_name, ok, message):
     log(out, robot, ('상태 초기화 완료: ' if ok else '상태 초기화 실패: ') + message[:200])
     push_state(out, robot)
     return out
+
+
+# ---------------------------------------------------------------- 실행 모드 (runner.py)
+
+def log_runner(job, ok, message):
+    """runner 스레드에서 호출: 결과를 기록에 남기고 UI 에 알린다."""
+    from asgiref.sync import async_to_sync
+    from channels.layers import get_channel_layer
+    entry = EventLog.objects.create(robot=get_robot(), message=f'{job} {"완료" if ok else "실패"}: {message}'[:255])
+    async_to_sync(get_channel_layer().group_send)('ui', {'type': 'send.msg', 'msg': {'type': 'log', 'log': entry.to_dict()}})

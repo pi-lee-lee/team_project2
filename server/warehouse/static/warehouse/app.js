@@ -56,6 +56,7 @@ function handle(msg) {
       S.poseAt = msg.pose ? Date.now() : 0;
       S.health = msg.health || { bridge: false };
       renderHealth();
+      if (msg.runner) setRunner(msg.runner);
       setMap(msg.map);
       $('#logs').innerHTML = '';
       msg.logs.slice().reverse().forEach(addLog);
@@ -93,6 +94,20 @@ function handle(msg) {
       S.health = msg;
       renderHealth();
       break;
+    case 'runner':
+      if (msg.state === 'started') {
+        S.runnerBusy = msg.job;
+        toast(`${msg.job} 시작...`);
+      } else {
+        S.runnerBusy = null;
+        if (msg.mode) S.runnerMode = msg.mode;
+        toast(`${msg.job} ${msg.ok ? '완료' : '실패'}: ${msg.message}`);
+      }
+      renderRunner();
+      break;
+    case 'runner_info':
+      setRunner(msg);
+      break;
     case 'reset_done':
       toast((msg.ok ? '상태 초기화 완료: ' : '상태 초기화 실패: ') + msg.message);
       break;
@@ -128,6 +143,7 @@ setInterval(() => {
 
 function renderHealth() {
   const h = S.health || {};
+  if (document.getElementById('runner-card')) renderRunner();
   const slam = h.bridge && h.mode === 'slam';
   const modeEl = $('#run-mode');
   modeEl.hidden = !h.bridge;
@@ -147,6 +163,63 @@ function renderHealth() {
     item(h.tipped ? `넘어짐 (${h.tilt_deg}°)` : '자세', h.bridge && !h.tipped),
   ].join(' ');
 }
+
+// ------------------------------------------------------------------ 실행 모드
+const ROBOT_LABEL = { sim: '시뮬레이션', real: '실물' };
+
+function setRunner(info) {
+  S.runnerMode = info.mode || {};
+  S.runnerBusy = info.busy || null;
+  const sel = $('#runner-map');
+  const keep = sel.value;
+  sel.innerHTML = '';
+  const def = document.createElement('option');
+  def.value = '';
+  def.textContent = '(시뮬레이션 기본 맵: turtlebot3_world)';
+  sel.appendChild(def);
+  for (const m of info.maps || []) {
+    const o = document.createElement('option');
+    o.value = m.path;
+    o.textContent = m.path;
+    sel.appendChild(o);
+  }
+  // 지금 쓰는 맵을 기본 선택
+  const cur = (S.runnerMode.map || '').split('/maps/').pop();
+  sel.value = keep || ([...sel.options].some((o) => o.value === cur) ? cur : '');
+  if (S.runnerMode.robot) $('#runner-robot').value = S.runnerMode.robot;
+  renderRunner();
+}
+
+function renderRunner() {
+  const m = S.runnerMode || {};
+  const h = S.health || {};
+  const running = h.bridge;
+  $('#runner-current').textContent = running
+    ? `현재: ${ROBOT_LABEL[m.robot] || m.robot || '?'} / ${m.mode === 'slam' ? '맵 만들기 (SLAM)' : `위치 추정 (AMCL) · ${(m.map || '').split('/').pop() || '-'}`}`
+    : `현재: 실행 중 아님${m.robot ? ` (마지막: ${ROBOT_LABEL[m.robot]} / ${m.mode === 'slam' ? 'SLAM' : 'AMCL'})` : ''}`;
+  const busy = !!S.runnerBusy;
+  $('#runner-busy').textContent = busy ? `진행 중: ${S.runnerBusy} (수십 초 걸립니다)` : '';
+  for (const id of ['#btn-run-amcl', '#btn-run-slam', '#btn-run-stop']) $(id).disabled = busy;
+  $('#btn-auto-localize').disabled = busy || !(h.bridge && h.mode === 'map');
+}
+
+function runnerStart(mode) {
+  const robot = $('#runner-robot').value;
+  const map = $('#runner-map').value;
+  if (mode === 'map' && robot === 'real' && !map) { toast('실물 로봇은 맵을 선택하세요.'); return; }
+  const what = mode === 'slam' ? '맵 만들기 (SLAM)' : `위치 추정 (AMCL) · ${map || '기본 맵'}`;
+  if (!confirm(`${ROBOT_LABEL[robot]} / ${what} 으로 다시 시작할까요?\n(지금 실행 중인 노드는 정지됩니다)`)) return;
+  send('runner_start', { robot, mode, map });
+}
+
+$('#btn-run-amcl').addEventListener('click', () => runnerStart('map'));
+$('#btn-run-slam').addEventListener('click', () => runnerStart('slam'));
+$('#btn-run-stop').addEventListener('click', () => {
+  if (confirm('ROS 노드와 시뮬레이션을 모두 정지할까요? (웹 서버는 유지)')) send('runner_stop');
+});
+$('#btn-auto-localize').addEventListener('click', () => {
+  if (confirm('맵 전체에서 로봇 위치를 찾아 초기 위치로 지정할까요? (10~30초)')) send('auto_localize');
+});
 
 function setWsStatus(on) {
   const el = $('#ws-status');

@@ -52,6 +52,7 @@ browser ⇄ /ws/ui/ ⇄ Django (daphne, :8000) ⇄ /ws/robot/tb3/ ⇄ bridge_nod
 - Channel layer is `InMemoryChannelLayer` → assumes a single server process.
 - Maps are stored per name; `Location`s (incl. home) are tied to a map name. SLAM mode always uses map name `slam_live` so saved maps/locations aren't overwritten.
 - Frontend is a single page: `templates/warehouse/index.html` + `static/warehouse/app.js` (canvas map, fixed fit-to-room, no zoom/pan).
+- `runner.py`: the web "실행 모드" card. The server itself runs `scripts/run.sh` / `stop_ros.sh` / `tools/localize.py --global` in a background thread (one job at a time) and broadcasts `{'type': 'runner', ...}` to the UI, so modes can be switched from the browser even when no ROS node is running. UI actions: `runner_start`, `runner_stop`, `auto_localize`, `list_maps`.
 
 **Message protocol** (field `type`): bridge → server: `hello`, `pose`, `pose_lost`, `health`, `path`, `map`, `battery`, `nav_status`, `map_saved`, `reset_done`. Server → bridge: `goto`, `cancel`, `stop`, `initial_pose`, `save_map`, `reset`. Adding a message means touching `bridge_node.py`, `consumers.py` (+ `services.py`) and usually `app.js`.
 

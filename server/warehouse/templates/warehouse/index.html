@@ -29,6 +29,29 @@
   </section>
 
   <aside>
+    <div class="card" id="runner-card">
+      <h2>실행 모드</h2>
+      <p id="runner-current" class="muted">-</p>
+      <div class="grid2">
+        <label>로봇
+          <select id="runner-robot">
+            <option value="sim">시뮬레이션 (Gazebo)</option>
+            <option value="real">실물 TurtleBot3</option>
+          </select>
+        </label>
+        <label>맵 (AMCL)
+          <select id="runner-map"></select>
+        </label>
+      </div>
+      <div class="buttons">
+        <button id="btn-run-amcl" class="primary" title="선택한 맵으로 map_server + AMCL 실행 (시뮬레이션은 초기 위치 자동)">저장된 맵으로 위치 추정 (AMCL)</button>
+        <button id="btn-run-slam" title="SLAM 으로 새 맵 만들기">맵 만들기 (SLAM)</button>
+        <button id="btn-auto-localize" title="맵 전체에서 LiDAR 스캔과 가장 잘 맞는 위치를 찾아 초기 위치로 지정">위치 자동 찾기</button>
+        <button id="btn-run-stop" title="ROS 노드와 시뮬레이션 정지 (웹 서버는 유지)">전체 정지</button>
+      </div>
+      <p id="runner-busy" class="muted"></p>
+    </div>
+
     <div class="card">
       <h2>로봇 <span id="robot-name"></span></h2>
       <div class="row"><span id="robot-state" class="badge">-</span><span id="battery"></span></div>

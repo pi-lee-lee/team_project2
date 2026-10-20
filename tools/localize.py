@@ -3,6 +3,7 @@
 
     source scripts/env.sh
     python3 tools/localize.py [X Y YAW_DEG] [--range 0.4] [--dry-run]
+    python3 tools/localize.py --global [--dry-run]    # 로봇 위치를 모를 때: 맵 전체에서 찾기
 
 기준 위치를 생략하면 현재 추정 위치(map->base_footprint), 그것도 없으면 (0, 0, 0)을 쓴다.
 """
@@ -32,6 +33,47 @@ def score_points(dist, info, px, py):
     return d
 
 
+def search(lx, ly, dist, info, xs, ys, yaws):
+    """후보 위치 (xs[i], ys[i]) 와 방향 yaws 의 모든 조합 점수. 반환: [(평균거리, x, y, yaw), ...]"""
+    out = []
+    for yaw in yaws:
+        cx = lx * math.cos(yaw) - ly * math.sin(yaw)
+        cy = lx * math.sin(yaw) + ly * math.cos(yaw)
+        px = cx[None, :] + xs[:, None]          # (후보, 스캔 점)
+        py = cy[None, :] + ys[:, None]
+        d = score_points(dist, info, px.ravel(), py.ravel()).reshape(px.shape)
+        mean = d.mean(axis=1)
+        out.extend(zip(mean.tolist(), xs.tolist(), ys.tolist(), [yaw] * len(xs)))
+    return out
+
+
+def global_search(lx, ly, dist, occ_known_free, info):
+    """맵 전체 탐색: 넓게(10cm, 5도) → 상위 후보 주변 정밀(2.5cm, 1도)."""
+    res = info.resolution
+    step = max(1, int(round(0.1 / res)))
+    rr, cc = np.nonzero(occ_known_free[::step, ::step])
+    xs = info.origin.position.x + (cc * step + 0.5) * res
+    ys = info.origin.position.y + (rr * step + 0.5) * res
+    coarse = search(lx, ly, dist, info, xs, ys, np.radians(np.arange(0, 360, 5)))
+    coarse.sort()
+    # 서로 30cm 이상 떨어진 상위 후보 5곳
+    picks = []
+    for c in coarse:
+        if all(math.hypot(c[1] - p[1], c[2] - p[2]) > 0.3 for p in picks):
+            picks.append(c)
+        if len(picks) == 5:
+            break
+    refined = []
+    for _, x0, y0, yaw0 in picks:
+        g = np.arange(-0.15, 0.15 + 1e-6, 0.025)
+        gx, gy = np.meshgrid(g, g)
+        r = search(lx, ly, dist, info, x0 + gx.ravel(), y0 + gy.ravel(),
+                   yaw0 + np.radians(np.arange(-6, 7, 1)))
+        refined.append(min(r))
+    refined.sort()
+    return refined
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('pose', nargs='*', type=float)
@@ -39,6 +81,8 @@ def main():
     ap.add_argument('--yaw-range', type=float, default=45.0, help='방향 탐색 범위 (도)')
     ap.add_argument('--server', default='ws://localhost:8000/ws/ui/')
     ap.add_argument('--dry-run', action='store_true', help='찾기만 하고 지정하지 않음')
+    ap.add_argument('--global', dest='global_search', action='store_true',
+                    help='맵 전체에서 찾기 (로봇 위치를 모를 때)')
     args = ap.parse_args()
 
     rclpy.init()
@@ -77,7 +121,23 @@ def main():
     ly = off.y + rng[ok] * np.sin(ang[ok])
 
     best = None
-    for dyaw in np.radians(np.arange(-args.yaw_range, args.yaw_range + 0.1, 2.0)):
+    if args.global_search:
+        grid_v = np.array(grid.data, dtype=np.int16).reshape(info.height, info.width)
+        known_free = (grid_v == 0) & (dist > 0.2)
+        found = global_search(lx, ly, dist, known_free, info)
+        if not found:
+            raise SystemExit('맵에 빈 공간이 없습니다.')
+        s0, x, y, yaw = found[0]
+        d = score_points(dist, info, lx * math.cos(yaw) - ly * math.sin(yaw) + x,
+                         lx * math.sin(yaw) + ly * math.cos(yaw) + y)
+        best = (s0, x, y, yaw, float(np.mean(d < 0.1)), float(np.mean(d < 0.2)))
+        # 멀리 떨어진 다른 후보가 거의 같은 점수면 (대칭인 방 등) 모호함
+        for s1, x1, y1, _ in found[1:]:
+            if math.hypot(x1 - x, y1 - y) > 0.5 and s1 < s0 * 1.15:
+                print(f'경고: 비슷하게 맞는 다른 위치가 있습니다 ({x1:.2f}, {y1:.2f}). 결과를 지도에서 확인하세요.')
+                break
+    for dyaw in (np.radians(np.arange(-args.yaw_range, args.yaw_range + 0.1, 2.0))
+                 if not args.global_search else []):
         yaw = yaw0 + dyaw
         cx = lx * math.cos(yaw) - ly * math.sin(yaw)
         cy = lx * math.sin(yaw) + ly * math.cos(yaw)
@@ -89,8 +149,10 @@ def main():
                     best = (s, x0 + dx, y0 + dy, yaw, float(np.mean(d < 0.1)), float(np.mean(d < 0.2)))
 
     _, x, y, yaw, p10, p20 = best
+    yaw = math.atan2(math.sin(yaw), math.cos(yaw))
     print(f'가장 잘 맞는 위치: x={x:.3f} y={y:.3f} yaw={math.degrees(yaw):.1f}°  '
           f'(스캔 점 중 벽과 10cm 이내 {p10 * 100:.0f}%, 20cm 이내 {p20 * 100:.0f}%)')
+    print(f'RESULT {x:.3f} {y:.3f} {yaw:.4f} {p20:.3f}')  # 서버가 읽는 줄
     if p20 < 0.8:
         print('경고: 맞는 정도가 낮습니다. 기준 위치나 탐색 범위를 바꿔 다시 시도하세요.')
     if not args.dry_run:

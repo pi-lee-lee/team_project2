@@ -186,6 +186,8 @@ SIGINT → SIGTERM → SIGKILL 순서로 보내고 남은 프로세스가 없는
 
 | 기능 | 방법 |
 |---|---|
+| **실행 모드** | "실행 모드" 카드에서 로봇(시뮬레이션/실물)과 맵 선택 → "저장된 맵으로 위치 추정 (AMCL)" / "맵 만들기 (SLAM)" / "전체 정지". 서버가 `scripts/run.sh` / `stop_ros.sh` 를 실행 (ROS 가 꺼져 있어도 가능, 수십 초 소요, 주행 중이면 먼저 비상정지) |
+| **위치 자동 찾기** | AMCL 모드에서 로봇 위치를 모를 때. 맵 전체에서 LiDAR 스캔과 가장 잘 맞는 위치를 찾아 초기 위치로 지정 (`tools/localize.py --global`, 수 초). 대칭인 방이면 "비슷한 다른 위치" 경고 |
 | **여기로 이동** | 버튼 → 지도에서 지점 클릭 (드래그하면 도착 후 바라볼 방향 지정, 클릭만 하면 진행 방향) |
 | 위치 추가 | "위치 추가" → 지도 클릭+드래그 → 이름/종류(물류 위치·홈) 저장 |
 | 작업 실행 | 위치 목록에서 체크 → "선택한 위치로 작업 시작" (목록 순서대로 방문, 마지막에 홈 복귀 선택) |
@@ -288,6 +290,7 @@ dpkg -l ros-humble-tf2 ros-humble-tf2-ros | grep ^ii   # 0.25.24 확인
 | 명령 | 용도 |
 |---|---|
 | `python3 tools/localize.py [x y 방향°] [--dry-run]` | 스캔으로 위치를 찾아 초기 위치 지정 (`--dry-run`: 찾기만) |
+| `python3 tools/localize.py --global` | 맵 전체에서 찾기 (10cm·5° 로 넓게 → 상위 5곳을 2.5cm·1° 로 정밀). 웹 "위치 자동 찾기" 와 같음 |
 | `python3 tools/tf_rates.py [초]` | TF별 수신 빈도와 지연 측정 |
 | `python3 tools/ui_goto.py x y [yaw]` / `--home` | 웹과 같은 방식으로 이동(또는 홈 복귀) 명령을 보내고 진행 출력 (시간 초과 시 비상정지) |
 | `python3 tools/clean_map.py ~/maps/maze_map.yaml` | 맵 정리 → `maze_map_clean.yaml/.pgm` + 비교 이미지 `_preview.png` (원본 유지) |
