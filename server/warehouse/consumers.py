@@ -115,7 +115,8 @@ class UIConsumer(AsyncJsonWebsocketConsumer):
         snap['pose'] = live.get('pose')
         snap['path'] = live.get('path', [])
         snap['health'] = live.get('health', {'bridge': False})
-        snap['runner'] = {'maps': runner.list_maps(), 'mode': runner.current_mode(), 'busy': runner.busy()}
+        snap['runner'] = {'maps': runner.list_maps(), 'worlds': runner.list_worlds(),
+                          'mode': runner.current_mode(), 'busy': runner.busy()}
         await self.send_json(snap)
 
     async def disconnect(self, code):
@@ -125,7 +126,7 @@ class UIConsumer(AsyncJsonWebsocketConsumer):
         """실행 모드 전환 (서버가 scripts/run.sh 등을 실행)."""
         try:
             if action == 'list_maps':
-                await self.send_json({'type': 'runner_info', 'maps': runner.list_maps(),
+                await self.send_json({'type': 'runner_info', 'maps': runner.list_maps(), 'worlds': runner.list_worlds(),
                                       'mode': runner.current_mode(), 'busy': runner.busy()})
                 return
             if action in ('runner_start', 'runner_stop'):
@@ -135,7 +136,7 @@ class UIConsumer(AsyncJsonWebsocketConsumer):
                     await dispatch(self.channel_layer, await database_sync_to_async(services.estop)(None))
             if action == 'runner_start':
                 await database_sync_to_async(runner.start_mode)(
-                    str(msg.get('robot')), str(msg.get('mode')), msg.get('map') or None)
+                    str(msg.get('robot')), str(msg.get('mode')), msg.get('map') or None, msg.get('world') or None)
             elif action == 'runner_stop':
                 await database_sync_to_async(runner.stop_all)()
             elif action == 'explore_start':

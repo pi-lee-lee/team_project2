@@ -19,6 +19,17 @@ HOME = os.path.dirname(settings.BASE_DIR)          # 저장소 최상위 (server
 SCRIPTS = os.path.join(HOME, 'scripts')
 MAP_DIR = os.path.expanduser('~/maps')
 RUN_MODE_FILE = os.path.join(HOME, 'logs', 'run_mode.env')
+# 시뮬레이션 월드 (scripts/start_sim.sh 가 찾는 곳과 같음)
+AWS_WORLDS = os.path.expanduser('~/sim_ws/src/aws-robomaker-small-warehouse-world/worlds')
+TB3_WORLDS = os.path.expanduser('~/turtlebot3_ws/install/turtlebot3_gazebo/share/turtlebot3_gazebo/worlds')
+WORLD_LABELS = {
+    'maze_room': '미로 방 (실제 방 복제)',
+    'turtlebot3_world': 'TurtleBot3 기본 (육각형)',
+    'turtlebot3_house': 'TurtleBot3 집',
+    'empty_world': '빈 공간',
+    'no_roof_small_warehouse': 'AWS 소형 창고 (지붕 없음)',
+    'small_warehouse': 'AWS 소형 창고',
+}
 
 _lock = threading.Lock()
 _running = None  # 실행 중인 작업 이름
@@ -31,12 +42,36 @@ class RunnerError(Exception):
 
 
 def list_maps():
-    """~/maps 아래 맵 yaml 목록 (미리보기 등 제외). 경로는 ~/maps 기준 상대 경로."""
+    """~/maps 아래 맵 yaml 목록 (미리보기 등 제외). 경로는 ~/maps 기준 상대 경로.
+    world: 시뮬레이션에서 만든 맵이면 만든 월드 (yaml 의 '# world:' 줄, scripts/save_map.sh 가 기록)."""
     paths = glob.glob(os.path.join(MAP_DIR, '**', '*.yaml'), recursive=True)
     out = []
     for p in sorted(paths):
         rel = os.path.relpath(p, MAP_DIR)
-        out.append({'path': rel, 'name': os.path.basename(p)[:-5]})
+        world = ''
+        try:
+            with open(p, encoding='utf-8') as f:
+                for line in f:
+                    if line.startswith('# world:'):
+                        world = line.split(':', 1)[1].strip()
+        except OSError:
+            pass
+        out.append({'path': rel, 'name': os.path.basename(p)[:-5], 'world': world})
+    return out
+
+
+def list_worlds():
+    """시뮬레이션 월드 목록 [{'name', 'label'}]. 이 저장소 worlds/, AWS 창고, TurtleBot3 기본 월드."""
+    names = [os.path.basename(p)[:-6] for p in sorted(glob.glob(os.path.join(HOME, 'worlds', '*.world')))]
+    names += [os.path.basename(d) for d in sorted(glob.glob(os.path.join(AWS_WORLDS, '*')))
+              if os.path.isfile(os.path.join(d, os.path.basename(d) + '.world'))]
+    names += [n for n in ('turtlebot3_world', 'turtlebot3_house', 'empty_world')
+              if os.path.isfile(os.path.join(TB3_WORLDS, n + '.world'))]
+    seen, out = set(), []
+    for n in names:
+        if n not in seen:
+            seen.add(n)
+            out.append({'name': n, 'label': WORLD_LABELS.get(n, n)})
     return out
 
 
@@ -108,11 +143,16 @@ def _last_lines(output, n=2):
     return ' / '.join(lines[-n:])[:300]
 
 
-def start_mode(robot, mode, map_path=None):
-    """robot: sim|real, mode: map|slam. map_path: ~/maps 기준 상대 경로 (map 모드)."""
+def start_mode(robot, mode, map_path=None, world=None):
+    """robot: sim|real, mode: map|slam. map_path: ~/maps 기준 상대 경로 (map 모드).
+    world: 시뮬레이션 월드. 비우면 SLAM 은 turtlebot3_world, 맵 모드는 맵에 기록된 월드 (run.sh)."""
     if robot not in ('sim', 'real') or mode not in ('map', 'slam'):
         raise RunnerError('잘못된 모드입니다.')
     cmd = [os.path.join(SCRIPTS, 'run.sh'), '--robot', robot, '--mode', mode]
+    if robot == 'sim' and world:
+        if world not in {w['name'] for w in list_worlds()}:
+            raise RunnerError(f'월드를 찾을 수 없습니다: {world}')
+        cmd += ['--world', world]
     if mode == 'map':
         if map_path:
             full = os.path.realpath(os.path.join(MAP_DIR, map_path))
@@ -121,11 +161,12 @@ def start_mode(robot, mode, map_path=None):
             cmd += ['--map', full]
         elif robot != 'sim':
             raise RunnerError('맵을 선택하세요.')
-    label = f'{"시뮬레이션" if robot == "sim" else "실물"} {"맵 만들기(SLAM)" if mode == "slam" else "위치 추정(AMCL)"}'
+    label = (f'{"시뮬레이션" if robot == "sim" else "실물"}{f" ({world})" if robot == "sim" and world else ""} '
+             f'{"맵 만들기(SLAM)" if mode == "slam" else "위치 추정(AMCL)"}')
 
     def parse(output, ok):
         done = [l for l in output.splitlines() if l.startswith('==') or '가장 잘 맞는' in l or '실패' in l
-                or '없습니다' in l or '접속할 수 없습니다' in l]
+                or '없습니다' in l or '접속할 수 없습니다' in l or '월드' in l]
         return ' / '.join(l.strip('= ') for l in done[-3:])[:300] or _last_lines(output)
     _start(label, cmd, timeout=240, parse=parse)
 

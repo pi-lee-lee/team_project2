@@ -209,16 +209,53 @@ function setRunner(info) {
   const cur = (S.runnerMode.map || '').split('/maps/').pop();
   sel.value = keep || ([...sel.options].some((o) => o.value === cur) ? cur : '');
   if (S.runnerMode.robot) $('#runner-robot').value = S.runnerMode.robot;
+  S.runnerMaps = info.maps || [];
+  const ws = $('#runner-world');
+  const keepWorld = ws.value;
+  ws.innerHTML = '';
+  for (const w of info.worlds || []) {
+    const o = document.createElement('option');
+    o.value = w.name;
+    o.textContent = w.label === w.name ? w.name : `${w.label} · ${w.name}`;
+    ws.appendChild(o);
+  }
+  // 지금 실행 중인 월드를 기본 선택
+  ws.value = keepWorld || S.runnerMode.world || 'turtlebot3_world';
   renderRunner();
 }
+
+// 선택한 맵을 만든 월드 (시뮬레이션에서 저장한 맵만 기록되어 있음)
+function selectedMapWorld() {
+  const path = $('#runner-map').value;
+  if (!path) return 'turtlebot3_world';  // 시뮬레이션 기본 맵 = TurtleBot3 기본 월드 맵
+  const m = (S.runnerMaps || []).find((x) => x.path === path);
+  return m ? m.world : '';
+}
+
+// 맵을 고르면 그 맵을 만든 월드로 맞춘다 (다른 월드에서 AMCL 을 쓰면 좌표가 맞지 않음)
+function syncWorldToMap() {
+  const w = selectedMapWorld();
+  if (w && [...$('#runner-world').options].some((o) => o.value === w)) $('#runner-world').value = w;
+  renderRunner();
+}
+$('#runner-map').addEventListener('change', syncWorldToMap);
+$('#runner-world').addEventListener('change', renderRunner);
+$('#runner-robot').addEventListener('change', renderRunner);
 
 function renderRunner() {
   const m = S.runnerMode || {};
   const h = S.health || {};
   const running = h.bridge;
+  const world = m.robot === 'sim' && m.world ? ` (${m.world})` : '';
   $('#runner-current').textContent = running
-    ? `현재: ${ROBOT_LABEL[m.robot] || m.robot || '?'} / ${m.mode === 'slam' ? '맵 만들기 (SLAM)' : `위치 추정 (AMCL) · ${(m.map || '').split('/').pop() || '-'}`}`
+    ? `현재: ${ROBOT_LABEL[m.robot] || m.robot || '?'}${world} / ${m.mode === 'slam' ? '맵 만들기 (SLAM)' : `위치 추정 (AMCL) · ${(m.map || '').split('/').pop() || '-'}`}`
     : `현재: 실행 중 아님${m.robot ? ` (마지막: ${ROBOT_LABEL[m.robot]} / ${m.mode === 'slam' ? 'SLAM' : 'AMCL'})` : ''}`;
+  const sim = $('#runner-robot').value === 'sim';
+  $('#runner-world-row').hidden = !sim;
+  const mw = selectedMapWorld(), cw = $('#runner-world').value;
+  $('#runner-world-hint').textContent = !sim ? ''
+    : mw && mw !== cw ? `주의: 선택한 맵은 '${mw}' 월드에서 만든 맵입니다. AMCL 은 그 월드에서만 맞습니다 (맵 만들기에는 상관없음).`
+    : mw ? `선택한 맵을 만든 월드: ${mw}` : '';
   const busy = !!S.runnerBusy;
   $('#runner-busy').textContent = busy ? `진행 중: ${S.runnerBusy} (수십 초 걸립니다)` : '';
   for (const id of ['#btn-run-amcl', '#btn-run-slam', '#btn-run-stop']) $(id).disabled = busy;
@@ -233,9 +270,13 @@ function runnerStart(mode) {
   const robot = $('#runner-robot').value;
   const map = $('#runner-map').value;
   if (mode === 'map' && robot === 'real' && !map) { toast('실물 로봇은 맵을 선택하세요.'); return; }
+  const world = robot === 'sim' ? $('#runner-world').value : '';
+  const mw = selectedMapWorld();
+  if (mode === 'map' && robot === 'sim' && mw && mw !== world
+      && !confirm(`선택한 맵은 '${mw}' 월드에서 만든 맵인데 '${world}' 월드로 실행합니다.\n위치 추정이 맞지 않을 수 있습니다. 계속할까요?`)) return;
   const what = mode === 'slam' ? '맵 만들기 (SLAM)' : `위치 추정 (AMCL) · ${map || '기본 맵'}`;
-  if (!confirm(`${ROBOT_LABEL[robot]} / ${what} 으로 다시 시작할까요?\n(지금 실행 중인 노드는 정지됩니다)`)) return;
-  send('runner_start', { robot, mode, map });
+  if (!confirm(`${ROBOT_LABEL[robot]}${world ? ` (${world})` : ''} / ${what} 으로 다시 시작할까요?\n(지금 실행 중인 노드는 정지됩니다)`)) return;
+  send('runner_start', { robot, mode, map, world });
 }
 
 $('#btn-run-amcl').addEventListener('click', () => runnerStart('map'));
