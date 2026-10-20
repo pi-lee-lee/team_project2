@@ -357,13 +357,22 @@ def start_task(robot_name, location_ids, with_home=True):
 
 
 @transaction.atomic
-def goto_point(robot_name, x, y, yaw):
-    """등록하지 않은 임의의 지점으로 이동 (도착하면 바로 완료)."""
+def goto_point(robot_name, x, y, yaw, replace=False):
+    """등록하지 않은 임의의 지점으로 이동 (도착하면 바로 완료).
+    replace: 진행 중인 작업이 '지정 지점' 이동 하나뿐이면 그것을 이 목표로 바꾼다. 로봇에는 취소를 보내지 않으므로
+    멈추지 않고 이어서 간다 (브리지는 새 goto 를 받으면 이전 목표를 버림). 자동 탐색이 씀."""
     out = Outbox()
     robot = get_robot(robot_name)
     require_online(robot)
-    if active_task(robot):
-        raise ServiceError('진행 중인 작업이 있습니다. 먼저 취소하세요.')
+    task = active_task(robot)
+    if task:
+        steps = list(task.steps.all())
+        single_move = len(steps) == 1 and steps[0].action == TaskStep.ACTION_MOVE and steps[0].location_id is None
+        if not (replace and single_move):
+            raise ServiceError('진행 중인 작업이 있습니다. 먼저 취소하세요.')
+        task.steps.filter(status__in=[TaskStep.STATUS_MOVING, TaskStep.STATUS_ARRIVED]) \
+            .update(status=TaskStep.STATUS_FAILED)
+        finish_task(out, robot, task, Task.STATUS_CANCELED, f'작업 #{task.id}: 다음 지점으로 이어 감')
     task = Task.objects.create(robot=robot)
     TaskStep.objects.create(task=task, order=0, action=TaskStep.ACTION_MOVE,
                             name=f'지정 지점({x:.2f}, {y:.2f})', x=x, y=y, yaw=yaw)
