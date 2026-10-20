@@ -289,7 +289,8 @@ function useVirtualMap() {
             width: n, height: n };
   S.mapImg = null;
   S.mapName = null;
-  S.bbox = { x0: 0, y0: 0, x1: n, y1: n };
+  S.wbox = { x0: S.map.origin[0], y0: S.map.origin[1],
+             x1: S.map.origin[0] + VIRTUAL_SIZE_M, y1: S.map.origin[1] + VIRTUAL_SIZE_M };
   $('#no-map').hidden = false;
   fitView();
 }
@@ -299,30 +300,39 @@ function setMap(map) {
     useVirtualMap();
     return;
   }
-  S.map = map;
+  const wasVirtual = S.map && S.map.virtual;
   $('#no-map').hidden = true;
   const img = new Image();
   img.onload = () => {
+    // 이미지가 준비된 뒤에 맵을 바꾼다 (원점이 바뀐 새 맵과 이전 이미지가 섞여 그려지지 않게)
+    S.map = map;
     const changed = !S.mapImg || S.mapName !== map.name;
     S.mapImg = img;
     S.mapName = map.name;
-    const b = knownBounds(img);
-    // 같은 맵이 갱신될 때(SLAM)는 지금 보이는 범위를 벗어날 때만 다시 맞춘다 (계속 축소되지 않게)
-    const inside = S.bbox && b.x0 >= S.bbox.x0 && b.y0 >= S.bbox.y0 && b.x1 <= S.bbox.x1 && b.y1 <= S.bbox.y1;
-    if (changed || !inside) {
-      const g = changed ? 0 : 10;  // SLAM 으로 커지는 중이면 여유를 두어 자주 바뀌지 않게
-      S.bbox = { x0: b.x0 - g, y0: b.y0 - g, x1: b.x1 + g, y1: b.y1 + g };
+    const b = knownBounds(img, map);
+    // 화면 범위는 월드 좌표로 기억한다. SLAM 맵은 커질 때 원점이 바뀌므로 픽셀로 기억하면
+    // 갱신(3초)마다 화면 전체가 밀려 로봇/위치가 흔들려 보였다
+    const w = S.wbox;
+    const inside = w && b.x0 >= w.x0 && b.y0 >= w.y0 && b.x1 <= w.x1 && b.y1 <= w.y1;
+    if (wasVirtual && inside) {
+      fitView();  // SLAM 시작 때의 격자 화면(로봇 주변 8m)을 그대로 이어 쓴다
+    } else if (changed && !wasVirtual || !inside) {
+      // SLAM 으로 커지는 중이면 0.5m 여유를 두어 자주 바뀌지 않게
+      const g = changed && !wasVirtual ? 0 : 0.5;
+      const u = changed || !w ? b : { x0: Math.min(b.x0, w.x0), y0: Math.min(b.y0, w.y0),
+                                      x1: Math.max(b.x1, w.x1), y1: Math.max(b.y1, w.y1) };
+      S.wbox = { x0: u.x0 - g, y0: u.y0 - g, x1: u.x1 + g, y1: u.y1 + g };
       fitView();
     } else {
-      draw();
+      fitView();  // 범위는 그대로, 새 원점에 맞춰 변환만 다시 계산 (화면상 위치는 변하지 않음)
     }
   };
   img.src = map.image_url;
   renderLocations();
 }
 
-// 미탐색(회색 205)이 아닌 영역의 경계 상자 = 실제 방 범위
-function knownBounds(img) {
+// 미탐색(회색 205)이 아닌 영역의 경계 상자 = 실제 방 범위 (월드 좌표, m)
+function knownBounds(img, map) {
   const c = document.createElement('canvas');
   c.width = img.width;
   c.height = img.height;
@@ -340,15 +350,23 @@ function knownBounds(img) {
       }
     }
   }
-  if (x1 < 0) return { x0: 0, y0: 0, x1: img.width, y1: img.height };
+  if (x1 < 0) { x0 = 0; y0 = 0; x1 = img.width - 1; y1 = img.height - 1; }
   const m = 4;  // 여백(칸)
-  return { x0: x0 - m, y0: y0 - m, x1: x1 + 1 + m, y1: y1 + 1 + m };
+  const r = map.resolution, [ox, oy] = map.origin;
+  // 이미지 y 는 아래로, 월드 y 는 위로
+  return { x0: ox + (x0 - m) * r, x1: ox + (x1 + 1 + m) * r,
+           y0: oy + (img.height - (y1 + 1 + m)) * r, y1: oy + (img.height - (y0 - m)) * r };
 }
 
 // 화면을 방 범위에 맞춰 고정 (확대/축소/이동 없음)
 function fitView() {
   if (!S.map) return;
-  const b = S.bbox || { x0: 0, y0: 0, x1: S.map.width, y1: S.map.height };
+  // 월드 범위(S.wbox)를 지금 맵의 이미지 픽셀 범위로 바꿔서 맞춘다
+  const m = S.map, r = m.resolution;
+  const wb = S.wbox || { x0: m.origin[0], y0: m.origin[1],
+                         x1: m.origin[0] + m.width * r, y1: m.origin[1] + m.height * r };
+  const b = { x0: (wb.x0 - m.origin[0]) / r, x1: (wb.x1 - m.origin[0]) / r,
+              y0: m.height - (wb.y1 - m.origin[1]) / r, y1: m.height - (wb.y0 - m.origin[1]) / r };
   const w = canvas.clientWidth, h = canvas.clientHeight;
   const bw = b.x1 - b.x0, bh = b.y1 - b.y0;
   const scale = Math.min(w / bw, h / bh);
