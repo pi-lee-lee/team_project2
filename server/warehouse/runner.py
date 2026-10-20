@@ -22,8 +22,11 @@ RUN_MODE_FILE = os.path.join(HOME, 'logs', 'run_mode.env')
 # 시뮬레이션 월드 (scripts/start_sim.sh 가 찾는 곳과 같음)
 AWS_WORLDS = os.path.expanduser('~/sim_ws/src/aws-robomaker-small-warehouse-world/worlds')
 TB3_WORLDS = os.path.expanduser('~/turtlebot3_ws/install/turtlebot3_gazebo/share/turtlebot3_gazebo/worlds')
+if not os.path.isdir(TB3_WORLDS):  # 소스 빌드 대신 apt 로 설치한 PC
+    TB3_WORLDS = '/opt/ros/humble/share/turtlebot3_gazebo/worlds'
 WORLD_LABELS = {
     'maze_room': '미로 방 (실제 방 복제)',
+    'lecture_hall': '강당 (강단 + 복도 6×5, 책상 20·의자 40)',
     'turtlebot3_world': 'TurtleBot3 기본 (육각형)',
     'turtlebot3_house': 'TurtleBot3 집',
     'empty_world': '빈 공간',

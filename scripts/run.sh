@@ -11,7 +11,7 @@
 #   --map FILE     (map) 맵 yaml. sim + turtlebot3_world 는 생략 시 TurtleBot3 기본 맵 사용
 #   --name NAME    (map) 서버 DB 맵 이름 (등록 위치가 묶임). 기본: 파일 이름에서 _straight/_clean 뺀 것
 #   --slam ENGINE  (slam) slam_toolbox(기본) | cartographer
-#   --world WORLD  (sim) turtlebot3_world(기본) | turtlebot3_house | empty_world | maze_room(worlds/, 실제 방 복제)
+#   --world WORLD  (sim) turtlebot3_world(기본) | turtlebot3_house | empty_world | maze_room(worlds/, 실제 방 복제) | lecture_hall(강당)
 #                  | no_roof_small_warehouse (AWS 창고, ~/sim_ws 에 받아야 함) ...
 #   --gui          (sim) Gazebo 화면 표시
 #   --nav2         Nav2 주행 노드(planner/controller_server, bt_navigator)도 실행. slam/map 모두 가능
@@ -60,7 +60,7 @@ if [ "$PLANNER" = nav2 ] || [ "$CONTROLLER" = nav2 ]; then NAV2=1; fi
 
 if [ "$MODE" = map ]; then
   if [ -z "$MAP" ] && [ "$ROBOT" = sim ] && [ "$WORLD" = turtlebot3_world ]; then
-    source /opt/ros/humble/setup.bash; source "$HOME/turtlebot3_ws/install/setup.bash"
+    source /opt/ros/humble/setup.bash; [ -f "$HOME/turtlebot3_ws/install/setup.bash" ] && source "$HOME/turtlebot3_ws/install/setup.bash"
     MAP="$(ros2 pkg prefix turtlebot3_navigation2)/share/turtlebot3_navigation2/map/map.yaml"
     NAME="${NAME:-sim_turtlebot3_world}"
   fi
