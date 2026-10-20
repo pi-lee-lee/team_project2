@@ -771,7 +771,9 @@ class BridgeNode(Node):
                                    f'차체가 {math.degrees(self.tilt_rel):.0f}도 기울었습니다 (낮은 장애물에 올라탐).')
                 return
             self.stop_following()
-            self.report('failed', '로봇 위치 정보가 갱신되지 않아 정지했습니다.')
+            why = 'TF 없음' if pose is None else f'TF 나이 {pose[3]:.2f}초'
+            self.get_logger().warn(f'위치 TF 끊김: {why}, 기울기 {math.degrees(self.tilt_rel):.1f}°')
+            self.report('failed', f'로봇 위치 정보가 갱신되지 않아 정지했습니다 ({why}).')
             return
         x, y, yaw, _ = pose
         if self.tilt_rel < math.radians(2):
