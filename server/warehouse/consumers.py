@@ -96,6 +96,11 @@ class RobotConsumer(AsyncJsonWebsocketConsumer):
             await self.run(services.map_saved, self.robot_name, bool(msg.get('ok')), msg.get('message', ''))
         elif kind == 'map':
             await self.run(services.handle_map, self.robot_name, msg)
+        elif kind == 'cargo':
+            # 카메라 인식 결과 (브리지가 1초 이상 같을 때만 보냄). '' = 아무것도 안 보임
+            live['cargo'] = str(msg.get('label') or '')
+            await self.broadcast({'type': 'cargo', 'robot': self.robot_name, 'label': live['cargo']})
+            await self.run(services.handle_cargo, self.robot_name, live['cargo'])
         elif kind == 'battery':
             await self.run(services.handle_battery, self.robot_name,
                            msg.get('voltage'), msg.get('percentage'))
@@ -113,6 +118,7 @@ class UIConsumer(AsyncJsonWebsocketConsumer):
         snap = await database_sync_to_async(services.snapshot)()
         live = LIVE.get(snap['robot']['name'], {})
         snap['pose'] = live.get('pose')
+        snap['cargo'] = live.get('cargo')   # None = 인식 노드 없음
         snap['path'] = live.get('path', [])
         snap['health'] = live.get('health', {'bridge': False})
         snap['runner'] = {'maps': runner.list_maps(), 'worlds': runner.list_worlds(),
@@ -196,6 +202,9 @@ class UIConsumer(AsyncJsonWebsocketConsumer):
                                    float(msg['x']), float(msg['y']), float(msg['yaw'])),
             'go_home': lambda: (services.go_home, robot),
             'confirm_load': lambda: (services.confirm_load, robot),
+            'confirm_unload': lambda: (services.confirm_unload, robot),
+            'start_delivery': lambda: (services.start_delivery, robot, int(msg['location_id']),
+                                       float(msg['x']), float(msg['y']), float(msg.get('yaw', 0.0))),
             'retry_step': lambda: (services.retry_step, robot),
             'skip_step': lambda: (services.skip_step, robot),
             'cancel_task': lambda: (services.cancel_task, robot),

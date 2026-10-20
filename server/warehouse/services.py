@@ -300,8 +300,20 @@ def handle_nav_status(name, goal_id, status, message=''):
         if step.action == TaskStep.ACTION_LOAD:
             step.status = TaskStep.STATUS_ARRIVED
             step.save(update_fields=['status'])
-            set_state(robot, Robot.STATE_WAITING_LOAD, f'{step.name} 도착, 적재 대기')
-            log(out, robot, f'{step.name} 도착 - 적재 후 확인을 눌러주세요')
+            if step.cargo:
+                set_state(robot, Robot.STATE_WAITING_LOAD, f'{step.name} 도착, {step.cargo} 을(를) 실어 주세요')
+                log(out, robot, f'{step.name} 도착 - {step.cargo} 적재 대기 (카메라 인식 또는 "실었어요")')
+                # 이미 실려 있으면 (도착 전에 실음) 바로 확인
+                if cargo_matches(LIVE.get(robot.name, {}).get('cargo'), step.cargo):
+                    complete_cargo_step(out, robot, task, step, f'카메라: {step.cargo} 적재 확인')
+            else:
+                set_state(robot, Robot.STATE_WAITING_LOAD, f'{step.name} 도착, 적재 대기')
+                log(out, robot, f'{step.name} 도착 - 적재 후 확인을 눌러주세요')
+        elif step.action == TaskStep.ACTION_UNLOAD:
+            step.status = TaskStep.STATUS_ARRIVED
+            step.save(update_fields=['status'])
+            set_state(robot, Robot.STATE_WAITING_UNLOAD, f'{step.name} 도착, {step.cargo} 을(를) 꺼내 주세요')
+            log(out, robot, f'{step.name} 도착 - {step.cargo} 수령 대기 (카메라 인식 또는 "꺼냈어요")')
         else:
             step.status = TaskStep.STATUS_DONE
             step.save(update_fields=['status'])
@@ -386,6 +398,86 @@ def confirm_load(robot_name):
     step.save(update_fields=['status'])
     log(out, robot, f'{step.name} 적재 완료')
     advance(out, robot, task)
+    push_state(out, robot)
+    return out
+
+
+@transaction.atomic
+def confirm_unload(robot_name):
+    """수동 수령 확인 (카메라가 인식하지 못할 때 태블릿의 "꺼냈어요")."""
+    out = Outbox()
+    robot = get_robot(robot_name)
+    task = active_task(robot)
+    step = task.current_step() if task else None
+    if step is None or step.status != TaskStep.STATUS_ARRIVED or step.action != TaskStep.ACTION_UNLOAD:
+        raise ServiceError('수령 대기 중인 배달이 없습니다.')
+    complete_cargo_step(out, robot, task, step, f'{step.name} 수령 완료')
+    push_state(out, robot)
+    return out
+
+
+# ---------------------------------------------------------------- LED 배달
+# 받는 사람이 LED 를 요청 → 로봇이 LED 위치로 가서 사람이 실어 줌(카메라로 확인) → 요청 위치로 가서
+# 받는 사람이 꺼냄(카메라에서 사라짐) → 홈. 한 번에 한 건만 받고, 진행 중이면 새 요청은 거절한다.
+
+def cargo_matches(label, expected):
+    return bool(label) and bool(expected) and label.strip().lower() == expected.strip().lower()
+
+
+def complete_cargo_step(out, robot, task, step, message):
+    step.status = TaskStep.STATUS_DONE
+    step.save(update_fields=['status'])
+    log(out, robot, message)
+    advance(out, robot, task)
+
+
+@transaction.atomic
+def start_delivery(robot_name, location_id, x, y, yaw):
+    """location_id: LED 가 놓인 위치, (x, y, yaw): 받을 사람이 지도에서 찍은 자리."""
+    out = Outbox()
+    robot = get_robot(robot_name)
+    require_online(robot)
+    task = active_task(robot)
+    if task:
+        raise ServiceError(f'다른 요청(작업 #{task.id})을 처리 중입니다. 끝난 뒤 다시 요청하세요.')
+    loc = Location.objects.filter(map=active_map(), id=location_id).first()
+    if loc is None or loc.kind == Location.KIND_HOME:
+        raise ServiceError('요청할 물건(LED) 위치를 고르세요.')
+    if LIVE.get(robot.name, {}).get('cargo'):
+        raise ServiceError(f'로봇에 이미 물건({LIVE[robot.name]["cargo"]})이 실려 있습니다. 먼저 꺼내 주세요.')
+    label = loc.cargo_label()
+    task = Task.objects.create(robot=robot)
+    TaskStep.objects.create(task=task, order=0, action=TaskStep.ACTION_LOAD, location=loc,
+                            name=loc.name, x=loc.x, y=loc.y, yaw=loc.yaw, cargo=label)
+    TaskStep.objects.create(task=task, order=1, action=TaskStep.ACTION_UNLOAD,
+                            name=f'요청 위치({x:.2f}, {y:.2f})', x=x, y=y, yaw=yaw, cargo=label)
+    home = home_location()
+    if home:
+        TaskStep.objects.create(task=task, order=2, action=TaskStep.ACTION_MOVE, location=home,
+                                name=home.name, x=home.x, y=home.y, yaw=home.yaw)
+    log(out, robot, f'{label} 요청 (작업 #{task.id}): {loc.name} 에서 싣고 요청 위치로'
+                    f'{" → " + home.name if home else ""}')
+    advance(out, robot, task)
+    push_state(out, robot)
+    return out
+
+
+@transaction.atomic
+def handle_cargo(name, label):
+    """카메라 인식 결과가 바뀌었을 때 (label: 보이는 물건 라벨, '' = 아무것도 없음)."""
+    out = Outbox()
+    robot = get_robot(name)
+    task = active_task(robot)
+    step = task.current_step() if task else None
+    if step is None or step.status != TaskStep.STATUS_ARRIVED or not step.cargo:
+        return out
+    if step.action == TaskStep.ACTION_LOAD:
+        if cargo_matches(label, step.cargo):
+            complete_cargo_step(out, robot, task, step, f'카메라: {step.cargo} 적재 확인')
+        elif label:
+            log(out, robot, f'카메라: {label} 이(가) 실렸습니다. 요청한 것은 {step.cargo} 입니다')
+    elif step.action == TaskStep.ACTION_UNLOAD and not label:
+        complete_cargo_step(out, robot, task, step, f'카메라: {step.cargo} 수령 확인 (꺼냄)')
     push_state(out, robot)
     return out
 
@@ -485,6 +577,8 @@ def save_location(data):
         raise ServiceError('잘못된 위치 종류입니다.')
     fields = dict(name=name, kind=kind, x=float(data['x']), y=float(data['y']),
                   yaw=float(data.get('yaw', 0.0)))
+    if 'cargo' in data:  # 카메라 인식 라벨 (비우면 위치 이름)
+        fields['cargo'] = str(data.get('cargo') or '').strip()[:50]
     if data.get('id'):
         loc = Location.objects.filter(map=m, id=data['id']).first()
         if loc is None:
@@ -582,7 +676,7 @@ def carry_over_locations(name):
     copied = 0
     for loc in src.locations.all():
         _, created = Location.objects.update_or_create(
-            map=m, name=loc.name, defaults=dict(kind=loc.kind, x=loc.x, y=loc.y, yaw=loc.yaw))
+            map=m, name=loc.name, defaults=dict(kind=loc.kind, x=loc.x, y=loc.y, yaw=loc.yaw, cargo=loc.cargo))
         copied += 1
     return copied
 

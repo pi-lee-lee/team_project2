@@ -61,6 +61,8 @@ function handle(msg) {
       renderHealth();
       if (msg.runner) setRunner(msg.runner);
       setMap(msg.map);
+      S.cargo = msg.cargo;
+      renderCargo();
       $('#logs').innerHTML = '';
       msg.logs.slice().reverse().forEach(addLog);
       renderPanel();
@@ -72,6 +74,10 @@ function handle(msg) {
       break;
     case 'map':
       setMap(msg.map);
+      break;
+    case 'cargo':
+      S.cargo = msg.label;
+      renderCargo();
       break;
     case 'locations':
       S.locations = msg.locations;
@@ -593,6 +599,10 @@ canvas.addEventListener('pointerup', () => {
     S.lastCommandAt = now;
     send('goto_point', { x: wx, y: wy, yaw });
     setMode('view');
+  } else if (S.mode === 'deliver' && S.deliveryLoc) {
+    S.lastCommandAt = now;
+    send('start_delivery', { location_id: S.deliveryLoc.id, x: wx, y: wy, yaw });
+    setMode('view');
   } else if (S.mode === 'add') {
     openLocationForm({ x: wx, y: wy, yaw });
   }
@@ -604,20 +614,62 @@ const HINTS = {
   goto: '갈 지점을 클릭하세요 (드래그하면 도착 후 바라볼 방향 지정). A* 경로로 이동합니다',
   add: '위치를 클릭하고, 바라볼 방향으로 드래그하세요',
   initpose: '로봇의 실제 위치를 클릭하고, 로봇이 바라보는 방향으로 드래그하세요',
+  deliver: 'LED 를 받을 자리를 클릭하세요 (드래그하면 도착 후 바라볼 방향)',
 };
 
 function setMode(mode) {
   S.mode = mode;
   document.querySelectorAll('button.mode').forEach((b) => b.classList.toggle('active', b.dataset.mode === mode));
-  $('#mode-hint').textContent = HINTS[mode];
+  $('#mode-hint').textContent = mode === 'deliver' && S.deliveryLoc
+    ? `${S.deliveryLoc.cargo} — ${HINTS.deliver}` : HINTS[mode];
+  if (mode !== 'deliver') S.deliveryLoc = null;
+  renderDeliveryButtons();
 }
 
 document.querySelectorAll('button.mode').forEach((b) => b.addEventListener('click', () => setMode(b.dataset.mode)));
 
 // ------------------------------------------------------------------ 패널
 const STATE_LABEL = {
-  OFFLINE: '오프라인', IDLE: '대기', MOVING: '이동 중', WAITING_LOAD: '적재 대기', ERROR: '오류',
+  OFFLINE: '오프라인', IDLE: '대기', MOVING: '이동 중', WAITING_LOAD: '적재 대기', WAITING_UNLOAD: '수령 대기', ERROR: '오류',
 };
+
+// ------------------------------------------------------------------ LED 요청 (배달)
+// 인식 라벨이 색 이름이면 그 색으로 칩을 칠한다
+const CARGO_COLORS = { red: '#ef4444', green: '#22c55e', blue: '#3b82f6', yellow: '#eab308', white: '#e5e7eb',
+                       빨강: '#ef4444', 초록: '#22c55e', 파랑: '#3b82f6', 노랑: '#eab308' };
+function cargoColor(label) { return CARGO_COLORS[(label || '').toLowerCase()] || '#64748b'; }
+
+function renderDeliveryButtons() {
+  const box = $('#delivery-buttons');
+  if (!box) return;
+  box.innerHTML = '';
+  const busy = !!(S.task && S.task.status === 'running');
+  const online = S.robot && S.robot.state !== 'OFFLINE';
+  const items = (S.locations || []).filter((l) => l.kind !== 'home');
+  if (!items.length) { box.textContent = '등록된 물류 위치가 없습니다.'; return; }
+  for (const loc of items) {
+    const b = document.createElement('button');
+    b.className = 'cargo-btn' + (S.deliveryLoc && S.deliveryLoc.id === loc.id ? ' active' : '');
+    b.innerHTML = `<i style="background:${cargoColor(loc.cargo)}"></i>${loc.cargo}` +
+                  (loc.cargo !== loc.name ? ` <small>(${loc.name})</small>` : '');
+    b.disabled = busy || !online;
+    b.title = busy ? '다른 요청을 처리 중입니다' : `${loc.cargo} 요청: 지도에서 받을 자리를 클릭`;
+    b.addEventListener('click', () => {
+      if (S.cargo) { toast(`로봇에 이미 ${S.cargo} 이(가) 실려 있습니다. 먼저 꺼내 주세요.`); return; }
+      S.deliveryLoc = loc;
+      setMode('deliver');
+    });
+    box.appendChild(b);
+  }
+}
+
+function renderCargo() {
+  const el = $('#cargo-status');
+  if (!el) return;
+  el.textContent = S.cargo === undefined || S.cargo === null ? '카메라 인식: 인식 노드 없음'
+    : `카메라 인식: ${S.cargo || '비어 있음'}`;
+  el.className = 'cargo-status' + (S.cargo ? ' loaded' : '');
+}
 const STEP_LABEL = {
   pending: '대기', moving: '이동 중', arrived: '도착(적재 대기)', done: '완료', failed: '실패', skipped: '건너뜀',
 };
@@ -651,7 +703,10 @@ function renderPanel() {
   const online = state !== 'OFFLINE';
   const running = S.task && S.task.status === 'running';
   const step = currentStep();
+  const unload = step && step.action === 'unload';
+  $('#btn-confirm').textContent = unload ? '✓ 수령 완료' : '✓ 적재 완료';
   $('#btn-confirm').disabled = !(step && step.status === 'arrived');
+  renderDeliveryButtons();
   $('#btn-retry').disabled = !(online && step && (step.status === 'failed' || state === 'ERROR'));
   $('#btn-skip').disabled = !(online && step);
   $('#btn-cancel').disabled = !running;
@@ -764,6 +819,7 @@ function openLocationForm(loc) {
   form.elements.x.value = loc.x.toFixed(2);
   form.elements.y.value = loc.y.toFixed(2);
   form.elements.yaw_deg.value = Math.round((loc.yaw || 0) * 180 / Math.PI);
+  form.elements.cargo.value = loc.cargo && loc.cargo !== loc.name ? loc.cargo : '';
   form.elements.name.focus();
 }
 
@@ -778,6 +834,7 @@ form.addEventListener('submit', (ev) => {
       x: Number(f.x.value),
       y: Number(f.y.value),
       yaw: Number(f.yaw_deg.value || 0) * Math.PI / 180,
+      cargo: f.cargo.value,
     },
   });
   $('#loc-form-card').hidden = true;
@@ -785,7 +842,10 @@ form.addEventListener('submit', (ev) => {
 $('#loc-form-cancel').addEventListener('click', () => { $('#loc-form-card').hidden = true; });
 
 // ------------------------------------------------------------------ 버튼
-$('#btn-confirm').addEventListener('click', () => send('confirm_load'));
+$('#btn-confirm').addEventListener('click', () => {
+  const step = currentStep();
+  send(step && step.action === 'unload' ? 'confirm_unload' : 'confirm_load');
+});
 $('#btn-retry').addEventListener('click', () => send('retry_step'));
 $('#btn-skip').addEventListener('click', () => send('skip_step'));
 $('#btn-cancel').addEventListener('click', () => send('cancel_task'));

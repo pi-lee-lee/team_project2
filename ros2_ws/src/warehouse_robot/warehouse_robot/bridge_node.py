@@ -35,6 +35,7 @@ from rclpy.node import Node
 from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy, qos_profile_sensor_data
 from rclpy.time import Time
 from sensor_msgs.msg import BatteryState, Imu, LaserScan
+from std_msgs.msg import String
 from std_srvs.srv import Empty
 from tf2_ros import Buffer, TransformException, TransformListener
 
@@ -197,6 +198,14 @@ class BridgeNode(Node):
         self.lift_dir = 0.0           # 들린 쪽 방향 (로봇 기준 rad, 0 = 앞). 장애물이 있는 쪽
         self.tipped_since = None  # 넘어진 상태가 시작된 시각
         self.create_subscription(Imu, 'imu', self.on_imu, qos_profile_sensor_data)
+        # 카메라 물건(LED) 인식 결과: 인식 노드(cargo_detector 또는 직접 만든 YOLO 노드)가 보이는 라벨을 발행.
+        # '' = 아무것도 없음. 흔들림을 막기 위해 cargo_stable_sec 동안 같을 때만 서버에 알린다
+        self.declare_parameter('cargo_stable_sec', 1.0)
+        self.cargo_raw = None       # (라벨, 처음 본 시각)
+        self.cargo_sent = None      # 서버에 마지막으로 알린 라벨 (None = 인식 노드 없음)
+        self.cargo_resend = False   # 서버에 다시 연결되면 지금 라벨을 다시 알림
+        self.create_subscription(String, 'cargo/detected', self.on_cargo, 10)
+        self.create_timer(0.2, self.flush_cargo)
         self.initial_pose_pub = self.create_publisher(PoseWithCovarianceStamped, 'initialpose', 1)
         self.nomotion_client = self.create_client(Empty, 'request_nomotion_update')  # AMCL
         self.nomotion_left = 0
@@ -239,6 +248,7 @@ class BridgeNode(Node):
             kind = msg.get('type')
             try:
                 if kind == '_connected':
+                    self.cargo_resend = self.cargo_sent is not None
                     self.server.send({'type': 'hello', 'mode': self.mode, 'session': self.session,
                                       'active_goal_id': self.goal['id'] if self.goal else None})
                     self.send_map()
@@ -597,6 +607,22 @@ class BridgeNode(Node):
             self.report('failed', reason)
 
     # 내장 추종기 (controller=builtin) ------------------------------
+    def on_cargo(self, msg):
+        label = msg.data.strip()
+        if self.cargo_raw is None or self.cargo_raw[0] != label:
+            self.cargo_raw = (label, time.monotonic())
+
+    def flush_cargo(self):
+        if self.cargo_raw is None:
+            return
+        label, since = self.cargo_raw
+        if (label != self.cargo_sent or self.cargo_resend) and \
+                time.monotonic() - since >= self.get_parameter('cargo_stable_sec').value:
+            self.cargo_sent = label
+            self.cargo_resend = False
+            self.server.send({'type': 'cargo', 'label': label})
+            self.get_logger().info(f'카메라 인식: {label or "없음"}')
+
     def on_scan(self, msg):
         self.scan = msg
         # AMCL/SLAM/A* 기억에는 평소보다 기울지 않았을 때의 스캔만 넘긴다 (scan_level).

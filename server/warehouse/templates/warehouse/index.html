@@ -61,6 +61,13 @@
       </div>
       <div id="health" class="health"></div>
       <p id="robot-message"></p>
+      <p id="cargo-status" class="cargo-status" title="카메라 물건(LED) 인식 결과 (cargo/detected)"></p>
+    </section>
+
+    <section class="card">
+      <div class="card-head"><h2>LED 요청</h2><a href="/robot" target="_blank" class="muted small">로봇 화면 ↗</a></div>
+      <p class="muted small">필요한 LED 를 고른 뒤 지도에서 받을 자리를 클릭하세요. 로봇이 LED 를 싣고 옵니다. 한 번에 한 건만 받습니다.</p>
+      <div id="delivery-buttons" class="delivery-buttons"></div>
     </section>
 
     <section class="card">
@@ -113,6 +120,7 @@
             <option value="home">홈(복귀 위치)</option>
           </select>
         </label>
+        <label>카메라 인식 라벨 <input name="cargo" maxlength="50" placeholder="비우면 위치 이름 (예: A)"></label>
         <div class="grid3">
           <label>x(m) <input name="x" type="number" step="0.01" required></label>
           <label>y(m) <input name="y" type="number" step="0.01" required></label>

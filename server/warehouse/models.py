@@ -43,6 +43,8 @@ class Location(models.Model):
     x = models.FloatField()
     y = models.FloatField()
     yaw = models.FloatField(default=0.0)  # rad, 도착 시 바라볼 방향
+    # 이 위치에 놓인 물건(LED)을 카메라가 인식했을 때의 라벨 (예: red, B). 비우면 위치 이름으로 비교
+    cargo = models.CharField(max_length=50, blank=True, default='')
 
     class Meta:
         ordering = ['kind', 'name']
@@ -52,7 +54,10 @@ class Location(models.Model):
 
     def to_dict(self):
         return {'id': self.id, 'name': self.name, 'kind': self.kind,
-                'x': self.x, 'y': self.y, 'yaw': self.yaw}
+                'x': self.x, 'y': self.y, 'yaw': self.yaw, 'cargo': self.cargo_label()}
+
+    def cargo_label(self):
+        return self.cargo or self.name
 
 
 class Robot(models.Model):
@@ -60,9 +65,10 @@ class Robot(models.Model):
     STATE_IDLE = 'IDLE'
     STATE_MOVING = 'MOVING'
     STATE_WAITING_LOAD = 'WAITING_LOAD'
+    STATE_WAITING_UNLOAD = 'WAITING_UNLOAD'   # 배달 도착, 받는 사람이 꺼내기를 기다림
     STATE_ERROR = 'ERROR'
     STATE_CHOICES = [(s, s) for s in
-                     (STATE_OFFLINE, STATE_IDLE, STATE_MOVING, STATE_WAITING_LOAD, STATE_ERROR)]
+                     (STATE_OFFLINE, STATE_IDLE, STATE_MOVING, STATE_WAITING_LOAD, STATE_WAITING_UNLOAD, STATE_ERROR)]
 
     name = models.CharField(max_length=50, unique=True)
     state = models.CharField(max_length=20, choices=STATE_CHOICES, default=STATE_OFFLINE)
@@ -112,9 +118,10 @@ class Task(models.Model):
 
 
 class TaskStep(models.Model):
-    ACTION_LOAD = 'load'  # 도착 후 적재 확인을 기다림
-    ACTION_MOVE = 'move'  # 도착하면 바로 완료 (복귀, 단순 이동)
-    ACTION_CHOICES = [(ACTION_LOAD, '적재'), (ACTION_MOVE, '이동')]
+    ACTION_LOAD = 'load'      # 도착 후 적재 확인을 기다림
+    ACTION_UNLOAD = 'unload'  # 도착 후 수령(물건 꺼냄) 확인을 기다림 (LED 배달)
+    ACTION_MOVE = 'move'      # 도착하면 바로 완료 (복귀, 단순 이동)
+    ACTION_CHOICES = [(ACTION_LOAD, '적재'), (ACTION_UNLOAD, '수령'), (ACTION_MOVE, '이동')]
 
     STATUS_PENDING = 'pending'
     STATUS_MOVING = 'moving'
@@ -136,6 +143,8 @@ class TaskStep(models.Model):
     y = models.FloatField()
     yaw = models.FloatField()
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default=STATUS_PENDING)
+    # LED 배달: 이 단계에서 카메라로 확인할 물건 라벨 (적재: 이 라벨이 보이면 완료, 수령: 아무것도 안 보이면 완료)
+    cargo = models.CharField(max_length=50, blank=True, default='')
     # 이동 기록 (이동 시간 학습용, planning.py). 출발할 때 채우고 도착하면 finished_at
     start_x = models.FloatField(null=True, blank=True)
     start_y = models.FloatField(null=True, blank=True)
@@ -155,7 +164,7 @@ class TaskStep(models.Model):
 
     def to_dict(self):
         return {'id': self.id, 'order': self.order, 'action': self.action, 'name': self.name,
-                'x': self.x, 'y': self.y, 'yaw': self.yaw, 'status': self.status,
+                'x': self.x, 'y': self.y, 'yaw': self.yaw, 'status': self.status, 'cargo': self.cargo,
                 'predicted_sec': self.predicted_sec,
                 'started_at': self.started_at.isoformat() if self.started_at else None}
 

@@ -1,0 +1,83 @@
+/* 로봇 위 태블릿 화면: 멀리서도 보이게 큰 글씨, 상태마다 배경색 */
+:root {
+  --fg: #0f172a;
+  --muted: #475569;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body {
+  font-family: system-ui, -apple-system, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+  color: var(--fg);
+  background: #f1f5f9;
+  display: flex;
+  flex-direction: column;
+  transition: background 0.3s;
+  -webkit-user-select: none;
+  user-select: none;
+}
+body.IDLE { background: #f1f5f9; }
+body.GO_LOAD, body.DELIVER, body.MOVING, body.RETURN { background: #dbeafe; }
+body.LOAD { background: #fef3c7; }
+body.UNLOAD { background: #ede9fe; }
+body.ERROR { background: #fee2e2; }
+body.OFFLINE { background: #e2e8f0; }
+
+header, footer {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 18px;
+  font-size: 16px;
+  color: var(--muted);
+}
+header #battery { flex: 1; }
+.conn { padding: 4px 10px; border-radius: 999px; font-size: 14px; font-weight: 600; }
+.conn.on { background: #dcfce7; color: #15803d; }
+.conn.off { background: #fee2e2; color: #b91c1c; }
+.stop {
+  font-size: 18px; font-weight: 800; padding: 10px 18px; border: 0; border-radius: 12px;
+  background: #dc2626; color: #fff;
+}
+
+main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 12px 24px;
+  gap: 14px;
+}
+h1 { margin: 0; font-size: clamp(32px, 7vw, 72px); line-height: 1.15; }
+#sub { margin: 0; font-size: clamp(18px, 3.2vw, 30px); color: var(--muted); }
+.note { margin: 0; min-height: 1.4em; font-size: clamp(16px, 2.6vw, 24px); color: #b45309; font-weight: 700; }
+.led {
+  width: clamp(110px, 22vw, 200px);
+  height: clamp(110px, 22vw, 200px);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: clamp(36px, 7vw, 64px);
+  font-weight: 800;
+  color: #fff;
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 0 0 8px rgba(255, 255, 255, 0.7), 0 10px 30px rgba(0, 0, 0, 0.15);
+}
+.led[hidden], .manual[hidden] { display: none; }
+body.LOAD .led, body.UNLOAD .led { animation: pulse 1.6s ease-in-out infinite; }
+@keyframes pulse { 50% { transform: scale(1.06); } }
+.manual {
+  margin-top: 8px;
+  font-size: clamp(24px, 4.5vw, 40px);
+  font-weight: 800;
+  padding: 18px 48px;
+  border: 0;
+  border-radius: 20px;
+  background: #16a34a;
+  color: #fff;
+  box-shadow: 0 6px 18px rgba(22, 163, 74, 0.35);
+}
+.manual:active { transform: translateY(2px); }
+footer { justify-content: space-between; font-size: 15px; flex-wrap: wrap; }
