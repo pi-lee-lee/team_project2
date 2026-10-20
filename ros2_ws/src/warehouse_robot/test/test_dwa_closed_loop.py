@@ -131,3 +131,48 @@ def test_escape_when_parked_next_to_wall():
     assert state == 'blocked'
     v, w, state = DWAFollower(path, 0.0, DWAConfig(**PROJECT)).compute((0, 0, 0), 0.0, 0.0, (0, 0, 0), wall, [])
     assert state == 'driving' and v > 0.0
+
+
+def test_goal_directly_behind_turns_around_and_arrives():
+    """목표가 정확히 뒤쪽이면 DWA 가 속도 0 을 계속 내며 멈춰 있던 문제 (sim 강당 자동 탐색)."""
+    cfg = DWAConfig(max_v=0.15, min_v=-0.08, max_w=1.0, max_acc_v=0.3, max_acc_w=1.5, predict_time=2.5,
+                    footprint=(-0.197, 0.069, 0.153), allow_escape=True, reverse_only_when_needed=True,
+                    safety_margin=0.08)
+    path = [(0.0, 0.0 - 1.2 * t) for t in np.linspace(0, 1, 25)]
+    wall = np.array([[-0.5, yy] for yy in np.arange(-2.0, 1.0, 0.05)])
+    for start_yaw in (math.radians(90), math.radians(-90 + 179.5)):
+        f = DWAFollower(path, -math.pi / 2, cfg)
+        x, y, yaw, v, w = 0.0, 0.0, start_yaw, 0.0, 0.0
+        state = ''
+        for _ in range(300):
+            v, w, state = f.compute((x, y, yaw), v, w, (0, 0, 0), wall, [])
+            if state == 'done':
+                break
+            yaw += w * 0.1
+            x += v * math.cos(yaw) * 0.1
+            y += v * math.sin(yaw) * 0.1
+        assert state == 'done', (start_yaw, x, y)
+        assert abs(y + 1.2) < 0.15
+
+
+def test_goal_behind_next_to_wall_backs_off_then_turns():
+    """벽에 바짝 붙은 채 목표가 뒤쪽: 돌 공간이 없으면 떨어진 뒤 돌아서 도착 (벽에 닿지 않음)."""
+    cfg = DWAConfig(max_v=0.15, min_v=-0.08, max_w=1.0, max_acc_v=0.3, max_acc_w=1.5, predict_time=2.5,
+                    footprint=(-0.197, 0.069, 0.153), allow_escape=True, reverse_only_when_needed=True,
+                    safety_margin=0.08)
+    # 로봇은 동쪽(벽 x=0.17)을 보고 벽 앞 10cm, 목표는 서쪽 1.5m
+    wall = np.array([[0.17, yy] for yy in np.arange(-1.5, 1.5, 0.03)])
+    path = [(-1.5 * t, 0.0) for t in np.linspace(0, 1, 25)]
+    f = DWAFollower(path, math.pi, cfg)
+    x, y, yaw, v, w = 0.0, 0.0, 0.0, 0.0, 0.0
+    state = ''
+    for _ in range(400):
+        v, w, state = f.compute((x, y, yaw), v, w, (0, 0, 0), wall, [])
+        if state == 'done':
+            break
+        yaw += w * 0.1
+        x += v * math.cos(yaw) * 0.1
+        y += v * math.sin(yaw) * 0.1
+        for px, py in wall[::5]:
+            assert footprint_gap(x, y, yaw, px, py, 0.0) > 0.0
+    assert state == 'done', (x, y)

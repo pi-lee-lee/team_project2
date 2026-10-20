@@ -7,6 +7,7 @@
    -> 첫 충돌 지점 전에 멈출 수 없는 궤적 제거 (admissible velocity: v^2/2a <= 충돌까지 거리)
 4) 비용 = 방향 + 경로이탈 + 목표거리 + 장애물근접 + 느림  -> 최소 비용 (v, w) 선택
 """
+import math
 from dataclasses import dataclass
 from typing import Optional
 
@@ -296,7 +297,12 @@ class DWAFollower:
 
     계산은 odom 프레임에서 한다 (tb3_nav local_planner 와 같음): AMCL 이 map->odom 을 고칠 때마다
     map 좌표가 몇 cm 씩 튀는데, 로봇/스캔/추적 장애물을 odom 에 두면 연속적이고 경로만 살짝 옮겨진다.
-    compute() 반환 state: driving | blocked (안전한 궤적 없음) | rotating (도착 후 방향 맞춤) | done
+    compute() 반환 state: driving | blocked (안전한 궤적 없음) | rotating (도착 후 방향 맞춤, 또는 출발 전 돌아서기) | done
+
+    가야 할 방향이 rotate_first(90°) 보다 크게 뒤쪽이면 DWA 대신 제자리에서 먼저 돈다 (방향이 45° 안으로 들어올
+    때까지). DWA 는 지금 속도에서 한 주기에 낼 수 있는 범위만 보므로, 멈춘 채 목표가 정확히 뒤에 있으면
+    후보 회전이 ±0.15 rad/s 뿐이라 굴려 봐도 방향이 거의 안 바뀌고 좌우가 대칭이어서 '가만히 있기' 가
+    가장 싸다 → 속도 0 을 계속 내며 멈춰 있었다 (sim 강당 자동 탐색, 줄을 바꿀 때 다음 목표가 뒤쪽).
     """
 
     def __init__(self, path_map, goal_yaw, cfg=None, goal_tolerance=0.1, lookahead=0.5,
@@ -313,6 +319,10 @@ class DWAFollower:
         self.last_trajectory = None
         self.sidestep = None      # 마주 오는 물체를 피해 잠시 가는 옆 지점 (odom)
         self.sidestep_enabled = True
+        self.rotate_first = math.radians(90)
+        self.turning = False      # 출발 전 돌아서는 중 (45° 안으로 들어오면 끝)
+        # 돌아서기 회전 속도 (rad/s): LiDAR(5Hz) 한 바퀴 동안 많이 돌면 스캔이 휘어 SLAM 매칭이 나빠짐
+        self.rotate_speed = 0.6
 
     def local_target(self, path, x, y):
         window = path[self.progress:self.progress + 60]
@@ -322,6 +332,33 @@ class DWAFollower:
         s = np.concatenate([[0.0], np.cumsum(seg)])
         idx = np.searchsorted(s, self.lookahead)
         return ahead[s <= self.local_path_length], ahead[min(idx, len(ahead) - 1)]
+
+    def _rotation_clear(self, x, y, yaw, w, pts, horizon=1.0):
+        """제자리에서 w 로 horizon 초 도는 동안 차체가 정적 점에 닿지 않는지."""
+        if not len(pts):
+            return True
+        t = np.arange(1, int(horizon / 0.1) + 1) * 0.1
+        traj = np.stack([np.full_like(t, x), np.full_like(t, y), yaw + w * t], axis=1)[None]
+        return float(self.dwa._static_clearance(traj, pts).min()) > 0.01
+
+    def _escape_speed(self, x, y, yaw, pts, speed=0.05, need=0.10):
+        """앞/뒤 중 차체 앞뒤 끝에서 장애물까지 더 많이 비어 있는 쪽으로 천천히 (m/s). 둘 다 need 보다 좁으면 0."""
+        if not len(pts):
+            return speed
+        x0, x1, hw = self.dwa.cfg.footprint if self.dwa.cfg.footprint else (-self.dwa.cfg.robot_radius,
+                                                                             self.dwa.cfg.robot_radius,
+                                                                             self.dwa.cfg.robot_radius)
+        c, s = math.cos(-yaw), math.sin(-yaw)
+        lx = c * (pts[:, 0] - x) - s * (pts[:, 1] - y)
+        ly = s * (pts[:, 0] - x) + c * (pts[:, 1] - y)
+        side = np.abs(ly) <= hw + 0.03
+        front = lx[side & (lx > 0)] - x1
+        back = -lx[side & (lx < 0)] + x0
+        gap_f = float(front.min()) if len(front) else np.inf
+        gap_b = float(back.min()) if len(back) else np.inf
+        if max(gap_f, gap_b) < need:
+            return 0.0
+        return speed if gap_f >= gap_b else -speed
 
     def sidestep_target(self, x, y, moving, pts, path_dir, look=1.5, offset=0.6):
         """정면으로 마주 오는 움직이는 물체가 있으면 옆으로 offset 만큼 비켜선 지점, 없으면 None.
@@ -388,6 +425,29 @@ class DWAFollower:
         side = self.sidestep_target(x, y, moving, pts, path_dir) if self.sidestep_enabled else None
         if side is not None:
             local_path, local_goal = np.array([side]), side
+        else:
+            err = math.atan2(local_goal[1] - y, local_goal[0] - x) - yaw
+            err = math.atan2(math.sin(err), math.cos(err))
+            limit = math.radians(45) if self.turning else self.rotate_first
+            # 가까이 움직이는 물체가 있으면 제자리 회전 대신 DWA (예측해서 피함). 돌아서기는 정적 점만 보므로
+            # 피하던 중 돌다가 다가오는 물체에 부딪혔음 (dwa_tune cross_back_5.0s)
+            near_moving = len(moving) and float(np.min(np.hypot(moving[:, 0] - x, moving[:, 1] - y))) < 1.5
+            self.turning = abs(err) > limit and not near_moving
+            if self.turning:
+                max_w = min(self.dwa.cfg.max_w, self.rotate_speed)
+                w = float(np.clip(2.0 * err, -max_w, max_w))
+                if abs(w) < 0.3:
+                    w = math.copysign(0.3, err)
+                # 필요한 회전 전체에 대해 검사 (1초 앞만 보면 돌다 멈추고 물러나기를 번갈아 해서, 옆으로 선 차체가
+                # 벽과 나란히 미끄러지기만 했음)
+                if self._rotation_clear(x, y, yaw, w, pts, horizon=max(1.0, abs(err) / abs(w))):
+                    return 0.0, w, 'rotating'
+                # 벽에 붙어 돌 공간이 없으면 앞/뒤 중 트인 쪽으로 천천히 떨어진 뒤 돈다
+                # (그냥 DWA 에 맡기면 목표가 뒤라 멈춰 있다가, 브리지 회복 동작이 벽에 붙은 채 돌아 넘어졌음)
+                v = self._escape_speed(x, y, yaw, pts)
+                if v != 0.0:
+                    return v, 0.0, 'driving'
+                self.turning = False
         r = self.dwa.compute(RobotState(x, y, yaw, v0, w0), local_path, local_goal, pts, moving)
         self.last_trajectory = r.trajectory
         if not r.ok:

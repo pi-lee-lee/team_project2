@@ -10,7 +10,7 @@ echo "[start_slam] $ENGINE, 시뮬레이션 시간 $WAREHOUSE_SIM_TIME, 도메�
 
 case "$ENGINE" in
   slam_toolbox)
-    # config/slam_toolbox.yaml: 수평일 때 스캔(/scan_level, 브리지가 발행)만 사용
+    # config/slam_toolbox.yaml: 수평일 때 스캔(/scan_slam, 브리지가 발행, inf 빔 → 빈 공간)만 사용
     exec ros2 launch slam_toolbox online_async_launch.py use_sim_time:="$WAREHOUSE_SIM_TIME" \
       slam_params_file:="$WAREHOUSE_HOME/config/slam_toolbox.yaml"
     ;;
