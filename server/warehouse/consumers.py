@@ -86,7 +86,8 @@ class RobotConsumer(AsyncJsonWebsocketConsumer):
                 'type': 'path', 'robot': self.robot_name, 'points': live['path']}})
         elif kind == 'hello':
             live['mode'] = msg.get('mode', 'map')
-            await self.run(services.robot_connected, self.robot_name, msg.get('active_goal_id'))
+            await self.run(services.robot_connected, self.robot_name, msg.get('active_goal_id'),
+                           live['mode'], str(msg.get('session', '')))
         elif kind == 'reset_done':
             await self.broadcast({'type': 'reset_done', 'ok': bool(msg.get('ok')), 'message': msg.get('message', '')})
             await self.run(services.reset_done, self.robot_name, bool(msg.get('ok')), msg.get('message', ''))

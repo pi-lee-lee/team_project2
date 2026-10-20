@@ -160,9 +160,11 @@ def cancel_active(out, robot, reason):
 # ---------------------------------------------------------------- 로봇 → 서버
 
 @transaction.atomic
-def robot_connected(name, active_goal_id):
+def robot_connected(name, active_goal_id, mode='map', session=''):
     out = Outbox()
     robot = get_robot(name)
+    if mode == 'slam' and session:
+        start_slam_session(out, robot, session)
     robot.last_seen = timezone.now()
     # 이전 연결(예: 어제 실물 로봇)의 배터리 값이 남아 보이지 않도록 지운다.
     # 브리지가 /battery_state 를 받으면 다시 채운다 (시뮬레이션은 배터리 정보가 없어 비어 있음)
@@ -223,6 +225,23 @@ def robot_disconnected(name):
 
 
 @transaction.atomic
+def start_slam_session(out, robot, session):
+    """새 SLAM 실행이면 이전 SLAM 맵과 그 위에 등록한 위치를 지운다.
+    SLAM 맵의 원점은 SLAM 을 시작한 순간의 로봇 위치라 실행(월드/출발 위치)마다 좌표계가 다르다.
+    지우지 않으면 이전 실행의 위치가 새 지도 위 엉뚱한 곳에 보인다. 저장한 맵의 위치는 저장할 때 복사되어 남아 있다.
+    브리지가 재연결만 한 것(같은 실행 번호)이면 그대로 둔다."""
+    SLAM_SESSION[robot.name] = session
+    m = Map.objects.filter(name=SLAM_MAP).first()
+    if m is None or m.session == session:
+        return
+    n = m.locations.count()
+    m.delete()
+    out.to_ui({'type': 'map', 'map': None})
+    out.to_ui({'type': 'locations', 'locations': []})
+    log(out, robot, f'새 SLAM 실행: 이전 SLAM 맵{f"과 위치 {n}개" if n else ""}를 지웠습니다 (좌표계가 달라서)')
+
+
+@transaction.atomic
 def handle_map(name, msg):
     """브리지가 보낸 OccupancyGrid를 PNG로 저장하고 활성 맵으로 지정."""
     out = Outbox()
@@ -235,6 +254,9 @@ def handle_map(name, msg):
     png = encode_png(grid_to_rows(data, width, height), width, height)
     m = save_map(msg.get('name') or 'default', msg['resolution'],
                  msg['origin'][0], msg['origin'][1], width, height, png)
+    if m.name == SLAM_MAP and SLAM_SESSION.get(name) and m.session != SLAM_SESSION[name]:
+        m.session = SLAM_SESSION[name]
+        m.save(update_fields=['session'])
     out.to_ui({'type': 'map', 'map': m.to_dict()})
     push_locations(out)
     return out
@@ -508,6 +530,8 @@ def delete_location(location_id):
 
 MAP_NAME_RE = re.compile(r'^[A-Za-z0-9_-]{1,50}$')
 PENDING_SAVE = {}  # robot_name -> 저장 요청한 맵 이름
+SLAM_MAP = 'slam_live'
+SLAM_SESSION = {}  # robot_name -> 지금 연결된 브리지의 SLAM 실행 번호
 
 
 @transaction.atomic

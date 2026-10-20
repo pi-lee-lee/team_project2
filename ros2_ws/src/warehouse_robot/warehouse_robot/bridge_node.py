@@ -171,6 +171,8 @@ class BridgeNode(Node):
         self.stall_timeout = p('stall_timeout')
         self.backoff_distance = p('backoff_distance')
         self.mode = p('mode')
+        # 이 브리지 실행 번호. 서버는 SLAM 실행이 바뀐 것을 알고 이전 SLAM 맵/위치(다른 좌표계)를 지운다
+        self.session = f'{int(time.time())}-{os.getpid()}'
         self.map_dirty = False      # SLAM 모드: 서버로 보낼 새 맵이 있음
         self.last_map_sent = 0.0
         self.script_running = None  # 실행 중인 scripts/*.sh 이름
@@ -237,7 +239,7 @@ class BridgeNode(Node):
             kind = msg.get('type')
             try:
                 if kind == '_connected':
-                    self.server.send({'type': 'hello', 'mode': self.mode,
+                    self.server.send({'type': 'hello', 'mode': self.mode, 'session': self.session,
                                       'active_goal_id': self.goal['id'] if self.goal else None})
                     self.send_map()
                 elif kind == 'goto':

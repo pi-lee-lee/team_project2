@@ -13,6 +13,9 @@ class Map(models.Model):
     png = models.BinaryField()
     is_active = models.BooleanField(default=False)
     updated_at = models.DateTimeField(auto_now=True)
+    # SLAM 맵(slam_live)을 만든 브리지 실행 번호. SLAM 좌표계(원점 = 시작 때 로봇 위치)는 실행마다 다르므로
+    # 새 실행이면 이전 맵과 위치를 지운다
+    session = models.CharField(max_length=40, blank=True, default='')
 
     def __str__(self):
         return self.name
