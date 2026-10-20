@@ -1,0 +1,31 @@
+astar_planner:
+  ros__parameters:
+    map_topic: map
+    robot_radius: 0.22        # Waffle Pi 외곽 반경 (m)
+    inflation_radius: 0.55    # 이 거리까지는 벽에서 멀어지도록 비용 부여
+    cost_weight: 3.0
+    occupied_threshold: 65
+    allow_unknown: false
+    goal_tolerance: 0.3       # 목표가 벽에 붙어 있으면 이 반경 안에서 가까운 빈 곳으로
+
+warehouse_bridge:
+  ros__parameters:
+    server_url: ws://localhost:8000/ws/robot/tb3/
+    map_name: default         # 서버 DB에 저장될 맵 이름 (위치 좌표가 이 맵에 묶임)
+    map_topic: map
+    global_frame: map
+    base_frame: base_footprint
+    planner: astar            # astar: 직접 구현한 A* + FollowPath / nav2: NavigateToPose
+    pose_rate: 5.0
+    max_retries: 2
+    arrive_tolerance: 0.3     # Nav2가 성공이라고 해도 목표와 이 거리 이상이면 실패로 처리
+    controller: builtin       # builtin: 브리지의 pure pursuit로 직접 주행 / nav2: Nav2 controller_server 사용
+    max_speed: 0.15           # m/s
+    max_turn_speed: 1.0       # rad/s
+    stop_distance: 0.35       # 앞쪽 ±25° 안에 이 거리 이내 물체가 있으면 정지 후 대기 (m)
+    blocked_timeout: 10.0     # 이 시간 넘게 막히면 재계획, 재시도도 다 쓰면 실패 (s)
+    progress_timeout: 15.0    # 이 시간 동안 5cm도 못 가면 실패 (s)
+    tf_timeout: 0.5           # 로봇 위치 TF가 이보다 오래되면 즉시 정지 (s)
+    rotate_timeout: 15.0      # 제자리 회전이 이보다 길면 정지 후 재계획/실패 (s)
+    battery_cells: 3          # 배터리 % 계산용 LiPo 셀 수 (TurtleBot3 11.1V = 3셀)
+    follow_frame: odom        # FollowPath 경로 좌표계 (odom: controller_server가 map->odom TF 없이 주행)

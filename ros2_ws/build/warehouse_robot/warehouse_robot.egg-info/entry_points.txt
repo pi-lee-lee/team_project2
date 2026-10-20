@@ -1,0 +1,4 @@
+[console_scripts]
+astar_planner = warehouse_robot.astar_planner_node:main
+bridge = warehouse_robot.bridge_node:main
+

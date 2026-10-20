@@ -1,0 +1,96 @@
+{% load static %}<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>창고 로봇 관제</title>
+  <link rel="stylesheet" href="{% static 'warehouse/style.css' %}?v={{ static_version }}">
+</head>
+<body>
+<header>
+  <h1>창고 로봇 관제</h1>
+  <span><span id="run-mode" class="badge" hidden></span> <span id="ws-status" class="badge off">서버 연결 안 됨</span></span>
+</header>
+
+<main>
+  <section id="map-panel">
+    <div id="map-toolbar">
+      <button data-mode="view" class="mode active">보기</button>
+      <button data-mode="goto" class="mode">여기로 이동</button>
+      <button data-mode="add" class="mode">위치 추가</button>
+      <button data-mode="initpose" class="mode">초기 위치 지정</button>
+      <span id="mode-hint">모드를 고르세요</span>
+    </div>
+    <div id="canvas-wrap">
+      <canvas id="map"></canvas>
+      <div id="no-map" hidden>맵이 없습니다. 로봇을 연결하거나 <code>manage.py import_map</code>으로 불러오세요.</div>
+    </div>
+    <div id="cursor-pos">&nbsp;</div>
+  </section>
+
+  <aside>
+    <div class="card">
+      <h2>로봇 <span id="robot-name"></span></h2>
+      <div class="row"><span id="robot-state" class="badge">-</span><span id="battery"></span></div>
+      <div id="health" class="health"></div>
+      <p id="robot-message"></p>
+      <div class="buttons">
+        <button id="btn-confirm" class="primary">적재 완료</button>
+        <button id="btn-retry">재시도</button>
+        <button id="btn-skip">건너뛰기</button>
+        <button id="btn-cancel">작업 취소</button>
+        <button id="btn-home">홈 복귀</button>
+        <button id="btn-set-home" title="로봇이 지금 있는 위치와 방향을 홈으로 저장">현재 위치를 홈으로</button>
+        <button id="btn-save-map" class="primary" hidden title="지금까지 만든 맵을 ~/maps 에 저장하고 반듯하게 정리">맵 저장</button>
+        <button id="btn-reset">오류 해제</button>
+        <button id="btn-reset-robot" title="작업 취소, 정지, 시뮬레이션이면 로봇을 출발 위치에 바로 세움">상태 초기화</button>
+        <button id="btn-estop" class="danger">비상정지</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>현재 작업</h2>
+      <ol id="task-steps"><li class="muted">없음</li></ol>
+    </div>
+
+    <div class="card">
+      <h2>위치</h2>
+      <ul id="locations"></ul>
+      <label class="check"><input type="checkbox" id="with-home" checked> 마지막에 홈으로 복귀</label>
+      <button id="btn-start" class="primary wide">선택한 위치로 작업 시작</button>
+    </div>
+
+    <div class="card" id="loc-form-card" hidden>
+      <h2 id="loc-form-title">위치 추가</h2>
+      <form id="loc-form">
+        <input type="hidden" name="id">
+        <label>이름 <input name="name" required maxlength="100"></label>
+        <label>종류
+          <select name="kind">
+            <option value="pickup">물류 위치</option>
+            <option value="home">홈(복귀 위치)</option>
+          </select>
+        </label>
+        <div class="grid3">
+          <label>x(m) <input name="x" type="number" step="0.01" required></label>
+          <label>y(m) <input name="y" type="number" step="0.01" required></label>
+          <label>방향(°) <input name="yaw_deg" type="number" step="1" value="0"></label>
+        </div>
+        <div class="buttons">
+          <button type="submit" class="primary">저장</button>
+          <button type="button" id="loc-form-cancel">닫기</button>
+        </div>
+      </form>
+    </div>
+
+    <div class="card">
+      <h2>기록</h2>
+      <ul id="logs"></ul>
+    </div>
+  </aside>
+</main>
+
+<div id="toast" hidden></div>
+<script src="{% static 'warehouse/app.js' %}?v={{ static_version }}"></script>
+</body>
+</html>

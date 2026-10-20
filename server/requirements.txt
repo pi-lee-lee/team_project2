@@ -1,0 +1,4 @@
+Django>=4.2,<5
+channels>=4.0,<5
+daphne>=4.0,<5
+mysqlclient>=2.1,<3

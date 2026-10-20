@@ -1,0 +1,1553 @@
+[INFO] [launch]: All log files can be found below /home/abc/.ros/log/2026-10-19-17-36-11-034631-abc-B360M-DS3H-9529
+[INFO] [launch]: Default logging verbosity is set to INFO
+[INFO] [gdb-1]: process started with pid [9555]
+[INFO] [smoother_server-2]: process started with pid [9557]
+[INFO] [planner_server-3]: process started with pid [9559]
+[INFO] [behavior_server-4]: process started with pid [9561]
+[INFO] [bt_navigator-5]: process started with pid [9563]
+[INFO] [waypoint_follower-6]: process started with pid [9565]
+[INFO] [velocity_smoother-7]: process started with pid [9567]
+[INFO] [lifecycle_manager-8]: process started with pid [9569]
+[behavior_server-4] [INFO] [1792398971.229153622] [behavior_server]: 
+[behavior_server-4] 	behavior_server lifecycle node launched. 
+[behavior_server-4] 	Waiting on external lifecycle transitions to activate
+[behavior_server-4] 	See https://design.ros2.org/articles/node_lifecycle.html for more information.
+[velocity_smoother-7] [INFO] [1792398971.231586209] [velocity_smoother]: 
+[velocity_smoother-7] 	velocity_smoother lifecycle node launched. 
+[velocity_smoother-7] 	Waiting on external lifecycle transitions to activate
+[velocity_smoother-7] 	See https://design.ros2.org/articles/node_lifecycle.html for more information.
+[smoother_server-2] [INFO] [1792398971.232459390] [smoother_server]: 
+[smoother_server-2] 	smoother_server lifecycle node launched. 
+[smoother_server-2] 	Waiting on external lifecycle transitions to activate
+[smoother_server-2] 	See https://design.ros2.org/articles/node_lifecycle.html for more information.
+[waypoint_follower-6] [INFO] [1792398971.234448299] [waypoint_follower]: 
+[waypoint_follower-6] 	waypoint_follower lifecycle node launched. 
+[waypoint_follower-6] 	Waiting on external lifecycle transitions to activate
+[waypoint_follower-6] 	See https://design.ros2.org/articles/node_lifecycle.html for more information.
+[waypoint_follower-6] [INFO] [1792398971.235227318] [waypoint_follower]: Creating
+[lifecycle_manager-8] [INFO] [1792398971.236042091] [lifecycle_manager_navigation]: Creating
+[smoother_server-2] [INFO] [1792398971.236446419] [smoother_server]: Creating smoother server
+[bt_navigator-5] [INFO] [1792398971.239437483] [bt_navigator]: 
+[bt_navigator-5] 	bt_navigator lifecycle node launched. 
+[bt_navigator-5] 	Waiting on external lifecycle transitions to activate
+[bt_navigator-5] 	See https://design.ros2.org/articles/node_lifecycle.html for more information.
+[bt_navigator-5] [INFO] [1792398971.239547417] [bt_navigator]: Creating
+[planner_server-3] [INFO] [1792398971.240858377] [planner_server]: 
+[planner_server-3] 	planner_server lifecycle node launched. 
+[planner_server-3] 	Waiting on external lifecycle transitions to activate
+[planner_server-3] 	See https://design.ros2.org/articles/node_lifecycle.html for more information.
+[planner_server-3] [INFO] [1792398971.243766878] [planner_server]: Creating
+[lifecycle_manager-8] [INFO] [1792398971.241219541] [lifecycle_manager_navigation]: [34m[1mCreating and initializing lifecycle service clients[0m[0m
+[planner_server-3] [INFO] [1792398971.254273104] [global_costmap.global_costmap]: 
+[planner_server-3] 	global_costmap lifecycle node launched. 
+[planner_server-3] 	Waiting on external lifecycle transitions to activate
+[planner_server-3] 	See https://design.ros2.org/articles/node_lifecycle.html for more information.
+[planner_server-3] [INFO] [1792398971.254915020] [global_costmap.global_costmap]: Creating Costmap
+[gdb-1] [Thread debugging using libthread_db enabled]
+[gdb-1] Using host libthread_db library "/lib/x86_64-linux-gnu/libthread_db.so.1".
+[gdb-1] [New Thread 0x7ffff6792640 (LWP 9681)]
+[gdb-1] [New Thread 0x7ffff5f91640 (LWP 9682)]
+[gdb-1] [New Thread 0x7ffff5790640 (LWP 9683)]
+[gdb-1] [New Thread 0x7ffff4f8f640 (LWP 9684)]
+[gdb-1] [New Thread 0x7fffeffff640 (LWP 9685)]
+[gdb-1] [New Thread 0x7fffef7fe640 (LWP 9686)]
+[gdb-1] [New Thread 0x7fffeeffd640 (LWP 9687)]
+[gdb-1] [New Thread 0x7fffee7fc640 (LWP 9688)]
+[gdb-1] [New Thread 0x7fffedffb640 (LWP 9689)]
+[gdb-1] [New Thread 0x7fffed7fa640 (LWP 9690)]
+[gdb-1] [New Thread 0x7fffecff9640 (LWP 9691)]
+[gdb-1] [INFO] [1792398971.728314145] [controller_server]: 
+[gdb-1] 	controller_server lifecycle node launched. 
+[gdb-1] 	Waiting on external lifecycle transitions to activate
+[gdb-1] 	See https://design.ros2.org/articles/node_lifecycle.html for more information.
+[lifecycle_manager-8] [INFO] [1792398971.731147961] [lifecycle_manager_navigation]: [34m[1mStarting managed nodes bringup...[0m[0m
+[lifecycle_manager-8] [INFO] [1792398971.731195515] [lifecycle_manager_navigation]: [34m[1mConfiguring controller_server[0m[0m
+[gdb-1] [INFO] [1792398971.735238470] [controller_server]: Creating controller server
+[gdb-1] [New Thread 0x7fffcbfff640 (LWP 9693)]
+[gdb-1] [INFO] [1792398971.741087455] [local_costmap.local_costmap]: 
+[gdb-1] 	local_costmap lifecycle node launched. 
+[gdb-1] 	Waiting on external lifecycle transitions to activate
+[gdb-1] 	See https://design.ros2.org/articles/node_lifecycle.html for more information.
+[gdb-1] [INFO] [1792398971.741769485] [local_costmap.local_costmap]: Creating Costmap
+[gdb-1] [INFO] [1792398971.742990935] [controller_server]: Configuring controller interface
+[gdb-1] [INFO] [1792398971.743073901] [controller_server]: getting goal checker plugins..
+[gdb-1] [INFO] [1792398971.743143144] [controller_server]: Controller frequency set to 10.0000Hz
+[gdb-1] [INFO] [1792398971.743178371] [local_costmap.local_costmap]: Configuring
+[gdb-1] [INFO] [1792398971.751620284] [local_costmap.local_costmap]: Using plugin "obstacle_layer"
+[gdb-1] [New Thread 0x7fffcb7fe640 (LWP 9694)]
+[gdb-1] [INFO] [1792398971.797362752] [local_costmap.local_costmap]: Subscribed to Topics: scan
+[gdb-1] [INFO] [1792398971.803221338] [local_costmap.local_costmap]: Initialized plugin "obstacle_layer"
+[gdb-1] [INFO] [1792398971.803257842] [local_costmap.local_costmap]: Using plugin "voxel_layer"
+[gdb-1] [INFO] [1792398971.803662177] [local_costmap.local_costmap]: Subscribed to Topics: scan
+[gdb-1] [INFO] [1792398971.812572351] [local_costmap.local_costmap]: Initialized plugin "voxel_layer"
+[gdb-1] [INFO] [1792398971.812605965] [local_costmap.local_costmap]: Using plugin "inflation_layer"
+[gdb-1] [INFO] [1792398971.813365519] [local_costmap.local_costmap]: Initialized plugin "inflation_layer"
+[gdb-1] [New Thread 0x7fffcaffd640 (LWP 9695)]
+[gdb-1] [New Thread 0x7fffca7fc640 (LWP 9696)]
+[gdb-1] [INFO] [1792398971.826642745] [controller_server]: Created progress_checker : progress_checker of type nav2_controller::SimpleProgressChecker
+[gdb-1] [INFO] [1792398971.830650769] [controller_server]: Created goal checker : general_goal_checker of type nav2_controller::SimpleGoalChecker
+[gdb-1] [INFO] [1792398971.830936662] [controller_server]: Controller Server has general_goal_checker  goal checkers available.
+[gdb-1] [INFO] [1792398971.838682580] [controller_server]: Created controller : FollowPath of type dwb_core::DWBLocalPlanner
+[gdb-1] [INFO] [1792398971.839306693] [controller_server]: Setting transform_tolerance to 0.200000
+[gdb-1] [INFO] [1792398971.862490960] [controller_server]: Using critic "RotateToGoal" (dwb_critics::RotateToGoalCritic)
+[gdb-1] [INFO] [1792398971.862905916] [controller_server]: Critic plugin initialized
+[gdb-1] [INFO] [1792398971.863011581] [controller_server]: Using critic "Oscillation" (dwb_critics::OscillationCritic)
+[gdb-1] [INFO] [1792398971.863312049] [controller_server]: Critic plugin initialized
+[gdb-1] [INFO] [1792398971.863413593] [controller_server]: Using critic "BaseObstacle" (dwb_critics::BaseObstacleCritic)
+[gdb-1] [INFO] [1792398971.863578698] [controller_server]: Critic plugin initialized
+[gdb-1] [INFO] [1792398971.863677108] [controller_server]: Using critic "GoalAlign" (dwb_critics::GoalAlignCritic)
+[gdb-1] [INFO] [1792398971.863974813] [controller_server]: Critic plugin initialized
+[gdb-1] [INFO] [1792398971.864077355] [controller_server]: Using critic "PathAlign" (dwb_critics::PathAlignCritic)
+[gdb-1] [INFO] [1792398971.864311019] [controller_server]: Critic plugin initialized
+[gdb-1] [INFO] [1792398971.864423699] [controller_server]: Using critic "PathDist" (dwb_critics::PathDistCritic)
+[gdb-1] [INFO] [1792398971.864595428] [controller_server]: Critic plugin initialized
+[gdb-1] [INFO] [1792398971.864693350] [controller_server]: Using critic "GoalDist" (dwb_critics::GoalDistCritic)
+[gdb-1] [INFO] [1792398971.864871177] [controller_server]: Critic plugin initialized
+[gdb-1] [INFO] [1792398971.864905684] [controller_server]: Controller Server has FollowPath  controllers available.
+[gdb-1] [New Thread 0x7fffc9ffb640 (LWP 9697)]
+[lifecycle_manager-8] [INFO] [1792398971.871290064] [lifecycle_manager_navigation]: [34m[1mConfiguring smoother_server[0m[0m
+[smoother_server-2] [INFO] [1792398971.871441816] [smoother_server]: Configuring smoother server
+[smoother_server-2] [INFO] [1792398971.875519296] [smoother_server]: Created smoother : simple_smoother of type nav2_smoother::SimpleSmoother
+[smoother_server-2] [INFO] [1792398971.875790767] [smoother_server]: Smoother Server has simple_smoother  smoothers available.
+[lifecycle_manager-8] [INFO] [1792398971.877694038] [lifecycle_manager_navigation]: [34m[1mConfiguring planner_server[0m[0m
+[planner_server-3] [INFO] [1792398971.877864127] [planner_server]: Configuring
+[planner_server-3] [INFO] [1792398971.877901089] [global_costmap.global_costmap]: Configuring
+[planner_server-3] [INFO] [1792398971.881236904] [global_costmap.global_costmap]: Using plugin "static_layer"
+[planner_server-3] [INFO] [1792398971.884145936] [global_costmap.global_costmap]: Subscribing to the map topic (/map) with transient local durability
+[planner_server-3] [INFO] [1792398971.884668121] [global_costmap.global_costmap]: Initialized plugin "static_layer"
+[planner_server-3] [INFO] [1792398971.884688932] [global_costmap.global_costmap]: Using plugin "obstacle_layer"
+[planner_server-3] [INFO] [1792398971.885212160] [global_costmap.global_costmap]: Subscribed to Topics: scan
+[planner_server-3] [INFO] [1792398971.886855917] [global_costmap.global_costmap]: Initialized plugin "obstacle_layer"
+[planner_server-3] [INFO] [1792398971.886885709] [global_costmap.global_costmap]: Using plugin "voxel_layer"
+[planner_server-3] [INFO] [1792398971.887409035] [global_costmap.global_costmap]: Subscribed to Topics: scan
+[planner_server-3] [INFO] [1792398971.889902708] [global_costmap.global_costmap]: Initialized plugin "voxel_layer"
+[planner_server-3] [INFO] [1792398971.889932544] [global_costmap.global_costmap]: Using plugin "inflation_layer"
+[planner_server-3] [INFO] [1792398971.890420738] [global_costmap.global_costmap]: Initialized plugin "inflation_layer"
+[planner_server-3] [INFO] [1792398971.893131370] [global_costmap.global_costmap]: StaticLayer: Resizing costmap to 112 X 103 at 0.050000 m/pix
+[planner_server-3] [INFO] [1792398971.893485253] [planner_server]: Created global planner plugin GridBased of type nav2_navfn_planner/NavfnPlanner
+[planner_server-3] [INFO] [1792398971.893510815] [planner_server]: Configuring plugin GridBased of type NavfnPlanner
+[planner_server-3] [INFO] [1792398971.893881051] [planner_server]: Planner Server has GridBased  planners available.
+[lifecycle_manager-8] [INFO] [1792398971.897492754] [lifecycle_manager_navigation]: [34m[1mConfiguring behavior_server[0m[0m
+[behavior_server-4] [INFO] [1792398971.897675847] [behavior_server]: Configuring
+[behavior_server-4] [INFO] [1792398971.901358531] [behavior_server]: Creating behavior plugin spin of type nav2_behaviors/Spin
+[behavior_server-4] [INFO] [1792398971.902034518] [behavior_server]: Configuring spin
+[behavior_server-4] [INFO] [1792398971.903566181] [behavior_server]: Creating behavior plugin backup of type nav2_behaviors/BackUp
+[behavior_server-4] [INFO] [1792398971.904294917] [behavior_server]: Configuring backup
+[behavior_server-4] [INFO] [1792398971.905766630] [behavior_server]: Creating behavior plugin drive_on_heading of type nav2_behaviors/DriveOnHeading
+[behavior_server-4] [INFO] [1792398971.906364125] [behavior_server]: Configuring drive_on_heading
+[behavior_server-4] [INFO] [1792398971.907831270] [behavior_server]: Creating behavior plugin wait of type nav2_behaviors/Wait
+[behavior_server-4] [INFO] [1792398971.908477885] [behavior_server]: Configuring wait
+[lifecycle_manager-8] [INFO] [1792398971.910358315] [lifecycle_manager_navigation]: [34m[1mConfiguring bt_navigator[0m[0m
+[bt_navigator-5] [INFO] [1792398971.910514987] [bt_navigator]: Configuring
+[lifecycle_manager-8] [INFO] [1792398972.030014610] [lifecycle_manager_navigation]: [34m[1mConfiguring waypoint_follower[0m[0m
+[waypoint_follower-6] [INFO] [1792398972.030253655] [waypoint_follower]: Configuring
+[waypoint_follower-6] [INFO] [1792398972.034990076] [waypoint_follower]: Created waypoint_task_executor : wait_at_waypoint of type nav2_waypoint_follower::WaitAtWaypoint
+[lifecycle_manager-8] [INFO] [1792398972.035668715] [lifecycle_manager_navigation]: [34m[1mConfiguring velocity_smoother[0m[0m
+[velocity_smoother-7] [INFO] [1792398972.035869188] [velocity_smoother]: Configuring velocity smoother
+[lifecycle_manager-8] [INFO] [1792398972.038263481] [lifecycle_manager_navigation]: [34m[1mActivating controller_server[0m[0m
+[gdb-1] [INFO] [1792398972.038435620] [controller_server]: Activating
+[gdb-1] [INFO] [1792398972.038484850] [local_costmap.local_costmap]: Activating
+[gdb-1] [INFO] [1792398972.038506389] [local_costmap.local_costmap]: Checking transform
+[gdb-1] [INFO] [1792398972.038750713] [local_costmap.local_costmap]: start
+[gdb-1] [New Thread 0x7fffc97fa640 (LWP 9706)]
+[gdb-1] [INFO] [1792398972.239639652] [controller_server]: Creating bond (controller_server) to lifecycle manager.
+[lifecycle_manager-8] [INFO] [1792398972.351632418] [lifecycle_manager_navigation]: Server controller_server connected with bond.
+[lifecycle_manager-8] [INFO] [1792398972.351684295] [lifecycle_manager_navigation]: [34m[1mActivating smoother_server[0m[0m
+[smoother_server-2] [INFO] [1792398972.352004604] [smoother_server]: Activating
+[smoother_server-2] [INFO] [1792398972.352049136] [smoother_server]: Creating bond (smoother_server) to lifecycle manager.
+[lifecycle_manager-8] [INFO] [1792398972.454899726] [lifecycle_manager_navigation]: Server smoother_server connected with bond.
+[lifecycle_manager-8] [INFO] [1792398972.454958601] [lifecycle_manager_navigation]: [34m[1mActivating planner_server[0m[0m
+[planner_server-3] [INFO] [1792398972.455274988] [planner_server]: Activating
+[planner_server-3] [INFO] [1792398972.455353709] [global_costmap.global_costmap]: Activating
+[planner_server-3] [INFO] [1792398972.455383260] [global_costmap.global_costmap]: Checking transform
+[planner_server-3] [INFO] [1792398972.455511749] [global_costmap.global_costmap]: start
+[planner_server-3] [INFO] [1792398973.506456271] [planner_server]: Activating plugin GridBased of type NavfnPlanner
+[planner_server-3] [INFO] [1792398973.507016086] [planner_server]: Creating bond (planner_server) to lifecycle manager.
+[lifecycle_manager-8] [INFO] [1792398973.609268518] [lifecycle_manager_navigation]: Server planner_server connected with bond.
+[lifecycle_manager-8] [INFO] [1792398973.609324544] [lifecycle_manager_navigation]: [34m[1mActivating behavior_server[0m[0m
+[behavior_server-4] [INFO] [1792398973.609659074] [behavior_server]: Activating
+[behavior_server-4] [INFO] [1792398973.609699999] [behavior_server]: Activating spin
+[behavior_server-4] [INFO] [1792398973.609727718] [behavior_server]: Activating backup
+[behavior_server-4] [INFO] [1792398973.609757519] [behavior_server]: Activating drive_on_heading
+[behavior_server-4] [INFO] [1792398973.609783530] [behavior_server]: Activating wait
+[behavior_server-4] [INFO] [1792398973.609815551] [behavior_server]: Creating bond (behavior_server) to lifecycle manager.
+[lifecycle_manager-8] [INFO] [1792398973.712388596] [lifecycle_manager_navigation]: Server behavior_server connected with bond.
+[lifecycle_manager-8] [INFO] [1792398973.712444654] [lifecycle_manager_navigation]: [34m[1mActivating bt_navigator[0m[0m
+[bt_navigator-5] [INFO] [1792398973.712776311] [bt_navigator]: Activating
+[bt_navigator-5] [INFO] [1792398973.842182002] [bt_navigator]: Creating bond (bt_navigator) to lifecycle manager.
+[lifecycle_manager-8] [INFO] [1792398973.945007536] [lifecycle_manager_navigation]: Server bt_navigator connected with bond.
+[lifecycle_manager-8] [INFO] [1792398973.945066225] [lifecycle_manager_navigation]: [34m[1mActivating waypoint_follower[0m[0m
+[waypoint_follower-6] [INFO] [1792398973.945407289] [waypoint_follower]: Activating
+[waypoint_follower-6] [INFO] [1792398973.945464398] [waypoint_follower]: Creating bond (waypoint_follower) to lifecycle manager.
+[lifecycle_manager-8] [INFO] [1792398974.048505491] [lifecycle_manager_navigation]: Server waypoint_follower connected with bond.
+[lifecycle_manager-8] [INFO] [1792398974.048584189] [lifecycle_manager_navigation]: [34m[1mActivating velocity_smoother[0m[0m
+[velocity_smoother-7] [INFO] [1792398974.048980535] [velocity_smoother]: Activating
+[velocity_smoother-7] [INFO] [1792398974.049049757] [velocity_smoother]: Creating bond (velocity_smoother) to lifecycle manager.
+[lifecycle_manager-8] [INFO] [1792398974.152260385] [lifecycle_manager_navigation]: Server velocity_smoother connected with bond.
+[lifecycle_manager-8] [INFO] [1792398974.152324047] [lifecycle_manager_navigation]: [34m[1mManaged nodes are active[0m[0m
+[lifecycle_manager-8] [INFO] [1792398974.152354085] [lifecycle_manager_navigation]: [34m[1mCreating bond timer...[0m[0m
+[bt_navigator-5] [INFO] [1792398975.234250548] [bt_navigator]: Begin navigating from current location (0.40, 1.53) to (-1.50, -0.60)
+[gdb-1] [INFO] [1792398975.255359910] [controller_server]: Received a goal, begin computing control effort.
+[gdb-1] [New Thread 0x7fffc8ff9640 (LWP 9777)]
+[gdb-1] [WARN] [1792398975.255435093] [controller_server]: No goal checker was specified in parameter 'current_goal_checker'. Server will use only plugin loaded general_goal_checker . This warning will appear once.
+[gdb-1] [INFO] [1792398976.355766946] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792398977.355683924] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792398978.355676924] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792398979.455651445] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792398980.455681759] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792398981.455678881] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792398982.555684710] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792398983.555677163] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792398984.555680537] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792398985.555679319] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792398986.655678354] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792398987.655682872] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792398988.655655281] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792398989.755685134] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792398990.755680321] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792398991.755654439] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792398992.755651373] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792398993.855681570] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792398994.855673431] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792398995.855684893] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792398996.855647446] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792398997.955649211] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792398998.955648743] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792398999.955684948] [controller_server]: Passing new path to controller.
+[gdb-1] [ERROR] [1792399000.955702346] [controller_server]: Failed to make progress
+[gdb-1] [WARN] [1792399000.955787878] [controller_server]: [follow_path] [ActionServer] Aborting handle.
+[gdb-1] [Thread 0x7fffc8ff9640 (LWP 9777) exited]
+[gdb-1] [INFO] [1792399000.974602240] [local_costmap.local_costmap]: Received request to clear entirely the local_costmap
+[gdb-1] [INFO] [1792399000.976216126] [controller_server]: Received a goal, begin computing control effort.
+[gdb-1] [New Thread 0x7fffabfff640 (LWP 10084)]
+[gdb-1] [INFO] [1792399001.046456341] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399001.060286316] [controller_server]: Reached the goal!
+[gdb-1] [Thread 0x7fffabfff640 (LWP 10084) exited]
+[bt_navigator-5] [INFO] [1792399001.104687779] [bt_navigator]: Goal succeeded
+[bt_navigator-5] [INFO] [1792399001.105983684] [bt_navigator]: Begin navigating from current location (-1.45, -0.59) to (-1.60, 0.60)
+[gdb-1] [New Thread 0x7fffc8ff9640 (LWP 10087)]
+[gdb-1] [INFO] [1792399001.127139897] [controller_server]: Received a goal, begin computing control effort.
+[gdb-1] [INFO] [1792399002.227448749] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399003.227353788] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399004.227349545] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399005.327351232] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399006.327369402] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399007.327381470] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399008.427377000] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399009.427350669] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399010.427349959] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399011.427382506] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399012.527384783] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399013.527355366] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399014.527382073] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399015.627461370] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399016.137724669] [controller_server]: Reached the goal!
+[gdb-1] [Thread 0x7fffc8ff9640 (LWP 10087) exited]
+[bt_navigator-5] [INFO] [1792399016.176293216] [bt_navigator]: Goal succeeded
+[bt_navigator-5] [INFO] [1792399016.177198240] [bt_navigator]: Begin navigating from current location (-1.60, 0.55) to (-0.50, 1.60)
+[gdb-1] [INFO] [1792399016.198495966] [controller_server]: Received a goal, begin computing control effort.
+[gdb-1] [New Thread 0x7fffabfff640 (LWP 10159)]
+[gdb-1] [INFO] [1792399017.298736160] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399018.298758907] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399019.298731257] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399020.398753917] [controller_server]: Passing new path to controller.
+[planner_server-3] [WARN] [1792399021.317951112] [planner_server]: Planner loop missed its desired rate of 20.0000 Hz. Current loop rate is 10.0000 Hz
+[gdb-1] [INFO] [1792399021.398732032] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399022.398737360] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399023.398732894] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399024.498744875] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399025.498762020] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399026.498747181] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399027.598732862] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399028.598757925] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399029.598767038] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399030.212113709] [controller_server]: Reached the goal!
+[gdb-1] [Thread 0x7fffabfff640 (LWP 10159) exited]
+[bt_navigator-5] [INFO] [1792399030.247832288] [bt_navigator]: Goal succeeded
+[bt_navigator-5] [INFO] [1792399030.250360036] [bt_navigator]: Begin navigating from current location (-0.49, 1.56) to (-1.60, 0.60)
+[gdb-1] [INFO] [1792399030.271542240] [controller_server]: Received a goal, begin computing control effort.
+[gdb-1] [New Thread 0x7fffc8ff9640 (LWP 10279)]
+[gdb-1] [INFO] [1792399031.371793566] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399032.371792013] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399033.371782500] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399034.471787278] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399035.471784932] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399036.471786596] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399037.471784191] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399038.571758788] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399039.571837229] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399040.571795817] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399041.671795786] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399042.671807632] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399043.671861441] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399044.771761190] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399045.771775366] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399046.771785720] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399047.771783558] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399048.871761541] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399049.477914729] [controller_server]: Reached the goal!
+[gdb-1] [Thread 0x7fffc8ff9640 (LWP 10279) exited]
+[bt_navigator-5] [INFO] [1792399049.510770774] [bt_navigator]: Goal succeeded
+[bt_navigator-5] [INFO] [1792399049.511425908] [bt_navigator]: Begin navigating from current location (-1.55, 0.59) to (-2.00, -0.50)
+[gdb-1] [INFO] [1792399049.532294126] [controller_server]: Received a goal, begin computing control effort.
+[gdb-1] [New Thread 0x7fffabfff640 (LWP 11426)]
+[gdb-1] [INFO] [1792399050.632509042] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399051.632476094] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399052.632509583] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399053.732479370] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399054.732479131] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399055.732508060] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399056.832480814] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399057.832508916] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399058.832514832] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399059.832489033] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399060.932500530] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399061.932486011] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399062.932513646] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399063.932512214] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399065.032512796] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399065.345251422] [controller_server]: Reached the goal!
+[gdb-1] [Thread 0x7fffabfff640 (LWP 11426) exited]
+[bt_navigator-5] [INFO] [1792399065.381835979] [bt_navigator]: Goal succeeded
+[bt_navigator-5] [INFO] [1792399065.382888805] [bt_navigator]: Begin navigating from current location (-1.98, -0.45) to (-1.50, -0.60)
+[gdb-1] [INFO] [1792399065.404002372] [controller_server]: Received a goal, begin computing control effort.
+[gdb-1] [New Thread 0x7fffc8ff9640 (LWP 11838)]
+[gdb-1] [INFO] [1792399066.504243162] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399067.504236808] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399068.504211240] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399069.604245197] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399070.604214577] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399071.604243529] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399071.911610022] [controller_server]: Reached the goal!
+[gdb-1] [Thread 0x7fffc8ff9640 (LWP 11838) exited]
+[bt_navigator-5] [INFO] [1792399071.943164050] [bt_navigator]: Goal succeeded
+[bt_navigator-5] [INFO] [1792399071.943967809] [bt_navigator]: Begin navigating from current location (-1.54, -0.58) to (-1.60, 0.60)
+[gdb-1] [New Thread 0x7fffabfff640 (LWP 11926)]
+[gdb-1] [INFO] [1792399071.965173555] [controller_server]: Received a goal, begin computing control effort.
+[gdb-1] [INFO] [1792399073.065373614] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399074.065423689] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399075.065404271] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399076.165386202] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399077.165388212] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399078.165392345] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399079.265409224] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399080.265411185] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399081.265401461] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399082.265410420] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399083.365400273] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399084.365412719] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399085.365393696] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399086.465394327] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399087.174474138] [controller_server]: Reached the goal!
+[gdb-1] [Thread 0x7fffabfff640 (LWP 11926) exited]
+[bt_navigator-5] [INFO] [1792399087.214330100] [bt_navigator]: Goal succeeded
+[bt_navigator-5] [INFO] [1792399087.215337414] [bt_navigator]: Begin navigating from current location (-1.59, 0.55) to (-0.50, 1.60)
+[gdb-1] [INFO] [1792399087.236298264] [controller_server]: Received a goal, begin computing control effort.
+[gdb-1] [New Thread 0x7fffc8ff9640 (LWP 12063)]
+[gdb-1] [INFO] [1792399088.336525586] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399089.336555954] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399090.336564256] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399091.436521354] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399092.436545869] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399093.436554460] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399094.436515717] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399095.536541693] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399096.536514978] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399097.536521777] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399098.636518860] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399099.636616668] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399100.636552773] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399101.344257926] [controller_server]: Reached the goal!
+[gdb-1] [Thread 0x7fffc8ff9640 (LWP 12063) exited]
+[bt_navigator-5] [INFO] [1792399101.375750661] [bt_navigator]: Goal succeeded
+[bt_navigator-5] [INFO] [1792399101.376659129] [bt_navigator]: Begin navigating from current location (-0.50, 1.55) to (-1.60, 0.60)
+[gdb-1] [INFO] [1792399101.397766228] [controller_server]: Received a goal, begin computing control effort.
+[gdb-1] [New Thread 0x7fffabfff640 (LWP 12132)]
+[gdb-1] [INFO] [1792399102.498018503] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399103.498016627] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399104.498014517] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399105.598026426] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399106.598044072] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399107.598039212] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399108.698016602] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399109.698076184] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399110.698013305] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399111.698018432] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399112.798018634] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399113.798015367] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399114.798052453] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399115.898018472] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399116.898018154] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399117.898049131] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399118.898048275] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399119.998038705] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399120.998064745] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399121.998040591] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399122.006418834] [controller_server]: Reached the goal!
+[gdb-1] [Thread 0x7fffabfff640 (LWP 12132) exited]
+[bt_navigator-5] [INFO] [1792399122.047169761] [bt_navigator]: Goal succeeded
+[bt_navigator-5] [INFO] [1792399122.049255554] [bt_navigator]: Begin navigating from current location (-1.55, 0.59) to (-2.00, -0.50)
+[gdb-1] [INFO] [1792399122.070306491] [controller_server]: Received a goal, begin computing control effort.
+[gdb-1] [New Thread 0x7fffc8ff9640 (LWP 12434)]
+[gdb-1] [INFO] [1792399123.170523061] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399124.170557129] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399125.170551552] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399126.270526055] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399127.270525698] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399128.270526929] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399129.370556682] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399130.370525864] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399131.370545542] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399132.370553164] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399133.470527399] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399134.470523106] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399135.470642892] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399136.570556487] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399137.570557089] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399137.676074721] [controller_server]: Reached the goal!
+[gdb-1] [Thread 0x7fffc8ff9640 (LWP 12434) exited]
+[bt_navigator-5] [INFO] [1792399137.709581365] [bt_navigator]: Goal succeeded
+[bt_navigator-5] [INFO] [1792399137.710403935] [bt_navigator]: Begin navigating from current location (-1.98, -0.45) to (-1.50, -0.60)
+[gdb-1] [INFO] [1792399137.731321314] [controller_server]: Received a goal, begin computing control effort.
+[gdb-1] [New Thread 0x7fffabfff640 (LWP 13316)]
+[gdb-1] [INFO] [1792399138.831533976] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399139.831563123] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399140.831522081] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399141.931554262] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399142.931524059] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399143.837794727] [controller_server]: Reached the goal!
+[gdb-1] [Thread 0x7fffabfff640 (LWP 13316) exited]
+[bt_navigator-5] [INFO] [1792399143.871175066] [bt_navigator]: Goal succeeded
+[bt_navigator-5] [INFO] [1792399143.873172204] [bt_navigator]: Begin navigating from current location (-1.55, -0.58) to (-1.60, 0.60)
+[gdb-1] [INFO] [1792399143.894627047] [controller_server]: Received a goal, begin computing control effort.
+[gdb-1] [New Thread 0x7fffc8ff9640 (LWP 13547)]
+[gdb-1] [INFO] [1792399144.994833876] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399145.994875766] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399146.994833490] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399148.094987945] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399149.094877995] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399150.094874981] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399151.094869999] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399152.194884507] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399153.194886537] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399154.194839535] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399155.194874410] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399156.294976227] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399157.294890467] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399158.294866640] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399158.800948756] [controller_server]: Reached the goal!
+[gdb-1] [Thread 0x7fffc8ff9640 (LWP 13547) exited]
+[bt_navigator-5] [INFO] [1792399158.833574232] [bt_navigator]: Goal succeeded
+[bt_navigator-5] [INFO] [1792399158.834670823] [bt_navigator]: Begin navigating from current location (-1.60, 0.55) to (-0.50, 1.60)
+[gdb-1] [INFO] [1792399158.855918723] [controller_server]: Received a goal, begin computing control effort.
+[gdb-1] [New Thread 0x7fffabfff640 (LWP 13904)]
+[gdb-1] [INFO] [1792399159.956158066] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399160.956142005] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399161.956133570] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399163.056142088] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399164.056128028] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399165.056132928] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399166.056133051] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399167.156110072] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399168.156140906] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399169.156112979] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399170.156106349] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399171.256143351] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399172.256135562] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399172.863744714] [controller_server]: Reached the goal!
+[gdb-1] [Thread 0x7fffabfff640 (LWP 13904) exited]
+[bt_navigator-5] [INFO] [1792399172.895016268] [bt_navigator]: Goal succeeded
+[bt_navigator-5] [INFO] [1792399172.895840357] [bt_navigator]: Begin navigating from current location (-0.50, 1.56) to (-1.60, 0.60)
+[gdb-1] [INFO] [1792399172.917130256] [controller_server]: Received a goal, begin computing control effort.
+[gdb-1] [New Thread 0x7fffc8ff9640 (LWP 14201)]
+[gdb-1] [INFO] [1792399174.017404581] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399175.017397281] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399176.017370073] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399177.117371033] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399178.117374436] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399179.117400987] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399180.217403450] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399181.217369995] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399182.217374965] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399183.217412234] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399184.317397548] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399185.317405800] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399186.317375151] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399187.417399748] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399188.417391660] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399189.417370366] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399190.517401880] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399191.517370718] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399191.623988404] [controller_server]: Reached the goal!
+[gdb-1] [Thread 0x7fffc8ff9640 (LWP 14201) exited]
+[bt_navigator-5] [INFO] [1792399191.656171028] [bt_navigator]: Goal succeeded
+[bt_navigator-5] [INFO] [1792399191.657381990] [bt_navigator]: Begin navigating from current location (-1.55, 0.59) to (-2.00, -0.50)
+[gdb-1] [INFO] [1792399191.678438915] [controller_server]: Received a goal, begin computing control effort.
+[gdb-1] [New Thread 0x7fffabfff640 (LWP 14545)]
+[planner_server-3] [WARN] [1792399192.678443860] [planner_server]: Planner loop missed its desired rate of 20.0000 Hz. Current loop rate is 10.0000 Hz
+[gdb-1] [INFO] [1792399192.778639534] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399193.778654332] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399194.778638431] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399195.878643375] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399196.878664462] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399197.878663978] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399198.878637704] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399199.978635236] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399200.978638322] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399201.978662851] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399203.078671439] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399204.078633654] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399205.078672405] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399206.078633679] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399207.178669564] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399207.688586754] [controller_server]: Reached the goal!
+[gdb-1] [Thread 0x7fffabfff640 (LWP 14545) exited]
+[bt_navigator-5] [INFO] [1792399207.727805297] [bt_navigator]: Goal succeeded
+[bt_navigator-5] [INFO] [1792399207.728683270] [bt_navigator]: Begin navigating from current location (-1.99, -0.45) to (-1.50, -0.60)
+[gdb-1] [INFO] [1792399207.750297315] [controller_server]: Received a goal, begin computing control effort.
+[gdb-1] [New Thread 0x7fffc8ff9640 (LWP 14732)]
+[gdb-1] [INFO] [1792399208.850502719] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399209.850503916] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399210.850532666] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399211.950582310] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399212.950497820] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399213.950586855] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399214.950533126] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399215.759462224] [controller_server]: Reached the goal!
+[gdb-1] [Thread 0x7fffc8ff9640 (LWP 14732) exited]
+[bt_navigator-5] [INFO] [1792399215.799125384] [bt_navigator]: Goal succeeded
+[bt_navigator-5] [INFO] [1792399215.800274653] [bt_navigator]: Begin navigating from current location (-1.55, -0.59) to (-1.60, 0.60)
+[gdb-1] [INFO] [1792399215.821858406] [controller_server]: Received a goal, begin computing control effort.
+[gdb-1] [New Thread 0x7fffabfff640 (LWP 14782)]
+[gdb-1] [INFO] [1792399216.922150421] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399217.922115521] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399218.922158100] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399220.022151166] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399221.022139873] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399222.022117389] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399223.022162945] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399224.122141640] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399225.122142513] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399226.122119497] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399227.122194215] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399228.222120006] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399228.930924524] [controller_server]: Reached the goal!
+[gdb-1] [Thread 0x7fffabfff640 (LWP 14782) exited]
+[bt_navigator-5] [INFO] [1792399228.971195639] [bt_navigator]: Goal succeeded
+[bt_navigator-5] [INFO] [1792399228.974211970] [bt_navigator]: Begin navigating from current location (-1.60, 0.56) to (-0.50, 1.60)
+[gdb-1] [INFO] [1792399228.996186598] [controller_server]: Received a goal, begin computing control effort.
+[gdb-1] [New Thread 0x7fffc8ff9640 (LWP 14931)]
+[gdb-1] [INFO] [1792399230.096450721] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399231.096452330] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399232.096448595] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399233.196452812] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399234.196446136] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399235.196446419] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399236.296446301] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399237.296479900] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399238.296451087] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399239.296444746] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399240.396461803] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399241.396476534] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399242.396456249] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399242.905484542] [controller_server]: Reached the goal!
+[gdb-1] [Thread 0x7fffc8ff9640 (LWP 14931) exited]
+[bt_navigator-5] [INFO] [1792399242.944713689] [bt_navigator]: Goal succeeded
+[bt_navigator-5] [INFO] [1792399242.945670623] [bt_navigator]: Begin navigating from current location (-0.50, 1.55) to (-1.60, 0.60)
+[gdb-1] [INFO] [1792399242.967181896] [controller_server]: Received a goal, begin computing control effort.
+[gdb-1] [New Thread 0x7fffabfff640 (LWP 15129)]
+[gdb-1] [INFO] [1792399244.067424081] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399245.067427360] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399246.067394513] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399247.167421016] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399248.167425713] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399249.167397790] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399250.267428218] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399251.267392598] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399252.267395334] [controller_server]: Passing new path to controller.
+[planner_server-3] [INFO] [1792399252.455752567] [global_costmap.global_costmap]: StaticLayer: Resizing costmap to 112 X 103 at 0.050000 m/pix
+[gdb-1] [INFO] [1792399253.267391594] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399254.367394507] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399255.367393903] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399256.367392923] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399257.467395039] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399258.467395782] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399259.467397290] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399260.467387697] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399261.567395942] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399261.673724912] [controller_server]: Reached the goal!
+[gdb-1] [Thread 0x7fffabfff640 (LWP 15129) exited]
+[bt_navigator-5] [INFO] [1792399261.705949435] [bt_navigator]: Goal succeeded
+[bt_navigator-5] [INFO] [1792399261.707207260] [bt_navigator]: Begin navigating from current location (-1.55, 0.59) to (-2.00, -0.50)
+[gdb-1] [INFO] [1792399261.728723911] [controller_server]: Received a goal, begin computing control effort.
+[gdb-1] [New Thread 0x7fffc8ff9640 (LWP 15299)]
+[gdb-1] [INFO] [1792399262.828951103] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399263.828953063] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399264.828953307] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399265.928957322] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399266.928983288] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399267.928954411] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399269.028948775] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399270.028949952] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399271.028957667] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399272.028950837] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399273.128950973] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399274.128951080] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399275.128961702] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399276.228979748] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399276.537388325] [controller_server]: Reached the goal!
+[gdb-1] [Thread 0x7fffc8ff9640 (LWP 15299) exited]
+[bt_navigator-5] [INFO] [1792399276.567522573] [bt_navigator]: Goal succeeded
+[bt_navigator-5] [INFO] [1792399276.568494466] [bt_navigator]: Begin navigating from current location (-1.99, -0.45) to (-1.50, -0.60)
+[gdb-1] [INFO] [1792399276.589677260] [controller_server]: Received a goal, begin computing control effort.
+[gdb-1] [New Thread 0x7fffabfff640 (LWP 15427)]
+[gdb-1] [INFO] [1792399277.689837232] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399278.689987027] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399279.689840873] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399280.789839081] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399281.789835897] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399282.789927905] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399282.799198067] [controller_server]: Reached the goal!
+[gdb-1] [Thread 0x7fffabfff640 (LWP 15427) exited]
+[bt_navigator-5] [INFO] [1792399282.848896797] [bt_navigator]: Goal succeeded
+[bt_navigator-5] [INFO] [1792399282.849948648] [bt_navigator]: Begin navigating from current location (-1.54, -0.58) to (-1.60, 0.60)
+[gdb-1] [New Thread 0x7fffc8ff9640 (LWP 15527)]
+[gdb-1] [INFO] [1792399282.870987108] [controller_server]: Received a goal, begin computing control effort.
+[gdb-1] [INFO] [1792399283.971150080] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399284.971181469] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399285.971185806] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399287.071177196] [controller_server]: Passing new path to controller.
+[planner_server-3] [INFO] [1792399287.455700919] [global_costmap.global_costmap]: StaticLayer: Resizing costmap to 112 X 103 at 0.050000 m/pix
+[gdb-1] [INFO] [1792399288.071152310] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399289.071177571] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399290.171153383] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399291.171182531] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399292.171182764] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399293.171148259] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399294.271184875] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399295.271184726] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399295.578692812] [controller_server]: Reached the goal!
+[gdb-1] [Thread 0x7fffc8ff9640 (LWP 15527) exited]
+[bt_navigator-5] [INFO] [1792399295.610280322] [bt_navigator]: Goal succeeded
+[bt_navigator-5] [INFO] [1792399295.611003598] [bt_navigator]: Begin navigating from current location (-1.61, 0.56) to (-0.50, 1.60)
+[gdb-1] [INFO] [1792399295.632617042] [controller_server]: Received a goal, begin computing control effort.
+[gdb-1] [New Thread 0x7fffabfff640 (LWP 15694)]
+[gdb-1] [INFO] [1792399296.733046498] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399297.733068676] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399298.733048889] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399299.833048595] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399300.833046703] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399301.833047066] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399302.933083134] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399303.933052882] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399304.933089111] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399305.933047903] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399307.033076516] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399308.033050885] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399309.033083056] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399309.540424483] [controller_server]: Reached the goal!
+[gdb-1] [Thread 0x7fffabfff640 (LWP 15694) exited]
+[bt_navigator-5] [INFO] [1792399309.571309265] [bt_navigator]: Goal succeeded
+[bt_navigator-5] [INFO] [1792399309.572021629] [bt_navigator]: Begin navigating from current location (-0.49, 1.55) to (-1.60, 0.60)
+[gdb-1] [INFO] [1792399309.593195578] [controller_server]: Received a goal, begin computing control effort.
+[gdb-1] [New Thread 0x7fffc8ff9640 (LWP 15761)]
+[gdb-1] [INFO] [1792399310.693412004] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399311.693385126] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399312.693384417] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399313.793463858] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399314.793384983] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399315.793412316] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399316.893416933] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399317.893384037] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399318.893385311] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399319.993424286] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399320.993384238] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399321.993383884] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399322.993413757] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399324.093422814] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399325.093484462] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399326.093386795] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399327.093381604] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399327.500960028] [controller_server]: Reached the goal!
+[gdb-1] [Thread 0x7fffc8ff9640 (LWP 15761) exited]
+[bt_navigator-5] [INFO] [1792399327.532429250] [bt_navigator]: Goal succeeded
+[bt_navigator-5] [INFO] [1792399327.533188343] [bt_navigator]: Begin navigating from current location (-1.62, 0.64) to (-2.00, -0.50)
+[gdb-1] [INFO] [1792399327.554652880] [controller_server]: Received a goal, begin computing control effort.
+[gdb-1] [New Thread 0x7fffabfff640 (LWP 16044)]
+[gdb-1] [INFO] [1792399328.654837588] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399329.654988020] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399330.654904187] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399331.754876313] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399332.754837083] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399333.754836524] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399334.754870700] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399335.854970603] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399336.854888053] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399337.854892091] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399338.954951397] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399339.954925982] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399340.954871936] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399341.954888726] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399342.060352824] [controller_server]: Reached the goal!
+[gdb-1] [Thread 0x7fffabfff640 (LWP 16044) exited]
+[bt_navigator-5] [INFO] [1792399342.093537083] [bt_navigator]: Goal succeeded
+[bt_navigator-5] [INFO] [1792399342.095122014] [bt_navigator]: Begin navigating from current location (-2.00, -0.45) to (-1.50, -0.60)
+[gdb-1] [INFO] [1792399342.116362225] [controller_server]: Received a goal, begin computing control effort.
+[gdb-1] [New Thread 0x7fffc8ff9640 (LWP 16291)]
+[gdb-1] [INFO] [1792399343.216538304] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399344.216544391] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399345.216567356] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399346.316542428] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399347.316542532] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399348.316540933] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399348.622677568] [controller_server]: Reached the goal!
+[gdb-1] [Thread 0x7fffc8ff9640 (LWP 16291) exited]
+[bt_navigator-5] [INFO] [1792399348.655483053] [bt_navigator]: Goal succeeded
+[bt_navigator-5] [INFO] [1792399348.656356653] [bt_navigator]: Begin navigating from current location (-1.54, -0.58) to (-1.60, 0.60)
+[gdb-1] [INFO] [1792399348.677889070] [controller_server]: Received a goal, begin computing control effort.
+[gdb-1] [New Thread 0x7fffabfff640 (LWP 16440)]
+[gdb-1] [INFO] [1792399349.778080563] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399350.778108639] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399351.778082360] [controller_server]: Passing new path to controller.
+[gdb-1] [ERROR] [1792399351.985413928] [DWBLocalPlanner]: No valid trajectories out of 819! 
+[gdb-1] [ERROR] [1792399351.985455927] [DWBLocalPlanner]: 1.00: BaseObstacle/Trajectory Hits Obstacle.
+[gdb-1] [WARN] [1792399351.985612627] [controller_server]: No valid trajectories out of 819! 
+[gdb-1] [ERROR] [1792399352.086734405] [DWBLocalPlanner]: No valid trajectories out of 819! 
+[gdb-1] [ERROR] [1792399352.086772064] [DWBLocalPlanner]: 1.00: BaseObstacle/Trajectory Hits Obstacle.
+[gdb-1] [WARN] [1792399352.086952980] [controller_server]: No valid trajectories out of 819! 
+[gdb-1] [ERROR] [1792399352.206414146] [DWBLocalPlanner]: No valid trajectories out of 819! 
+[gdb-1] [ERROR] [1792399352.206456428] [DWBLocalPlanner]: 1.00: BaseObstacle/Trajectory Hits Obstacle.
+[gdb-1] [WARN] [1792399352.206714228] [controller_server]: No valid trajectories out of 819! 
+[gdb-1] [ERROR] [1792399352.288106044] [DWBLocalPlanner]: No valid trajectories out of 819! 
+[gdb-1] [ERROR] [1792399352.288139929] [DWBLocalPlanner]: 1.00: BaseObstacle/Trajectory Hits Obstacle.
+[gdb-1] [WARN] [1792399352.288352655] [controller_server]: No valid trajectories out of 819! 
+[gdb-1] [ERROR] [1792399352.288389808] [controller_server]: Controller patience exceeded
+[gdb-1] [WARN] [1792399352.288431726] [controller_server]: [follow_path] [ActionServer] Aborting handle.
+[gdb-1] [Thread 0x7fffabfff640 (LWP 16440) exited]
+[gdb-1] [INFO] [1792399352.306711366] [local_costmap.local_costmap]: Received request to clear entirely the local_costmap
+[gdb-1] [INFO] [1792399352.307830138] [controller_server]: Received a goal, begin computing control effort.
+[gdb-1] [New Thread 0x7fffc8ff9640 (LWP 16459)]
+[gdb-1] [ERROR] [1792399352.456325087] [DWBLocalPlanner]: No valid trajectories out of 819! 
+[gdb-1] [ERROR] [1792399352.456364583] [DWBLocalPlanner]: 1.00: BaseObstacle/Trajectory Hits Obstacle.
+[gdb-1] [WARN] [1792399352.456537934] [controller_server]: No valid trajectories out of 819! 
+[gdb-1] [WARN] [1792399352.456664155] [controller_server]: Control loop missed its desired rate of 10.0000Hz
+[gdb-1] [ERROR] [1792399352.467720089] [DWBLocalPlanner]: No valid trajectories out of 819! 
+[gdb-1] [ERROR] [1792399352.467749931] [DWBLocalPlanner]: 1.00: BaseObstacle/Trajectory Hits Obstacle.
+[gdb-1] [WARN] [1792399352.467967500] [controller_server]: No valid trajectories out of 819! 
+[gdb-1] [ERROR] [1792399352.514987616] [DWBLocalPlanner]: No valid trajectories out of 819! 
+[gdb-1] [ERROR] [1792399352.515021572] [DWBLocalPlanner]: 1.00: BaseObstacle/Trajectory Hits Obstacle.
+[gdb-1] [WARN] [1792399352.515196863] [controller_server]: No valid trajectories out of 819! 
+[gdb-1] [ERROR] [1792399352.615066351] [DWBLocalPlanner]: No valid trajectories out of 819! 
+[gdb-1] [ERROR] [1792399352.615106145] [DWBLocalPlanner]: 1.00: BaseObstacle/Trajectory Hits Obstacle.
+[gdb-1] [WARN] [1792399352.615313378] [controller_server]: No valid trajectories out of 819! 
+[gdb-1] [ERROR] [1792399352.714797864] [DWBLocalPlanner]: No valid trajectories out of 819! 
+[gdb-1] [ERROR] [1792399352.714840259] [DWBLocalPlanner]: 1.00: BaseObstacle/Trajectory Hits Obstacle.
+[gdb-1] [WARN] [1792399352.715053001] [controller_server]: No valid trajectories out of 819! 
+[gdb-1] [ERROR] [1792399352.715086479] [controller_server]: Controller patience exceeded
+[gdb-1] [WARN] [1792399352.715121707] [controller_server]: [follow_path] [ActionServer] Aborting handle.
+[gdb-1] [Thread 0x7fffc8ff9640 (LWP 16459) exited]
+[gdb-1] [INFO] [1792399352.726787843] [local_costmap.local_costmap]: Received request to clear entirely the local_costmap
+[planner_server-3] [INFO] [1792399352.727157301] [global_costmap.global_costmap]: Received request to clear entirely the global_costmap
+[planner_server-3] [WARN] [1792399353.458551127] [planner_server]: Planner loop missed its desired rate of 20.0000 Hz. Current loop rate is 1.4286 Hz
+[gdb-1] [New Thread 0x7fffabfff640 (LWP 16467)]
+[gdb-1] [INFO] [1792399353.478201105] [controller_server]: Received a goal, begin computing control effort.
+[gdb-1] [ERROR] [1792399353.490136194] [DWBLocalPlanner]: No valid trajectories out of 819! 
+[gdb-1] [ERROR] [1792399353.490175528] [DWBLocalPlanner]: 1.00: BaseObstacle/Trajectory Hits Obstacle.
+[gdb-1] [WARN] [1792399353.490369851] [controller_server]: No valid trajectories out of 819! 
+[gdb-1] [ERROR] [1792399353.589622664] [DWBLocalPlanner]: No valid trajectories out of 819! 
+[gdb-1] [ERROR] [1792399353.589657728] [DWBLocalPlanner]: 1.00: BaseObstacle/Trajectory Hits Obstacle.
+[gdb-1] [WARN] [1792399353.589827142] [controller_server]: No valid trajectories out of 819! 
+[gdb-1] [ERROR] [1792399353.706458916] [DWBLocalPlanner]: No valid trajectories out of 819! 
+[gdb-1] [ERROR] [1792399353.706501645] [DWBLocalPlanner]: 1.00: BaseObstacle/Trajectory Hits Obstacle.
+[gdb-1] [WARN] [1792399353.706767398] [controller_server]: No valid trajectories out of 819! 
+[gdb-1] [ERROR] [1792399353.787053613] [DWBLocalPlanner]: No valid trajectories out of 819! 
+[gdb-1] [ERROR] [1792399353.787096978] [DWBLocalPlanner]: 1.00: BaseObstacle/Trajectory Hits Obstacle.
+[gdb-1] [WARN] [1792399353.787351072] [controller_server]: No valid trajectories out of 819! 
+[gdb-1] [ERROR] [1792399353.887254826] [DWBLocalPlanner]: No valid trajectories out of 819! 
+[gdb-1] [ERROR] [1792399353.887288861] [DWBLocalPlanner]: 1.00: BaseObstacle/Trajectory Hits Obstacle.
+[gdb-1] [WARN] [1792399353.887463835] [controller_server]: No valid trajectories out of 819! 
+[gdb-1] [ERROR] [1792399353.887497379] [controller_server]: Controller patience exceeded
+[gdb-1] [WARN] [1792399353.887531548] [controller_server]: [follow_path] [ActionServer] Aborting handle.
+[gdb-1] [Thread 0x7fffabfff640 (LWP 16467) exited]
+[gdb-1] [INFO] [1792399353.906589286] [local_costmap.local_costmap]: Received request to clear entirely the local_costmap
+[gdb-1] [INFO] [1792399353.907978862] [controller_server]: Received a goal, begin computing control effort.
+[gdb-1] [New Thread 0x7fffc8ff9640 (LWP 16472)]
+[gdb-1] [ERROR] [1792399354.055945397] [DWBLocalPlanner]: No valid trajectories out of 819! 
+[gdb-1] [ERROR] [1792399354.055996394] [DWBLocalPlanner]: 1.00: BaseObstacle/Trajectory Hits Obstacle.
+[gdb-1] [WARN] [1792399354.056178979] [controller_server]: No valid trajectories out of 819! 
+[gdb-1] [WARN] [1792399354.056310298] [controller_server]: Control loop missed its desired rate of 10.0000Hz
+[gdb-1] [ERROR] [1792399354.062948512] [DWBLocalPlanner]: No valid trajectories out of 819! 
+[gdb-1] [ERROR] [1792399354.063014671] [DWBLocalPlanner]: 1.00: BaseObstacle/Trajectory Hits Obstacle.
+[gdb-1] [WARN] [1792399354.063220353] [controller_server]: No valid trajectories out of 819! 
+[gdb-1] [ERROR] [1792399354.116279768] [DWBLocalPlanner]: No valid trajectories out of 819! 
+[gdb-1] [ERROR] [1792399354.116314258] [DWBLocalPlanner]: 1.00: BaseObstacle/Trajectory Hits Obstacle.
+[gdb-1] [WARN] [1792399354.116485109] [controller_server]: No valid trajectories out of 819! 
+[gdb-1] [ERROR] [1792399354.215420278] [DWBLocalPlanner]: No valid trajectories out of 819! 
+[gdb-1] [ERROR] [1792399354.215452592] [DWBLocalPlanner]: 1.00: BaseObstacle/Trajectory Hits Obstacle.
+[gdb-1] [WARN] [1792399354.215633742] [controller_server]: No valid trajectories out of 819! 
+[gdb-1] [ERROR] [1792399354.314964586] [DWBLocalPlanner]: No valid trajectories out of 819! 
+[gdb-1] [ERROR] [1792399354.315002064] [DWBLocalPlanner]: 1.00: BaseObstacle/Trajectory Hits Obstacle.
+[gdb-1] [WARN] [1792399354.315335737] [controller_server]: No valid trajectories out of 819! 
+[gdb-1] [ERROR] [1792399354.315373151] [controller_server]: Controller patience exceeded
+[gdb-1] [WARN] [1792399354.315406428] [controller_server]: [follow_path] [ActionServer] Aborting handle.
+[gdb-1] [Thread 0x7fffc8ff9640 (LWP 16472) exited]
+[behavior_server-4] [INFO] [1792399354.326933154] [behavior_server]: Running spin
+[behavior_server-4] [INFO] [1792399354.327045712] [behavior_server]: Turning 1.57 for spin behavior.
+[behavior_server-4] [WARN] [1792399355.527226324] [behavior_server]: Collision Ahead - Exiting Spin
+[behavior_server-4] [WARN] [1792399355.527263119] [behavior_server]: spin failed
+[behavior_server-4] [WARN] [1792399355.527286224] [behavior_server]: [spin] [ActionServer] Aborting handle.
+[behavior_server-4] [INFO] [1792399355.556834113] [behavior_server]: Running wait
+[behavior_server-4] [INFO] [1792399360.557024090] [behavior_server]: wait completed successfully
+[gdb-1] [INFO] [1792399360.607716364] [controller_server]: Received a goal, begin computing control effort.
+[gdb-1] [New Thread 0x7fffabfff640 (LWP 16556)]
+[gdb-1] [INFO] [1792399361.707925351] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399362.707927323] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399363.707892197] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399364.807929831] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399365.807886713] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399366.807954149] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399367.807924603] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399368.907931102] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399369.907983000] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399370.114735259] [controller_server]: Reached the goal!
+[gdb-1] [Thread 0x7fffabfff640 (LWP 16556) exited]
+[bt_navigator-5] [INFO] [1792399370.146788830] [bt_navigator]: Goal succeeded
+[bt_navigator-5] [INFO] [1792399370.148231392] [bt_navigator]: Begin navigating from current location (-1.62, 0.56) to (-0.50, 1.60)
+[gdb-1] [New Thread 0x7fffc8ff9640 (LWP 16660)]
+[gdb-1] [INFO] [1792399370.170253148] [controller_server]: Received a goal, begin computing control effort.
+[gdb-1] [INFO] [1792399371.270444627] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399372.270480240] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399373.270504379] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399374.270469917] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399375.370568593] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399376.370440580] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399377.370557905] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399378.470472774] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399379.470545332] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399380.470477101] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399381.470469112] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399382.570537929] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399383.570544411] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399384.175958304] [controller_server]: Reached the goal!
+[gdb-1] [Thread 0x7fffc8ff9640 (LWP 16660) exited]
+[bt_navigator-5] [INFO] [1792399384.208616292] [bt_navigator]: Goal succeeded
+[bt_navigator-5] [INFO] [1792399384.209370769] [bt_navigator]: Begin navigating from current location (-0.50, 1.56) to (-1.60, 0.60)
+[gdb-1] [New Thread 0x7fffabfff640 (LWP 16763)]
+[gdb-1] [INFO] [1792399384.231345781] [controller_server]: Received a goal, begin computing control effort.
+[gdb-1] [INFO] [1792399385.331610671] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399386.331596679] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399387.331596432] [controller_server]: Passing new path to controller.
+[planner_server-3] [WARN] [1792399388.331019610] [planner_server]: Planner loop missed its desired rate of 20.0000 Hz. Current loop rate is 10.0000 Hz
+[gdb-1] [INFO] [1792399388.431565001] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399389.431652790] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399390.431594748] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399391.431595915] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399392.531613343] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399393.531672613] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399394.531608379] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399395.631648665] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399396.631664024] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399397.631593028] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399398.631597046] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399399.731667034] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399400.731653596] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399401.731597688] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399402.831655317] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399403.044937282] [controller_server]: Reached the goal!
+[gdb-1] [Thread 0x7fffabfff640 (LWP 16763) exited]
+[bt_navigator-5] [INFO] [1792399403.079951770] [bt_navigator]: Goal succeeded
+[bt_navigator-5] [INFO] [1792399403.080885869] [bt_navigator]: Begin navigating from current location (-1.55, 0.60) to (-2.00, -0.50)
+[gdb-1] [INFO] [1792399403.102837946] [controller_server]: Received a goal, begin computing control effort.
+[gdb-1] [New Thread 0x7fffc8ff9640 (LWP 16843)]
+[gdb-1] [INFO] [1792399404.203227741] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399405.203100587] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399406.203101561] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399407.303104682] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399408.303128977] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399409.303105033] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399410.403102523] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399411.403106292] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399412.403100336] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399413.403101067] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399414.503159232] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399415.503105188] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399416.503115666] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399417.603100537] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399418.116434977] [controller_server]: Reached the goal!
+[gdb-1] [Thread 0x7fffc8ff9640 (LWP 16843) exited]
+[bt_navigator-5] [INFO] [1792399418.151278934] [bt_navigator]: Goal succeeded
+[bt_navigator-5] [INFO] [1792399418.152058472] [bt_navigator]: Begin navigating from current location (-2.00, -0.45) to (-1.50, -0.60)
+[gdb-1] [INFO] [1792399418.173368555] [controller_server]: Received a goal, begin computing control effort.
+[gdb-1] [New Thread 0x7fffabfff640 (LWP 16912)]
+[gdb-1] [INFO] [1792399419.273588746] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399420.273596056] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399421.273598756] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399422.373566551] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399423.373609762] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399424.282897728] [controller_server]: Reached the goal!
+[gdb-1] [Thread 0x7fffabfff640 (LWP 16912) exited]
+[bt_navigator-5] [INFO] [1792399424.322381484] [bt_navigator]: Goal succeeded
+[bt_navigator-5] [INFO] [1792399424.323080723] [bt_navigator]: Begin navigating from current location (-1.54, -0.58) to (-1.60, 0.60)
+[gdb-1] [INFO] [1792399424.344420324] [controller_server]: Received a goal, begin computing control effort.
+[gdb-1] [New Thread 0x7fffc8ff9640 (LWP 16950)]
+[gdb-1] [INFO] [1792399425.444633604] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399426.444681152] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399427.444641029] [controller_server]: Passing new path to controller.
+[gdb-1] [ERROR] [1792399427.755927303] [DWBLocalPlanner]: No valid trajectories out of 819! 
+[gdb-1] [ERROR] [1792399427.755982262] [DWBLocalPlanner]: 1.00: BaseObstacle/Trajectory Hits Obstacle.
+[gdb-1] [WARN] [1792399427.756206479] [controller_server]: No valid trajectories out of 819! 
+[gdb-1] [INFO] [1792399428.544629391] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399429.544636810] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399430.544637127] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399431.644613745] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399432.644637994] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399433.644635466] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399434.744644292] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399435.744628007] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399436.744599068] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399437.162862113] [controller_server]: Reached the goal!
+[gdb-1] [Thread 0x7fffc8ff9640 (LWP 16950) exited]
+[bt_navigator-5] [INFO] [1792399437.193395082] [bt_navigator]: Goal succeeded
+[bt_navigator-5] [INFO] [1792399437.194086543] [bt_navigator]: Begin navigating from current location (-1.61, 0.55) to (-0.50, 1.60)
+[gdb-1] [INFO] [1792399437.215317209] [controller_server]: Received a goal, begin computing control effort.
+[gdb-1] [New Thread 0x7fffabfff640 (LWP 17066)]
+[gdb-1] [INFO] [1792399438.315559456] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399439.315522011] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399440.315550855] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399441.415556698] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399442.415603416] [controller_server]: Passing new path to controller.
+[planner_server-3] [INFO] [1792399442.455644910] [global_costmap.global_costmap]: StaticLayer: Resizing costmap to 112 X 103 at 0.050000 m/pix
+[gdb-1] [INFO] [1792399443.415553579] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399444.515637032] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399445.515551484] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399446.515551660] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399447.615522641] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399448.615547448] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399449.615550875] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399450.615551257] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399451.225664892] [controller_server]: Reached the goal!
+[gdb-1] [Thread 0x7fffabfff640 (LWP 17066) exited]
+[bt_navigator-5] [INFO] [1792399451.265072238] [bt_navigator]: Goal succeeded
+[bt_navigator-5] [INFO] [1792399451.268270220] [bt_navigator]: Begin navigating from current location (-0.50, 1.56) to (-1.60, 0.60)
+[gdb-1] [INFO] [1792399451.301094197] [controller_server]: Received a goal, begin computing control effort.
+[gdb-1] [New Thread 0x7fffc8ff9640 (LWP 17192)]
+[gdb-1] [INFO] [1792399452.401401118] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399453.401396478] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399454.401402701] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399455.501362571] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399456.501396194] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399457.501366359] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399458.501366729] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399459.601452182] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399460.601492760] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399461.601399175] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399462.701369460] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399463.701367613] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399464.701401627] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399465.701401260] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399466.801416016] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399467.801403893] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399468.801379005] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399469.901380721] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399470.901336242] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399471.310925618] [controller_server]: Reached the goal!
+[gdb-1] [Thread 0x7fffc8ff9640 (LWP 17192) exited]
+[bt_navigator-5] [INFO] [1792399471.348837712] [bt_navigator]: Goal succeeded
+[bt_navigator-5] [INFO] [1792399471.349804035] [bt_navigator]: Begin navigating from current location (-1.55, 0.60) to (-2.00, -0.50)
+[gdb-1] [INFO] [1792399471.371769786] [controller_server]: Received a goal, begin computing control effort.
+[gdb-1] [New Thread 0x7fffabfff640 (LWP 17401)]
+[gdb-1] [INFO] [1792399472.471975359] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399473.472024338] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399474.472027969] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399475.572023001] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399476.572021925] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399477.572025292] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399478.672027341] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399479.672027767] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399480.672024663] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399481.672031366] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399482.772027283] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399483.772029844] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399484.772033801] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399485.872023494] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399486.583039910] [controller_server]: Reached the goal!
+[gdb-1] [Thread 0x7fffabfff640 (LWP 17401) exited]
+[bt_navigator-5] [INFO] [1792399486.620164676] [bt_navigator]: Goal succeeded
+[bt_navigator-5] [INFO] [1792399486.620945816] [bt_navigator]: Begin navigating from current location (-2.00, -0.45) to (-1.50, -0.60)
+[gdb-1] [INFO] [1792399486.642440169] [controller_server]: Received a goal, begin computing control effort.
+[gdb-1] [New Thread 0x7fffc8ff9640 (LWP 17544)]
+[gdb-1] [INFO] [1792399487.742634516] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399488.742637870] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399489.742666864] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399490.842667092] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399491.842726847] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399492.352679758] [controller_server]: Reached the goal!
+[gdb-1] [Thread 0x7fffc8ff9640 (LWP 17544) exited]
+[bt_navigator-5] [INFO] [1792399492.391327356] [bt_navigator]: Goal succeeded
+[bt_navigator-5] [INFO] [1792399492.392232783] [bt_navigator]: Begin navigating from current location (-1.54, -0.58) to (-1.60, 0.60)
+[gdb-1] [INFO] [1792399492.413953212] [controller_server]: Received a goal, begin computing control effort.
+[gdb-1] [New Thread 0x7fffabfff640 (LWP 17572)]
+[gdb-1] [INFO] [1792399493.514297957] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399494.514284233] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399495.514291950] [controller_server]: Passing new path to controller.
+[gdb-1] [ERROR] [1792399495.926866375] [DWBLocalPlanner]: No valid trajectories out of 819! 
+[gdb-1] [ERROR] [1792399495.926929427] [DWBLocalPlanner]: 1.00: BaseObstacle/Trajectory Hits Obstacle.
+[gdb-1] [WARN] [1792399495.927127745] [controller_server]: No valid trajectories out of 819! 
+[gdb-1] [INFO] [1792399496.614277123] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399497.614297940] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399498.614262839] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399499.714292306] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399500.714289487] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399501.714260287] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399502.714290081] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399503.814304737] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399504.814256154] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399505.325378349] [controller_server]: Reached the goal!
+[gdb-1] [Thread 0x7fffabfff640 (LWP 17572) exited]
+[bt_navigator-5] [INFO] [1792399505.362612584] [bt_navigator]: Goal succeeded
+[bt_navigator-5] [INFO] [1792399505.363313007] [bt_navigator]: Begin navigating from current location (-1.61, 0.56) to (-0.50, 1.60)
+[gdb-1] [INFO] [1792399505.384606397] [controller_server]: Received a goal, begin computing control effort.
+[gdb-1] [New Thread 0x7fffc8ff9640 (LWP 17631)]
+[gdb-1] [INFO] [1792399506.484827631] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399507.484910267] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399508.484836139] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399509.584834229] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399510.584817894] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399511.584832685] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399512.684826013] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399513.684834901] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399514.684799078] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399515.784833806] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399516.784915011] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399517.784833239] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399518.784841696] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399519.393571679] [controller_server]: Reached the goal!
+[gdb-1] [Thread 0x7fffc8ff9640 (LWP 17631) exited]
+[bt_navigator-5] [INFO] [1792399519.423741970] [bt_navigator]: Goal succeeded
+[bt_navigator-5] [INFO] [1792399519.424459617] [bt_navigator]: Begin navigating from current location (-0.50, 1.56) to (-1.60, 0.60)
+[gdb-1] [INFO] [1792399519.446097250] [controller_server]: Received a goal, begin computing control effort.
+[gdb-1] [New Thread 0x7fffabfff640 (LWP 17840)]
+[gdb-1] [INFO] [1792399520.546347577] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399521.546298724] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399522.546291871] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399523.646326123] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399524.646291720] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399525.646294806] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399526.646329935] [controller_server]: Passing new path to controller.
+[gdb-1] [ERROR] [1792399527.663729252] [DWBLocalPlanner]: No valid trajectories out of 819! 
+[gdb-1] [ERROR] [1792399527.663785465] [DWBLocalPlanner]: 1.00: BaseObstacle/Trajectory Hits Obstacle.
+[gdb-1] [WARN] [1792399527.664028872] [controller_server]: No valid trajectories out of 819! 
+[gdb-1] [INFO] [1792399527.746347250] [controller_server]: Passing new path to controller.
+[gdb-1] [ERROR] [1792399527.755875479] [DWBLocalPlanner]: No valid trajectories out of 819! 
+[gdb-1] [ERROR] [1792399527.755903438] [DWBLocalPlanner]: 1.00: BaseObstacle/Trajectory Hits Obstacle.
+[gdb-1] [WARN] [1792399527.756051815] [controller_server]: No valid trajectories out of 819! 
+[gdb-1] [ERROR] [1792399527.853975028] [DWBLocalPlanner]: No valid trajectories out of 819! 
+[gdb-1] [ERROR] [1792399527.854007546] [DWBLocalPlanner]: 1.00: BaseObstacle/Trajectory Hits Obstacle.
+[gdb-1] [WARN] [1792399527.854144985] [controller_server]: No valid trajectories out of 819! 
+[gdb-1] [ERROR] [1792399527.956240176] [DWBLocalPlanner]: No valid trajectories out of 819! 
+[gdb-1] [ERROR] [1792399527.956285847] [DWBLocalPlanner]: 1.00: BaseObstacle/Trajectory Hits Obstacle.
+[gdb-1] [WARN] [1792399527.956447732] [controller_server]: No valid trajectories out of 819! 
+[gdb-1] [ERROR] [1792399527.956481459] [controller_server]: Controller patience exceeded
+[gdb-1] [WARN] [1792399527.956521400] [controller_server]: [follow_path] [ActionServer] Aborting handle.
+[gdb-1] [Thread 0x7fffabfff640 (LWP 17840) exited]
+[gdb-1] [INFO] [1792399527.974740690] [local_costmap.local_costmap]: Received request to clear entirely the local_costmap
+[gdb-1] [INFO] [1792399527.977327002] [controller_server]: Received a goal, begin computing control effort.
+[gdb-1] [New Thread 0x7fffc8ff9640 (LWP 17874)]
+[gdb-1] [ERROR] [1792399528.053513507] [DWBLocalPlanner]: No valid trajectories out of 819! 
+[gdb-1] [ERROR] [1792399528.053553950] [DWBLocalPlanner]: 1.00: BaseObstacle/Trajectory Hits Obstacle.
+[gdb-1] [WARN] [1792399528.053714425] [controller_server]: No valid trajectories out of 819! 
+[gdb-1] [ERROR] [1792399528.084975317] [DWBLocalPlanner]: No valid trajectories out of 819! 
+[gdb-1] [ERROR] [1792399528.085018274] [DWBLocalPlanner]: 1.00: BaseObstacle/Trajectory Hits Obstacle.
+[gdb-1] [WARN] [1792399528.085230946] [controller_server]: No valid trajectories out of 819! 
+[gdb-1] [ERROR] [1792399528.189029301] [DWBLocalPlanner]: No valid trajectories out of 819! 
+[gdb-1] [ERROR] [1792399528.189078917] [DWBLocalPlanner]: 1.00: BaseObstacle/Trajectory Hits Obstacle.
+[gdb-1] [WARN] [1792399528.189420968] [controller_server]: No valid trajectories out of 819! 
+[gdb-1] [ERROR] [1792399528.288135011] [DWBLocalPlanner]: No valid trajectories out of 819! 
+[gdb-1] [ERROR] [1792399528.288177328] [DWBLocalPlanner]: 1.00: BaseObstacle/Trajectory Hits Obstacle.
+[gdb-1] [WARN] [1792399528.288366539] [controller_server]: No valid trajectories out of 819! 
+[gdb-1] [ERROR] [1792399528.391196427] [DWBLocalPlanner]: No valid trajectories out of 819! 
+[gdb-1] [ERROR] [1792399528.391240763] [DWBLocalPlanner]: 1.00: BaseObstacle/Trajectory Hits Obstacle.
+[gdb-1] [WARN] [1792399528.391533685] [controller_server]: No valid trajectories out of 819! 
+[gdb-1] [ERROR] [1792399528.391598263] [controller_server]: Controller patience exceeded
+[gdb-1] [WARN] [1792399528.391665860] [controller_server]: [follow_path] [ActionServer] Aborting handle.
+[gdb-1] [Thread 0x7fffc8ff9640 (LWP 17874) exited]
+[behavior_server-4] [INFO] [1792399528.405006824] [behavior_server]: Running backup
+[behavior_server-4] [INFO] [1792399528.405173575] [behavior_server]: DriveOnHeading: no acceleration or deceleration limits set
+[behavior_server-4] [WARN] [1792399528.405286425] [behavior_server]: Collision Ahead - Exiting DriveOnHeading
+[behavior_server-4] [WARN] [1792399528.405304486] [behavior_server]: backup failed
+[behavior_server-4] [WARN] [1792399528.405319268] [behavior_server]: [backup] [ActionServer] Aborting handle.
+[gdb-1] [INFO] [1792399528.434838419] [local_costmap.local_costmap]: Received request to clear entirely the local_costmap
+[planner_server-3] [INFO] [1792399528.435335488] [global_costmap.global_costmap]: Received request to clear entirely the global_costmap
+[gdb-1] [New Thread 0x7fffabfff640 (LWP 17888)]
+[gdb-1] [INFO] [1792399528.476477129] [controller_server]: Received a goal, begin computing control effort.
+[gdb-1] [ERROR] [1792399528.486699808] [DWBLocalPlanner]: No valid trajectories out of 819! 
+[gdb-1] [ERROR] [1792399528.486741368] [DWBLocalPlanner]: 1.00: BaseObstacle/Trajectory Hits Obstacle.
+[gdb-1] [WARN] [1792399528.486936821] [controller_server]: No valid trajectories out of 819! 
+[gdb-1] [ERROR] [1792399528.584461674] [DWBLocalPlanner]: No valid trajectories out of 819! 
+[gdb-1] [ERROR] [1792399528.584494327] [DWBLocalPlanner]: 1.00: BaseObstacle/Trajectory Hits Obstacle.
+[gdb-1] [WARN] [1792399528.584621771] [controller_server]: No valid trajectories out of 819! 
+[gdb-1] [ERROR] [1792399528.688746482] [DWBLocalPlanner]: No valid trajectories out of 819! 
+[gdb-1] [ERROR] [1792399528.688777401] [DWBLocalPlanner]: 1.00: BaseObstacle/Trajectory Hits Obstacle.
+[gdb-1] [WARN] [1792399528.688958301] [controller_server]: No valid trajectories out of 819! 
+[gdb-1] [ERROR] [1792399528.787445345] [DWBLocalPlanner]: No valid trajectories out of 819! 
+[gdb-1] [ERROR] [1792399528.787490145] [DWBLocalPlanner]: 1.00: BaseObstacle/Trajectory Hits Obstacle.
+[gdb-1] [WARN] [1792399528.787785013] [controller_server]: No valid trajectories out of 819! 
+[gdb-1] [ERROR] [1792399528.888647908] [DWBLocalPlanner]: No valid trajectories out of 819! 
+[gdb-1] [ERROR] [1792399528.888689188] [DWBLocalPlanner]: 1.00: BaseObstacle/Trajectory Hits Obstacle.
+[gdb-1] [WARN] [1792399528.888881960] [controller_server]: No valid trajectories out of 819! 
+[gdb-1] [ERROR] [1792399528.888926106] [controller_server]: Controller patience exceeded
+[gdb-1] [WARN] [1792399528.888979240] [controller_server]: [follow_path] [ActionServer] Aborting handle.
+[gdb-1] [Thread 0x7fffabfff640 (LWP 17888) exited]
+[gdb-1] [INFO] [1792399528.904726974] [local_costmap.local_costmap]: Received request to clear entirely the local_costmap
+[gdb-1] [INFO] [1792399528.907837139] [controller_server]: Received a goal, begin computing control effort.
+[gdb-1] [New Thread 0x7fffc8ff9640 (LWP 17889)]
+[gdb-1] [ERROR] [1792399529.069685924] [DWBLocalPlanner]: No valid trajectories out of 819! 
+[gdb-1] [ERROR] [1792399529.069752744] [DWBLocalPlanner]: 1.00: BaseObstacle/Trajectory Hits Obstacle.
+[gdb-1] [WARN] [1792399529.070023753] [controller_server]: No valid trajectories out of 819! 
+[gdb-1] [WARN] [1792399529.070192271] [controller_server]: Control loop missed its desired rate of 10.0000Hz
+[gdb-1] [ERROR] [1792399529.081294967] [DWBLocalPlanner]: No valid trajectories out of 819! 
+[gdb-1] [ERROR] [1792399529.081320854] [DWBLocalPlanner]: 1.00: BaseObstacle/Trajectory Hits Obstacle.
+[gdb-1] [WARN] [1792399529.081458112] [controller_server]: No valid trajectories out of 819! 
+[gdb-1] [ERROR] [1792399529.113890892] [DWBLocalPlanner]: No valid trajectories out of 819! 
+[gdb-1] [ERROR] [1792399529.113916075] [DWBLocalPlanner]: 1.00: BaseObstacle/Trajectory Hits Obstacle.
+[gdb-1] [WARN] [1792399529.114018497] [controller_server]: No valid trajectories out of 819! 
+[gdb-1] [ERROR] [1792399529.217029655] [DWBLocalPlanner]: No valid trajectories out of 819! 
+[gdb-1] [ERROR] [1792399529.217062434] [DWBLocalPlanner]: 1.00: BaseObstacle/Trajectory Hits Obstacle.
+[gdb-1] [WARN] [1792399529.217228658] [controller_server]: No valid trajectories out of 819! 
+[gdb-1] [ERROR] [1792399529.321972173] [DWBLocalPlanner]: No valid trajectories out of 819! 
+[gdb-1] [ERROR] [1792399529.322016132] [DWBLocalPlanner]: 1.00: BaseObstacle/Trajectory Hits Obstacle.
+[gdb-1] [WARN] [1792399529.322228080] [controller_server]: No valid trajectories out of 819! 
+[gdb-1] [ERROR] [1792399529.322277133] [controller_server]: Controller patience exceeded
+[gdb-1] [WARN] [1792399529.322332357] [controller_server]: [follow_path] [ActionServer] Aborting handle.
+[gdb-1] [Thread 0x7fffc8ff9640 (LWP 17889) exited]
+[behavior_server-4] [INFO] [1792399529.334917648] [behavior_server]: Running spin
+[behavior_server-4] [INFO] [1792399529.335000841] [behavior_server]: Turning 1.57 for spin behavior.
+[behavior_server-4] [WARN] [1792399530.535216538] [behavior_server]: Collision Ahead - Exiting Spin
+[behavior_server-4] [WARN] [1792399530.535261282] [behavior_server]: spin failed
+[behavior_server-4] [WARN] [1792399530.535280077] [behavior_server]: [spin] [ActionServer] Aborting handle.
+[behavior_server-4] [INFO] [1792399530.565092559] [behavior_server]: Running wait
+[behavior_server-4] [INFO] [1792399535.565281227] [behavior_server]: wait completed successfully
+[gdb-1] [INFO] [1792399535.615990058] [controller_server]: Received a goal, begin computing control effort.
+[gdb-1] [New Thread 0x7fffabfff640 (LWP 18053)]
+[gdb-1] [INFO] [1792399536.716190535] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399537.716217862] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399538.716217512] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399539.816215264] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399540.816221649] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399541.816215546] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399542.916186965] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399543.916186137] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399544.916212974] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399546.016225321] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399547.016186484] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399548.016179176] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399549.016222085] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399550.116214468] [controller_server]: Passing new path to controller.
+[gdb-1] [ERROR] [1792399551.016260712] [controller_server]: Failed to make progress
+[gdb-1] [WARN] [1792399551.016395846] [controller_server]: [follow_path] [ActionServer] Aborting handle.
+[gdb-1] [Thread 0x7fffabfff640 (LWP 18053) exited]
+[gdb-1] [INFO] [1792399551.035047447] [local_costmap.local_costmap]: Received request to clear entirely the local_costmap
+[gdb-1] [INFO] [1792399551.037702657] [controller_server]: Received a goal, begin computing control effort.
+[gdb-1] [New Thread 0x7fffc8ff9640 (LWP 18134)]
+[gdb-1] [INFO] [1792399551.137937455] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399551.549773876] [controller_server]: Reached the goal!
+[gdb-1] [Thread 0x7fffc8ff9640 (LWP 18134) exited]
+[bt_navigator-5] [INFO] [1792399551.584884387] [bt_navigator]: Goal succeeded
+[bt_navigator-5] [INFO] [1792399551.585808374] [bt_navigator]: Begin navigating from current location (-1.55, 0.59) to (-2.00, -0.50)
+[gdb-1] [INFO] [1792399551.607199840] [controller_server]: Received a goal, begin computing control effort.
+[gdb-1] [New Thread 0x7fffabfff640 (LWP 18137)]
+[gdb-1] [INFO] [1792399552.707434940] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399553.707468594] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399554.707394470] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399555.807467882] [controller_server]: Passing new path to controller.
+[planner_server-3] [WARN] [1792399556.728017899] [planner_server]: Planner loop missed its desired rate of 20.0000 Hz. Current loop rate is 10.0000 Hz
+[gdb-1] [INFO] [1792399556.807377728] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399557.807377915] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399558.807381436] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399559.907462881] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399560.907474712] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399561.907378604] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399563.007410658] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399564.007486980] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399565.007407607] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399566.016774652] [controller_server]: Reached the goal!
+[gdb-1] [INFO] [1792399566.018043968] [controller_server]: Received a goal, begin computing control effort.
+[gdb-1] [INFO] [1792399566.026780898] [controller_server]: Reached the goal!
+[gdb-1] [Thread 0x7fffabfff640 (LWP 18137) exited]
+[bt_navigator-5] [INFO] [1792399566.076169277] [bt_navigator]: Goal succeeded
+[bt_navigator-5] [INFO] [1792399566.076913774] [bt_navigator]: Begin navigating from current location (-2.00, -0.45) to (-1.50, -0.60)
+[gdb-1] [INFO] [1792399566.098450318] [controller_server]: Received a goal, begin computing control effort.
+[gdb-1] [New Thread 0x7fffc8ff9640 (LWP 18203)]
+[gdb-1] [INFO] [1792399567.198639087] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399568.198727490] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399569.198667672] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399570.298646387] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399571.298677894] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399571.906300879] [controller_server]: Reached the goal!
+[gdb-1] [Thread 0x7fffc8ff9640 (LWP 18203) exited]
+[bt_navigator-5] [INFO] [1792399571.937263848] [bt_navigator]: Goal succeeded
+[bt_navigator-5] [INFO] [1792399571.938253452] [bt_navigator]: Begin navigating from current location (-1.55, -0.58) to (-1.60, 0.60)
+[gdb-1] [New Thread 0x7fffabfff640 (LWP 18230)]
+[gdb-1] [INFO] [1792399571.960912822] [controller_server]: Received a goal, begin computing control effort.
+[gdb-1] [INFO] [1792399573.061135023] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399574.061167665] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399575.061143033] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399576.161136253] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399577.161134944] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399578.161136131] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399579.161131489] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399580.261133301] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399581.261134659] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399582.261159866] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399583.361168390] [controller_server]: Passing new path to controller.
+[gdb-1] [INFO] [1792399584.361135211] [controller_server]: Passing new path to controller.
+[gdb-1] 
+[gdb-1] Thread 1 "controller_serv" received signal SIGINT, Interrupt.
+[gdb-1] __futex_abstimed_wait_common64 (private=33, cancel=true, abstime=0x7fffffffb490, op=393, expected=0, futex_word=0x5555556989d8) at ./nptl/futex-internal.c:57
+[gdb-1] 57	./nptl/futex-internal.c: No such file or directory.
+[gdb-1]   Id   Target Id                                           Frame 
+[gdb-1] * 1    Thread 0x7ffff703d480 (LWP 9667) "controller_serv"  __futex_abstimed_wait_common64 (private=33, cancel=true, abstime=0x7fffffffb490, op=393, expected=0, futex_word=0x5555556989d8) at ./nptl/futex-internal.c:57
+[gdb-1]   2    Thread 0x7ffff6792640 (LWP 9681) "controller_serv"  __futex_abstimed_wait_common64 (private=0, cancel=true, abstime=0x7ffff6791520, op=137, expected=0, futex_word=0x5555555886c0) at ./nptl/futex-internal.c:57
+[gdb-1]   3    Thread 0x7ffff5f91640 (LWP 9682) "controller_serv"  __futex_abstimed_wait_common64 (private=<optimized out>, cancel=true, abstime=0x0, op=393, expected=0, futex_word=0x555555577128) at ./nptl/futex-internal.c:57
+[gdb-1]   4    Thread 0x7ffff5790640 (LWP 9683) "gc"               __futex_abstimed_wait_common64 (private=-146123757, cancel=true, abstime=0x7ffff578f440, op=393, expected=0, futex_word=0x555555584474) at ./nptl/futex-internal.c:57
+[gdb-1]   5    Thread 0x7ffff4f8f640 (LWP 9684) "dq.builtins"      __futex_abstimed_wait_common64 (private=0, cancel=true, abstime=0x0, op=393, expected=0, futex_word=0x5555555943f0) at ./nptl/futex-internal.c:57
+[gdb-1]   6    Thread 0x7fffeffff640 (LWP 9685) "dq.user"          __futex_abstimed_wait_common64 (private=0, cancel=true, abstime=0x0, op=393, expected=0, futex_word=0x5555555844f0) at ./nptl/futex-internal.c:57
+[gdb-1]   7    Thread 0x7fffef7fe640 (LWP 9686) "tev"              __futex_abstimed_wait_common64 (private=0, cancel=true, abstime=0x7fffef7fd390, op=393, expected=0, futex_word=0x55555557e018) at ./nptl/futex-internal.c:57
+[gdb-1]   8    Thread 0x7fffeeffd640 (LWP 9687) "recv"             0x00007ffff751b78d in __GI___select (nfds=9, readfds=0x5555555866d0, writefds=0x0, exceptfds=0x0, timeout=0x0) at ../sysdeps/unix/sysv/linux/select.c:69
+[gdb-1]   9    Thread 0x7fffee7fc640 (LWP 9688) "recvMC"           __recvmsg_syscall (flags=0, msg=0x7fffee7fb220, fd=6) at ../sysdeps/unix/sysv/linux/recvmsg.c:27
+[gdb-1]   10   Thread 0x7fffedffb640 (LWP 9689) "recvUC"           __recvmsg_syscall (flags=0, msg=0x7fffedffa220, fd=4) at ../sysdeps/unix/sysv/linux/recvmsg.c:27
+[gdb-1]   11   Thread 0x7fffed7fa640 (LWP 9690) "controller_serv"  __futex_abstimed_wait_common64 (private=0, cancel=true, abstime=0x0, op=393, expected=0, futex_word=0x7fffcc000ddc) at ./nptl/futex-internal.c:57
+[gdb-1]   12   Thread 0x7fffecff9640 (LWP 9691) "controller_serv"  __futex_abstimed_wait_common64 (private=0, cancel=true, abstime=0x0, op=393, expected=0, futex_word=0x55555561df7c) at ./nptl/futex-internal.c:57
+[gdb-1]   13   Thread 0x7fffcbfff640 (LWP 9693) "controller_serv"  __futex_abstimed_wait_common64 (private=0, cancel=true, abstime=0x0, op=393, expected=0, futex_word=0x5555556a9b9c) at ./nptl/futex-internal.c:57
+[gdb-1]   14   Thread 0x7fffcb7fe640 (LWP 9694) "controller_serv"  __futex_abstimed_wait_common64 (private=0, cancel=true, abstime=0x0, op=393, expected=0, futex_word=0x5555556c46b8) at ./nptl/futex-internal.c:57
+[gdb-1]   15   Thread 0x7fffcaffd640 (LWP 9695) "controller_serv"  __futex_abstimed_wait_common64 (private=-144593696, cancel=true, abstime=0x7fffcaffb550, op=393, expected=0, futex_word=0x5555557c20b8) at ./nptl/futex-internal.c:57
+[gdb-1]   16   Thread 0x7fffca7fc640 (LWP 9696) "controller_serv"  __futex_abstimed_wait_common64 (private=0, cancel=true, abstime=0x0, op=393, expected=0, futex_word=0x5555557c2f88) at ./nptl/futex-internal.c:57
+[gdb-1]   17   Thread 0x7fffc9ffb640 (LWP 9697) "controller_serv"  __futex_abstimed_wait_common64 (private=-144593696, cancel=true, abstime=0x7fffc9ff9550, op=393, expected=0, futex_word=0x55555584d90c) at ./nptl/futex-internal.c:57
+[gdb-1]   18   Thread 0x7fffc97fa640 (LWP 9706) "controller_serv"  __futex_abstimed_wait_common64 (private=226, cancel=true, abstime=0x7fffc97f8c50, op=137, expected=0, futex_word=0x555555575120) at ./nptl/futex-internal.c:57
+[gdb-1]   70   Thread 0x7fffabfff640 (LWP 18230) "controller_serv" __futex_abstimed_wait_common64 (private=-199433374, cancel=true, abstime=0x7fffabffd160, op=137, expected=0, futex_word=0x555555575120) at ./nptl/futex-internal.c:57
+[gdb-1] 
+[gdb-1] Thread 70 (Thread 0x7fffabfff640 (LWP 18230) "controller_serv"):
+[gdb-1] #0  __futex_abstimed_wait_common64 (private=-199433374, cancel=true, abstime=0x7fffabffd160, op=137, expected=0, futex_word=0x555555575120) at ./nptl/futex-internal.c:57
+[gdb-1] #1  __futex_abstimed_wait_common (cancel=true, private=-199433374, abstime=0x7fffabffd160, clockid=0, expected=0, futex_word=0x555555575120) at ./nptl/futex-internal.c:87
+[gdb-1] #2  __GI___futex_abstimed_wait_cancelable64 (futex_word=futex_word@entry=0x555555575120, expected=expected@entry=0, clockid=clockid@entry=1, abstime=abstime@entry=0x7fffabffd160, private=private@entry=0) at ./nptl/futex-internal.c:139
+[gdb-1] #3  0x00007ffff749429d in __pthread_cond_wait_common (abstime=0x7fffabffd160, clockid=1, mutex=0x555555575128, cond=0x5555555750f8) at ./nptl/pthread_cond_wait.c:503
+[gdb-1] #4  ___pthread_cond_clockwait64 (abstime=0x7fffabffd160, clockid=1, mutex=0x555555575128, cond=0x5555555750f8) at ./nptl/pthread_cond_wait.c:691
+[gdb-1] #5  ___pthread_cond_clockwait64 (cond=0x5555555750f8, mutex=0x555555575128, clockid=1, abstime=0x7fffabffd160) at ./nptl/pthread_cond_wait.c:679
+[gdb-1] #6  0x00007ffff7dfd0d0 in rclcpp::Context::sleep_for(std::chrono::duration<long, std::ratio<1l, 1000000000l> > const&) () from /opt/ros/humble/lib/librclcpp.so
+[gdb-1] #7  0x00007ffff7c93b0c in nav2_controller::ControllerServer::computeControl() () from /opt/ros/humble/lib/libcontroller_server_core.so
+[gdb-1] #8  0x00007ffff7cabafe in ?? () from /opt/ros/humble/lib/libcontroller_server_core.so
+[gdb-1] #9  0x00007ffff7cc6ecc in std::_Function_handler<std::unique_ptr<std::__future_base::_Result_base, std::__future_base::_Result_base::_Deleter> (), std::__future_base::_Task_setter<std::unique_ptr<std::__future_base::_Result<void>, std::__future_base::_Result_base::_Deleter>, std::thread::_Invoker<std::tuple<nav2_util::SimpleActionServer<nav2_msgs::action::FollowPath>::handle_accepted(std::shared_ptr<rclcpp_action::ServerGoalHandle<nav2_msgs::action::FollowPath> >)::{lambda()#1}> >, void> >::_M_invoke(std::_Any_data const&) () from /opt/ros/humble/lib/libcontroller_server_core.so
+[gdb-1] #10 0x00007ffff7e42c9d in std::__future_base::_State_baseV2::_M_do_set(std::function<std::unique_ptr<std::__future_base::_Result_base, std::__future_base::_Result_base::_Deleter> ()>*, bool*) () from /opt/ros/humble/lib/librclcpp.so
+[gdb-1] #11 0x00007ffff7499ea8 in __pthread_once_slow (once_control=0x7fffb019cac8, init_routine=0x7ffff78dad50 <__once_proxy>) at ./nptl/pthread_once.c:116
+[gdb-1] #12 0x00007ffff7cc1f81 in std::__future_base::_Async_state_impl<std::thread::_Invoker<std::tuple<nav2_util::SimpleActionServer<nav2_msgs::action::FollowPath>::handle_accepted(std::shared_ptr<rclcpp_action::ServerGoalHandle<nav2_msgs::action::FollowPath> >)::{lambda()#1}> >, void>::_M_run() () from /opt/ros/humble/lib/libcontroller_server_core.so
+[gdb-1] #13 0x00007ffff78dc253 in ?? () from /lib/x86_64-linux-gnu/libstdc++.so.6
+[gdb-1] #14 0x00007ffff7494a83 in start_thread (arg=<optimized out>) at ./nptl/pthread_create.c:442
+[gdb-1] #15 0x00007ffff75268e0 in clone3 () at ../sysdeps/unix/sysv/linux/x86_64/clone3.S:81
+[gdb-1] 
+[gdb-1] Thread 18 (Thread 0x7fffc97fa640 (LWP 9706) "controller_serv"):
+[gdb-1] #0  __futex_abstimed_wait_common64 (private=226, cancel=true, abstime=0x7fffc97f8c50, op=137, expected=0, futex_word=0x555555575120) at ./nptl/futex-internal.c:57
+[gdb-1] #1  __futex_abstimed_wait_common (cancel=true, private=226, abstime=0x7fffc97f8c50, clockid=0, expected=0, futex_word=0x555555575120) at ./nptl/futex-internal.c:87
+[gdb-1] #2  __GI___futex_abstimed_wait_cancelable64 (futex_word=futex_word@entry=0x555555575120, expected=expected@entry=0, clockid=clockid@entry=1, abstime=abstime@entry=0x7fffc97f8c50, private=private@entry=0) at ./nptl/futex-internal.c:139
+[gdb-1] #3  0x00007ffff749429d in __pthread_cond_wait_common (abstime=0x7fffc97f8c50, clockid=1, mutex=0x555555575128, cond=0x5555555750f8) at ./nptl/pthread_cond_wait.c:503
+[gdb-1] #4  ___pthread_cond_clockwait64 (abstime=0x7fffc97f8c50, clockid=1, mutex=0x555555575128, cond=0x5555555750f8) at ./nptl/pthread_cond_wait.c:691
+[gdb-1] #5  ___pthread_cond_clockwait64 (cond=0x5555555750f8, mutex=0x555555575128, clockid=1, abstime=0x7fffc97f8c50) at ./nptl/pthread_cond_wait.c:679
+[gdb-1] #6  0x00007ffff7dfd0d0 in rclcpp::Context::sleep_for(std::chrono::duration<long, std::ratio<1l, 1000000000l> > const&) () from /opt/ros/humble/lib/librclcpp.so
+[gdb-1] #7  0x00007ffff73631b8 in nav2_costmap_2d::Costmap2DROS::mapUpdateLoop(double) () from /opt/ros/humble/lib/libnav2_costmap_2d_core.so
+[gdb-1] #8  0x00007ffff78dc253 in ?? () from /lib/x86_64-linux-gnu/libstdc++.so.6
+[gdb-1] #9  0x00007ffff7494a83 in start_thread (arg=<optimized out>) at ./nptl/pthread_create.c:442
+[gdb-1] #10 0x00007ffff75268e0 in clone3 () at ../sysdeps/unix/sysv/linux/x86_64/clone3.S:81
+[gdb-1] 
+[gdb-1] Thread 17 (Thread 0x7fffc9ffb640 (LWP 9697) "controller_serv"):
+[gdb-1] #0  __futex_abstimed_wait_common64 (private=-144593696, cancel=true, abstime=0x7fffc9ff9550, op=393, expected=0, futex_word=0x55555584d90c) at ./nptl/futex-internal.c:57
+[gdb-1] #1  __futex_abstimed_wait_common (cancel=true, private=-144593696, abstime=0x7fffc9ff9550, clockid=1514266543, expected=0, futex_word=0x55555584d90c) at ./nptl/futex-internal.c:87
+[gdb-1] #2  __GI___futex_abstimed_wait_cancelable64 (futex_word=futex_word@entry=0x55555584d90c, expected=expected@entry=0, clockid=clockid@entry=0, abstime=abstime@entry=0x7fffc9ff9550, private=private@entry=0) at ./nptl/futex-internal.c:139
+[gdb-1] #3  0x00007ffff7493e5b in __pthread_cond_wait_common (abstime=0x7fffc9ff9550, clockid=0, mutex=0x55555584d8b8, cond=0x55555584d8e0) at ./nptl/pthread_cond_wait.c:503
+[gdb-1] #4  ___pthread_cond_timedwait64 (cond=0x55555584d8e0, mutex=0x55555584d8b8, abstime=0x7fffc9ff9550) at ./nptl/pthread_cond_wait.c:652
+[gdb-1] #5  0x00007ffff6f4ff29 in ddsrt_cond_waituntil () from /opt/ros/humble/lib/x86_64-linux-gnu/libddsc.so.0
+[gdb-1] #6  0x00007ffff6f3688d in ?? () from /opt/ros/humble/lib/x86_64-linux-gnu/libddsc.so.0
+[gdb-1] #7  0x00007ffff6ff278f in rmw_wait () from /opt/ros/humble/lib/librmw_cyclonedds_cpp.so
+[gdb-1] #8  0x00007ffff7fa68d8 in rcl_wait () from /opt/ros/humble/lib/librcl.so
+[gdb-1] #9  0x00007ffff7e0921c in rclcpp::Executor::wait_for_work(std::chrono::duration<long, std::ratio<1l, 1000000000l> >) () from /opt/ros/humble/lib/librclcpp.so
+[gdb-1] #10 0x00007ffff7e0c133 in rclcpp::Executor::get_next_executable(rclcpp::AnyExecutable&, std::chrono::duration<long, std::ratio<1l, 1000000000l> >) () from /opt/ros/humble/lib/librclcpp.so
+[gdb-1] #11 0x00007ffff7e13881 in rclcpp::executors::SingleThreadedExecutor::spin() () from /opt/ros/humble/lib/librclcpp.so
+[gdb-1] #12 0x00007ffff78dc253 in ?? () from /lib/x86_64-linux-gnu/libstdc++.so.6
+[gdb-1] #13 0x00007ffff7494a83 in start_thread (arg=<optimized out>) at ./nptl/pthread_create.c:442
+[gdb-1] #14 0x00007ffff75268e0 in clone3 () at ../sysdeps/unix/sysv/linux/x86_64/clone3.S:81
+[gdb-1] 
+[gdb-1] Thread 16 (Thread 0x7fffca7fc640 (LWP 9696) "controller_serv"):
+[gdb-1] #0  __futex_abstimed_wait_common64 (private=0, cancel=true, abstime=0x0, op=393, expected=0, futex_word=0x5555557c2f88) at ./nptl/futex-internal.c:57
+[gdb-1] #1  __futex_abstimed_wait_common (cancel=true, private=0, abstime=0x0, clockid=0, expected=0, futex_word=0x5555557c2f88) at ./nptl/futex-internal.c:87
+[gdb-1] #2  __GI___futex_abstimed_wait_cancelable64 (futex_word=futex_word@entry=0x5555557c2f88, expected=expected@entry=0, clockid=clockid@entry=0, abstime=abstime@entry=0x0, private=private@entry=0) at ./nptl/futex-internal.c:139
+[gdb-1] #3  0x00007ffff7493a01 in __pthread_cond_wait_common (abstime=0x0, clockid=0, mutex=0x5555557c2f38, cond=0x5555557c2f60) at ./nptl/pthread_cond_wait.c:503
+[gdb-1] #4  ___pthread_cond_wait (cond=0x5555557c2f60, mutex=0x5555557c2f38) at ./nptl/pthread_cond_wait.c:627
+[gdb-1] #5  0x00007ffff6f4fe9d in ddsrt_cond_wait () from /opt/ros/humble/lib/x86_64-linux-gnu/libddsc.so.0
+[gdb-1] #6  0x00007ffff6f4ff65 in ddsrt_cond_waituntil () from /opt/ros/humble/lib/x86_64-linux-gnu/libddsc.so.0
+[gdb-1] #7  0x00007ffff6f3688d in ?? () from /opt/ros/humble/lib/x86_64-linux-gnu/libddsc.so.0
+[gdb-1] #8  0x00007ffff6ff278f in rmw_wait () from /opt/ros/humble/lib/librmw_cyclonedds_cpp.so
+[gdb-1] #9  0x00007ffff7fa68d8 in rcl_wait () from /opt/ros/humble/lib/librcl.so
+[gdb-1] #10 0x00007ffff7e0921c in rclcpp::Executor::wait_for_work(std::chrono::duration<long, std::ratio<1l, 1000000000l> >) () from /opt/ros/humble/lib/librclcpp.so
+[gdb-1] #11 0x00007ffff7e0c133 in rclcpp::Executor::get_next_executable(rclcpp::AnyExecutable&, std::chrono::duration<long, std::ratio<1l, 1000000000l> >) () from /opt/ros/humble/lib/librclcpp.so
+[gdb-1] #12 0x00007ffff7e13881 in rclcpp::executors::SingleThreadedExecutor::spin() () from /opt/ros/humble/lib/librclcpp.so
+[gdb-1] #13 0x00007ffff7ab1add in ?? () from /opt/ros/humble/lib/libnav2_util_core.so
+[gdb-1] #14 0x00007ffff78dc253 in ?? () from /lib/x86_64-linux-gnu/libstdc++.so.6
+[gdb-1] #15 0x00007ffff7494a83 in start_thread (arg=<optimized out>) at ./nptl/pthread_create.c:442
+[gdb-1] #16 0x00007ffff75268e0 in clone3 () at ../sysdeps/unix/sysv/linux/x86_64/clone3.S:81
+[gdb-1] 
+[gdb-1] Thread 15 (Thread 0x7fffcaffd640 (LWP 9695) "controller_serv"):
+[gdb-1] #0  __futex_abstimed_wait_common64 (private=-144593696, cancel=true, abstime=0x7fffcaffb550, op=393, expected=0, futex_word=0x5555557c20b8) at ./nptl/futex-internal.c:57
+[gdb-1] #1  __futex_abstimed_wait_common (cancel=true, private=-144593696, abstime=0x7fffcaffb550, clockid=1514266543, expected=0, futex_word=0x5555557c20b8) at ./nptl/futex-internal.c:87
+[gdb-1] #2  __GI___futex_abstimed_wait_cancelable64 (futex_word=futex_word@entry=0x5555557c20b8, expected=expected@entry=0, clockid=clockid@entry=0, abstime=abstime@entry=0x7fffcaffb550, private=private@entry=0) at ./nptl/futex-internal.c:139
+[gdb-1] #3  0x00007ffff7493e5b in __pthread_cond_wait_common (abstime=0x7fffcaffb550, clockid=0, mutex=0x5555557c2068, cond=0x5555557c2090) at ./nptl/pthread_cond_wait.c:503
+[gdb-1] #4  ___pthread_cond_timedwait64 (cond=0x5555557c2090, mutex=0x5555557c2068, abstime=0x7fffcaffb550) at ./nptl/pthread_cond_wait.c:652
+[gdb-1] #5  0x00007ffff6f4ff29 in ddsrt_cond_waituntil () from /opt/ros/humble/lib/x86_64-linux-gnu/libddsc.so.0
+[gdb-1] #6  0x00007ffff6f3688d in ?? () from /opt/ros/humble/lib/x86_64-linux-gnu/libddsc.so.0
+[gdb-1] #7  0x00007ffff6ff278f in rmw_wait () from /opt/ros/humble/lib/librmw_cyclonedds_cpp.so
+[gdb-1] #8  0x00007ffff7fa68d8 in rcl_wait () from /opt/ros/humble/lib/librcl.so
+[gdb-1] #9  0x00007ffff7e0921c in rclcpp::Executor::wait_for_work(std::chrono::duration<long, std::ratio<1l, 1000000000l> >) () from /opt/ros/humble/lib/librclcpp.so
+[gdb-1] #10 0x00007ffff7e0c133 in rclcpp::Executor::get_next_executable(rclcpp::AnyExecutable&, std::chrono::duration<long, std::ratio<1l, 1000000000l> >) () from /opt/ros/humble/lib/librclcpp.so
+[gdb-1] #11 0x00007ffff7e13881 in rclcpp::executors::SingleThreadedExecutor::spin() () from /opt/ros/humble/lib/librclcpp.so
+[gdb-1] #12 0x00007ffff78dc253 in ?? () from /lib/x86_64-linux-gnu/libstdc++.so.6
+[gdb-1] #13 0x00007ffff7494a83 in start_thread (arg=<optimized out>) at ./nptl/pthread_create.c:442
+[gdb-1] #14 0x00007ffff75268e0 in clone3 () at ../sysdeps/unix/sysv/linux/x86_64/clone3.S:81
+[gdb-1] 
+[gdb-1] Thread 14 (Thread 0x7fffcb7fe640 (LWP 9694) "controller_serv"):
+[gdb-1] #0  __futex_abstimed_wait_common64 (private=0, cancel=true, abstime=0x0, op=393, expected=0, futex_word=0x5555556c46b8) at ./nptl/futex-internal.c:57
+[gdb-1] #1  __futex_abstimed_wait_common (cancel=true, private=0, abstime=0x0, clockid=0, expected=0, futex_word=0x5555556c46b8) at ./nptl/futex-internal.c:87
+[gdb-1] #2  __GI___futex_abstimed_wait_cancelable64 (futex_word=futex_word@entry=0x5555556c46b8, expected=expected@entry=0, clockid=clockid@entry=0, abstime=abstime@entry=0x0, private=private@entry=0) at ./nptl/futex-internal.c:139
+[gdb-1] #3  0x00007ffff7493a01 in __pthread_cond_wait_common (abstime=0x0, clockid=0, mutex=0x5555556c4668, cond=0x5555556c4690) at ./nptl/pthread_cond_wait.c:503
+[gdb-1] #4  ___pthread_cond_wait (cond=0x5555556c4690, mutex=0x5555556c4668) at ./nptl/pthread_cond_wait.c:627
+[gdb-1] #5  0x00007ffff6f4fe9d in ddsrt_cond_wait () from /opt/ros/humble/lib/x86_64-linux-gnu/libddsc.so.0
+[gdb-1] #6  0x00007ffff6f4ff65 in ddsrt_cond_waituntil () from /opt/ros/humble/lib/x86_64-linux-gnu/libddsc.so.0
+[gdb-1] #7  0x00007ffff6f3688d in ?? () from /opt/ros/humble/lib/x86_64-linux-gnu/libddsc.so.0
+[gdb-1] #8  0x00007ffff6ff278f in rmw_wait () from /opt/ros/humble/lib/librmw_cyclonedds_cpp.so
+[gdb-1] #9  0x00007ffff7fa68d8 in rcl_wait () from /opt/ros/humble/lib/librcl.so
+[gdb-1] #10 0x00007ffff7e0921c in rclcpp::Executor::wait_for_work(std::chrono::duration<long, std::ratio<1l, 1000000000l> >) () from /opt/ros/humble/lib/librclcpp.so
+[gdb-1] #11 0x00007ffff7e0c133 in rclcpp::Executor::get_next_executable(rclcpp::AnyExecutable&, std::chrono::duration<long, std::ratio<1l, 1000000000l> >) () from /opt/ros/humble/lib/librclcpp.so
+[gdb-1] #12 0x00007ffff7e13881 in rclcpp::executors::SingleThreadedExecutor::spin() () from /opt/ros/humble/lib/librclcpp.so
+[gdb-1] #13 0x00007ffff78dc253 in ?? () from /lib/x86_64-linux-gnu/libstdc++.so.6
+[gdb-1] #14 0x00007ffff7494a83 in start_thread (arg=<optimized out>) at ./nptl/pthread_create.c:442
+[gdb-1] #15 0x00007ffff75268e0 in clone3 () at ../sysdeps/unix/sysv/linux/x86_64/clone3.S:81
+[gdb-1] 
+[gdb-1] Thread 13 (Thread 0x7fffcbfff640 (LWP 9693) "controller_serv"):
+[gdb-1] #0  __futex_abstimed_wait_common64 (private=0, cancel=true, abstime=0x0, op=393, expected=0, futex_word=0x5555556a9b9c) at ./nptl/futex-internal.c:57
+[gdb-1] #1  __futex_abstimed_wait_common (cancel=true, private=0, abstime=0x0, clockid=0, expected=0, futex_word=0x5555556a9b9c) at ./nptl/futex-internal.c:87
+[gdb-1] #2  __GI___futex_abstimed_wait_cancelable64 (futex_word=futex_word@entry=0x5555556a9b9c, expected=expected@entry=0, clockid=clockid@entry=0, abstime=abstime@entry=0x0, private=private@entry=0) at ./nptl/futex-internal.c:139
+[gdb-1] #3  0x00007ffff7493a01 in __pthread_cond_wait_common (abstime=0x0, clockid=0, mutex=0x5555556a9b48, cond=0x5555556a9b70) at ./nptl/pthread_cond_wait.c:503
+[gdb-1] #4  ___pthread_cond_wait (cond=0x5555556a9b70, mutex=0x5555556a9b48) at ./nptl/pthread_cond_wait.c:627
+[gdb-1] #5  0x00007ffff6f4fe9d in ddsrt_cond_wait () from /opt/ros/humble/lib/x86_64-linux-gnu/libddsc.so.0
+[gdb-1] #6  0x00007ffff6f4ff65 in ddsrt_cond_waituntil () from /opt/ros/humble/lib/x86_64-linux-gnu/libddsc.so.0
+[gdb-1] #7  0x00007ffff6f3688d in ?? () from /opt/ros/humble/lib/x86_64-linux-gnu/libddsc.so.0
+[gdb-1] #8  0x00007ffff6ff278f in rmw_wait () from /opt/ros/humble/lib/librmw_cyclonedds_cpp.so
+[gdb-1] #9  0x00007ffff7fa68d8 in rcl_wait () from /opt/ros/humble/lib/librcl.so
+[gdb-1] #10 0x00007ffff7e0921c in rclcpp::Executor::wait_for_work(std::chrono::duration<long, std::ratio<1l, 1000000000l> >) () from /opt/ros/humble/lib/librclcpp.so
+[gdb-1] #11 0x00007ffff7e0c133 in rclcpp::Executor::get_next_executable(rclcpp::AnyExecutable&, std::chrono::duration<long, std::ratio<1l, 1000000000l> >) () from /opt/ros/humble/lib/librclcpp.so
+[gdb-1] #12 0x00007ffff7e0d642 in rclcpp::Executor::spin_once_impl(std::chrono::duration<long, std::ratio<1l, 1000000000l> >) () from /opt/ros/humble/lib/librclcpp.so
+[gdb-1] #13 0x00007ffff7ea3141 in ?? () from /opt/ros/humble/lib/librclcpp.so
+[gdb-1] #14 0x00007ffff78dc253 in ?? () from /lib/x86_64-linux-gnu/libstdc++.so.6
+[gdb-1] #15 0x00007ffff7494a83 in start_thread (arg=<optimized out>) at ./nptl/pthread_create.c:442
+[gdb-1] #16 0x00007ffff75268e0 in clone3 () at ../sysdeps/unix/sysv/linux/x86_64/clone3.S:81
+[gdb-1] 
+[gdb-1] Thread 12 (Thread 0x7fffecff9640 (LWP 9691) "controller_serv"):
+[gdb-1] #0  __futex_abstimed_wait_common64 (private=0, cancel=true, abstime=0x0, op=393, expected=0, futex_word=0x55555561df7c) at ./nptl/futex-internal.c:57
+[gdb-1] #1  __futex_abstimed_wait_common (cancel=true, private=0, abstime=0x0, clockid=0, expected=0, futex_word=0x55555561df7c) at ./nptl/futex-internal.c:87
+[gdb-1] #2  __GI___futex_abstimed_wait_cancelable64 (futex_word=futex_word@entry=0x55555561df7c, expected=expected@entry=0, clockid=clockid@entry=0, abstime=abstime@entry=0x0, private=private@entry=0) at ./nptl/futex-internal.c:139
+[gdb-1] #3  0x00007ffff7493a01 in __pthread_cond_wait_common (abstime=0x0, clockid=0, mutex=0x55555561df28, cond=0x55555561df50) at ./nptl/pthread_cond_wait.c:503
+[gdb-1] #4  ___pthread_cond_wait (cond=0x55555561df50, mutex=0x55555561df28) at ./nptl/pthread_cond_wait.c:627
+[gdb-1] #5  0x00007ffff6f4fe9d in ddsrt_cond_wait () from /opt/ros/humble/lib/x86_64-linux-gnu/libddsc.so.0
+[gdb-1] #6  0x00007ffff6f4ff65 in ddsrt_cond_waituntil () from /opt/ros/humble/lib/x86_64-linux-gnu/libddsc.so.0
+[gdb-1] #7  0x00007ffff6f3688d in ?? () from /opt/ros/humble/lib/x86_64-linux-gnu/libddsc.so.0
+[gdb-1] #8  0x00007ffff6ff278f in rmw_wait () from /opt/ros/humble/lib/librmw_cyclonedds_cpp.so
+[gdb-1] #9  0x00007ffff7fa68d8 in rcl_wait () from /opt/ros/humble/lib/librcl.so
+[gdb-1] #10 0x00007ffff7e0921c in rclcpp::Executor::wait_for_work(std::chrono::duration<long, std::ratio<1l, 1000000000l> >) () from /opt/ros/humble/lib/librclcpp.so
+[gdb-1] #11 0x00007ffff7e0c133 in rclcpp::Executor::get_next_executable(rclcpp::AnyExecutable&, std::chrono::duration<long, std::ratio<1l, 1000000000l> >) () from /opt/ros/humble/lib/librclcpp.so
+[gdb-1] #12 0x00007ffff7e0d642 in rclcpp::Executor::spin_once_impl(std::chrono::duration<long, std::ratio<1l, 1000000000l> >) () from /opt/ros/humble/lib/librclcpp.so
+[gdb-1] #13 0x00007ffff7ea3141 in ?? () from /opt/ros/humble/lib/librclcpp.so
+[gdb-1] #14 0x00007ffff78dc253 in ?? () from /lib/x86_64-linux-gnu/libstdc++.so.6
+[gdb-1] #15 0x00007ffff7494a83 in start_thread (arg=<optimized out>) at ./nptl/pthread_create.c:442
+[gdb-1] #16 0x00007ffff75268e0 in clone3 () at ../sysdeps/unix/sysv/linux/x86_64/clone3.S:81
+[gdb-1] 
+[gdb-1] Thread 11 (Thread 0x7fffed7fa640 (LWP 9690) "controller_serv"):
+[gdb-1] #0  __futex_abstimed_wait_common64 (private=0, cancel=true, abstime=0x0, op=393, expected=0, futex_word=0x7fffcc000ddc) at ./nptl/futex-internal.c:57
+[gdb-1] #1  __futex_abstimed_wait_common (cancel=true, private=0, abstime=0x0, clockid=0, expected=0, futex_word=0x7fffcc000ddc) at ./nptl/futex-internal.c:87
+[gdb-1] #2  __GI___futex_abstimed_wait_cancelable64 (futex_word=futex_word@entry=0x7fffcc000ddc, expected=expected@entry=0, clockid=clockid@entry=0, abstime=abstime@entry=0x0, private=private@entry=0) at ./nptl/futex-internal.c:139
+[gdb-1] #3  0x00007ffff7493a01 in __pthread_cond_wait_common (abstime=0x0, clockid=0, mutex=0x7fffcc000d88, cond=0x7fffcc000db0) at ./nptl/pthread_cond_wait.c:503
+[gdb-1] #4  ___pthread_cond_wait (cond=0x7fffcc000db0, mutex=0x7fffcc000d88) at ./nptl/pthread_cond_wait.c:627
+[gdb-1] #5  0x00007ffff6f4fe9d in ddsrt_cond_wait () from /opt/ros/humble/lib/x86_64-linux-gnu/libddsc.so.0
+[gdb-1] #6  0x00007ffff6f4ff65 in ddsrt_cond_waituntil () from /opt/ros/humble/lib/x86_64-linux-gnu/libddsc.so.0
+[gdb-1] #7  0x00007ffff6f3688d in ?? () from /opt/ros/humble/lib/x86_64-linux-gnu/libddsc.so.0
+[gdb-1] #8  0x00007ffff6fe2c0e in ?? () from /opt/ros/humble/lib/librmw_cyclonedds_cpp.so
+[gdb-1] #9  0x00007ffff78dc253 in ?? () from /lib/x86_64-linux-gnu/libstdc++.so.6
+[gdb-1] #10 0x00007ffff7494a83 in start_thread (arg=<optimized out>) at ./nptl/pthread_create.c:442
+[gdb-1] #11 0x00007ffff75268e0 in clone3 () at ../sysdeps/unix/sysv/linux/x86_64/clone3.S:81
+[gdb-1] 
+[gdb-1] Thread 10 (Thread 0x7fffedffb640 (LWP 9689) "recvUC"):
+[gdb-1] #0  __recvmsg_syscall (flags=0, msg=0x7fffedffa220, fd=4) at ../sysdeps/unix/sysv/linux/recvmsg.c:27
+[gdb-1] #1  __libc_recvmsg (fd=4, msg=0x7fffedffa220, flags=0) at ../sysdeps/unix/sysv/linux/recvmsg.c:41
+[gdb-1] #2  0x00007ffff6f4c28d in ddsrt_recvmsg () from /opt/ros/humble/lib/x86_64-linux-gnu/libddsc.so.0
+[gdb-1] #3  0x00007ffff6ea3511 in ?? () from /opt/ros/humble/lib/x86_64-linux-gnu/libddsc.so.0
+[gdb-1] #4  0x00007ffff6f0883e in ?? () from /opt/ros/humble/lib/x86_64-linux-gnu/libddsc.so.0
+[gdb-1] #5  0x00007ffff6f08abd in ?? () from /opt/ros/humble/lib/x86_64-linux-gnu/libddsc.so.0
+[gdb-1] #6  0x00007ffff6f04675 in ?? () from /opt/ros/humble/lib/x86_64-linux-gnu/libddsc.so.0
+[gdb-1] #7  0x00007ffff6f5021c in ?? () from /opt/ros/humble/lib/x86_64-linux-gnu/libddsc.so.0
+[gdb-1] #8  0x00007ffff7494a83 in start_thread (arg=<optimized out>) at ./nptl/pthread_create.c:442
+[gdb-1] #9  0x00007ffff75268e0 in clone3 () at ../sysdeps/unix/sysv/linux/x86_64/clone3.S:81
+[gdb-1] 
+[gdb-1] Thread 9 (Thread 0x7fffee7fc640 (LWP 9688) "recvMC"):
+[gdb-1] #0  __recvmsg_syscall (flags=0, msg=0x7fffee7fb220, fd=6) at ../sysdeps/unix/sysv/linux/recvmsg.c:27
+[gdb-1] #1  __libc_recvmsg (fd=6, msg=0x7fffee7fb220, flags=0) at ../sysdeps/unix/sysv/linux/recvmsg.c:41
+[gdb-1] #2  0x00007ffff6f4c28d in ddsrt_recvmsg () from /opt/ros/humble/lib/x86_64-linux-gnu/libddsc.so.0
+[gdb-1] #3  0x00007ffff6ea3511 in ?? () from /opt/ros/humble/lib/x86_64-linux-gnu/libddsc.so.0
+[gdb-1] #4  0x00007ffff6f0883e in ?? () from /opt/ros/humble/lib/x86_64-linux-gnu/libddsc.so.0
+[gdb-1] #5  0x00007ffff6f08abd in ?? () from /opt/ros/humble/lib/x86_64-linux-gnu/libddsc.so.0
+[gdb-1] #6  0x00007ffff6f04675 in ?? () from /opt/ros/humble/lib/x86_64-linux-gnu/libddsc.so.0
+[gdb-1] #7  0x00007ffff6f5021c in ?? () from /opt/ros/humble/lib/x86_64-linux-gnu/libddsc.so.0
+[gdb-1] #8  0x00007ffff7494a83 in start_thread (arg=<optimized out>) at ./nptl/pthread_create.c:442
+[gdb-1] #9  0x00007ffff75268e0 in clone3 () at ../sysdeps/unix/sysv/linux/x86_64/clone3.S:81
+[gdb-1] 
+[gdb-1] Thread 8 (Thread 0x7fffeeffd640 (LWP 9687) "recv"):
+[gdb-1] #0  0x00007ffff751b78d in __GI___select (nfds=9, readfds=0x5555555866d0, writefds=0x0, exceptfds=0x0, timeout=0x0) at ../sysdeps/unix/sysv/linux/select.c:69
+[gdb-1] #1  0x00007ffff6f4c494 in ddsrt_select () from /opt/ros/humble/lib/x86_64-linux-gnu/libddsc.so.0
+[gdb-1] #2  0x00007ffff6f08cca in ?? () from /opt/ros/humble/lib/x86_64-linux-gnu/libddsc.so.0
+[gdb-1] #3  0x00007ffff6f04675 in ?? () from /opt/ros/humble/lib/x86_64-linux-gnu/libddsc.so.0
+[gdb-1] #4  0x00007ffff6f5021c in ?? () from /opt/ros/humble/lib/x86_64-linux-gnu/libddsc.so.0
+[gdb-1] #5  0x00007ffff7494a83 in start_thread (arg=<optimized out>) at ./nptl/pthread_create.c:442
+[gdb-1] #6  0x00007ffff75268e0 in clone3 () at ../sysdeps/unix/sysv/linux/x86_64/clone3.S:81
+[gdb-1] 
+[gdb-1] Thread 7 (Thread 0x7fffef7fe640 (LWP 9686) "tev"):
+[gdb-1] #0  __futex_abstimed_wait_common64 (private=0, cancel=true, abstime=0x7fffef7fd390, op=393, expected=0, futex_word=0x55555557e018) at ./nptl/futex-internal.c:57
+[gdb-1] #1  __futex_abstimed_wait_common (cancel=true, private=0, abstime=0x7fffef7fd390, clockid=0, expected=0, futex_word=0x55555557e018) at ./nptl/futex-internal.c:87
+[gdb-1] #2  __GI___futex_abstimed_wait_cancelable64 (futex_word=futex_word@entry=0x55555557e018, expected=expected@entry=0, clockid=clockid@entry=0, abstime=abstime@entry=0x7fffef7fd390, private=private@entry=0) at ./nptl/futex-internal.c:139
+[gdb-1] #3  0x00007ffff7493e5b in __pthread_cond_wait_common (abstime=0x7fffef7fd390, clockid=0, mutex=0x55555557dfc8, cond=0x55555557dff0) at ./nptl/pthread_cond_wait.c:503
+[gdb-1] #4  ___pthread_cond_timedwait64 (cond=0x55555557dff0, mutex=0x55555557dfc8, abstime=0x7fffef7fd390) at ./nptl/pthread_cond_wait.c:652
+[gdb-1] #5  0x00007ffff6f4ff29 in ddsrt_cond_waituntil () from /opt/ros/humble/lib/x86_64-linux-gnu/libddsc.so.0
+[gdb-1] #6  0x00007ffff6f11c98 in ?? () from /opt/ros/humble/lib/x86_64-linux-gnu/libddsc.so.0
+[gdb-1] #7  0x00007ffff6f04675 in ?? () from /opt/ros/humble/lib/x86_64-linux-gnu/libddsc.so.0
+[gdb-1] #8  0x00007ffff6f5021c in ?? () from /opt/ros/humble/lib/x86_64-linux-gnu/libddsc.so.0
+[gdb-1] #9  0x00007ffff7494a83 in start_thread (arg=<optimized out>) at ./nptl/pthread_create.c:442
+[gdb-1] #10 0x00007ffff75268e0 in clone3 () at ../sysdeps/unix/sysv/linux/x86_64/clone3.S:81
+[gdb-1] 
+[gdb-1] Thread 6 (Thread 0x7fffeffff640 (LWP 9685) "dq.user"):
+[gdb-1] #0  __futex_abstimed_wait_common64 (private=0, cancel=true, abstime=0x0, op=393, expected=0, futex_word=0x5555555844f0) at ./nptl/futex-internal.c:57
+[gdb-1] #1  __futex_abstimed_wait_common (cancel=true, private=0, abstime=0x0, clockid=0, expected=0, futex_word=0x5555555844f0) at ./nptl/futex-internal.c:87
+[gdb-1] #2  __GI___futex_abstimed_wait_cancelable64 (futex_word=futex_word@entry=0x5555555844f0, expected=expected@entry=0, clockid=clockid@entry=0, abstime=abstime@entry=0x0, private=private@entry=0) at ./nptl/futex-internal.c:139
+[gdb-1] #3  0x00007ffff7493a01 in __pthread_cond_wait_common (abstime=0x0, clockid=0, mutex=0x5555555844a0, cond=0x5555555844c8) at ./nptl/pthread_cond_wait.c:503
+[gdb-1] #4  ___pthread_cond_wait (cond=0x5555555844c8, mutex=0x5555555844a0) at ./nptl/pthread_cond_wait.c:627
+[gdb-1] #5  0x00007ffff6f4fe9d in ddsrt_cond_wait () from /opt/ros/humble/lib/x86_64-linux-gnu/libddsc.so.0
+[gdb-1] #6  0x00007ffff6f0042c in ?? () from /opt/ros/humble/lib/x86_64-linux-gnu/libddsc.so.0
+[gdb-1] #7  0x00007ffff6f04675 in ?? () from /opt/ros/humble/lib/x86_64-linux-gnu/libddsc.so.0
+[gdb-1] #8  0x00007ffff6f5021c in ?? () from /opt/ros/humble/lib/x86_64-linux-gnu/libddsc.so.0
+[gdb-1] #9  0x00007ffff7494a83 in start_thread (arg=<optimized out>) at ./nptl/pthread_create.c:442
+[gdb-1] #10 0x00007ffff75268e0 in clone3 () at ../sysdeps/unix/sysv/linux/x86_64/clone3.S:81
+[gdb-1] 
+[gdb-1] Thread 5 (Thread 0x7ffff4f8f640 (LWP 9684) "dq.builtins"):
+[gdb-1] #0  __futex_abstimed_wait_common64 (private=0, cancel=true, abstime=0x0, op=393, expected=0, futex_word=0x5555555943f0) at ./nptl/futex-internal.c:57
+[gdb-1] #1  __futex_abstimed_wait_common (cancel=true, private=0, abstime=0x0, clockid=0, expected=0, futex_word=0x5555555943f0) at ./nptl/futex-internal.c:87
+[gdb-1] #2  __GI___futex_abstimed_wait_cancelable64 (futex_word=futex_word@entry=0x5555555943f0, expected=expected@entry=0, clockid=clockid@entry=0, abstime=abstime@entry=0x0, private=private@entry=0) at ./nptl/futex-internal.c:139
+[gdb-1] #3  0x00007ffff7493a01 in __pthread_cond_wait_common (abstime=0x0, clockid=0, mutex=0x5555555943a0, cond=0x5555555943c8) at ./nptl/pthread_cond_wait.c:503
+[gdb-1] #4  ___pthread_cond_wait (cond=0x5555555943c8, mutex=0x5555555943a0) at ./nptl/pthread_cond_wait.c:627
+[gdb-1] #5  0x00007ffff6f4fe9d in ddsrt_cond_wait () from /opt/ros/humble/lib/x86_64-linux-gnu/libddsc.so.0
+[gdb-1] #6  0x00007ffff6f0042c in ?? () from /opt/ros/humble/lib/x86_64-linux-gnu/libddsc.so.0
+[gdb-1] #7  0x00007ffff6f04675 in ?? () from /opt/ros/humble/lib/x86_64-linux-gnu/libddsc.so.0
+[gdb-1] #8  0x00007ffff6f5021c in ?? () from /opt/ros/humble/lib/x86_64-linux-gnu/libddsc.so.0
+[gdb-1] #9  0x00007ffff7494a83 in start_thread (arg=<optimized out>) at ./nptl/pthread_create.c:442
+[gdb-1] #10 0x00007ffff75268e0 in clone3 () at ../sysdeps/unix/sysv/linux/x86_64/clone3.S:81
+[gdb-1] 
+[gdb-1] Thread 4 (Thread 0x7ffff5790640 (LWP 9683) "gc"):
+[gdb-1] #0  __futex_abstimed_wait_common64 (private=-146123757, cancel=true, abstime=0x7ffff578f440, op=393, expected=0, futex_word=0x555555584474) at ./nptl/futex-internal.c:57
+[gdb-1] #1  __futex_abstimed_wait_common (cancel=true, private=-146123757, abstime=0x7ffff578f440, clockid=-152361280, expected=0, futex_word=0x555555584474) at ./nptl/futex-internal.c:87
+[gdb-1] #2  __GI___futex_abstimed_wait_cancelable64 (futex_word=futex_word@entry=0x555555584474, expected=expected@entry=0, clockid=clockid@entry=0, abstime=abstime@entry=0x7ffff578f440, private=private@entry=0) at ./nptl/futex-internal.c:139
+[gdb-1] #3  0x00007ffff7493e5b in __pthread_cond_wait_common (abstime=0x7ffff578f440, clockid=0, mutex=0x555555584420, cond=0x555555584448) at ./nptl/pthread_cond_wait.c:503
+[gdb-1] #4  ___pthread_cond_timedwait64 (cond=0x555555584448, mutex=0x555555584420, abstime=0x7ffff578f440) at ./nptl/pthread_cond_wait.c:652
+[gdb-1] #5  0x00007ffff6f4ff29 in ddsrt_cond_waituntil () from /opt/ros/humble/lib/x86_64-linux-gnu/libddsc.so.0
+[gdb-1] #6  0x00007ffff6ef33b3 in ?? () from /opt/ros/humble/lib/x86_64-linux-gnu/libddsc.so.0
+[gdb-1] #7  0x00007ffff6f04675 in ?? () from /opt/ros/humble/lib/x86_64-linux-gnu/libddsc.so.0
+[gdb-1] #8  0x00007ffff6f5021c in ?? () from /opt/ros/humble/lib/x86_64-linux-gnu/libddsc.so.0
+[gdb-1] #9  0x00007ffff7494a83 in start_thread (arg=<optimized out>) at ./nptl/pthread_create.c:442
+[gdb-1] #10 0x00007ffff75268e0 in clone3 () at ../sysdeps/unix/sysv/linux/x86_64/clone3.S:81
+[gdb-1] 
+[gdb-1] Thread 3 (Thread 0x7ffff5f91640 (LWP 9682) "controller_serv"):
+[gdb-1] #0  __futex_abstimed_wait_common64 (private=<optimized out>, cancel=true, abstime=0x0, op=393, expected=0, futex_word=0x555555577128) at ./nptl/futex-internal.c:57
+[gdb-1] #1  __futex_abstimed_wait_common (cancel=true, private=<optimized out>, abstime=0x0, clockid=0, expected=0, futex_word=0x555555577128) at ./nptl/futex-internal.c:87
+[gdb-1] #2  __GI___futex_abstimed_wait_cancelable64 (futex_word=futex_word@entry=0x555555577128, expected=expected@entry=0, clockid=clockid@entry=0, abstime=abstime@entry=0x0, private=<optimized out>) at ./nptl/futex-internal.c:139
+[gdb-1] #3  0x00007ffff749cb9f in do_futex_wait (sem=sem@entry=0x555555577128, abstime=0x0, clockid=0) at ./nptl/sem_waitcommon.c:111
+[gdb-1] #4  0x00007ffff749cc38 in __new_sem_wait_slow64 (sem=0x555555577128, abstime=0x0, clockid=0) at ./nptl/sem_waitcommon.c:183
+[gdb-1] #5  0x00007ffff7e83372 in rclcpp::SignalHandler::wait_for_signal() () from /opt/ros/humble/lib/librclcpp.so
+[gdb-1] #6  0x00007ffff7e8410e in rclcpp::SignalHandler::deferred_signal_handler() () from /opt/ros/humble/lib/librclcpp.so
+[gdb-1] #7  0x00007ffff78dc253 in ?? () from /lib/x86_64-linux-gnu/libstdc++.so.6
+[gdb-1] #8  0x00007ffff7494a83 in start_thread (arg=<optimized out>) at ./nptl/pthread_create.c:442
+[gdb-1] #9  0x00007ffff75268e0 in clone3 () at ../sysdeps/unix/sysv/linux/x86_64/clone3.S:81
+[gdb-1] 
+[gdb-1] Thread 2 (Thread 0x7ffff6792640 (LWP 9681) "controller_serv"):
+[gdb-1] #0  __futex_abstimed_wait_common64 (private=0, cancel=true, abstime=0x7ffff6791520, op=137, expected=0, futex_word=0x5555555886c0) at ./nptl/futex-internal.c:57
+[gdb-1] #1  __futex_abstimed_wait_common (cancel=true, private=0, abstime=0x7ffff6791520, clockid=0, expected=0, futex_word=0x5555555886c0) at ./nptl/futex-internal.c:87
+[gdb-1] #2  __GI___futex_abstimed_wait_cancelable64 (futex_word=futex_word@entry=0x5555555886c0, expected=expected@entry=0, clockid=clockid@entry=1, abstime=abstime@entry=0x7ffff6791520, private=private@entry=0) at ./nptl/futex-internal.c:139
+[gdb-1] #3  0x00007ffff749429d in __pthread_cond_wait_common (abstime=0x7ffff6791520, clockid=1, mutex=0x555555588670, cond=0x555555588698) at ./nptl/pthread_cond_wait.c:503
+[gdb-1] #4  ___pthread_cond_clockwait64 (abstime=0x7ffff6791520, clockid=1, mutex=0x555555588670, cond=0x555555588698) at ./nptl/pthread_cond_wait.c:691
+[gdb-1] #5  ___pthread_cond_clockwait64 (cond=0x555555588698, mutex=0x555555588670, clockid=1, abstime=0x7ffff6791520) at ./nptl/pthread_cond_wait.c:679
+[gdb-1] #6  0x00007ffff72c2839 in ?? () from /lib/x86_64-linux-gnu/libspdlog.so.1
+[gdb-1] #7  0x00007ffff78dc253 in ?? () from /lib/x86_64-linux-gnu/libstdc++.so.6
+[gdb-1] #8  0x00007ffff7494a83 in start_thread (arg=<optimized out>) at ./nptl/pthread_create.c:442
+[gdb-1] #9  0x00007ffff75268e0 in clone3 () at ../sysdeps/unix/sysv/linux/x86_64/clone3.S:81
+[gdb-1] 
+[gdb-1] Thread 1 (Thread 0x7ffff703d480 (LWP 9667) "controller_serv"):
+[gdb-1] #0  __futex_abstimed_wait_common64 (private=33, cancel=true, abstime=0x7fffffffb490, op=393, expected=0, futex_word=0x5555556989d8) at ./nptl/futex-internal.c:57
+[gdb-1] #1  __futex_abstimed_wait_common (cancel=true, private=33, abstime=0x7fffffffb490, clockid=-144593792, expected=0, futex_word=0x5555556989d8) at ./nptl/futex-internal.c:87
+[gdb-1] #2  __GI___futex_abstimed_wait_cancelable64 (futex_word=futex_word@entry=0x5555556989d8, expected=expected@entry=0, clockid=clockid@entry=0, abstime=abstime@entry=0x7fffffffb490, private=private@entry=0) at ./nptl/futex-internal.c:139
+[gdb-1] #3  0x00007ffff7493e5b in __pthread_cond_wait_common (abstime=0x7fffffffb490, clockid=0, mutex=0x555555698988, cond=0x5555556989b0) at ./nptl/pthread_cond_wait.c:503
+[gdb-1] #4  ___pthread_cond_timedwait64 (cond=0x5555556989b0, mutex=0x555555698988, abstime=0x7fffffffb490) at ./nptl/pthread_cond_wait.c:652
+[gdb-1] #5  0x00007ffff6f4ff29 in ddsrt_cond_waituntil () from /opt/ros/humble/lib/x86_64-linux-gnu/libddsc.so.0
+[gdb-1] #6  0x00007ffff6f3688d in ?? () from /opt/ros/humble/lib/x86_64-linux-gnu/libddsc.so.0
+[gdb-1] #7  0x00007ffff6ff278f in rmw_wait () from /opt/ros/humble/lib/librmw_cyclonedds_cpp.so
+[gdb-1] #8  0x00007ffff7fa68d8 in rcl_wait () from /opt/ros/humble/lib/librcl.so
+[gdb-1] #9  0x00007ffff7e0921c in rclcpp::Executor::wait_for_work(std::chrono::duration<long, std::ratio<1l, 1000000000l> >) () from /opt/ros/humble/lib/librclcpp.so
+[gdb-1] #10 0x00007ffff7e0c133 in rclcpp::Executor::get_next_executable(rclcpp::AnyExecutable&, std::chrono::duration<long, std::ratio<1l, 1000000000l> >) () from /opt/ros/humble/lib/librclcpp.so
+[gdb-1] #11 0x00007ffff7e13881 in rclcpp::executors::SingleThreadedExecutor::spin() () from /opt/ros/humble/lib/librclcpp.so
+[gdb-1] #12 0x00007ffff7e13b03 in rclcpp::spin(std::shared_ptr<rclcpp::node_interfaces::NodeBaseInterface>) () from /opt/ros/humble/lib/librclcpp.so
+[gdb-1] #13 0x00005555555563ff in ?? ()
+[gdb-1] #14 0x00007ffff7429d90 in __libc_start_call_main (main=main@entry=0x5555555562d0, argc=argc@entry=13, argv=argv@entry=0x7fffffffcbb8) at ../sysdeps/nptl/libc_start_call_main.h:58
+[gdb-1] #15 0x00007ffff7429e40 in __libc_start_main_impl (main=0x5555555562d0, argc=13, argv=0x7fffffffcbb8, init=<optimized out>, fini=<optimized out>, rtld_fini=<optimized out>, stack_end=0x7fffffffcba8) at ../csu/libc-start.c:392
+[gdb-1] #16 0x0000555555556625 in ?? ()
+[INFO] [gdb-1]: process has finished cleanly [pid 9555]
+[bt_navigator-5] [WARN] [1792399585.349452956] [bt_navigator_navigate_to_pose_rclcpp_node]: Timed out while waiting for action server to acknowledge goal request for follow_path
+[bt_navigator-5] [WARN] [1792399585.370546881] [bt_navigator_navigate_to_pose_rclcpp_node]: Node timed out while executing service call to local_costmap/clear_entirely_local_costmap.
+[behavior_server-4] [INFO] [1792399585.370908737] [behavior_server]: Running backup
+[lifecycle_manager-8] [INFO] [1792399588.539283325] [lifecycle_manager_navigation]: [34m[1mHave not received a heartbeat from controller_server.[0m[0m
+[lifecycle_manager-8] [ERROR] [1792399588.539343000] [lifecycle_manager_navigation]: CRITICAL FAILURE: SERVER controller_server IS DOWN after not receiving a heartbeat for 4000 ms. Shutting down related nodes.
+[lifecycle_manager-8] [INFO] [1792399588.539398041] [lifecycle_manager_navigation]: [34m[1mTerminating bond timer...[0m[0m
+[lifecycle_manager-8] [INFO] [1792399588.539422589] [lifecycle_manager_navigation]: [34m[1mResetting managed nodes...[0m[0m
+[lifecycle_manager-8] [INFO] [1792399588.539442516] [lifecycle_manager_navigation]: [34m[1mDeactivating velocity_smoother[0m[0m
+[velocity_smoother-7] [INFO] [1792399588.539810626] [velocity_smoother]: Deactivating
+[velocity_smoother-7] [INFO] [1792399588.539887462] [velocity_smoother]: Destroying bond (velocity_smoother) to lifecycle manager.
+[lifecycle_manager-8] [INFO] [1792399589.652232623] [lifecycle_manager_navigation]: [34m[1mDeactivating waypoint_follower[0m[0m
+[waypoint_follower-6] [INFO] [1792399589.652583509] [waypoint_follower]: Deactivating
+[waypoint_follower-6] [INFO] [1792399589.652631820] [waypoint_follower]: Destroying bond (waypoint_follower) to lifecycle manager.
+[lifecycle_manager-8] [INFO] [1792399590.765107515] [lifecycle_manager_navigation]: [34m[1mDeactivating bt_navigator[0m[0m
+[bt_navigator-5] [INFO] [1792399590.765458175] [bt_navigator]: Deactivating
+[bt_navigator-5] [WARN] [1792399590.765512764] [bt_navigator]: [navigate_to_pose] [ActionServer] Requested to deactivate server but goal is still executing. Should check if action server is running before deactivating.
+[behavior_server-4] [INFO] [1792399590.771089182] [behavior_server]: Canceling backup
+[behavior_server-4] [INFO] [1792399590.771178121] [behavior_server]: [backup] [ActionServer] Client requested to cancel the goal. Cancelling.
+[bt_navigator-5] [WARN] [1792399590.771410864] [bt_navigator]: [navigate_to_pose] [ActionServer] Aborting handle.
+[bt_navigator-5] [INFO] [1792399590.771836538] [bt_navigator]: Goal canceled
+[bt_navigator-5] [WARN] [1792399590.771874895] [bt_navigator]: [navigate_to_pose] [ActionServer] Stopping the thread per request.
+[bt_navigator-5] [INFO] [1792399590.772020246] [bt_navigator]: Destroying bond (bt_navigator) to lifecycle manager.
+[lifecycle_manager-8] [INFO] [1792399591.884488536] [lifecycle_manager_navigation]: [34m[1mDeactivating behavior_server[0m[0m
+[behavior_server-4] [INFO] [1792399591.884783777] [behavior_server]: Deactivating
+[behavior_server-4] [INFO] [1792399591.884841158] [behavior_server]: Destroying bond (behavior_server) to lifecycle manager.
+[lifecycle_manager-8] [INFO] [1792399592.997265865] [lifecycle_manager_navigation]: [34m[1mDeactivating planner_server[0m[0m
+[planner_server-3] [INFO] [1792399592.997612600] [planner_server]: Deactivating
+[planner_server-3] [INFO] [1792399592.997685491] [global_costmap.global_costmap]: Deactivating
+[planner_server-3] [INFO] [1792399593.455737677] [planner_server]: Deactivating plugin GridBased of type NavfnPlanner
+[planner_server-3] [INFO] [1792399593.455776740] [planner_server]: Destroying bond (planner_server) to lifecycle manager.
+[lifecycle_manager-8] [INFO] [1792399594.567449366] [lifecycle_manager_navigation]: [34m[1mDeactivating smoother_server[0m[0m
+[smoother_server-2] [INFO] [1792399594.567720830] [smoother_server]: Deactivating
+[smoother_server-2] [INFO] [1792399594.567753534] [smoother_server]: Destroying bond (smoother_server) to lifecycle manager.
+[lifecycle_manager-8] [INFO] [1792399594.759206759] [lifecycle_manager_navigation]: [34m[1mDeactivating controller_server[0m[0m
+[lifecycle_manager-8] [ERROR] [1792399599.759442994] [lifecycle_manager_navigation]: Failed to change state for node: controller_server. Exception: change_state service is not available!.
+[lifecycle_manager-8] [INFO] [1792399599.759541653] [lifecycle_manager_navigation]: [34m[1mManaged nodes have been reset[0m[0m
+[ERROR] [velocity_smoother-7]: process has died [pid 9567, exit code -9, cmd '/opt/ros/humble/lib/nav2_velocity_smoother/velocity_smoother --ros-args --log-level info --ros-args -r __node:=velocity_smoother --params-file /tmp/launch_params_geevh_wy -r /tf:=tf -r /tf_static:=tf_static -r cmd_vel:=cmd_vel_nav -r cmd_vel_smoothed:=cmd_vel'].
+[ERROR] [lifecycle_manager-8]: process has died [pid 9569, exit code -9, cmd '/opt/ros/humble/lib/nav2_lifecycle_manager/lifecycle_manager --ros-args --log-level info --ros-args -r __node:=lifecycle_manager_navigation --params-file /tmp/launch_params_m91jpcpi --params-file /tmp/launch_params_g6sdqb0q --params-file /tmp/launch_params_8vgqw4y_'].
+[ERROR] [smoother_server-2]: process has died [pid 9557, exit code -9, cmd '/opt/ros/humble/lib/nav2_smoother/smoother_server --ros-args --log-level info --ros-args -r __node:=smoother_server --params-file /tmp/launch_params_geevh_wy -r /tf:=tf -r /tf_static:=tf_static'].
+[ERROR] [behavior_server-4]: process has died [pid 9561, exit code -9, cmd '/opt/ros/humble/lib/nav2_behaviors/behavior_server --ros-args --log-level info --ros-args -r __node:=behavior_server --params-file /tmp/launch_params_geevh_wy -r /tf:=tf -r /tf_static:=tf_static'].
+[ERROR] [waypoint_follower-6]: process has died [pid 9565, exit code -9, cmd '/opt/ros/humble/lib/nav2_waypoint_follower/waypoint_follower --ros-args --log-level info --ros-args -r __node:=waypoint_follower --params-file /tmp/launch_params_geevh_wy -r /tf:=tf -r /tf_static:=tf_static'].
+[ERROR] [planner_server-3]: process has died [pid 9559, exit code -9, cmd '/opt/ros/humble/lib/nav2_planner/planner_server --ros-args --log-level info --ros-args -r __node:=planner_server --params-file /tmp/launch_params_geevh_wy -r /tf:=tf -r /tf_static:=tf_static'].
+[ERROR] [bt_navigator-5]: process has died [pid 9563, exit code -9, cmd '/opt/ros/humble/lib/nav2_bt_navigator/bt_navigator --ros-args --log-level info --ros-args -r __node:=bt_navigator --params-file /tmp/launch_params_geevh_wy -r /tf:=tf -r /tf_static:=tf_static'].

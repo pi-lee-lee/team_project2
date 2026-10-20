@@ -1,0 +1,12 @@
+Metadata-Version: 2.1
+Name: warehouse-robot
+Version: 0.1.0
+Summary: TurtleBot3 물류창고 로봇: A* 플래너와 Django 서버 브리지
+Home-page: UNKNOWN
+Maintainer: abc
+Maintainer-email: wlgh8449@gmail.com
+License: Apache-2.0
+Platform: UNKNOWN
+
+UNKNOWN
+

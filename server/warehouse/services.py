@@ -1,0 +1,543 @@
+"""작업 흐름(상태 머신) 로직.
+
+consumer에서 database_sync_to_async로 호출한다. 각 함수는 DB를 바꾸고
+보낼 메시지를 Outbox에 담아 돌려준다. 실제 전송은 consumer가 맡는다.
+
+    로봇 상태: OFFLINE / IDLE / MOVING / WAITING_LOAD / ERROR
+    작업 흐름: 물류 위치(load) ... → 홈 복귀(move) → 완료
+"""
+import base64
+import math
+import re
+import zlib
+
+from django.db import transaction
+from django.utils import timezone
+
+from .mapimage import encode_png, grid_to_rows
+from .models import EventLog, Location, Map, Robot, Task, TaskStep
+
+DEFAULT_ROBOT = 'tb3'
+
+
+class ServiceError(Exception):
+    """요청한 UI에만 돌려줄 오류."""
+
+
+class Outbox:
+    def __init__(self):
+        self.robot = []  # (robot_name, message)
+        self.ui = []     # message (모든 UI에 브로드캐스트)
+
+    def to_robot(self, robot, msg):
+        self.robot.append((robot.name, msg))
+
+    def to_ui(self, msg):
+        self.ui.append(msg)
+
+
+# ---------------------------------------------------------------- 공통
+
+def get_robot(name=None):
+    robot, _ = Robot.objects.get_or_create(name=name or DEFAULT_ROBOT)
+    return robot
+
+
+def active_map():
+    return Map.objects.filter(is_active=True).first()
+
+
+def active_task(robot):
+    return robot.tasks.filter(status=Task.STATUS_RUNNING).first()
+
+
+def log(out, robot, message):
+    entry = EventLog.objects.create(robot=robot, message=message)
+    out.to_ui({'type': 'log', 'log': entry.to_dict()})
+
+
+def set_state(robot, state, message=''):
+    robot.state = state
+    robot.message = message
+    robot.save(update_fields=['state', 'message'])
+
+
+def push_state(out, robot):
+    task = active_task(robot) or robot.tasks.first()
+    out.to_ui({'type': 'state', 'robot': robot.to_dict(),
+               'task': task.to_dict() if task else None})
+
+
+def push_locations(out):
+    m = active_map()
+    locs = [l.to_dict() for l in m.locations.all()] if m else []
+    out.to_ui({'type': 'locations', 'locations': locs})
+
+
+def snapshot(robot_name=None):
+    """UI가 처음 접속했을 때 보낼 전체 상태."""
+    robot = get_robot(robot_name)
+    m = active_map()
+    task = active_task(robot) or robot.tasks.first()
+    return {
+        'type': 'snapshot',
+        'robot': robot.to_dict(),
+        'task': task.to_dict() if task else None,
+        'map': m.to_dict() if m else None,
+        'locations': [l.to_dict() for l in m.locations.all()] if m else [],
+        'logs': [e.to_dict() for e in EventLog.objects.all()[:30]],
+    }
+
+
+def require_online(robot):
+    if robot.state == Robot.STATE_OFFLINE:
+        raise ServiceError('로봇이 연결되어 있지 않습니다.')
+
+
+def send_goal(out, robot, step):
+    step.status = TaskStep.STATUS_MOVING
+    step.save(update_fields=['status'])
+    out.to_robot(robot, {'type': 'goto', 'goal_id': step.goal_id,
+                         'x': step.x, 'y': step.y, 'yaw': step.yaw})
+    set_state(robot, Robot.STATE_MOVING, f'{step.name}(으)로 이동 중')
+    log(out, robot, f'{step.name}(으)로 이동 시작')
+
+
+def finish_task(out, robot, task, status, message):
+    task.status = status
+    task.finished_at = timezone.now()
+    task.save(update_fields=['status', 'finished_at'])
+    log(out, robot, message)
+
+
+def advance(out, robot, task):
+    """다음 단계로 진행. 남은 단계가 없으면 작업 완료."""
+    step = task.current_step()
+    if step is None:
+        finish_task(out, robot, task, Task.STATUS_DONE, f'작업 #{task.id} 완료')
+        set_state(robot, Robot.STATE_IDLE)
+    else:
+        send_goal(out, robot, step)
+
+
+def create_task(robot, locations, with_home):
+    task = Task.objects.create(robot=robot)
+    order = 0
+    for loc in locations:
+        action = TaskStep.ACTION_MOVE if loc.kind == Location.KIND_HOME else TaskStep.ACTION_LOAD
+        TaskStep.objects.create(task=task, order=order, action=action, location=loc,
+                                name=loc.name, x=loc.x, y=loc.y, yaw=loc.yaw)
+        order += 1
+    if with_home:
+        home = home_location()
+        if home is None:
+            raise ServiceError('홈 위치가 등록되어 있지 않습니다.')
+        TaskStep.objects.create(task=task, order=order, action=TaskStep.ACTION_MOVE,
+                                location=home, name=home.name,
+                                x=home.x, y=home.y, yaw=home.yaw)
+    return task
+
+
+def home_location():
+    m = active_map()
+    return m.locations.filter(kind=Location.KIND_HOME).first() if m else None
+
+
+def cancel_active(out, robot, reason):
+    task = active_task(robot)
+    if task is None:
+        return
+    out.to_robot(robot, {'type': 'cancel'})
+    task.steps.filter(status__in=[TaskStep.STATUS_MOVING, TaskStep.STATUS_ARRIVED]) \
+        .update(status=TaskStep.STATUS_FAILED)
+    finish_task(out, robot, task, Task.STATUS_CANCELED, f'작업 #{task.id} 취소: {reason}')
+
+
+# ---------------------------------------------------------------- 로봇 → 서버
+
+@transaction.atomic
+def robot_connected(name, active_goal_id):
+    out = Outbox()
+    robot = get_robot(name)
+    robot.last_seen = timezone.now()
+    robot.save(update_fields=['last_seen'])
+
+    task = active_task(robot)
+    step = task.current_step() if task else None
+    if step is None:
+        set_state(robot, Robot.STATE_IDLE)
+    elif step.status == TaskStep.STATUS_ARRIVED:
+        set_state(robot, Robot.STATE_WAITING_LOAD, f'{step.name} 적재 대기')
+    elif step.status == TaskStep.STATUS_MOVING and active_goal_id == step.goal_id:
+        set_state(robot, Robot.STATE_MOVING, f'{step.name}(으)로 이동 중')
+    elif task.steps.count() == 1:
+        # 단일 이동은 목표를 잃었으면 실패로 끝내서 다음 명령을 막지 않는다
+        step.status = TaskStep.STATUS_FAILED
+        step.save(update_fields=['status'])
+        finish_task(out, robot, task, Task.STATUS_FAILED, f'작업 #{task.id} 실패: 재연결로 이동이 끊김')
+        set_state(robot, Robot.STATE_IDLE, '직전 이동이 연결 끊김으로 중단됨')
+    else:
+        set_state(robot, Robot.STATE_ERROR, '재연결됨: 진행 중이던 이동이 끊겼습니다. 재시도하세요.')
+    log(out, robot, '로봇 연결됨')
+    push_state(out, robot)
+    return out
+
+
+@transaction.atomic
+def robot_health(name, robot_ok):
+    """브리지는 연결돼 있지만 로봇(Pi)의 LiDAR/오도메트리가 끊기거나 돌아왔을 때."""
+    out = Outbox()
+    robot = get_robot(name)
+    if not robot_ok:
+        if robot.state != Robot.STATE_OFFLINE:
+            set_state(robot, Robot.STATE_OFFLINE, '로봇(Pi) 응답 없음: LiDAR/오도메트리가 들어오지 않습니다')
+            log(out, robot, '로봇(Pi) 응답 없음')
+    elif robot.state == Robot.STATE_OFFLINE:
+        # 진행 중이던 작업 상태에 맞춰 복귀 (브리지 재연결과 같은 처리)
+        goal_step = None
+        task = active_task(robot)
+        step = task.current_step() if task else None
+        if step is not None and step.status == TaskStep.STATUS_MOVING:
+            goal_step = step.goal_id
+        return robot_connected(name, goal_step)
+    push_state(out, robot)
+    return out
+
+
+@transaction.atomic
+def robot_disconnected(name):
+    out = Outbox()
+    robot = get_robot(name)
+    set_state(robot, Robot.STATE_OFFLINE, '연결 끊김')
+    log(out, robot, '로봇 연결 끊김')
+    push_state(out, robot)
+    return out
+
+
+@transaction.atomic
+def handle_map(name, msg):
+    """브리지가 보낸 OccupancyGrid를 PNG로 저장하고 활성 맵으로 지정."""
+    out = Outbox()
+    width, height = int(msg['width']), int(msg['height'])
+    data = zlib.decompress(base64.b64decode(msg['data']))
+    if len(data) != width * height:
+        raise ServiceError('맵 데이터 크기가 맞지 않습니다.')
+    png = encode_png(grid_to_rows(data, width, height), width, height)
+    m = save_map(msg.get('name') or 'default', msg['resolution'],
+                 msg['origin'][0], msg['origin'][1], width, height, png)
+    out.to_ui({'type': 'map', 'map': m.to_dict()})
+    push_locations(out)
+    return out
+
+
+def save_map(name, resolution, origin_x, origin_y, width, height, png):
+    m, _ = Map.objects.update_or_create(name=name, defaults=dict(
+        resolution=resolution, origin_x=origin_x, origin_y=origin_y,
+        width=width, height=height, png=png))
+    if not m.is_active:
+        Map.objects.exclude(pk=m.pk).update(is_active=False)
+        m.is_active = True
+        m.save(update_fields=['is_active'])
+    return m
+
+
+@transaction.atomic
+def handle_battery(name, voltage, percentage):
+    out = Outbox()
+    robot = get_robot(name)
+    robot.battery_voltage = voltage
+    robot.battery_percentage = percentage
+    robot.last_seen = timezone.now()
+    robot.save(update_fields=['battery_voltage', 'battery_percentage', 'last_seen'])
+    push_state(out, robot)
+    return out
+
+
+@transaction.atomic
+def handle_nav_status(name, goal_id, status, message=''):
+    """status: succeeded / failed / canceled"""
+    out = Outbox()
+    robot = get_robot(name)
+    task = active_task(robot)
+    step = task.current_step() if task else None
+    if step is None or step.goal_id != goal_id or step.status != TaskStep.STATUS_MOVING:
+        return out  # 이미 취소됐거나 지난 목표에 대한 응답
+
+    if status == 'succeeded':
+        if step.action == TaskStep.ACTION_LOAD:
+            step.status = TaskStep.STATUS_ARRIVED
+            step.save(update_fields=['status'])
+            set_state(robot, Robot.STATE_WAITING_LOAD, f'{step.name} 도착, 적재 대기')
+            log(out, robot, f'{step.name} 도착 - 적재 후 확인을 눌러주세요')
+        else:
+            step.status = TaskStep.STATUS_DONE
+            step.save(update_fields=['status'])
+            log(out, robot, f'{step.name} 도착')
+            advance(out, robot, task)
+    elif status == 'failed':
+        step.status = TaskStep.STATUS_FAILED
+        step.save(update_fields=['status'])
+        log(out, robot, f'{step.name} 이동 실패: {message}')
+        if task.steps.count() == 1:
+            # 단일 이동("여기로 이동", 위치 하나로 이동)은 바로 실패로 끝내서 다음 명령을 막지 않는다
+            finish_task(out, robot, task, Task.STATUS_FAILED, f'작업 #{task.id} 실패')
+            set_state(robot, Robot.STATE_IDLE, f'직전 이동 실패: {message}')
+        else:
+            # 여러 위치 작업은 재시도/건너뛰기/취소를 기다린다
+            set_state(robot, Robot.STATE_ERROR, f'{step.name} 이동 실패: {message}')
+    # canceled는 서버가 요청한 경우이므로 무시
+    push_state(out, robot)
+    return out
+
+
+# ---------------------------------------------------------------- UI → 서버
+
+@transaction.atomic
+def start_task(robot_name, location_ids, with_home=True):
+    out = Outbox()
+    robot = get_robot(robot_name)
+    require_online(robot)
+    if active_task(robot):
+        raise ServiceError('진행 중인 작업이 있습니다. 먼저 취소하세요.')
+    m = active_map()
+    by_id = {l.id: l for l in Location.objects.filter(map=m, id__in=location_ids)}
+    locations = [by_id[i] for i in location_ids if i in by_id]
+    if not locations:
+        raise ServiceError('이동할 위치를 선택하세요.')
+    task = create_task(robot, locations, with_home)
+    log(out, robot, f'작업 #{task.id} 시작: ' + ' → '.join(s.name for s in task.steps.all()))
+    advance(out, robot, task)
+    push_state(out, robot)
+    return out
+
+
+@transaction.atomic
+def goto_point(robot_name, x, y, yaw):
+    """등록하지 않은 임의의 지점으로 이동 (도착하면 바로 완료)."""
+    out = Outbox()
+    robot = get_robot(robot_name)
+    require_online(robot)
+    if active_task(robot):
+        raise ServiceError('진행 중인 작업이 있습니다. 먼저 취소하세요.')
+    task = Task.objects.create(robot=robot)
+    TaskStep.objects.create(task=task, order=0, action=TaskStep.ACTION_MOVE,
+                            name=f'지정 지점({x:.2f}, {y:.2f})', x=x, y=y, yaw=yaw)
+    advance(out, robot, task)
+    push_state(out, robot)
+    return out
+
+
+@transaction.atomic
+def go_home(robot_name):
+    out = Outbox()
+    robot = get_robot(robot_name)
+    require_online(robot)
+    if home_location() is None:
+        raise ServiceError('홈 위치가 등록되어 있지 않습니다.')
+    cancel_active(out, robot, '홈 복귀 요청')
+    task = create_task(robot, [], with_home=True)
+    advance(out, robot, task)
+    push_state(out, robot)
+    return out
+
+
+@transaction.atomic
+def confirm_load(robot_name):
+    out = Outbox()
+    robot = get_robot(robot_name)
+    task = active_task(robot)
+    step = task.current_step() if task else None
+    if step is None or step.status != TaskStep.STATUS_ARRIVED:
+        raise ServiceError('적재 대기 중인 위치가 없습니다.')
+    step.status = TaskStep.STATUS_DONE
+    step.save(update_fields=['status'])
+    log(out, robot, f'{step.name} 적재 완료')
+    advance(out, robot, task)
+    push_state(out, robot)
+    return out
+
+
+@transaction.atomic
+def retry_step(robot_name):
+    out = Outbox()
+    robot = get_robot(robot_name)
+    require_online(robot)
+    task = active_task(robot)
+    step = task.current_step() if task else None
+    if step is None or step.status not in (TaskStep.STATUS_FAILED, TaskStep.STATUS_MOVING):
+        raise ServiceError('재시도할 이동이 없습니다.')
+    send_goal(out, robot, step)
+    push_state(out, robot)
+    return out
+
+
+@transaction.atomic
+def skip_step(robot_name):
+    out = Outbox()
+    robot = get_robot(robot_name)
+    require_online(robot)
+    task = active_task(robot)
+    step = task.current_step() if task else None
+    if step is None:
+        raise ServiceError('건너뛸 단계가 없습니다.')
+    out.to_robot(robot, {'type': 'cancel'})
+    step.status = TaskStep.STATUS_SKIPPED
+    step.save(update_fields=['status'])
+    log(out, robot, f'{step.name} 건너뜀')
+    advance(out, robot, task)
+    push_state(out, robot)
+    return out
+
+
+@transaction.atomic
+def cancel_task(robot_name):
+    out = Outbox()
+    robot = get_robot(robot_name)
+    if not active_task(robot):
+        raise ServiceError('진행 중인 작업이 없습니다.')
+    cancel_active(out, robot, '사용자 요청')
+    if robot.state != Robot.STATE_OFFLINE:
+        set_state(robot, Robot.STATE_IDLE)
+    push_state(out, robot)
+    return out
+
+
+@transaction.atomic
+def estop(robot_name):
+    out = Outbox()
+    robot = get_robot(robot_name)
+    out.to_robot(robot, {'type': 'stop'})
+    cancel_active(out, robot, '비상정지')
+    if robot.state != Robot.STATE_OFFLINE:
+        set_state(robot, Robot.STATE_ERROR, '비상정지됨')
+    log(out, robot, '비상정지')
+    push_state(out, robot)
+    return out
+
+
+@transaction.atomic
+def reset_error(robot_name):
+    out = Outbox()
+    robot = get_robot(robot_name)
+    if robot.state == Robot.STATE_ERROR and not active_task(robot):
+        set_state(robot, Robot.STATE_IDLE)
+    push_state(out, robot)
+    return out
+
+
+@transaction.atomic
+def set_initial_pose(robot_name, x, y, yaw):
+    out = Outbox()
+    robot = get_robot(robot_name)
+    require_online(robot)
+    out.to_robot(robot, {'type': 'initial_pose', 'x': float(x), 'y': float(y), 'yaw': float(yaw)})
+    log(out, robot, f'초기 위치 지정 ({x:.2f}, {y:.2f}, {math.degrees(yaw):.0f}°)')
+    return out
+
+
+@transaction.atomic
+def save_location(data):
+    """data에 id가 있으면 수정, 없으면 추가."""
+    out = Outbox()
+    m = active_map()
+    if m is None:
+        raise ServiceError('먼저 맵을 불러오세요.')
+    name = (data.get('name') or '').strip()
+    if not name:
+        raise ServiceError('위치 이름을 입력하세요.')
+    kind = data.get('kind', Location.KIND_PICKUP)
+    if kind not in (Location.KIND_PICKUP, Location.KIND_HOME):
+        raise ServiceError('잘못된 위치 종류입니다.')
+    fields = dict(name=name, kind=kind, x=float(data['x']), y=float(data['y']),
+                  yaw=float(data.get('yaw', 0.0)))
+    if data.get('id'):
+        loc = Location.objects.filter(map=m, id=data['id']).first()
+        if loc is None:
+            raise ServiceError('위치를 찾을 수 없습니다.')
+        for k, v in fields.items():
+            setattr(loc, k, v)
+        loc.save()
+    else:
+        loc = Location.objects.create(map=m, **fields)
+    if kind == Location.KIND_HOME:  # 홈은 하나만
+        m.locations.filter(kind=Location.KIND_HOME).exclude(pk=loc.pk) \
+            .update(kind=Location.KIND_PICKUP)
+    push_locations(out)
+    return out
+
+
+@transaction.atomic
+def set_home(x, y, yaw):
+    """홈 위치를 (x, y, yaw)로 지정. 이미 있으면 위치만 바꾼다."""
+    out = Outbox()
+    m = active_map()
+    if m is None:
+        raise ServiceError('먼저 맵을 불러오세요.')
+    home = m.locations.filter(kind=Location.KIND_HOME).first()
+    if home is None:
+        home = Location(map=m, name='홈', kind=Location.KIND_HOME)
+    home.x, home.y, home.yaw = float(x), float(y), float(yaw)
+    home.save()
+    log(out, None, f'홈 위치 지정 ({home.x:.2f}, {home.y:.2f}, {math.degrees(home.yaw):.0f}°)')
+    push_locations(out)
+    return out
+
+
+@transaction.atomic
+def delete_location(location_id):
+    out = Outbox()
+    Location.objects.filter(id=location_id).delete()
+    push_locations(out)
+    return out
+
+
+# ---------------------------------------------------------------- 맵 만들기 (SLAM 모드)
+
+MAP_NAME_RE = re.compile(r'^[A-Za-z0-9_-]{1,50}$')
+
+
+@transaction.atomic
+def request_save_map(robot_name, name):
+    out = Outbox()
+    robot = get_robot(robot_name)
+    require_online(robot)
+    if not MAP_NAME_RE.match(name):
+        raise ServiceError('맵 이름은 영문/숫자/_/- 만 쓸 수 있습니다 (예: office_1f).')
+    out.to_robot(robot, {'type': 'save_map', 'name': name})
+    log(out, robot, f'맵 저장 요청: {name}')
+    return out
+
+
+@transaction.atomic
+def map_saved(robot_name, ok, message):
+    out = Outbox()
+    robot = get_robot(robot_name)
+    log(out, robot, ('맵 저장 완료: ' if ok else '맵 저장 실패: ') + message[:200])
+    return out
+
+
+# ---------------------------------------------------------------- 상태 초기화
+
+@transaction.atomic
+def reset_robot(robot_name):
+    """진행 중인 작업 취소, 상태를 대기로, 로봇에 초기화 요청 (시뮬레이션은 출발 위치로 되돌림)."""
+    out = Outbox()
+    robot = get_robot(robot_name)
+    require_online(robot)
+    cancel_active(out, robot, '상태 초기화')
+    out.to_robot(robot, {'type': 'reset'})
+    set_state(robot, Robot.STATE_IDLE, '상태 초기화 중...')
+    log(out, robot, '상태 초기화 요청')
+    push_state(out, robot)
+    return out
+
+
+@transaction.atomic
+def reset_done(robot_name, ok, message):
+    out = Outbox()
+    robot = get_robot(robot_name)
+    if robot.state != Robot.STATE_OFFLINE:
+        set_state(robot, Robot.STATE_IDLE if ok else Robot.STATE_ERROR, message[:255])
+    log(out, robot, ('상태 초기화 완료: ' if ok else '상태 초기화 실패: ') + message[:200])
+    push_state(out, robot)
+    return out

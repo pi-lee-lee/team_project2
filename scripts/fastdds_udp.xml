@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Fast DDS 공유 메모리(SHM) 전송을 끄고 UDP만 사용.
+     프로세스를 강제 종료하면 남는 SHM 찌꺼기 때문에 같은 PC 안의 노드끼리
+     메시지(TF 등)가 전달되지 않는 문제를 피하기 위함. -->
+<profiles xmlns="http://www.eprosima.com/XMLSchemas/fastRTPS_Profiles">
+  <transport_descriptors>
+    <transport_descriptor>
+      <transport_id>udp_only</transport_id>
+      <type>UDPv4</type>
+    </transport_descriptor>
+  </transport_descriptors>
+  <participant profile_name="udp_only_participant" is_default_profile="true">
+    <rtps>
+      <userTransports>
+        <transport_id>udp_only</transport_id>
+      </userTransports>
+      <useBuiltinTransports>false</useBuiltinTransports>
+    </rtps>
+  </participant>
+</profiles>

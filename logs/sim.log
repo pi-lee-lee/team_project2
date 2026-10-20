@@ -1,0 +1,37 @@
+[start_sim] 월드 turtlebot3_world, 출발 위치 (-2.0, -0.5), 화면 없음, 도메인 77
+[INFO] [launch]: All log files can be found below /home/abc/.ros/log/2026-10-19-17-31-40-232104-abc-B360M-DS3H-6171
+[INFO] [launch]: All log files can be found below /home/abc/.ros/log/2026-10-19-17-31-40-232321-abc-B360M-DS3H-6172
+[INFO] [launch]: Default logging verbosity is set to INFO
+[INFO] [launch]: All log files can be found below /home/abc/.ros/log/2026-10-19-17-31-40-232550-abc-B360M-DS3H-6173
+[INFO] [launch]: Default logging verbosity is set to INFO
+[INFO] [launch]: Default logging verbosity is set to INFO
+urdf_file_name : turtlebot3_waffle_pi.urdf
+[INFO] [spawn_entity.py-1]: process started with pid [6176]
+[INFO] [robot_state_publisher-1]: process started with pid [6178]
+[robot_state_publisher-1] [INFO] [1792398700.334959616] [robot_state_publisher]: got segment base_footprint
+[robot_state_publisher-1] [INFO] [1792398700.335029565] [robot_state_publisher]: got segment base_link
+[robot_state_publisher-1] [INFO] [1792398700.335038743] [robot_state_publisher]: got segment base_scan
+[robot_state_publisher-1] [INFO] [1792398700.335044532] [robot_state_publisher]: got segment camera_link
+[robot_state_publisher-1] [INFO] [1792398700.335049662] [robot_state_publisher]: got segment camera_rgb_frame
+[robot_state_publisher-1] [INFO] [1792398700.335054774] [robot_state_publisher]: got segment camera_rgb_optical_frame
+[robot_state_publisher-1] [INFO] [1792398700.335060035] [robot_state_publisher]: got segment caster_back_left_link
+[robot_state_publisher-1] [INFO] [1792398700.335065190] [robot_state_publisher]: got segment caster_back_right_link
+[robot_state_publisher-1] [INFO] [1792398700.335070335] [robot_state_publisher]: got segment imu_link
+[robot_state_publisher-1] [INFO] [1792398700.335075552] [robot_state_publisher]: got segment wheel_left_link
+[robot_state_publisher-1] [INFO] [1792398700.335080612] [robot_state_publisher]: got segment wheel_right_link
+[INFO] [gzserver-1]: process started with pid [6202]
+[spawn_entity.py-1] [INFO] [1792398700.698136886] [spawn_entity]: Spawn Entity started
+[spawn_entity.py-1] [INFO] [1792398700.698460995] [spawn_entity]: Loading entity XML from file /home/abc/turtlebot3_ws/install/turtlebot3_gazebo/share/turtlebot3_gazebo/models/turtlebot3_waffle_pi/model.sdf
+[spawn_entity.py-1] [INFO] [1792398700.700012262] [spawn_entity]: Waiting for service /spawn_entity, timeout = 30
+[spawn_entity.py-1] [INFO] [1792398700.700273464] [spawn_entity]: Waiting for service /spawn_entity
+[spawn_entity.py-1] [INFO] [1792398701.710744996] [spawn_entity]: Calling service /spawn_entity
+[gzserver-1] [INFO] [1792398701.995722847] [turtlebot3_imu]: <initial_orientation_as_reference> is unset, using default value of false to comply with REP 145 (world as orientation reference)
+[spawn_entity.py-1] [INFO] [1792398702.085149480] [spawn_entity]: Spawn status: SpawnEntity: Successfully spawned entity [waffle_pi]
+[gzserver-1] [INFO] [1792398702.100589451] [turtlebot3_diff_drive]: Wheel pair 1 separation set to [0.287000m]
+[gzserver-1] [INFO] [1792398702.100637503] [turtlebot3_diff_drive]: Wheel pair 1 diameter set to [0.066000m]
+[gzserver-1] [INFO] [1792398702.101405362] [turtlebot3_diff_drive]: Subscribed to [/cmd_vel]
+[gzserver-1] [INFO] [1792398702.102814738] [turtlebot3_diff_drive]: Advertise odometry on [/odom]
+[gzserver-1] [INFO] [1792398702.104201762] [turtlebot3_diff_drive]: Publishing odom transforms between [odom] and [base_footprint]
+[gzserver-1] [INFO] [1792398702.112759825] [turtlebot3_joint_state]: Going to publish joint [wheel_left_joint]
+[gzserver-1] [INFO] [1792398702.112788135] [turtlebot3_joint_state]: Going to publish joint [wheel_right_joint]
+[INFO] [spawn_entity.py-1]: process has finished cleanly [pid 6176]

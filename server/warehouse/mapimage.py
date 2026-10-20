@@ -1,0 +1,65 @@
+"""OccupancyGrid / PGM -> PNG 변환 (Pillow 없이 표준 라이브러리만 사용)."""
+import struct
+import zlib
+
+
+def occupancy_to_gray(value):
+    """OccupancyGrid 값(-1, 0~100)을 map_saver와 같은 회색조 값으로 변환."""
+    if value < 0 or value > 100:
+        return 205  # unknown
+    return 254 - int(value * 254 / 100)
+
+
+def grid_to_rows(data, width, height):
+    """OccupancyGrid(row 0 = 아래쪽)를 이미지 행 순서(row 0 = 위쪽)로 변환."""
+    lut = bytes(occupancy_to_gray(v if v < 128 else v - 256) for v in range(256))
+    rows = []
+    for r in range(height - 1, -1, -1):
+        rows.append(bytes(data[r * width:(r + 1) * width]).translate(lut))
+    return rows
+
+
+def encode_png(rows, width, height):
+    """8bit grayscale PNG 인코딩."""
+    raw = b''.join(b'\x00' + row for row in rows)
+
+    def chunk(tag, body):
+        return (struct.pack('>I', len(body)) + tag + body
+                + struct.pack('>I', zlib.crc32(tag + body) & 0xFFFFFFFF))
+
+    ihdr = struct.pack('>IIBBBBB', width, height, 8, 0, 0, 0, 0)
+    return (b'\x89PNG\r\n\x1a\n' + chunk(b'IHDR', ihdr)
+            + chunk(b'IDAT', zlib.compress(raw, 6)) + chunk(b'IEND', b''))
+
+
+def read_pgm(path):
+    """map_saver가 저장한 P5(binary) / P2(ascii) PGM 읽기. (width, height, rows) 반환."""
+    with open(path, 'rb') as f:
+        content = f.read()
+
+    tokens = []
+    pos = 0
+    while len(tokens) < 4:
+        # 공백과 주석 건너뛰기
+        while content[pos:pos + 1].isspace():
+            pos += 1
+        if content[pos:pos + 1] == b'#':
+            while content[pos:pos + 1] not in (b'\n', b''):
+                pos += 1
+            continue
+        start = pos
+        while not content[pos:pos + 1].isspace():
+            pos += 1
+        tokens.append(content[start:pos])
+    magic, width, height, maxval = tokens[0], int(tokens[1]), int(tokens[2]), int(tokens[3])
+
+    if magic == b'P5':
+        pixels = content[pos + 1:pos + 1 + width * height]
+    elif magic == b'P2':
+        pixels = bytes(int(v) for v in content[pos:].split()[:width * height])
+    else:
+        raise ValueError(f'지원하지 않는 PGM 형식: {magic!r}')
+    if maxval != 255:
+        pixels = bytes(min(255, p * 255 // maxval) for p in pixels)
+    rows = [pixels[r * width:(r + 1) * width] for r in range(height)]
+    return width, height, rows
