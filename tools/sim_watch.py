@@ -121,8 +121,8 @@ def main():
             if 'imu' in d:
                 q = d['imu'].orientation
                 tilt = math.degrees(math.acos(max(-1, min(1, 1 - 2 * (q.x * q.x + q.y * q.y)))))
-            if tilt > max_tilt:
-                max_tilt, max_tilt_at = tilt, (time.time() - t0, truth)
+                if tilt > max_tilt:
+                    max_tilt, max_tilt_at = tilt, (time.time() - t0, truth)
             err = yerr = None
             if buf.can_transform('map', 'base_footprint', rclpy.time.Time()):
                 t = buf.lookup_transform('map', 'base_footprint', rclpy.time.Time()).transform
