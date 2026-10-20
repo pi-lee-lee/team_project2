@@ -87,3 +87,47 @@ if __name__ == '__main__':
         for delay in (1.0, 2.0, 3.0, 4.0, 5.0):
             gap, end, state = run(delay, perfect=perfect)
             print(f'{"정답 정보" if perfect else "추적기   "} 원기둥 출발 {delay:.0f}초: 최소 여유 {gap:+.3f} m, 끝 {state} ({end[0]:.2f}, {end[1]:.2f})')
+
+
+PROJECT = dict(max_v=0.18, control_period=0.1, robot_radius=0.17, footprint=(-0.197, 0.069, 0.153),
+               allow_escape=True, safety_margin=0.08, dynamic_margin=0.25, predict_time=3.0)
+
+
+def test_narrow_corridor_passable_with_rectangle():
+    """폭 0.62m 통로 (벽이 중심에서 0.31m): 원 하나(반경 0.25 + 여유 0.08)면 앞으로 못 가고, 직사각형이면 지나간다."""
+    walls = [[x, yy] for x in np.arange(-0.5, 2.5, 0.03) for yy in (-0.31, 0.31)]
+    path = [[x, 0.0] for x in np.linspace(0.0, 2.0, 41)]
+
+    def drive(cfg):
+        f = DWAFollower(path, 0.0, cfg)
+        x = y = yaw = v = w = 0.0
+        for _ in range(300):
+            v, w, state = f.compute((x, y, yaw), v, w, (0, 0, 0), walls, [])
+            if state == 'done':
+                return x
+            yaw += w * 0.1
+            x += v * math.cos(yaw) * 0.1
+            y += v * math.sin(yaw) * 0.1
+        return x
+
+    one = dict(PROJECT, robot_radius=0.25, circle_offsets=(0.0,), footprint=(), allow_escape=False)
+    assert drive(DWAConfig(**one)) < 0.3          # 거의 못 나아감
+    assert drive(DWAConfig(**PROJECT)) > 1.85     # 끝까지 감
+
+
+def test_crossing_with_project_params():
+    for delay in (1.0, 2.0, 3.0):
+        gap, end, state = run(delay, cfg=DWAConfig(**PROJECT))
+        assert gap > 0.0, f'delay {delay}: 겹침 {gap:.3f}'
+
+
+def test_escape_when_parked_next_to_wall():
+    """sim 에서 갇힌 자세 재현: 로봇 뒤 벽이 뒷면에서 3.8cm. 원 두 개(뒤로 0.30 까지)는 '이미 닿음' 으로 갇히고,
+    직사각형은 앞으로 출발."""
+    wall = [[-0.235, yy] for yy in np.arange(-1.0, 1.0, 0.02)]      # 뒷면(-0.197)에서 3.8cm
+    path = [[x, 0.0] for x in np.linspace(0.0, 1.5, 31)]
+    circles = DWAConfig(**dict(PROJECT, footprint=(), circle_offsets=(-0.13, 0.0), allow_escape=False))
+    v, w, state = DWAFollower(path, 0.0, circles).compute((0, 0, 0), 0.0, 0.0, (0, 0, 0), wall, [])
+    assert state == 'blocked'
+    v, w, state = DWAFollower(path, 0.0, DWAConfig(**PROJECT)).compute((0, 0, 0), 0.0, 0.0, (0, 0, 0), wall, [])
+    assert state == 'driving' and v > 0.0

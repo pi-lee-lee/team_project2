@@ -52,13 +52,17 @@ class AStarPlannerNode(Node):
         self.declare_parameter('scan_memory', 20.0)      # s
         self.declare_parameter('scan_max_range', 2.0)    # m, 이보다 먼 점은 무시
         self.declare_parameter('scan_wall_margin', 0.15)  # m, 맵 벽에서 이 거리 안의 점은 벽으로 보고 무시
+        # 같은 5cm 칸에서 이 시간 넘게 계속 보여야 기억한다. 지나가는 사람/물체(한 칸에 1~2초)는 기억하지 않음
+        # (움직이는 원기둥이 지나간 궤적 전체가 727칸의 가짜 벽이 되어 통로가 막혔었음)
+        self.declare_parameter('scan_persist', 2.5)       # s
         self.declare_parameter('bump_memory', 120.0)     # s, 부딪힌 자리를 장애물로 기억하는 시간
         self.declare_parameter('bump_radius', 0.15)      # m, 부딪힌 자리 주변을 이 반경만큼 막음
 
         self.planner = None
         self.map_msg = None
         self.frame_id = 'map'
-        self.scan_points = deque()   # (시각, xs, ys) map 좌표
+        self.scan_points = deque()   # (시각, xs, ys) map 좌표 - 오래 머문(정지한) 장애물만
+        self.cell_seen = {}          # 5cm 칸 -> [처음 본 시각, 마지막 본 시각, 본 횟수]
         self.bump_points = deque()   # (시각, xs, ys) 부딪힌 자리 주변 점
         self.last_scan_time = 0.0
 
@@ -116,7 +120,6 @@ class AStarPlannerNode(Node):
         ang = msg.angle_min + np.arange(len(r)) * msg.angle_increment
         ok = np.isfinite(r) & (r > msg.range_min) & (r < self.get_parameter('scan_max_range').value)
         if not ok.any():
-            self.scan_points.append((now, np.empty(0), np.empty(0)))
             return
         tr, yaw = t.transform.translation, yaw_from_quaternion(t.transform.rotation)
         lx, ly = r[ok] * np.cos(ang[ok]), r[ok] * np.sin(ang[ok])
@@ -128,10 +131,29 @@ class AStarPlannerNode(Node):
         inside = (rows >= 0) & (rows < pl.height) & (cols >= 0) & (cols < pl.width)
         keep = np.zeros(len(xs), dtype=bool)
         keep[inside] = pl.dist[rows[inside], cols[inside]] > self.get_parameter('scan_wall_margin').value
-        self.scan_points.append((now, xs[keep], ys[keep]))
+        self.remember_persistent(now, xs[keep], ys[keep])
+
+    def remember_persistent(self, now, xs, ys):
+        """이번 스캔의 맵에 없는 점 중, 같은 칸에서 scan_persist 초 넘게 계속 보인 것만 기억에 넣는다."""
+        persist = self.get_parameter('scan_persist').value
+        cells = set(map(tuple, np.floor(np.column_stack([xs, ys]) / 0.05).astype(int).tolist()))
+        for c in cells:
+            seen = self.cell_seen.get(c)
+            if seen is None:
+                self.cell_seen[c] = [now, now, 1]
+            else:
+                seen[1], seen[2] = now, seen[2] + 1
+        # 1초 넘게 안 보인 칸은 처음부터 다시 센다 (지나간 물체)
+        self.cell_seen = {c: s for c, s in self.cell_seen.items() if now - s[1] <= 1.0}
+        steady = [c for c in cells if now - self.cell_seen[c][0] >= persist
+                  and self.cell_seen[c][2] >= 0.6 * persist / 0.5]   # 스캔은 0.5초마다
+        if steady:
+            pts = (np.array(steady, dtype=float) + 0.5) * 0.05
+            self.scan_points.append((now, pts[:, 0], pts[:, 1]))
 
     def on_clear(self, request, response):
         self.scan_points.clear()
+        self.cell_seen.clear()
         self.bump_points.clear()
         self.bump_centers.clear()
         self.get_logger().info('기억한 장애물(LiDAR/부딪힌 자리)을 모두 지웠습니다')

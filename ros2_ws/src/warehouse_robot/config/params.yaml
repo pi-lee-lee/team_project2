@@ -56,26 +56,29 @@ warehouse_bridge:
       max_speed: 1.5
     # controller: dwa 일 때 (tb3_nav local_planner 이식). 실수는 소수점을 붙일 것
     dwa:
-      max_v: 0.18
+      max_v: 0.15             # 내장 추종기와 같게 (하드웨어 한계 0.26)
       min_v: -0.08            # 느린 후진 (다가오는 장애물에서 물러나기)
-      max_w: 1.5
-      max_acc_v: 0.5
-      max_acc_w: 2.5
+      max_w: 1.0              # 내장 추종기와 같게 (하드웨어 한계 1.82)
+      max_acc_v: 0.3          # sim 실측 1.0~1.2 m/s² (tools/step_test.py). 실물 미측정이라 보수적으로
+      max_acc_w: 1.5          # sim 실측 7~12 rad/s². 보수적으로
       v_samples: 9
       w_samples: 21
       sim_dt: 0.1
-      predict_time: 2.0
-      robot_radius: 0.22
-      safety_margin: 0.05
-      dynamic_margin: 0.15    # 움직이는 장애물에는 여유를 더
-      dynamic_growth: 0.05    # 예측 1초당 반경 증가
+      predict_time: 2.5       # tools/dwa_tune.py 로 비교: 3.0 보다 빠르고 충돌 없음
+      robot_radius: 0.17      # 정규화/탐색 범위용 (충돌은 아래 footprint 직사각형으로 봄)
+      footprint: [-0.197, 0.069, 0.153]   # Waffle Pi 외곽 직사각형 (x_min, x_max, 반폭). 원으로 덮으면 앞뒤가 커서 벽 옆에서 갇힘
+      allow_escape: true      # 벽에 바짝 붙어 갈 궤적이 없으면 여유가 줄지 않는 이동은 허용
+      reverse_only_when_needed: true   # 후진은 전진/회전으로 피할 수 없을 때만
+      safety_margin: 0.08
+      dynamic_margin: 0.15    # 움직이는 장애물 추가 여유. sim 추적 오차(95% 10cm)보다 크게. 0.25 는 너무 오래 기다림
+      dynamic_growth: 0.03    # 예측 1초당 반경 증가
       obstacle_influence: 0.5
       w_heading: 0.4
       w_path: 1.0
       w_goal: 1.0
       w_obstacle: 0.6
       w_speed: 0.3
-      w_collision: 5.0
+      w_collision: 2.0        # 1.0~6.0 사이에서 결과 차이 없음 (tools/dwa_tune.py), 덜 극단적인 값
     dwa_follow:
       lookahead: 0.5          # 경로 위 이 거리 앞 점을 DWA 목표로
       goal_tolerance: 0.1     # 이 안에 들면 제자리에서 도착 방향 맞춤
