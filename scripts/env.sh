@@ -20,6 +20,14 @@ if [ "$WAREHOUSE_ROBOT" = sim ]; then
   [ -f /usr/share/gazebo/setup.sh ] && source /usr/share/gazebo/setup.sh
   export GAZEBO_MODEL_DATABASE_URI=""
   export GAZEBO_MODEL_PATH="${GAZEBO_MODEL_PATH:+$GAZEBO_MODEL_PATH:}$(ros2 pkg prefix turtlebot3_gazebo 2>/dev/null)/share/turtlebot3_gazebo/models"
+  # AWS RoboMaker Small Warehouse (선택 설치: ~/sim_ws/src/aws-robomaker-small-warehouse-world, ros2 브랜치)
+  export AWS_WAREHOUSE_DIR="$HOME/sim_ws/src/aws-robomaker-small-warehouse-world"
+  if [ -d "$AWS_WAREHOUSE_DIR/models" ]; then
+    export GAZEBO_MODEL_PATH="$GAZEBO_MODEL_PATH:$AWS_WAREHOUSE_DIR/models"
+    # 창고 모델은 메시를 file://models/... 상대 경로로 가리키므로 패키지 폴더를 리소스 경로에 넣어야
+    # 충돌 형상이 생긴다 (없으면 LiDAR 광선이 선반을 그냥 통과함)
+    export GAZEBO_RESOURCE_PATH="${GAZEBO_RESOURCE_PATH:+$GAZEBO_RESOURCE_PATH:}$AWS_WAREHOUSE_DIR"
+  fi
 else
   export ROS_DOMAIN_ID=44
   export WAREHOUSE_SIM_TIME=false

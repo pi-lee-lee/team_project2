@@ -2,6 +2,8 @@
 # Gazebo 시뮬레이션 (TurtleBot3 Waffle Pi). 실물 로봇의 bringup 대신 /scan, /odom, /tf 를 낸다.
 #   사용: scripts/start_sim.sh [월드] [--gui] [--x X --y Y]
 #     월드: turtlebot3_world(기본) | turtlebot3_house | empty_world | 그 밖의 turtlebot3_gazebo/worlds/*.world
+#           | 이 저장소 worlds/*.world (예: maze_room = 실제 방 복제, tools/map_to_world.py 로 생성)
+#           | no_roof_small_warehouse / small_warehouse (AWS 창고, ~/sim_ws 에 받아 둔 경우)
 #     --gui: Gazebo 화면도 띄움 (기본은 화면 없이 gzserver 만)
 # 도메인 77 에서 실행되도록 WAREHOUSE_ROBOT=sim 으로 env.sh 를 읽는다.
 export WAREHOUSE_ROBOT=sim
@@ -29,7 +31,9 @@ if [ -z "$X" ]; then
 fi
 
 GZ=$(ros2 pkg prefix turtlebot3_gazebo)/share/turtlebot3_gazebo
-WORLD_FILE="$GZ/worlds/$WORLD.world"
+WORLD_FILE="$WAREHOUSE_HOME/worlds/$WORLD.world"
+[ -f "$WORLD_FILE" ] || WORLD_FILE="$AWS_WAREHOUSE_DIR/worlds/$WORLD/$WORLD.world"
+[ -f "$WORLD_FILE" ] || WORLD_FILE="$GZ/worlds/$WORLD.world"
 [ -f "$WORLD_FILE" ] || { echo "[start_sim] 월드 파일 없음: $WORLD_FILE"; exit 1; }
 echo "[start_sim] 월드 $WORLD, 출발 위치 ($X, $Y), 화면 $([ $GUI = 1 ] && echo 표시 || echo 없음), 도메인 $ROS_DOMAIN_ID"
 

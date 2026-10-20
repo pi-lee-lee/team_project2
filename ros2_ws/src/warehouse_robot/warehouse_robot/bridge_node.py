@@ -291,8 +291,8 @@ class BridgeNode(Node):
 
     def send_map(self):
         m = self.map_msg
-        if m is None:
-            return
+        if m is None or m.info.width == 0 or m.info.height == 0:
+            return  # SLAM 시작 직후 빈 맵은 보내지 않는다 (웹은 맵 없이 로봇 주변 격자를 보여줌)
         raw = np.asarray(m.data, dtype=np.int8).tobytes()
         self.server.send({
             'type': 'map',

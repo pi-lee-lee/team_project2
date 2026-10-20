@@ -11,7 +11,8 @@
 #   --map FILE     (map) 맵 yaml. sim + turtlebot3_world 는 생략 시 TurtleBot3 기본 맵 사용
 #   --name NAME    (map) 서버 DB 맵 이름 (등록 위치가 묶임). 기본: 파일 이름에서 _straight/_clean 뺀 것
 #   --slam ENGINE  (slam) slam_toolbox(기본) | cartographer
-#   --world WORLD  (sim) turtlebot3_world(기본) | turtlebot3_house | empty_world ...
+#   --world WORLD  (sim) turtlebot3_world(기본) | turtlebot3_house | empty_world | maze_room(worlds/, 실제 방 복제)
+#                  | no_roof_small_warehouse (AWS 창고, ~/sim_ws 에 받아야 함) ...
 #   --gui          (sim) Gazebo 화면 표시
 #   --nav2         Nav2 주행 노드(planner/controller_server, bt_navigator)도 실행. slam/map 모두 가능
 #                  (slam: SLAM 이 맵과 위치를 내므로 AMCL/map_server 없이 주행 노드만)
@@ -72,7 +73,12 @@ if [ "$MODE" = map ]; then
 fi
 
 # 시뮬레이션 출발 위치 (상태 초기화/초기 위치 자동 지정에 사용)
-case "$WORLD" in turtlebot3_world|turtlebot3_house) SPAWN_X=-2.0; SPAWN_Y=-0.5 ;; *) SPAWN_X=0.0; SPAWN_Y=0.0 ;; esac
+case "$WORLD" in
+  turtlebot3_world|turtlebot3_house) SPAWN_X=-2.0; SPAWN_Y=-0.5 ;;
+  maze_room) SPAWN_X=0.2; SPAWN_Y=0.0 ;;   # 실제 로봇을 놓던 자리 (worlds/maze_room.world 는 실제 방 맵 좌표 그대로)
+  no_roof_small_warehouse|small_warehouse) SPAWN_X=-3.3; SPAWN_Y=-2.0 ;;   # AWS 창고: 가운데(0,0)는 3.5m 안에 아무것도 없어 LiDAR 가 못 봄 → 선반 근처 빈 통로
+  *) SPAWN_X=0.0; SPAWN_Y=0.0 ;;
+esac
 
 # 이미 떠 있는 노드/시뮬레이션은 먼저 정리 (서버는 유지)
 "$DIR/stop_ros.sh" --sim >/dev/null || true
@@ -110,7 +116,7 @@ fi
 
 # 2) 로봇
 if [ "$ROBOT" = sim ]; then
-  echo "2) Gazebo 시뮬레이션 ($WORLD)"; start sim "$DIR/start_sim.sh" "$WORLD" $GUI
+  echo "2) Gazebo 시뮬레이션 ($WORLD)"; start sim "$DIR/start_sim.sh" "$WORLD" $GUI --x "$SPAWN_X" --y "$SPAWN_Y"
   sleep 12
 else
   echo "2) 실물 로봇 bringup ($PI_HOST)"

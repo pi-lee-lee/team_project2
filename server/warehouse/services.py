@@ -219,6 +219,8 @@ def handle_map(name, msg):
     """브리지가 보낸 OccupancyGrid를 PNG로 저장하고 활성 맵으로 지정."""
     out = Outbox()
     width, height = int(msg['width']), int(msg['height'])
+    if width == 0 or height == 0:
+        return out  # SLAM 시작 직후의 빈 맵은 저장하지 않는다
     data = zlib.decompress(base64.b64decode(msg['data']))
     if len(data) != width * height:
         raise ServiceError('맵 데이터 크기가 맞지 않습니다.')

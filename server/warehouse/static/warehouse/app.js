@@ -83,6 +83,14 @@ function handle(msg) {
         break;
       }
       S.poseAt = Date.now();
+      // 가상 맵인데 로봇이 가장자리(중심에서 3m 이상)로 가면 로봇 중심으로 다시 잡는다
+      if (S.map && S.map.virtual) {
+        const c = [S.map.origin[0] + VIRTUAL_SIZE_M / 2, S.map.origin[1] + VIRTUAL_SIZE_M / 2];
+        if (!S.pose || Math.hypot(msg.x - c[0], msg.y - c[1]) > 3) {
+          S.pose = { x: msg.x, y: msg.y, yaw: msg.yaw };
+          useVirtualMap();
+        }
+      }
       if (!S.pose) {
         S.pose = { x: msg.x, y: msg.y, yaw: msg.yaw };
         renderPanel();  // 위치를 처음 알게 되면 "현재 위치를 홈으로" 활성화
@@ -249,14 +257,28 @@ function worldToCanvas(x, y) { return imgToCanvas(...worldToImg(x, y)); }
 function canvasToWorld(cx, cy) { return imgToWorld(...canvasToImg(cx, cy)); }
 
 // ------------------------------------------------------------------ 맵
+// 맵이 아직 없을 때(SLAM 시작 직후 등): 로봇 주변 8m 를 격자로 보여주는 가상 맵.
+// 좌표 변환은 진짜 맵과 똑같이 동작하므로 로봇/경로 표시와 "여기로 이동" 클릭을 그대로 쓸 수 있다
+const VIRTUAL_SIZE_M = 8;
+function useVirtualMap() {
+  const p = S.pose || { x: 0, y: 0 };
+  const res = 0.05, n = VIRTUAL_SIZE_M / res;
+  S.map = { virtual: true, name: '', resolution: res, origin: [p.x - VIRTUAL_SIZE_M / 2, p.y - VIRTUAL_SIZE_M / 2],
+            width: n, height: n };
+  S.mapImg = null;
+  S.mapName = null;
+  S.bbox = { x0: 0, y0: 0, x1: n, y1: n };
+  $('#no-map').hidden = false;
+  fitView();
+}
+
 function setMap(map) {
-  S.map = map;
-  $('#no-map').hidden = !!map;
-  if (!map) {
-    S.mapImg = null;
-    draw();
+  if (!map || !map.width || !map.height) {
+    useVirtualMap();
     return;
   }
+  S.map = map;
+  $('#no-map').hidden = true;
   const img = new Image();
   img.onload = () => {
     const changed = !S.mapImg || S.mapName !== map.name;
@@ -325,11 +347,15 @@ function resizeCanvas() {
 function draw() {
   const w = canvas.clientWidth, h = canvas.clientHeight;
   ctx.clearRect(0, 0, w, h);
-  if (!S.map || !S.mapImg) return;
-
+  if (!S.map) return;
   const v = S.view;
-  ctx.imageSmoothingEnabled = false;
-  ctx.drawImage(S.mapImg, v.ox, v.oy, S.map.width * v.scale, S.map.height * v.scale);
+  if (S.map.virtual) {
+    drawGrid();
+  } else {
+    if (!S.mapImg) return;
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(S.mapImg, v.ox, v.oy, S.map.width * v.scale, S.map.height * v.scale);
+  }
 
   const pxPerM = v.scale / S.map.resolution;
 
@@ -405,6 +431,24 @@ function draw() {
     ctx.moveTo(sx, sy);
     ctx.lineTo(cx, cy);
     ctx.stroke();
+  }
+}
+
+// 가상 맵: 1m 격자
+function drawGrid() {
+  const m = S.map, v = S.view;
+  ctx.fillStyle = '#e5e7eb';
+  ctx.fillRect(v.ox, v.oy, m.width * v.scale, m.height * v.scale);
+  ctx.strokeStyle = '#cbd5e1';
+  ctx.lineWidth = 1;
+  const x0 = Math.ceil(m.origin[0]), y0 = Math.ceil(m.origin[1]);
+  for (let x = x0; x <= m.origin[0] + VIRTUAL_SIZE_M; x++) {
+    const [a, b] = worldToCanvas(x, m.origin[1]), [, d] = worldToCanvas(x, m.origin[1] + VIRTUAL_SIZE_M);
+    ctx.beginPath(); ctx.moveTo(a, b); ctx.lineTo(a, d); ctx.stroke();
+  }
+  for (let y = y0; y <= m.origin[1] + VIRTUAL_SIZE_M; y++) {
+    const [a, b] = worldToCanvas(m.origin[0], y), [c] = worldToCanvas(m.origin[0] + VIRTUAL_SIZE_M, y);
+    ctx.beginPath(); ctx.moveTo(a, b); ctx.lineTo(c, b); ctx.stroke();
   }
 }
 
