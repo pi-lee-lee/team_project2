@@ -1,12 +1,16 @@
 astar_planner:
   ros__parameters:
     map_topic: map
-    robot_radius: 0.22        # Waffle Pi 외곽 반경 (m)
+    robot_radius: 0.25        # Waffle Pi 외곽 반경 (m): 뒤쪽 모서리까지 (0.197, 0.153) → 0.25. 제자리 회전 때 닿지 않게
     inflation_radius: 0.55    # 이 거리까지는 벽에서 멀어지도록 비용 부여
     cost_weight: 3.0
     occupied_threshold: 65
     allow_unknown: false
     goal_tolerance: 0.3       # 목표가 벽에 붙어 있으면 이 반경 안에서 가까운 빈 곳으로
+    scan_obstacles: true      # LiDAR 로 본, 맵에 없는 장애물을 잠시 기억해 경로 계획에 반영
+    scan_memory: 20.0         # 장애물 기억 시간 (s)
+    scan_max_range: 2.0       # 이보다 먼 LiDAR 점은 무시 (m)
+    scan_wall_margin: 0.15    # 맵 벽에서 이 거리 안의 점은 벽으로 보고 무시 (m)
 
 warehouse_bridge:
   ros__parameters:
@@ -23,7 +27,7 @@ warehouse_bridge:
     max_speed: 0.15           # m/s
     max_turn_speed: 1.0       # rad/s
     stop_distance: 0.35       # 앞쪽 ±25° 안에 이 거리 이내 물체가 있으면 정지 후 대기 (m)
-    blocked_timeout: 10.0     # 이 시간 넘게 막히면 재계획, 재시도도 다 쓰면 실패 (s)
+    blocked_timeout: 5.0      # 이 시간 넘게 막히면 장애물을 피하는 경로로 재계획, 재시도도 다 쓰면 실패 (s)
     progress_timeout: 15.0    # 이 시간 동안 5cm도 못 가면 실패 (s)
     tf_timeout: 0.5           # 로봇 위치 TF가 이보다 오래되면 즉시 정지 (s)
     rotate_timeout: 15.0      # 제자리 회전이 이보다 길면 정지 후 재계획/실패 (s)

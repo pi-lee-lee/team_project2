@@ -47,6 +47,29 @@ def obstacle_distance(obstacle, resolution, max_dist):
     return dist
 
 
+def pad_grid(data, width, height, resolution, origin_x, origin_y, points, margin=1.0):
+    """points(월드 좌표)가 모두 들어가도록 격자를 미탐색(-1) 칸으로 넓힌다 (SLAM 중 아직 맵 밖인 목표용).
+
+    반환: (data 1차원 배열, width, height, origin_x, origin_y)
+    """
+    grid = np.asarray(data, dtype=np.int16).reshape(height, width)
+    xs = [p[0] for p in points]
+    ys = [p[1] for p in points]
+    cells = int(math.ceil(margin / resolution))
+    left = max(0, int(math.ceil((origin_x - min(xs)) / resolution)) + cells) if min(xs) < origin_x else 0
+    bottom = max(0, int(math.ceil((origin_y - min(ys)) / resolution)) + cells) if min(ys) < origin_y else 0
+    right_edge = origin_x + width * resolution
+    top_edge = origin_y + height * resolution
+    right = int(math.ceil((max(xs) - right_edge) / resolution)) + cells if max(xs) >= right_edge else 0
+    top = int(math.ceil((max(ys) - top_edge) / resolution)) + cells if max(ys) >= top_edge else 0
+    if not (left or bottom or right or top):
+        return grid.ravel(), width, height, origin_x, origin_y
+    out = np.full((height + bottom + top, width + left + right), -1, dtype=np.int16)
+    out[bottom:bottom + height, left:left + width] = grid
+    return (out.ravel(), out.shape[1], out.shape[0],
+            origin_x - left * resolution, origin_y - bottom * resolution)
+
+
 class GridPlanner:
     """OccupancyGrid 데이터로 만든 A* 플래너.
 
