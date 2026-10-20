@@ -90,10 +90,19 @@ case "$WORLD" in
   *) SPAWN_X=0.0; SPAWN_Y=0.0 ;;
 esac
 
-# 이미 떠 있는 노드/시뮬레이션은 먼저 정리 (서버는 유지)
-"$DIR/stop_ros.sh" --sim >/dev/null || true
-
+# 동시에 두 번 실행되면(웹 실행 + 터미널 등) 둘 다 정리 후 각자 띄워 SLAM/브리지가 두 개씩 뜬다
+# → 같은 /map, map->odom 을 두 SLAM 이 번갈아 내서 지도가 망가짐. 실행 중이면 바로 거절.
+# (잠금은 이 스크립트가 끝나면 풀림. 띄운 노드에는 넘기지 않음: start() 의 9>&-)
 mkdir -p "$LOGS"
+exec 9> "$LOGS/run.lock"
+if ! flock -n 9; then
+  echo "다른 run.sh 가 실행 중입니다. 끝난 뒤 다시 실행하세요 (웹 실행 모드 또는 다른 터미널)"
+  exit 1
+fi
+
+# 이미 떠 있는 노드/시뮬레이션은 먼저 정리 (서버는 유지)
+"$DIR/stop_ros.sh" --sim >/dev/null 9>&- || true
+
 cat > "$LOGS/run_mode.env" <<EOF
 # scripts/run.sh 가 기록한 현재 실행 모드 ($(date '+%F %T'))
 WAREHOUSE_ROBOT=$ROBOT
@@ -113,7 +122,7 @@ echo "== 로봇 $ROBOT / 모드 $MODE / Nav2 주행 노드 $([ -n "$NAV2" ] && e
 
 start() {  # start <로그이름> <명령...>
   local log="$LOGS/$1.log"; shift
-  setsid "$@" > "$log" 2>&1 < /dev/null &
+  setsid "$@" > "$log" 2>&1 < /dev/null 9>&- &
   echo "   시작: $* (로그 logs/$(basename "$log"))"
 }
 
