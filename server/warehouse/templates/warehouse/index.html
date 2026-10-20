@@ -47,6 +47,8 @@
         <button id="btn-run-amcl" class="primary" title="선택한 맵으로 map_server + AMCL 실행 (시뮬레이션은 초기 위치 자동)">저장된 맵으로 위치 추정 (AMCL)</button>
         <button id="btn-run-slam" title="SLAM 으로 새 맵 만들기">맵 만들기 (SLAM)</button>
         <button id="btn-auto-localize" title="맵 전체에서 LiDAR 스캔과 가장 잘 맞는 위치를 찾아 초기 위치로 지정">위치 자동 찾기</button>
+        <button id="btn-explore" title="SLAM 모드: 미탐색 경계(프론티어)로 자동으로 이동하며 맵 만들기 (최대 30분)">자동 탐색</button>
+        <button id="btn-explore-stop" class="danger" hidden>탐색 중지</button>
         <button id="btn-run-stop" title="ROS 노드와 시뮬레이션 정지 (웹 서버는 유지)">전체 정지</button>
       </div>
       <p id="runner-busy" class="muted"></p>

@@ -7,6 +7,7 @@ ROS 가 전부 꺼져 있어도 웹에서 켤 수 있도록 브리지가 아니�
 import glob
 import os
 import re
+import signal
 import subprocess
 import threading
 
@@ -21,6 +22,8 @@ RUN_MODE_FILE = os.path.join(HOME, 'logs', 'run_mode.env')
 
 _lock = threading.Lock()
 _running = None  # 실행 중인 작업 이름
+_proc = None     # 실행 중인 프로세스 (중지용)
+EXPLORE_JOB = '자동 탐색'
 
 
 class RunnerError(Exception):
@@ -71,20 +74,28 @@ def _start(job, cmd, timeout, parse=None):
 
     def run():
         global _running
+        global _proc
         ok, message = False, ''
         try:
-            r = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, cwd=HOME,
-                               start_new_session=True)
-            output = (r.stdout + r.stderr).strip()
-            ok = r.returncode == 0
+            _proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
+                                     cwd=HOME, start_new_session=True)
+            try:
+                output, _ = _proc.communicate(timeout=timeout)
+            except subprocess.TimeoutExpired:
+                os.killpg(_proc.pid, signal.SIGINT)
+                output, _ = _proc.communicate()
+                output += f'\n{timeout}초 안에 끝나지 않아 중지했습니다.'
+            output = output.strip()
+            ok = _proc.returncode == 0
             message = parse(output, ok) if parse else _last_lines(output)
-        except subprocess.TimeoutExpired:
-            message = f'{timeout}초 안에 끝나지 않았습니다.'
+            if _proc.returncode in (-signal.SIGINT, -signal.SIGTERM, 130):
+                ok, message = False, '중지됨. ' + message
         except Exception as e:  # 실행 파일 없음 등
             message = str(e)
         finally:
             with _lock:
                 _running = None
+                _proc = None
         _broadcast({'type': 'runner', 'job': job, 'state': 'done', 'ok': ok, 'message': message,
                     'mode': current_mode()})
         from . import services  # 순환 import 방지
@@ -134,3 +145,22 @@ def auto_localize():
             return _last_lines(output)
         return (m.group(0) + (' / ' + warn[0] if warn else ''))[:300]
     _start('위치 자동 찾기', cmd, timeout=120, parse=parse)
+
+
+def explore(max_minutes=30):
+    """SLAM 모드 자동 탐색 (tools/explore.py). cancel() 로 중지."""
+    cmd = ['bash', '-c', f'source "{SCRIPTS}/env.sh" && exec python3 -u -W ignore "{HOME}/tools/explore.py" '
+                         f'--max-minutes {int(max_minutes)}']
+
+    def parse(output, ok):
+        lines = [l.replace('[explore] ', '') for l in output.splitlines() if l.startswith('[explore]')]
+        return ' / '.join(lines[-2:])[:300] or _last_lines(output)
+    _start(EXPLORE_JOB, cmd, timeout=int(max_minutes * 60) + 120, parse=parse)
+
+
+def cancel(job):
+    """실행 중인 job 이 맞으면 프로세스 그룹에 SIGINT."""
+    with _lock:
+        if _running != job or _proc is None:
+            raise RunnerError(f'"{job}" 이(가) 실행 중이 아닙니다.')
+        os.killpg(_proc.pid, signal.SIGINT)

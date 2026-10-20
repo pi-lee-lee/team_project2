@@ -30,7 +30,7 @@ PATTERNS=(
   '^/opt/ros/humble/lib/(cartographer_ros|slam_toolbox)/'
   '^/usr/bin/python3 .*/warehouse_robot/lib/warehouse_robot/'
   '^gz(server|client)( |$)'
-  '^/usr/bin/python3 /opt/ros/humble/lib/gazebo_ros/'
+  '^(/usr/bin/)?python3 /opt/ros/humble/lib/gazebo_ros/'
   '^/opt/ros/humble/lib/robot_state_publisher/robot_state_publisher'
   '^/opt/ros/humble/lib/nav2_map_server/map_saver_cli'
 )
@@ -39,7 +39,14 @@ if [ "$STOP_SERVER" = 1 ]; then
 fi
 REGEX=$(IFS='|'; echo "${PATTERNS[*]}")
 
-list() { pgrep -f -- "$REGEX"; }
+# 이 프로젝트 노드만: ROS_DOMAIN_ID 가 44(실물)/77(시뮬레이션)이거나 없는(웹 서버 등) 프로세스.
+# 같은 PC 의 다른 프로젝트 Gazebo/노드(다른 도메인)는 건드리지 않는다.
+ours() {
+  local d
+  d=$(tr '\0' '\n' < "/proc/$1/environ" 2>/dev/null | sed -n 's/^ROS_DOMAIN_ID=//p')
+  [ -z "$d" ] || [ "$d" = 44 ] || [ "$d" = 77 ]
+}
+list() { for p in $(pgrep -f -- "$REGEX"); do ours "$p" && echo "$p"; done; }
 show() { ps -o pid=,ppid=,cmd= -p "$1" 2>/dev/null | cut -c1-110; }
 
 PIDS=$(list)

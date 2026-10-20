@@ -137,6 +137,16 @@ class UIConsumer(AsyncJsonWebsocketConsumer):
                     str(msg.get('robot')), str(msg.get('mode')), msg.get('map') or None)
             elif action == 'runner_stop':
                 await database_sync_to_async(runner.stop_all)()
+            elif action == 'explore_start':
+                if LIVE.get(services.DEFAULT_ROBOT, {}).get('mode') != 'slam':
+                    raise runner.RunnerError('자동 탐색은 "맵 만들기 (SLAM)" 모드에서 쓸 수 있습니다.')
+                await database_sync_to_async(runner.explore)()
+            elif action == 'explore_stop':
+                await database_sync_to_async(runner.cancel)(runner.EXPLORE_JOB)
+                # 탐색이 보낸 이동도 멈춘다
+                robot = await database_sync_to_async(services.get_robot)()
+                if robot.state == 'MOVING':
+                    await dispatch(self.channel_layer, await database_sync_to_async(services.cancel_task)(None))
             elif action == 'auto_localize':
                 if LIVE.get(services.DEFAULT_ROBOT, {}).get('mode') != 'map':
                     raise runner.RunnerError('위치 자동 찾기는 "저장된 맵으로 위치 추정(AMCL)" 모드에서 쓸 수 있습니다.')
@@ -150,7 +160,7 @@ class UIConsumer(AsyncJsonWebsocketConsumer):
     async def receive_json(self, msg, **kwargs):
         action = msg.get('action')
         robot = msg.get('robot')
-        if action in ('runner_start', 'runner_stop', 'auto_localize', 'list_maps'):
+        if action in ('runner_start', 'runner_stop', 'auto_localize', 'list_maps', 'explore_start', 'explore_stop'):
             await self.handle_runner(action, msg)
             return
         if action == 'set_home_here':

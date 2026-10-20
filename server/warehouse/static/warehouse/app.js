@@ -209,6 +209,10 @@ function renderRunner() {
   $('#runner-busy').textContent = busy ? `진행 중: ${S.runnerBusy} (수십 초 걸립니다)` : '';
   for (const id of ['#btn-run-amcl', '#btn-run-slam', '#btn-run-stop']) $(id).disabled = busy;
   $('#btn-auto-localize').disabled = busy || !(h.bridge && h.mode === 'map');
+  const exploring = S.runnerBusy === '자동 탐색';
+  $('#btn-explore').hidden = !(h.bridge && h.mode === 'slam') || exploring;
+  $('#btn-explore').disabled = busy;
+  $('#btn-explore-stop').hidden = !exploring;
 }
 
 function runnerStart(mode) {
@@ -225,6 +229,10 @@ $('#btn-run-slam').addEventListener('click', () => runnerStart('slam'));
 $('#btn-run-stop').addEventListener('click', () => {
   if (confirm('ROS 노드와 시뮬레이션을 모두 정지할까요? (웹 서버는 유지)')) send('runner_stop');
 });
+$('#btn-explore').addEventListener('click', () => {
+  if (confirm('미탐색 경계를 따라 자동으로 이동하며 맵을 만들까요? (최대 30분, "탐색 중지"로 멈춤)')) send('explore_start');
+});
+$('#btn-explore-stop').addEventListener('click', () => send('explore_stop'));
 $('#btn-auto-localize').addEventListener('click', () => {
   if (confirm('맵 전체에서 로봇 위치를 찾아 초기 위치로 지정할까요? (10~30초)')) send('auto_localize');
 });
