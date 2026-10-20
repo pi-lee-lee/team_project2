@@ -3,6 +3,8 @@
 구독:  map (nav_msgs/OccupancyGrid, transient local)
        scan_level (sensor_msgs/LaserScan, 브리지가 기울지 않았을 때만 발행) - 맵에 없는 장애물(새로 놓인 상자, 사람 등)을 잠시 기억해 경로 계획에 반영
        astar/obstacle (geometry_msgs/PointStamped) - 브리지가 부딪힘을 감지한 자리 (LiDAR 에 안 보이는 낮은 물체)
+발행:  astar/remembered (geometry_msgs/PoseArray) - 지금 기억 중인 LiDAR 장애물 칸 (1초마다, 웹 표시용)
+       astar/bumps (geometry_msgs/PoseArray) - 기억 중인 부딪힌 자리 중심
 서비스: astar/get_plan (nav_msgs/srv/GetPlan)
 발행:  astar/plan (nav_msgs/Path)  - RViz 확인용
 """
@@ -13,7 +15,7 @@ from collections import deque
 
 import numpy as np
 import rclpy
-from geometry_msgs.msg import PointStamped, PoseStamped
+from geometry_msgs.msg import Pose, PoseArray, PointStamped, PoseStamped
 from nav_msgs.msg import OccupancyGrid, Path
 from nav_msgs.srv import GetPlan
 from rclpy.node import Node
@@ -70,6 +72,10 @@ class AStarPlannerNode(Node):
         self.tf_listener = TransformListener(self.tf_buffer, self)
         self.create_subscription(PointStamped, 'astar/obstacle', self.on_bump, 10)
         self.create_service(Empty, 'astar/clear_obstacles', self.on_clear)
+        self.remembered_pub = self.create_publisher(PoseArray, 'astar/remembered', 1)
+        self.bumps_pub = self.create_publisher(PoseArray, 'astar/bumps', 1)
+        self.bump_centers = deque()   # (시각, x, y) 웹 표시용
+        self.create_timer(1.0, self.publish_memory)
         if self.get_parameter('scan_obstacles').value:
             self.create_subscription(LaserScan, 'scan_level', self.on_scan, qos_profile_sensor_data)
         self.get_logger().info(f'A* 플래너 시작, 맵 대기 중 ({topic})')
@@ -127,8 +133,33 @@ class AStarPlannerNode(Node):
     def on_clear(self, request, response):
         self.scan_points.clear()
         self.bump_points.clear()
+        self.bump_centers.clear()
         self.get_logger().info('기억한 장애물(LiDAR/부딪힌 자리)을 모두 지웠습니다')
         return response
+
+    def publish_memory(self):
+        """기억 중인 장애물을 발행 (브리지가 웹으로 보냄). LiDAR 점은 5cm 칸으로 묶는다."""
+        now = time.monotonic()
+        while self.scan_points and now - self.scan_points[0][0] > self.get_parameter('scan_memory').value:
+            self.scan_points.popleft()
+        while self.bump_centers and now - self.bump_centers[0][0] > self.get_parameter('bump_memory').value:
+            self.bump_centers.popleft()
+        cells = np.empty((0, 2))
+        if self.scan_points:
+            xs = np.concatenate([p[1] for p in self.scan_points])
+            ys = np.concatenate([p[2] for p in self.scan_points])
+            if len(xs):
+                cells = np.unique(np.floor(np.column_stack([xs, ys]) / 0.05), axis=0) * 0.05 + 0.025
+        for pub, pts in ((self.remembered_pub, cells), (self.bumps_pub, [(x, y) for _, x, y in self.bump_centers])):
+            msg = PoseArray()
+            msg.header.frame_id = self.frame_id
+            msg.header.stamp = self.get_clock().now().to_msg()
+            for x, y in pts:
+                p = Pose()
+                p.position.x, p.position.y = float(x), float(y)
+                p.orientation.w = 1.0
+                msg.poses.append(p)
+            pub.publish(msg)
 
     def on_bump(self, msg):
         r = self.get_parameter('bump_radius').value
@@ -136,6 +167,7 @@ class AStarPlannerNode(Node):
         xs = np.concatenate([[msg.point.x], msg.point.x + r * np.cos(a), msg.point.x + r / 2 * np.cos(a)])
         ys = np.concatenate([[msg.point.y], msg.point.y + r * np.sin(a), msg.point.y + r / 2 * np.sin(a)])
         self.bump_points.append((time.monotonic(), xs, ys))
+        self.bump_centers.append((time.monotonic(), msg.point.x, msg.point.y))
         self.get_logger().warn(f'부딪힌 자리 ({msg.point.x:.2f}, {msg.point.y:.2f}) 를 장애물로 기억')
 
     def planners_for(self, start, goal):

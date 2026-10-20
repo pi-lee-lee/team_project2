@@ -101,6 +101,14 @@ class RobotConsumer(AsyncJsonWebsocketConsumer):
             live['cargo'] = str(msg.get('label') or '')
             await self.broadcast({'type': 'cargo', 'robot': self.robot_name, 'label': live['cargo']})
             await self.run(services.handle_cargo, self.robot_name, live['cargo'])
+        elif kind == 'obstacles':
+            # 추적 중인 움직이는 장애물 (map 좌표, 위치+속도) - 화면 표시용, DB 에 저장하지 않음
+            live['obstacles'] = msg.get('obstacles', [])
+            await self.broadcast({'type': 'obstacles', 'robot': self.robot_name, 'obstacles': live['obstacles']})
+        elif kind == 'memory':
+            # A* 가 기억 중인 장애물: remembered = 맵에 없는 LiDAR 장애물 칸, bumps = 부딪힌 자리
+            live['memory'] = {'remembered': msg.get('remembered', []), 'bumps': msg.get('bumps', [])}
+            await self.broadcast({'type': 'memory', 'robot': self.robot_name, **live['memory']})
         elif kind == 'battery':
             await self.run(services.handle_battery, self.robot_name,
                            msg.get('voltage'), msg.get('percentage'))
@@ -119,6 +127,8 @@ class UIConsumer(AsyncJsonWebsocketConsumer):
         live = LIVE.get(snap['robot']['name'], {})
         snap['pose'] = live.get('pose')
         snap['cargo'] = live.get('cargo')   # None = 인식 노드 없음
+        snap['memory'] = live.get('memory')
+        snap['obstacles'] = live.get('obstacles', [])
         snap['path'] = live.get('path', [])
         snap['health'] = live.get('health', {'bridge': False})
         snap['runner'] = {'maps': runner.list_maps(), 'worlds': runner.list_worlds(),

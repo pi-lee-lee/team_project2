@@ -26,9 +26,9 @@ import numpy as np
 import rclpy
 import websocket
 from action_msgs.msg import GoalStatus
-from geometry_msgs.msg import PointStamped, PoseStamped, PoseWithCovarianceStamped, Twist
+from geometry_msgs.msg import PointStamped, PoseArray, PoseStamped, PoseWithCovarianceStamped, Twist
 from nav2_msgs.action import FollowPath, NavigateToPose
-from nav_msgs.msg import OccupancyGrid, Path
+from nav_msgs.msg import OccupancyGrid, Odometry, Path
 from nav_msgs.srv import GetPlan
 from rclpy.action import ActionClient
 from rclpy.node import Node
@@ -39,8 +39,11 @@ from std_msgs.msg import String
 from std_srvs.srv import Empty
 from tf2_ros import Buffer, TransformException, TransformListener
 
+from .astar import obstacle_distance
 from .astar_planner_node import quaternion_from_yaw, yaw_from_quaternion
+from .dwa import DWAConfig, DWAFollower, transform_points
 from .follower import PurePursuit
+from .tracker import MultiObjectTracker, detect_clusters
 
 
 # LiPo 셀 전압 → 남은 용량(%) (일반적인 방전 곡선)
@@ -134,7 +137,7 @@ class BridgeNode(Node):
         # FollowPath에 넘길 경로 좌표계. odom이면 controller_server가 map->odom TF 없이 주행한다
         self.declare_parameter('follow_frame', 'odom')
         # 경로 추종기 (controller=builtin)
-        self.declare_parameter('controller', 'builtin')  # builtin | nav2
+        self.declare_parameter('controller', 'builtin')  # builtin | nav2 | dwa
         self.declare_parameter('max_speed', 0.15)          # m/s
         self.declare_parameter('max_turn_speed', 1.0)      # rad/s
         self.declare_parameter('stop_distance', 0.35)      # 앞쪽 이 거리 안에 물체가 있으면 정지 (m)
@@ -206,6 +209,35 @@ class BridgeNode(Node):
         self.cargo_resend = False   # 서버에 다시 연결되면 지금 라벨을 다시 알림
         self.create_subscription(String, 'cargo/detected', self.on_cargo, 10)
         self.create_timer(0.2, self.flush_cargo)
+
+        # 움직이는 장애물 추적 (tb3_nav 의 obstacle_tracker 를 브리지 안으로): 스캔 → odom 점 → 지도 벽 근처 제외
+        # → 덩어리 → 칼만필터로 위치/속도. DWA 가 미래 위치를 피하는 데 쓰고, 웹 지도에 표시한다
+        tp = lambda n, d: self.declare_parameter(f'tracking.{n}', d).value  # noqa: E731
+        self.tracking = tp('enabled', True)
+        self.track_cfg = dict(max_range=tp('max_range', 3.0), static_match_dist=tp('static_match_dist', 0.15),
+                              cluster_gap=tp('cluster_gap', 0.15), min_points=tp('min_points', 3),
+                              max_diameter=tp('max_diameter', 0.8), min_radius=tp('min_radius', 0.05))
+        self.tracker = MultiObjectTracker(gate=tp('gate', 0.5), min_hits=tp('min_hits', 3),
+                                          max_misses=tp('max_misses', 5), accel_noise=tp('accel_noise', 1.0),
+                                          meas_noise=tp('meas_noise', 0.05), max_speed=tp('max_speed', 1.5))
+        self.tracks = []                   # 확정된 track (odom)
+        self.scan_odom = np.empty((0, 2))  # 최근 스캔 점 (odom) - DWA 정적 장애물
+        self.map_dist = None               # 지도 벽까지 거리 (벽 근처 점 = 정적) (dist, msg)
+        self.last_obstacles_sent = 0.0
+        # DWA (controller=dwa). 기본값은 tb3_nav 값에서 최고 속도만 이 프로젝트에 맞춤
+        defaults = DWAConfig(max_v=0.18)
+        self.dwa_cfg = DWAConfig(**{k: type(v)(self.declare_parameter(f'dwa.{k}', v).value)
+                                    for k, v in vars(defaults).items()})
+        self.dwa_cfg.control_period = 0.1    # DWA 계산 주기 (dwa_compute)
+        self.declare_parameter('dwa_follow.lookahead', 0.5)
+        self.declare_parameter('dwa_follow.goal_tolerance', 0.1)
+        self.declare_parameter('dwa_follow.moving_speed', 0.05)  # 이보다 빠른 track 만 움직이는 장애물로
+        self.odom_vw = (0.0, 0.0)
+        self.create_subscription(Odometry, 'odom', self.on_odom, qos_profile_sensor_data)
+        # A* 가 기억 중인 장애물 (맵에 없는 LiDAR 장애물, 부딪힌 자리) → 웹 지도 표시
+        self.memory = {'remembered': [], 'bumps': []}
+        self.create_subscription(PoseArray, 'astar/remembered', lambda m: self.on_memory('remembered', m), 1)
+        self.create_subscription(PoseArray, 'astar/bumps', lambda m: self.on_memory('bumps', m), 1)
         self.initial_pose_pub = self.create_publisher(PoseWithCovarianceStamped, 'initialpose', 1)
         self.nomotion_client = self.create_client(Empty, 'request_nomotion_update')  # AMCL
         self.nomotion_left = 0
@@ -276,6 +308,7 @@ class BridgeNode(Node):
     # ---------------------------------------------------------- 로봇 상태 → 서버
     def on_map(self, msg):
         self.map_msg = msg
+        self.update_map_dist(msg)
         if self.mode == 'slam':
             # SLAM 은 1~5초마다 맵을 갱신하므로 서버에는 3초에 한 번만 보낸다 (flush_map)
             self.map_dirty = True
@@ -498,7 +531,7 @@ class BridgeNode(Node):
         if plan is None or not plan.poses:
             self.report('failed', '경로를 찾을 수 없습니다.')
             return
-        if self.controller == 'builtin':
+        if self.controller in ('builtin', 'dwa'):
             start = self.current_pose()
             if start is None:
                 self.report('failed', '로봇 위치를 알 수 없습니다. 초기 위치를 지정하세요.')
@@ -506,14 +539,21 @@ class BridgeNode(Node):
             self.send_path(plan.poses)
             self.stop_count = 0  # 이전 목표의 정지 명령이 새 주행에 섞이지 않게
             now = time.monotonic()
+            points = [(ps.pose.position.x, ps.pose.position.y) for ps in plan.poses]
             self.follower = {
                 'gen': gen,
-                'pp': PurePursuit([(ps.pose.position.x, ps.pose.position.y) for ps in plan.poses],
-                                  self.goal['yaw'], max_v=self.max_speed, max_w=self.max_turn_speed),
                 'blocked_since': None,
                 'mark_pos': start[:2],
                 'mark_time': now,
             }
+            if self.controller == 'dwa':
+                self.follower['dwa'] = DWAFollower(
+                    points, self.goal['yaw'], self.dwa_cfg,
+                    goal_tolerance=self.get_parameter('dwa_follow.goal_tolerance').value,
+                    lookahead=self.get_parameter('dwa_follow.lookahead').value)
+            else:
+                self.follower['pp'] = PurePursuit(points, self.goal['yaw'], max_v=self.max_speed,
+                                                  max_w=self.max_turn_speed)
             return
         if not self.follow_client.server_is_ready():
             self.report('failed', 'Nav2 controller_server가 준비되지 않았습니다.')
@@ -635,6 +675,7 @@ class BridgeNode(Node):
             self.scan_gated_since = now
         if self.scan_gated_since is None or now - self.scan_gated_since > 3.0:
             self.level_scan_pub.publish(msg)
+            self.update_tracks(msg)   # 기울어진 스캔은 바닥을 보므로 추적/DWA 에도 쓰지 않음
 
     def on_imu(self, msg):
         """기울기가 35도를 넘은 채 0.5초 지나면 넘어진 것으로 보고 정지."""
@@ -728,7 +769,10 @@ class BridgeNode(Node):
         x, y, yaw, _ = pose
         if self.tilt_rel < math.radians(2):
             f['level_pose'] = (x, y, yaw)   # 부딪힌 자리는 기울기 시작 전 위치/방향으로 계산 (밀리면서 돌아가므로)
-        v, w, state = f['pp'].compute(x, y, yaw)
+        if 'dwa' in f:
+            v, w, state = self.dwa_compute(f['dwa'])
+        else:
+            v, w, state = f['pp'].compute(x, y, yaw)
 
         if state == 'done':
             self.stop_following()
@@ -745,7 +789,20 @@ class BridgeNode(Node):
             self.start_backoff(f, x, y, yaw, now,
                                f'차체가 {math.degrees(self.tilt_rel):.0f}도 기울었습니다 (낮은 장애물에 올라탐).')
             return
-        if v > 0.0:
+        if state == 'blocked':
+            # DWA: 안전한 궤적이 없음 (사람이 막고 있음 등) → 기다리다 오래 막히면 장애물을 피하는 경로로 재계획
+            if f['blocked_since'] is None:
+                f['blocked_since'] = now
+                self.get_logger().warn('DWA: 안전한 궤적 없음, 정지 후 대기')
+            if now - f['blocked_since'] > self.blocked_timeout:
+                self.stop_following()
+                self.fail_or_retry('앞이 막혀 진행할 수 없습니다.')
+                return
+            f['mark_time'] = now
+            f.pop('drive_since', None)
+            self.cmd_vel_pub.publish(Twist())
+            return
+        if v > 0.0 and 'dwa' not in f:   # DWA 는 장애물(움직이는 것 포함)을 스스로 피하므로 앞쪽 정지 규칙을 쓰지 않음
             clearance = self.front_clearance()
             if clearance < self.stop_distance and self.tilt_rel > math.radians(3):
                 # 장애물 모서리에 걸쳐 조금 기운 상태: LiDAR 가 아래를 보고 바닥/상자 윗면을 장애물로 본다.
@@ -765,6 +822,8 @@ class BridgeNode(Node):
                 f.pop('drive_since', None)
                 self.cmd_vel_pub.publish(Twist())
                 return
+            f['blocked_since'] = None
+        if state != 'blocked':
             f['blocked_since'] = None
 
         stall = self.detect_stall(f, x, y, v, state, now)
@@ -793,6 +852,97 @@ class BridgeNode(Node):
         cmd.linear.x = v
         cmd.angular.z = w
         self.cmd_vel_pub.publish(cmd)
+
+    # 움직이는 장애물 추적 + DWA -----------------------------------
+    def on_odom(self, msg):
+        self.odom_vw = (msg.twist.twist.linear.x, msg.twist.twist.angular.z)
+
+    def xyyaw(self, target, source, stamp=None):
+        try:
+            t = self.tf_buffer.lookup_transform(target, source, stamp if stamp is not None else Time())
+        except TransformException:
+            return None
+        tr = t.transform.translation
+        return tr.x, tr.y, yaw_from_quaternion(t.transform.rotation)
+
+    def update_tracks(self, scan):
+        """스캔 → odom 점 (DWA 정적 장애물) + 움직이는 장애물 추적."""
+        c = self.track_cfg
+        sensor = self.xyyaw('odom', scan.header.frame_id, Time.from_msg(scan.header.stamp)) \
+            or self.xyyaw('odom', scan.header.frame_id)
+        if sensor is None:
+            return
+        r = np.asarray(scan.ranges, dtype=float)
+        a = scan.angle_min + np.arange(len(r)) * scan.angle_increment
+        ok = np.isfinite(r) & (r >= scan.range_min) & (r <= min(scan.range_max, c['max_range']))
+        pts = transform_points(np.column_stack([r[ok] * np.cos(a[ok]), r[ok] * np.sin(a[ok])]), *sensor)
+        self.scan_odom = pts
+        if not self.tracking:
+            return
+        # 지도 벽 근처 점은 정적이므로 추적하지 않는다 (판별에만 map 을 쓰므로 AMCL 이 몇 cm 틀려도 속도에는 영향 없음)
+        if self.map_dist is not None and len(pts):
+            m_o = self.xyyaw(self.global_frame, 'odom')
+            if m_o is not None:
+                dist, info = self.map_dist
+                pm = transform_points(pts, *m_o)
+                col = np.floor((pm[:, 0] - info.origin.position.x) / info.resolution).astype(int)
+                row = np.floor((pm[:, 1] - info.origin.position.y) / info.resolution).astype(int)
+                inside = (row >= 0) & (row < info.height) & (col >= 0) & (col < info.width)
+                d = np.full(len(pts), np.inf)
+                d[inside] = dist[row[inside], col[inside]]
+                pts = pts[d > c['static_match_dist']]
+        dets = detect_clusters(pts, c['cluster_gap'], c['min_points'], c['max_diameter'], c['min_radius'],
+                               sensor[:2])
+        self.tracks = self.tracker.update(dets, Time.from_msg(scan.header.stamp).nanoseconds * 1e-9)
+        self.send_obstacles()
+
+    def on_memory(self, kind, msg):
+        pts = [[round(p.position.x, 3), round(p.position.y, 3)] for p in msg.poses]
+        if pts == self.memory[kind]:
+            return
+        self.memory[kind] = pts
+        self.server.send({'type': 'memory', **self.memory})
+
+    def update_map_dist(self, msg):
+        if msg.info.width == 0 or not self.tracking:
+            return
+        grid = np.asarray(msg.data, dtype=np.int16).reshape(msg.info.height, msg.info.width)
+        # 미탐색 칸은 벽이 아니다 → 그 안의 점은 움직이는 장애물 후보로 남긴다
+        self.map_dist = (obstacle_distance(grid >= 65, msg.info.resolution, 0.5), msg.info)
+
+    def send_obstacles(self):
+        """추적 중인 장애물을 웹에 (map 좌표, 0.25초마다)."""
+        now = time.monotonic()
+        if now - self.last_obstacles_sent < 0.25:
+            return
+        self.last_obstacles_sent = now
+        m_o = self.xyyaw(self.global_frame, 'odom')
+        if m_o is None:
+            return
+        c, s = math.cos(m_o[2]), math.sin(m_o[2])
+        out = []
+        for t in self.tracks:
+            (x, y), = transform_points([t.x[:2]], *m_o)
+            out.append({'id': t.id, 'x': round(float(x), 3), 'y': round(float(y), 3),
+                        'vx': round(float(c * t.x[2] - s * t.x[3]), 3), 'vy': round(float(s * t.x[2] + c * t.x[3]), 3),
+                        'r': round(float(t.radius), 3)})
+        self.server.send({'type': 'obstacles', 'obstacles': out})
+
+    def dwa_compute(self, follower):
+        # DWA 는 0.1초마다만 계산하고 그 사이에는 같은 명령 (브리지 한 스레드에서 TF 수신 등과 같이 돌기 때문)
+        now = time.monotonic()
+        last = getattr(follower, 'last_cmd', None)
+        if last is not None and now - last[0] < 0.1:
+            return last[1]
+        pose = self.xyyaw('odom', self.base_frame)
+        map_to_odom = self.xyyaw('odom', self.global_frame)
+        if pose is None or map_to_odom is None:
+            return 0.0, 0.0, 'blocked'
+        dyn = np.array([[t.x[0], t.x[1], t.x[2], t.x[3], t.radius] for t in self.tracks]).reshape(-1, 5)
+        result = follower.compute(pose, *self.odom_vw, map_to_odom, self.scan_odom, dyn,
+                                  moving_speed=self.get_parameter('dwa_follow.moving_speed').value)
+        follower.last_cmd = (now, result)
+        return result
 
     def start_backoff(self, f, x, y, yaw, now, reason):
         """x, y, yaw: 부딪힌 때의 map 좌표 (부딪힌 자리 계산용). 물러난 거리는 odom 으로 잰다

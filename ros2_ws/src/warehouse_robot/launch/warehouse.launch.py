@@ -25,7 +25,7 @@ def generate_launch_description():
         DeclareLaunchArgument('use_sim_time', default_value='false'),
         DeclareLaunchArgument('server_url', default_value='ws://localhost:8000/ws/robot/tb3/'),
         DeclareLaunchArgument('planner', default_value='astar', description='astar | nav2'),
-        DeclareLaunchArgument('controller', default_value='builtin', description='builtin | nav2'),
+        DeclareLaunchArgument('controller', default_value='builtin', description='builtin | nav2 | dwa'),
         DeclareLaunchArgument('map_name', default_value='default'),
         DeclareLaunchArgument('mode', default_value='map', description='map (기존 맵 + AMCL) | slam (맵 만들기)'),
         DeclareLaunchArgument('allow_unknown', default_value='false',

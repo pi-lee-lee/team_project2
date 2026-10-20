@@ -18,6 +18,7 @@
 #                  (slam: SLAM 이 맵과 위치를 내므로 AMCL/map_server 없이 주행 노드만)
 #   --planner P    astar(기본, 직접 구현한 A*) | nav2 (Nav2 가 계획+주행, NavigateToPose)
 #   --controller C builtin(기본, 내장 pure pursuit) | nav2 (A* 경로를 Nav2 controller_server 가 추종)
+#                  | dwa (A* 경로를 DWA 로 추종, 추적한 움직이는 장애물의 미래 위치를 피함. tb3_nav 에서 이식)
 #                  planner/controller 를 nav2 로 주면 --nav2 는 자동으로 켜짐
 #
 # 예)
@@ -54,7 +55,7 @@ done
 [[ "$ROBOT" =~ ^(real|sim)$ ]] || { echo "--robot real|sim 을 지정하세요"; exit 1; }
 [[ "$MODE" =~ ^(slam|map)$ ]] || { echo "--mode slam|map 을 지정하세요"; exit 1; }
 [[ "$PLANNER" =~ ^(astar|nav2)$ ]] || { echo "--planner astar|nav2"; exit 1; }
-[[ "$CONTROLLER" =~ ^(builtin|nav2)$ ]] || { echo "--controller builtin|nav2"; exit 1; }
+[[ "$CONTROLLER" =~ ^(builtin|nav2|dwa)$ ]] || { echo "--controller builtin|nav2|dwa"; exit 1; }
 if [ "$PLANNER" = nav2 ] || [ "$CONTROLLER" = nav2 ]; then NAV2=1; fi
 
 if [ "$MODE" = map ]; then

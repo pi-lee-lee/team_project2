@@ -39,3 +39,44 @@ warehouse_bridge:
     battery_cells: 3          # 배터리 % 계산용 LiPo 셀 수 (TurtleBot3 11.1V = 3셀)
     battery_empty_v: 11.0     # 이 전압을 0% 로 표시 (TurtleBot3 는 11V 아래에서 충전 경고)
     follow_frame: odom        # FollowPath 경로 좌표계 (odom: controller_server가 map->odom TF 없이 주행)
+    # 움직이는 장애물 추적 (tb3_nav obstacle_tracker 이식). 웹 지도에 주황 원 + 속도 화살표, controller=dwa 가 사용
+    tracking:
+      enabled: true
+      max_range: 3.0
+      static_match_dist: 0.15 # 지도 벽에서 이 거리 이내 점은 정적 (AMCL 오차 감안)
+      cluster_gap: 0.15
+      min_points: 3
+      max_diameter: 0.8       # 이보다 큰 덩어리(벽 등)는 장애물로 보지 않음
+      min_radius: 0.05
+      gate: 0.5               # 이전 track 과 이 거리 안이면 같은 물체
+      min_hits: 3             # 이만큼 연속으로 보여야 확정
+      max_misses: 5
+      accel_noise: 1.0
+      meas_noise: 0.05
+      max_speed: 1.5
+    # controller: dwa 일 때 (tb3_nav local_planner 이식). 실수는 소수점을 붙일 것
+    dwa:
+      max_v: 0.18
+      min_v: -0.08            # 느린 후진 (다가오는 장애물에서 물러나기)
+      max_w: 1.5
+      max_acc_v: 0.5
+      max_acc_w: 2.5
+      v_samples: 9
+      w_samples: 21
+      sim_dt: 0.1
+      predict_time: 2.0
+      robot_radius: 0.22
+      safety_margin: 0.05
+      dynamic_margin: 0.15    # 움직이는 장애물에는 여유를 더
+      dynamic_growth: 0.05    # 예측 1초당 반경 증가
+      obstacle_influence: 0.5
+      w_heading: 0.4
+      w_path: 1.0
+      w_goal: 1.0
+      w_obstacle: 0.6
+      w_speed: 0.3
+      w_collision: 5.0
+    dwa_follow:
+      lookahead: 0.5          # 경로 위 이 거리 앞 점을 DWA 목표로
+      goal_tolerance: 0.1     # 이 안에 들면 제자리에서 도착 방향 맞춤
+      moving_speed: 0.05      # 이보다 빠른 track 만 움직이는 장애물로 예측

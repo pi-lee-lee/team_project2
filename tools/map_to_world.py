@@ -55,6 +55,11 @@ def world_sdf(boxes, height, name):
 <!-- tools/map_to_world.py 로 맵에서 만든 월드: {name} -->
 <sdf version="1.6">
   <world name="{name}">
+    <!-- 모델 위치를 서비스로 바꿀 수 있게 (/set_entity_state): tools/sim_mover.py 로 움직이는 장애물 시험 -->
+    <plugin name="gazebo_ros_state" filename="libgazebo_ros_state.so">
+      <ros><namespace>/</namespace></ros>
+      <update_rate>20.0</update_rate>
+    </plugin>
     <include><uri>model://ground_plane</uri></include>
     <include><uri>model://sun</uri></include>
     <scene>

@@ -63,6 +63,9 @@ function handle(msg) {
       setMap(msg.map);
       S.cargo = msg.cargo;
       renderCargo();
+      S.memory = msg.memory;
+      S.obstacles = msg.obstacles || [];
+      S.obstaclesAt = Date.now();
       $('#logs').innerHTML = '';
       msg.logs.slice().reverse().forEach(addLog);
       renderPanel();
@@ -78,6 +81,15 @@ function handle(msg) {
     case 'cargo':
       S.cargo = msg.label;
       renderCargo();
+      break;
+    case 'obstacles':
+      S.obstacles = msg.obstacles || [];
+      S.obstaclesAt = Date.now();
+      draw();
+      break;
+    case 'memory':
+      S.memory = msg;
+      draw();
       break;
     case 'locations':
       S.locations = msg.locations;
@@ -155,6 +167,7 @@ function clearPose() {
   const had = !!S.pose;
   S.pose = null;
   S.path = [];
+  S.obstacles = [];
   draw();
   if (had) renderPanel();
 }
@@ -458,6 +471,45 @@ function draw() {
     ctx.fillStyle = '#111';
     ctx.font = '11px system-ui, sans-serif';
     ctx.fillText('원점(0,0)', cx + 4, cy + 14);
+  }
+
+  // A* 가 기억 중인 장애물: 맵에 없는 LiDAR 장애물 칸(빨간 점, 20초) + 부딪힌 자리(✕, 120초)
+  if (S.memory) {
+    const cell = Math.max(2, 0.05 * pxPerM);
+    ctx.fillStyle = 'rgba(220, 38, 38, 0.55)';
+    for (const [x, y] of S.memory.remembered || []) {
+      const [cx, cy] = worldToCanvas(x, y);
+      ctx.fillRect(cx - cell / 2, cy - cell / 2, cell, cell);
+    }
+    ctx.strokeStyle = '#b91c1c';
+    ctx.lineWidth = 3;
+    const k = Math.max(6, 0.12 * pxPerM);
+    for (const [x, y] of S.memory.bumps || []) {
+      const [cx, cy] = worldToCanvas(x, y);
+      ctx.beginPath();
+      ctx.moveTo(cx - k, cy - k); ctx.lineTo(cx + k, cy + k);
+      ctx.moveTo(cx + k, cy - k); ctx.lineTo(cx - k, cy + k);
+      ctx.stroke();
+    }
+  }
+
+  // 추적 중인 장애물 (LiDAR 군집 + 칼만필터): 주황 원 + 1초 뒤 위치까지 화살표
+  if (S.obstacles && S.obstacles.length && Date.now() - (S.obstaclesAt || 0) < 2000) {
+    for (const o of S.obstacles) {
+      const [cx, cy] = worldToCanvas(o.x, o.y);
+      ctx.beginPath();
+      ctx.arc(cx, cy, Math.max(4, o.r * pxPerM), 0, 2 * Math.PI);
+      ctx.fillStyle = 'rgba(249, 115, 22, 0.35)';
+      ctx.fill();
+      ctx.strokeStyle = '#ea580c';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      if (Math.hypot(o.vx, o.vy) > 0.05) {
+        const [ex, ey] = worldToCanvas(o.x + o.vx, o.y + o.vy);
+        ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(ex, ey); ctx.stroke();
+        ctx.beginPath(); ctx.arc(ex, ey, 3, 0, 2 * Math.PI); ctx.fillStyle = '#ea580c'; ctx.fill();
+      }
+    }
   }
 
   // 경로
