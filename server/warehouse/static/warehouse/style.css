@@ -166,6 +166,7 @@ main {
 .lgd.home { background: #7c3aed; }
 .lgd.goal { background: #ea580c; }
 .lgd.mem { background: rgba(220, 38, 38, 0.55); border-radius: 1px; }
+.lgd.scan { width: 16px; height: 3px; border-radius: 2px; background: rgba(8, 145, 178, 0.9); }
 .lgd.zone { background: rgba(220, 38, 38, 0.13); border: 2px solid #b91c1c; border-radius: 1px; }
 .lgd-x { color: #b91c1c; font-weight: 800; margin-right: 4px; }
 .lgd.obs-still { background: rgba(100, 116, 139, 0.35); border: 2px solid #475569; border-radius: 50%; }

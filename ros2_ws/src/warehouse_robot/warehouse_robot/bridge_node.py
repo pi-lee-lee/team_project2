@@ -75,6 +75,7 @@ def battery_percent(voltage, cells=3, empty_voltage=11.0):
 NO_RETURN_MARGIN = 0.05  # m. inf 빔을 range_max - 이 값으로 바꿈 (slam_toolbox max_laser_range 는 이보다 작아야 함)
 
 
+SCAN_SEND_INTERVAL = 0.25  # s, 웹에 실시간 LiDAR 를 보내는 간격 (화면 표시용, 초당 4번)
 MAP_MIN_INTERVAL = 0.5  # s, SLAM 맵을 서버로 보내는 최소 간격 (갱신되면 바로 보내되 몰려 오면 이 간격으로)
 SLAM_BEAMS = 240  # slam_toolbox 에 넘기는 스캔의 빔 개수 (1.5° 간격 고정). 실물 LDS-02 가 238~244 개라 빈 칸이 거의 없게
 
@@ -259,6 +260,7 @@ class BridgeNode(Node):
         self.create_subscription(BatteryState, 'battery_state', self.on_battery, qos_profile_sensor_data)
         self.create_subscription(Path, 'plan', self.on_nav2_plan, 1)  # nav2 모드 경로 표시용
         self.scan = None
+        self.last_scan_sent = 0.0   # 웹 실시간 LiDAR (send_scan)
         self.create_subscription(LaserScan, 'scan', self.on_scan, qos_profile_sensor_data)
         self.tilt = 0.0           # IMU 로 계산한 기울기 (rad)
         # 평소 기울기 (IMU 기본 오프셋, 기운 바닥): 천천히 따라가는 평균. tilt_rel = 평소보다 더 기운 정도
@@ -791,6 +793,7 @@ class BridgeNode(Node):
             noisy.ranges = r.astype(np.float32).tolist()
             msg = noisy
         self.scan = msg
+        self.send_scan(msg)
         # AMCL/SLAM/A* 기억에는 평소보다 기울지 않았을 때의 스캔만 넘긴다 (scan_level).
         # 부딪혀 기울어지면 LiDAR 가 바닥을 벽처럼 보고, 그 스캔으로 AMCL 위치가 수십 cm 튄다.
         # 단, 기운 채로 3초가 지나면(장애물에 걸쳐 멈춤 등) 다시 넘긴다 - 안 넘기면 위치 추정이 멈춘다
@@ -803,6 +806,26 @@ class BridgeNode(Node):
             self.level_scan_pub.publish(msg)
             self.slam_scan_pub.publish(to_slam_scan(msg))
             self.update_tracks(msg)   # 기울어진 스캔은 바닥을 보므로 추적/DWA 에도 쓰지 않음
+
+    def send_scan(self, msg):
+        """웹 화면용 실시간 LiDAR: 빔 순서대로 지도 좌표 점 (응답 없는 빔은 None). 웹이 이웃 점끼리 선으로 잇는다.
+        SCAN_SEND_INTERVAL 마다만. 지도/경로 계획에는 쓰지 않음."""
+        now = time.monotonic()
+        if now - self.last_scan_sent < SCAN_SEND_INTERVAL or not self.server.connected:
+            return
+        try:
+            t = self.tf_buffer.lookup_transform(self.global_frame, msg.header.frame_id, Time())
+        except TransformException:
+            return
+        self.last_scan_sent = now
+        r = np.asarray(msg.ranges, dtype=float)
+        ok = np.isfinite(r) & (r >= msg.range_min) & (r < msg.range_max)
+        tx, ty = t.transform.translation.x, t.transform.translation.y
+        ang = msg.angle_min + np.arange(len(r)) * msg.angle_increment + yaw_from_quaternion(t.transform.rotation)
+        rr = np.where(ok, r, 0.0)
+        xs, ys = np.round(tx + rr * np.cos(ang), 3), np.round(ty + rr * np.sin(ang), 3)
+        self.server.send({'type': 'scan', 'origin': [round(tx, 3), round(ty, 3)], 'inc': msg.angle_increment,
+                          'points': [[float(x), float(y)] if k else None for x, y, k in zip(xs, ys, ok)]})
 
     def on_imu(self, msg):
         """기울기가 35도를 넘은 채 0.5초 지나면 넘어진 것으로 보고 정지."""

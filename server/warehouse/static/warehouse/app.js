@@ -90,6 +90,11 @@ function handle(msg) {
       renderZones();
       draw();
       break;
+    case 'scan':
+      S.scan = msg;
+      S.scanAt = Date.now();
+      draw();
+      break;
     case 'obstacles':
       S.obstacles = msg.obstacles || [];
       S.obstaclesAt = Date.now();
@@ -491,6 +496,9 @@ function draw() {
     drawZone({ ...canvasPair(d) }, S.mode === 'wall' ? 'line' : 'rect', true);
   }
 
+  // 실시간 LiDAR: 이웃한 빔 점끼리 가까우면 선으로 이음 (벽은 실선, 떨어진 의자 다리 등은 점)
+  if (S.scan && Date.now() - (S.scanAt || 0) < 1500) drawScan(S.scan, pxPerM);
+
   // A* 가 기억 중인 장애물: 맵에 없는 LiDAR 장애물 칸(빨간 점, 20초) + 부딪힌 자리(✕, 120초)
   if (S.memory) {
     const cell = Math.max(2, 0.05 * pxPerM);
@@ -591,6 +599,42 @@ function draw() {
     ctx.lineTo(cx, cy);
     ctx.stroke();
   }
+}
+
+// 이웃 빔 점을 이을 최대 거리 (m): 기본 + 그 거리의 빔 간격 x 배수. 멀수록 빔 사이가 벌어지므로 (3m: 약 0.3m)
+// 의자 다리처럼 따로 떨어진 물체(0.4m 이상)는 잇지 않는다
+const SCAN_JOIN_BASE = 0.1, SCAN_JOIN_BEAMS = 2.5;
+
+function drawScan(scan, pxPerM) {
+  const pts = scan.points || [], n = pts.length;
+  if (!n) return;
+  const [ox, oy] = scan.origin || [0, 0];
+  const inc = scan.inc || (2 * Math.PI / n);
+  const joined = new Array(n).fill(false);
+  ctx.save();
+  ctx.strokeStyle = 'rgba(8, 145, 178, 0.9)';
+  ctx.lineWidth = 2;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  for (let i = 0; i < n; i++) {
+    const a = pts[i], b = pts[(i + 1) % n];
+    if (!a || !b) continue;
+    const r = Math.hypot(a[0] - ox, a[1] - oy);
+    if (Math.hypot(b[0] - a[0], b[1] - a[1]) > SCAN_JOIN_BASE + SCAN_JOIN_BEAMS * r * inc) continue;
+    const [ax, ay] = worldToCanvas(a[0], a[1]), [bx, by] = worldToCanvas(b[0], b[1]);
+    ctx.moveTo(ax, ay);
+    ctx.lineTo(bx, by);
+    joined[i] = joined[(i + 1) % n] = true;
+  }
+  ctx.stroke();
+  ctx.fillStyle = 'rgba(8, 145, 178, 0.9)';
+  const dot = Math.max(1.5, 0.025 * pxPerM);
+  for (let i = 0; i < n; i++) {
+    if (!pts[i] || joined[i]) continue;
+    const [cx, cy] = worldToCanvas(pts[i][0], pts[i][1]);
+    ctx.beginPath(); ctx.arc(cx, cy, dot, 0, 2 * Math.PI); ctx.fill();
+  }
+  ctx.restore();
 }
 
 function canvasPair(d) {

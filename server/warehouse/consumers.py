@@ -102,6 +102,10 @@ class RobotConsumer(AsyncJsonWebsocketConsumer):
             live['cargo'] = str(msg.get('label') or '')
             await self.broadcast({'type': 'cargo', 'robot': self.robot_name, 'label': live['cargo']})
             await self.run(services.handle_cargo, self.robot_name, live['cargo'])
+        elif kind == 'scan':
+            # 실시간 LiDAR (지도 좌표 점, 초당 4번) - 화면 표시용, DB 에 저장하지 않음
+            await self.broadcast({'type': 'scan', 'robot': self.robot_name, 'origin': msg.get('origin'),
+                                  'inc': msg.get('inc'), 'points': msg.get('points', [])})
         elif kind == 'obstacles':
             # 추적 중인 움직이는 장애물 (map 좌표, 위치+속도) - 화면 표시용, DB 에 저장하지 않음
             live['obstacles'] = msg.get('obstacles', [])
