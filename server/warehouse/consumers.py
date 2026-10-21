@@ -209,7 +209,7 @@ class UIConsumer(AsyncJsonWebsocketConsumer):
                                    bool(msg.get('with_home', True))),
             'goto_location': lambda: (services.start_task, robot, [int(msg['location_id'])], False),
             'goto_point': lambda: (services.goto_point, robot,
-                                   float(msg['x']), float(msg['y']), float(msg['yaw'])),
+                                   float(msg['x']), float(msg['y']), float(msg['yaw']), bool(msg.get('replace'))),
             'go_home': lambda: (services.go_home, robot),
             'confirm_load': lambda: (services.confirm_load, robot),
             'confirm_unload': lambda: (services.confirm_unload, robot),

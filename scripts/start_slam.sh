@@ -10,15 +10,9 @@ echo "[start_slam] $ENGINE, 시뮬레이션 시간 $WAREHOUSE_SIM_TIME, 도메�
 
 case "$ENGINE" in
   slam_toolbox)
-    # config/slam_toolbox.yaml: 수평일 때 스캔(/scan_level, 브리지가 발행)만 사용
-    # max_laser_range = LiDAR 최대 거리 - 0.1 (sim TB3 LiDAR 3.5m → 3.4, 실물 LDS-02 8m → 7.9. SLAM_MAX_RANGE 로 바꿀 수 있음)
-    # 브리지가 못 맞힌 빔을 '최대 거리 - 0.01' 로 넘기면, Karto 가 이 값 이상 빔을 '여기까지 비어 있음' 으로 칠한다
-    # (최대 거리 이상인 빔은 Karto 가 버리므로 max_laser_range 가 최대 거리와 같으면 아무것도 안 칠해짐)
-    RANGE="${SLAM_MAX_RANGE:-$([ "$WAREHOUSE_ROBOT" = real ] && echo 7.9 || echo 3.4)}"
-    PARAMS="$WAREHOUSE_HOME/logs/slam_toolbox_run.yaml"
-    sed "s/^    max_laser_range: .*/    max_laser_range: $RANGE/" "$WAREHOUSE_HOME/config/slam_toolbox.yaml" > "$PARAMS"
+    # config/slam_toolbox.yaml: 수평일 때 스캔(/scan_slam, 브리지가 발행, inf 빔 → 빈 공간)만 사용
     exec ros2 launch slam_toolbox online_async_launch.py use_sim_time:="$WAREHOUSE_SIM_TIME" \
-      slam_params_file:="$PARAMS"
+      slam_params_file:="$WAREHOUSE_HOME/config/slam_toolbox.yaml"
     ;;
   cartographer)
     exec ros2 launch turtlebot3_cartographer cartographer.launch.py \

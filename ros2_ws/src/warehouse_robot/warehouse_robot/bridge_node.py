@@ -70,6 +70,30 @@ def battery_percent(voltage, cells=3, empty_voltage=11.0):
     return max(0.0, min(100.0, (cap - lo) / (100.0 - lo) * 100.0))
 
 
+NO_RETURN_MARGIN = 0.05  # m. inf 빔을 range_max - 이 값으로 바꿈 (slam_toolbox max_laser_range 는 이보다 작아야 함)
+
+
+def to_slam_scan(msg):
+    """slam_toolbox(Karto) 는 range_max 이상(inf 포함)인 빔을 통째로 버린다 → 3.5 m 안에 아무것도 없는 넓은
+    공간은 로봇이 가도 빈 칸으로 칠해지지 않아 미탐색으로 남고, 자동 탐색이 그 경계를 끝없이 다시 찾아간다.
+    inf 를 range_max 바로 아래로 바꾸면 Karto 는 max_laser_range 까지만 빈 칸으로 칠하고 끝점은 장애물로 찍지 않는다.
+    AMCL/A* 기억은 이 값을 장애물로 보므로 scan_level(원본)을 그대로 쓴다.
+    실물 LDS 는 반사 없음을 0 으로 내보내는데, 0 은 너무 가까움과 구별이 안 되므로 바꾸지 않는다 (inf 만)."""
+    r = np.asarray(msg.ranges, dtype=np.float32)
+    no_return = np.isposinf(r)
+    if not no_return.any():
+        return msg
+    out = LaserScan()
+    out.header = msg.header
+    out.angle_min, out.angle_max, out.angle_increment = msg.angle_min, msg.angle_max, msg.angle_increment
+    out.time_increment, out.scan_time = msg.time_increment, msg.scan_time
+    out.range_min, out.range_max = msg.range_min, msg.range_max
+    r[no_return] = msg.range_max - NO_RETURN_MARGIN
+    out.ranges = r.tolist()
+    out.intensities = msg.intensities
+    return out
+
+
 class ServerConnection:
     """별도 스레드에서 WebSocket 연결을 유지한다. 받은 메시지는 inbox 큐에 넣는다."""
 
@@ -182,7 +206,12 @@ class BridgeNode(Node):
         self.script_running = None  # 실행 중인 scripts/*.sh 이름
 
         self.tf_buffer = Buffer()
-        self.tf_listener = TransformListener(self.tf_buffer, self)
+        # TF 는 별도 노드 + 스레드에서 받는다. 이 노드는 IMU(~200Hz)·odom·scan·타이머를 한 스레드에서 처리하는데
+        # 실행기는 한 바퀴에 구독마다 메시지 하나씩만 꺼내므로, 부하가 높으면 /tf(~100Hz) 가 큐에 쌓여
+        # 0.5초 넘게 밀리고 '위치 TF 끊김' 으로 멈췄다 (바깥 노드에서 잰 TF 는 정상이었음)
+        self.tf_node = rclpy.create_node('warehouse_bridge_tf', parameter_overrides=[
+            rclpy.parameter.Parameter('use_sim_time', value=self.get_parameter('use_sim_time').value)])
+        self.tf_listener = TransformListener(self.tf_buffer, self.tf_node, spin_thread=True)
 
         map_qos = QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL,
                              reliability=ReliabilityPolicy.RELIABLE)
@@ -250,6 +279,8 @@ class BridgeNode(Node):
         self.bump_pub = self.create_publisher(PointStamped, 'astar/obstacle', 10)  # 부딪힌 자리 → A* 플래너
         self.clear_obstacles_client = self.create_client(Empty, 'astar/clear_obstacles')
         self.level_scan_pub = self.create_publisher(LaserScan, 'scan_level', qos_profile_sensor_data)
+        # SLAM 전용: 아무것도 안 맞은 빔(inf)을 range_max 바로 아래 값으로 바꿔서 발행 (to_slam_scan 참고)
+        self.slam_scan_pub = self.create_publisher(LaserScan, 'scan_slam', qos_profile_sensor_data)
 
         self.plan_client = self.create_client(GetPlan, 'astar/get_plan')
         self.follow_client = ActionClient(self, FollowPath, 'follow_path')
@@ -667,25 +698,6 @@ class BridgeNode(Node):
             self.server.send({'type': 'cargo', 'label': label})
             self.get_logger().info(f'카메라 인식: {label or "없음"}')
 
-    def fill_no_return(self, msg):
-        """아무것도 못 맞힌 빔(inf)을 센서 최대 거리보다 1cm 짧게 바꾼다 (scan_level 용).
-        slam_toolbox 는 inf 빔을 빈 공간으로 칠하지 않아서, 넓은 창고(sim LiDAR 3.5m)에서 빔의 절반이 버려지고
-        선반이 가까운 쪽만 지도에 드러났다. Karto 는 센서 최대 거리(range_max) 이상인 빔은 버리고,
-        max_laser_range 이상 range_max 미만인 빔은 'max_laser_range 까지 비어 있음, 끝점은 벽 아님' 으로 칠한다
-        → range_max - 0.01 로 넘기고 max_laser_range = range_max - 0.1 (start_slam.sh).
-        (range_max 나 그보다 큰 값으로 넘기면 전부 버려졌음)"""
-        r = np.asarray(msg.ranges, dtype=np.float32)
-        inf = np.isinf(r)
-        if not inf.any():
-            return msg
-        out = LaserScan()
-        out.header, out.angle_min, out.angle_max = msg.header, msg.angle_min, msg.angle_max
-        out.angle_increment, out.time_increment, out.scan_time = msg.angle_increment, msg.time_increment, msg.scan_time
-        out.range_min, out.range_max, out.intensities = msg.range_min, msg.range_max, msg.intensities
-        r[inf] = msg.range_max - 0.01
-        out.ranges = r.tolist()
-        return out
-
     def on_scan(self, msg):
         self.scan = msg
         # AMCL/SLAM/A* 기억에는 평소보다 기울지 않았을 때의 스캔만 넘긴다 (scan_level).
@@ -697,7 +709,8 @@ class BridgeNode(Node):
         elif self.scan_gated_since is None:
             self.scan_gated_since = now
         if self.scan_gated_since is None or now - self.scan_gated_since > 3.0:
-            self.level_scan_pub.publish(self.fill_no_return(msg))
+            self.level_scan_pub.publish(msg)
+            self.slam_scan_pub.publish(to_slam_scan(msg))
             self.update_tracks(msg)   # 기울어진 스캔은 바닥을 보므로 추적/DWA 에도 쓰지 않음
 
     def on_imu(self, msg):
@@ -790,7 +803,9 @@ class BridgeNode(Node):
                                    f'차체가 {math.degrees(self.tilt_rel):.0f}도 기울었습니다 (낮은 장애물에 올라탐).')
                 return
             self.stop_following()
-            self.report('failed', '로봇 위치 정보가 갱신되지 않아 정지했습니다.')
+            why = 'TF 없음' if pose is None else f'TF 나이 {pose[3]:.2f}초'
+            self.get_logger().warn(f'위치 TF 끊김: {why}, 기울기 {math.degrees(self.tilt_rel):.1f}°')
+            self.report('failed', f'로봇 위치 정보가 갱신되지 않아 정지했습니다 ({why}).')
             return
         x, y, yaw, _ = pose
         if self.tilt_rel < math.radians(2):
@@ -989,6 +1004,15 @@ class BridgeNode(Node):
         if self.front_clearance(math.radians(30), center=math.pi) > 0.35:
             rec = {'mode': 'back', 'speed': -0.05}
             what = '뒤로 15cm 물러난 뒤'
+        elif not self.rotation_clear(odom):
+            # 벽에 바짝 붙어 돌 공간이 없음: 돌면 차체 모서리가 벽에 걸려 올라타고 넘어졌다 (sim 강당)
+            if self.front_clearance(math.radians(30)) > 0.35:
+                rec = {'mode': 'forward', 'speed': 0.05}
+                what = '돌 공간이 없어 앞으로 15cm 나온 뒤'
+            else:
+                self.stop_following()
+                self.fail_or_retry(f'{reason} 앞뒤가 막혀 돌 공간도 없습니다.')
+                return
         else:
             # 가장 트인 방향 (30° 칸마다 가장 가까운 물체 거리 중 가장 먼 쪽)
             best = max(range(-150, 181, 30), key=lambda d: self.front_clearance(math.radians(15), center=math.radians(d)))
@@ -1000,14 +1024,24 @@ class BridgeNode(Node):
         self.cmd_vel_pub.publish(Twist())
         self.get_logger().warn(f'{reason} {what} 다시 계획합니다')
 
+    def rotation_clear(self, odom):
+        """제자리에서 돌아도 차체가 닿지 않는지: 회전 중심에서 차체 끝까지 반경(외곽 모서리) + 여유 안에 스캔 점이 없음."""
+        pts = self.scan_odom
+        if not len(pts):
+            return True
+        x0, x1, hw = self.dwa_cfg.footprint if self.dwa_cfg.footprint else (-0.197, 0.069, 0.153)
+        radius = math.hypot(max(-x0, x1), hw) + 0.05
+        return float(np.min(np.hypot(pts[:, 0] - odom[0], pts[:, 1] - odom[1]))) > radius
+
     def recovery_step(self, f, now):
         r = f['recovery']
         odom = self.xyyaw('odom', self.base_frame)
         done = odom is None or now > r['until']
         cmd = Twist()
-        if not done and r['mode'] == 'back':
-            done = (math.hypot(odom[0] - r['start'][0], odom[1] - r['start'][1]) >= 0.15
-                    or self.front_clearance(math.radians(30), center=math.pi) < 0.3)
+        if not done and r['mode'] in ('back', 'forward'):
+            blocked = (self.front_clearance(math.radians(30), center=math.pi) < 0.3 if r['mode'] == 'back'
+                       else self.front_clearance(math.radians(30)) < 0.3)
+            done = math.hypot(odom[0] - r['start'][0], odom[1] - r['start'][1]) >= 0.15 or blocked
             cmd.linear.x = r['speed']
         elif not done:
             turned = math.atan2(math.sin(odom[2] - r['start'][2]), math.cos(odom[2] - r['start'][2]))
@@ -1169,6 +1203,7 @@ def main(args=None):
         pass
     finally:
         node.server.close()
+        node.tf_node.destroy_node()
         node.destroy_node()
         rclpy.try_shutdown()
 

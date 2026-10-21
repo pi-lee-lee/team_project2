@@ -332,7 +332,8 @@ dpkg -l ros-humble-tf2 ros-humble-tf2-ros | grep ^ii   # 0.25.24 확인
 | `python3 tools/localize.py --global` | 맵 전체에서 찾기 (10cm·5° 로 넓게 → 상위 5곳을 2.5cm·1° 로 정밀). 웹 "위치 자동 찾기" 와 같음 |
 | `python3 tools/tf_rates.py [초]` | TF별 수신 빈도와 지연 측정 |
 | `python3 tools/sim_watch.py --world worlds/maze_room.world [--world 상자.sdf] [--seconds N]` | (sim) Gazebo 정답 위치와 비교한 위치 오차, 충돌, 벽 여유, 기울기 기록. Ctrl-C 로 끝내도 요약 출력 |
-| `python3 tools/explore.py` | (SLAM) 프론티어 자동 탐색. 웹 "자동 탐색" 과 같음 |
+| `python3 tools/make_hall_world.py` | 강당 월드 `worlds/lecture_hall.world` 다시 만들기 (강단 + 가로 복도 6 × 세로 복도 5, 책상 20개 · 의자 40개, 치수는 파일 위쪽 상수) |
+| `python3 tools/explore.py` | (SLAM) 프론티어 자동 탐색. 웹 "자동 탐색" 과 같음. 가던 방향 유지, 가는 도중 목표가 보이면 바로 다음 목표, 막힌 작은 미탐색 구멍(1 m² 미만) 무시. `--turn-weight 0 --no-early-switch --pocket-min 0` 이면 예전 방식 |
 | `python3 tools/cargo_sim.py <라벨>` | 카메라 없이 LED 인식 결과 흉내 (`''` = 비어 있음) |
 | `python3 tools/collect_travel.py [--count 30]` | 빈 곳으로 무작위 이동을 반복해 이동 시간 학습 기록 모으기 |
 | `python3 tools/ui_goto.py x y [yaw]` / `--home` | 웹과 같은 방식으로 이동(또는 홈 복귀) 명령을 보내고 진행 출력 (시간 초과 시 비상정지) |
