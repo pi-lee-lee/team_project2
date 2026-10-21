@@ -27,6 +27,11 @@
    - 가는 도중 목표 프론티어가 이미 보여서 사라지면 바로 다음 목표로
    - 실패한 곳은 다시 고르지 않는다
 4. 프론티어가 남지 않으면 끝 (웹 "맵 저장" 으로 저장)
+5. 금지 구역 (웹에서 그린 것, 서버 WebSocket 으로 받음): 구역 칸은 장애물로 보고, 로봇에서 A* 처럼(로봇 반경, 미탐색 통과)
+   실제로 갈 수 있는 칸에서만 목표/줄 중심선 점을 고른다 → 구역 뒤나 구역으로 막힌 곳으로 목표를 보내지 않음.
+   가는 중에 구역이 바뀌어 지금 목표가 구역 안/뒤가 되면 이동을 멈추고 다시 고른다
+6. 실패: 실패한 곳 0.5m (같은 곳 두 번째 실패나 금지 구역 때문이면 1m) 안은 다시 고르지 않음 (줄 중심선 점 포함).
+   연속 MAX_FAILS 번 실패하면 탐색을 멈춘다 (예전: 줄 중심선 점이 실패 목록을 안 봐서 같은 점을 0.5초마다 수백 번 보냄)
 
     --no-continuous : 목표마다 도착(정지)까지 기다림   --no-early-switch : 목표 프론티어가 보여도 계속 감
     --pocket-min 0 : 작은 구멍도 탐색
@@ -48,6 +53,7 @@ from scipy import ndimage
 from tf2_ros import Buffer, TransformListener
 
 from warehouse_robot.astar import obstacle_distance
+from warehouse_robot.plan_map import near_mask, zone_mask
 
 MIN_CLUSTER = 8        # 이 칸 수(40cm) 미만 프론티어 묶음은 무시
 CHUNK = 40             # 큰 프론티어 묶음은 이 칸 수(2m) 조각으로 나눠 각각 목표 후보로
@@ -76,6 +82,74 @@ VISIT_STEP = 0.3       # 경로 기록 간격 (m)
 GAP_CELLS = 2          # 아는 칸 사이 이 폭(칸) 이하의 미탐색 줄은 광선 틈으로 보고 메움
 SLAM_JUMP = 0.5        # map->odom 이 한 번에 이보다 크게 바뀌면 경고 (m)
 SEEN_RADIUS = 0.6      # 목표 프론티어 중심 이 반경 안에 프론티어가 MIN_CLUSTER 칸 미만이면 '이미 봄'
+ROBOT_RADIUS = 0.25    # 갈 수 있는 칸 판정 (A* robot_radius 와 같게)
+START_CLEAR = 0.35     # 로봇 주변은 갈 수 있는 것으로 (A* start_clear_radius 와 같게)
+FAIL_RADIUS = (0.5, 1.0)  # 실패한 곳 제외 반경: 처음 / 같은 곳 두 번째 또는 금지 구역 때문
+MAX_FAILS = 5          # 연속 이만큼 실패하면 탐색을 멈춤
+
+ZONES = {'list': [], 'ver': 0}   # 서버에서 받은 금지 구역 (지금 맵), 바뀔 때마다 ver + 1
+_finished = {}                   # 작업 번호 -> (성공 여부, 메시지). 다른 곳에서 읽어 버린 끝 상태도 놓치지 않게
+
+
+def handle_msg(m):
+    """서버 WebSocket 메시지 공통 처리: 금지 구역 갱신, 끝난 작업 기억."""
+    if m.get('type') == 'zones' or (m.get('type') == 'snapshot' and 'zones' in m):
+        zones = m.get('zones') or []
+        if zones != ZONES['list']:
+            ZONES['list'] = zones
+            ZONES['ver'] += 1
+            print(f'[explore] 금지 구역 {len(zones)}개 반영', flush=True)
+    elif m.get('type') == 'state' and m.get('task') and m['task']['status'] != 'running':
+        _finished[m['task']['id']] = (m['task']['status'] == 'done', (m.get('robot') or {}).get('message', ''))
+
+
+def recv(ws):
+    """메시지 하나 (handle_msg 를 거침). 시간 초과면 WebSocketTimeoutException."""
+    m = json.loads(ws.recv())
+    handle_msg(m)
+    return m
+
+
+def drain(ws):
+    """쌓인 메시지를 읽어 금지 구역/작업 상태만 반영 (기다리지 않음)."""
+    ws.settimeout(0.01)
+    try:
+        while True:
+            recv(ws)
+    except websocket.WebSocketTimeoutException:
+        pass
+    finally:
+        ws.settimeout(0.5)
+
+
+def zone_grid(msg):
+    info = msg.info
+    return zone_mask((info.height, info.width), info.resolution, info.origin.position.x, info.origin.position.y,
+                     ZONES['list'])
+
+
+def reachable(msg, robot_xy, zmask):
+    """로봇에서 갈 수 있는 칸 (bool): 벽/금지 구역에서 ROBOT_RADIUS 떨어진 칸(미탐색 포함) 중 로봇과 이어진 것.
+    A*(SLAM 모드: 미탐색 통과, 출발 주변 비움)와 같은 기준."""
+    info = msg.info
+    res = info.resolution
+    raw = grid_of(msg)
+    wall = raw >= 65
+    passable = obstacle_distance(wall | zmask, res, ROBOT_RADIUS + 0.1) >= ROBOT_RADIUS
+    near = near_mask(raw.shape, res, info.origin.position.x, info.origin.position.y, robot_xy, START_CLEAR)
+    passable |= near & ~wall
+    labels, _ = ndimage.label(passable, structure=np.ones((3, 3), bool))
+    seeds = np.unique(labels[near & passable])
+    seeds = seeds[seeds > 0]
+    return np.isin(labels, seeds) if len(seeds) else np.zeros(raw.shape, bool)
+
+
+def blocked_by(blacklist, xs, ys):
+    """blacklist [(x, y, 반경)] 안에 드는 칸 (bool)."""
+    out = np.zeros(np.shape(xs), bool)
+    for bx, by, br in blacklist:
+        out |= np.hypot(xs - bx, ys - by) < br
+    return out
 
 
 def grid_of(msg):
@@ -337,14 +411,17 @@ def lane_heading(msg, robot_yaw):
     return min(options, key=lambda a: abs(math.atan2(math.sin(a - robot_yaw), math.cos(a - robot_yaw))))
 
 
-def lane_waypoint(msg, sweep, robot_xy, lane, d):
+def lane_waypoint(msg, sweep, robot_xy, lane, d, allowed=None, blacklist=(), exclude=()):
     """줄 중심선(v = lane x 줄 폭) 근처에서 로봇보다 WAYPOINT_AHEAD 만큼 앞(진행 방향 d)의 안전한 빈 칸 (x, y) 또는 None.
-    앞으로 많이, 중심선에 가까울수록 좋음."""
+    앞으로 많이, 중심선에 가까울수록 좋음. allowed: 갈 수 있는 칸(금지 구역 반영), blacklist/exclude: 실패한 곳/가는 곳."""
     info = msg.info
     res = info.resolution
     raw = grid_of(msg)
     dist = obstacle_distance(raw >= 65, res, CLEARANCE + 0.1)
-    rr, cc = np.nonzero((raw == 0) & (dist >= CLEARANCE))
+    safe = (raw == 0) & (dist >= CLEARANCE)
+    if allowed is not None:
+        safe &= allowed
+    rr, cc = np.nonzero(safe)
     if len(rr) == 0:
         return None
     xs = info.origin.position.x + (cc + 0.5) * res
@@ -356,6 +433,9 @@ def lane_waypoint(msg, sweep, robot_xy, lane, d):
     prog = (u - ru) * d
     off = np.abs(v - lane * sweep.w)
     ok = (prog >= WAYPOINT_AHEAD[0]) & (prog <= WAYPOINT_AHEAD[1]) & (off <= sweep.w / 2)
+    ok &= ~blocked_by(blacklist, xs, ys)
+    for ex, ey in exclude:
+        ok &= np.hypot(xs - ex, ys - ey) >= 0.8
     if not ok.any():
         return None
     score = np.where(ok, prog - 1.5 * off, -np.inf)
@@ -363,9 +443,10 @@ def lane_waypoint(msg, sweep, robot_xy, lane, d):
     return float(xs[i]), float(ys[i])
 
 
-def _candidates(msg, robot_xy, blacklist, pocket_min, exclude, sensor_range, visited):
+def _candidates(msg, robot_xy, blacklist, pocket_min, exclude, sensor_range, visited, allowed=None, zmask=None):
     """프론티어 묶음마다 목표 후보 하나: [(x, y, 가는 방향, 보일 넓이 m², 프론티어 중심 x, y, 묶음 칸 수)].
-    blacklist / exclude: 이 지점들 0.5m / 0.8m 안의 후보는 버림 (실패한 곳 / 지금 가고 있는 곳).
+    blacklist [(x, y, 반경)] / exclude: 그 반경 / 0.8m 안의 후보는 버림 (실패한 곳 / 지금 가고 있는 곳).
+    allowed: 로봇에서 갈 수 있는 칸 (reachable), zmask: 금지 구역 칸 - 구역 안 프론티어와 목표는 버림.
     목표 칸은 벽에서 CLEARANCE, 미탐색에서 UNKNOWN_STEPS 순서로 (그 묶음에 칸이 있는 가장 엄격한 여유로) 떨어진 칸.
     여유 완화는 묶음마다 따로 한다. 맵 전체로 하면 트인 곳(뒤쪽)의 묶음에 엄격한 칸이 하나라도 있을 때
     좁은 복도(앞쪽) 묶음은 칸이 0개라 후보에서 빠져, 방향 규칙과 상관없이 뒤로만 갔다."""
@@ -377,11 +458,16 @@ def _candidates(msg, robot_xy, blacklist, pocket_min, exclude, sensor_range, vis
     grid, unknown = effective_unknown(msg, pocket_min, visited)
     dist = obstacle_distance(occ, res, CLEARANCE + 0.1)
     base = (raw == 0) & (dist >= CLEARANCE)      # 메운 틈 칸에는 서지 않음
+    if allowed is not None:
+        base &= allowed
     dist_unknown = obstacle_distance(raw < 0, res, max(UNKNOWN_STEPS) + 0.1)
     levels = [(base & (dist_unknown >= u), mt) for u in UNKNOWN_STEPS for mt in (MIN_TRAVEL, 0.5)]
     k = int(SEARCH_RADIUS / res)
     out = []
-    for cells in frontiers(frontier_mask(grid, unknown)):
+    front = frontier_mask(grid, unknown)
+    if zmask is not None:
+        front &= ~zmask
+    for cells in frontiers(front):
         cr = int(np.mean([c[0] for c in cells]))
         cc = int(np.mean([c[1] for c in cells]))
         r0, r1 = max(0, cr - k), min(info.height, cr + k + 1)
@@ -393,8 +479,7 @@ def _candidates(msg, robot_xy, blacklist, pocket_min, exclude, sensor_range, vis
                 continue
             xs, ys = ox + (ccs + 0.5) * res, oy + (rr + 0.5) * res
             ok = np.hypot(xs - robot_xy[0], ys - robot_xy[1]) >= min_travel
-            for bx, by in blacklist:
-                ok &= np.hypot(xs - bx, ys - by) >= 0.5
+            ok &= ~blocked_by(blacklist, xs, ys)
             for ex, ey in exclude:
                 ok &= np.hypot(xs - ex, ys - ey) >= 0.8
             if ok.any():
@@ -420,7 +505,7 @@ def wait_idle(ws, timeout=3.0):
     end = time.time() + timeout
     while time.time() < end:
         try:
-            m = json.loads(ws.recv())
+            m = recv(ws)
         except websocket.WebSocketTimeoutException:
             continue
         if m['type'] == 'state' and not (m.get('task') and m['task']['status'] == 'running'):
@@ -446,7 +531,7 @@ def goto(ws, x, y, yaw, timeout, check=None, replace=False):
             if why:
                 return True, why
         try:
-            m = json.loads(ws.recv())
+            m = recv(ws)
         except websocket.WebSocketTimeoutException:
             continue
         if m['type'] == 'error':
@@ -495,7 +580,7 @@ def main():
                              QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL,
                                         reliability=ReliabilityPolicy.RELIABLE))
     ws = websocket.create_connection(args.server, timeout=0.5)
-    snap = json.loads(ws.recv())
+    snap = recv(ws)
     if snap.get('task') and snap['task']['status'] == 'running':
         print('[explore] 진행 중인 작업을 취소하고 시작합니다', flush=True)
         ws.send(json.dumps({'action': 'cancel_task'}))
@@ -528,7 +613,9 @@ def main():
         q = tf.rotation
         return tf.translation.x, tf.translation.y, math.atan2(2 * (q.w * q.z + q.x * q.y), 1 - 2 * (q.y * q.y + q.z * q.z))
 
-    blacklist = []
+    blacklist = []  # [(x, y, 반경)] 실패한 곳
+    failed_at = []  # 실패한 목표 (같은 곳 두 번째 실패 판정)
+    fails = 0       # 연속 실패 수
     reached = []    # 도착한 목표. 같은 곳에 두 번 도착해도 프론티어가 안 사라지면(그 자리에서 볼 수 없는 곳) 제외
     start = time.time()
     visited = ok_count = switched = chained = 0
@@ -547,12 +634,15 @@ def main():
 
     def choose(rx, ry, excl):
         """반환 (x, y, yaw, 보일 넓이, 프론티어 중심 x, y, 설명) 또는 None."""
-        cands = _candidates(latest['map'], (rx, ry), blacklist, args.pocket_min, excl, args.sensor_range, trail)
+        m = latest['map']
+        zm = zone_grid(m)
+        reach = reachable(m, (rx, ry), zm)
+        cands = _candidates(m, (rx, ry), blacklist, args.pocket_min, excl, args.sensor_range, trail, reach, zm)
         if not cands:
             return None
         if sweep is not None:
             c, label = sweep.pick(cands, (rx, ry), moving, time.time(),
-                                  lambda lane, d: lane_waypoint(latest['map'], sweep, (rx, ry), lane, d))
+                                  lambda lane, d: lane_waypoint(m, sweep, (rx, ry), lane, d, reach, blacklist, excl))
             if label == 'wait':
                 return 'wait'
             if c is not None:
@@ -561,8 +651,22 @@ def main():
         if g is None:
             return None
         return g[:6] + ((('자투리 ' if sweep is not None else '') + ('앞', '옆', '뒤')[g[6]]),)
+    def fail(gx, gy, message):
+        """실패한 목표를 제외하고 연속 실패를 센다. 반환: 탐색을 멈춰야 하면 True."""
+        nonlocal fails
+        again = any(math.hypot(gx - px, gy - py) < FAIL_RADIUS[0] for px, py in failed_at)
+        r = FAIL_RADIUS[1] if again or '금지 구역' in message else FAIL_RADIUS[0]
+        failed_at.append((gx, gy))
+        blacklist.append((gx, gy, r))
+        fails += 1
+        if fails >= MAX_FAILS:
+            print(f'[explore] 연속 {fails}번 실패해 탐색을 멈춥니다 (마지막: {message})', flush=True)
+            return True
+        return False
+
     while time.time() - start < args.max_minutes * 60:
         spin(0.05 if moving else 0.3)
+        drain(ws)   # 금지 구역 변경 반영
         if 'map' not in latest or not buf.can_transform('map', 'base_footprint', rclpy.time.Time()):
             print('[explore] 맵/위치 대기 중', flush=True)
             spin(2.0)
@@ -603,7 +707,7 @@ def main():
                     np.savez_compressed(os.path.join(args.debug_dir, 'final.npz'), grid=grid_of(m), res=m.info.resolution,
                                         origin=[m.info.origin.position.x, m.info.origin.position.y],
                                         robot=[rx, ry, ryaw], trail=np.array(trail),
-                                        blacklist=np.array(blacklist).reshape(-1, 2))
+                                        blacklist=np.array(blacklist).reshape(-1, 3))
                 break
         gx, gy, gyaw, gain, fx, fy, label = goal
         tier = 0 if not label.endswith(('옆', '뒤')) else (1 if label.endswith('옆') else 2)
@@ -615,7 +719,7 @@ def main():
                                 origin=[m.info.origin.position.x, m.info.origin.position.y],
                                 robot=[rx, ry, ryaw], heading=heading, goal=[gx, gy, tier], label=label,
                                 trail=np.array(trail),
-                                exclude=np.array(exclude).reshape(-1, 2), blacklist=np.array(blacklist).reshape(-1, 2))
+                                exclude=np.array(exclude).reshape(-1, 2), blacklist=np.array(blacklist).reshape(-1, 3))
         turn = math.degrees(abs(math.atan2(math.sin(gyaw - heading), math.cos(gyaw - heading))))
         print(f'[explore] #{visited} 목표 ({gx:.2f}, {gy:.2f}) 보일 넓이 {gain:.1f} m², 진행 방향과 {turn:.0f}° '
               f'[{label}]{" (이어 가기)" if moving else ""}', flush=True)
@@ -635,8 +739,21 @@ def main():
         if commit and math.hypot(gx - rx, gy - ry) >= PREFETCH_DIST + 0.2:
             print('[explore]   전에 도착 전에 떠난 곳: 이번엔 끝까지 감', flush=True)
 
+        zone_ver = ZONES['ver']
+
         def check():
+            nonlocal zone_ver
             spin(0.05)
+            if ZONES['ver'] != zone_ver:   # 가는 중에 금지 구역이 바뀜: 목표가 구역 안/뒤가 됐는지
+                zone_ver = ZONES['ver']
+                m = latest['map']
+                x, y, _ = robot_pose()
+                info = m.info
+                c = int((gx - info.origin.position.x) / info.resolution)
+                r = int((gy - info.origin.position.y) / info.resolution)
+                inside = 0 <= r < info.height and 0 <= c < info.width
+                if not inside or not reachable(m, (x, y), zone_grid(m))[r, c]:
+                    return '금지 구역 변경'
             if not args.no_continuous and not commit:
                 x, y, _ = robot_pose()
                 if math.hypot(gx - x, gy - y) < PREFETCH_DIST:
@@ -649,6 +766,14 @@ def main():
         ok, message = goto(ws, gx, gy, gyaw, args.goal_timeout, check, replace=moving)
         moving = False
         exclude = []
+        if ok and message == '금지 구역 변경':
+            print('[explore]   금지 구역이 바뀌어 지금 목표로 갈 수 없음: 멈추고 다시 고름', flush=True)
+            ws.send(json.dumps({'action': 'cancel_task'}))
+            wait_idle(ws)
+            blacklist.append((gx, gy, FAIL_RADIUS[1]))
+            continue
+        if ok:
+            fails = 0
         if ok and message in ('근접', '이미 봄'):
             if message == '이미 봄':
                 switched += 1
@@ -669,9 +794,14 @@ def main():
             if is_waypoint:
                 continue
             if any(math.hypot(gx - px, gy - py) < 0.4 for px, py in reached):
-                blacklist.append((gx, gy))
+                blacklist.append((gx, gy, FAIL_RADIUS[0]))
                 print('[explore]   같은 곳에 다시 왔지만 프론티어가 남음: 이 근처는 제외', flush=True)
             reached.append((gx, gy))
+        elif ok is None and ('금지 구역' in message or '같은 지점' in message):
+            # 서버가 목표 자체를 거절 (금지 구역 안, 같은 곳 반복 실패): 그 목표는 실패로 침
+            print(f'[explore]   요청 거절: {message}', flush=True)
+            if fail(gx, gy, message):
+                break
         elif ok is None:
             print(f'[explore]   요청 거절: {message} (잠시 뒤 다시 시도)', flush=True)
             spin(3.0)
@@ -681,7 +811,8 @@ def main():
                 # 로봇을 사람이 봐야 하는 상태: 이후 목표가 모두 거절되므로 계속하면 전부 제외되고 '완료' 로 잘못 끝남
                 print('[explore] 로봇 확인이 필요해 탐색을 멈춥니다 (상태 초기화 후 다시 시작)', flush=True)
                 break
-            blacklist.append((gx, gy))
+            if fail(gx, gy, message):
+                break
     else:
         print(f'[explore] 시간 제한 {args.max_minutes:.0f}분 도달', flush=True)
     if moving:
@@ -699,9 +830,11 @@ def goto_wait(ws, timeout):
     """진행 중인 goto 의 결과만 기다림 (새 요청 없이). 반환: (성공 여부, 메시지)"""
     end = time.time() + timeout
     task_id = _last['task']
+    if task_id in _finished:   # 다른 곳(drain)에서 이미 끝 상태를 읽었으면
+        return _finished[task_id]
     while time.time() < end:
         try:
-            m = json.loads(ws.recv())
+            m = recv(ws)
         except websocket.WebSocketTimeoutException:
             continue
         if m['type'] == 'state' and m.get('task') and m['task']['id'] == task_id and m['task']['status'] != 'running':
