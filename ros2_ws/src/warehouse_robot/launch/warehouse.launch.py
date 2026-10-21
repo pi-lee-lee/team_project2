@@ -20,6 +20,7 @@ def generate_launch_description():
     mode = LaunchConfiguration('mode')
     allow_unknown = LaunchConfiguration('allow_unknown')
     controller = LaunchConfiguration('controller')
+    scan_noise = LaunchConfiguration('scan_noise')
 
     return LaunchDescription([
         DeclareLaunchArgument('use_sim_time', default_value='false'),
@@ -28,6 +29,8 @@ def generate_launch_description():
         DeclareLaunchArgument('controller', default_value='builtin', description='builtin | nav2 | dwa'),
         DeclareLaunchArgument('map_name', default_value='default'),
         DeclareLaunchArgument('mode', default_value='map', description='map (기존 맵 + AMCL) | slam (맵 만들기)'),
+        DeclareLaunchArgument('scan_noise', default_value='false',
+                              description='시뮬레이션 LiDAR 를 실물 LDS-02 처럼 (빔 개수 변동, 흔들림, 값 빠짐)'),
         DeclareLaunchArgument('allow_unknown', default_value='false',
                               description='A*가 미탐색 칸을 지나갈 수 있는지 (SLAM 모드에서 true)'),
         Node(
@@ -38,5 +41,6 @@ def generate_launch_description():
             output='screen',
             parameters=[params, {'use_sim_time': use_sim_time, 'server_url': server_url,
                                  'planner': planner, 'controller': controller,
-                                 'map_name': map_name, 'mode': mode}]),
+                                 'map_name': map_name, 'mode': mode,
+                                 'sim_scan.enabled': scan_noise}]),
     ])

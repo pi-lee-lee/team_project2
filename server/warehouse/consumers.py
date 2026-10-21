@@ -154,7 +154,7 @@ class UIConsumer(AsyncJsonWebsocketConsumer):
             if action == 'runner_start':
                 await database_sync_to_async(runner.start_mode)(
                     str(msg.get('robot')), str(msg.get('mode')), msg.get('map') or None, msg.get('world') or None,
-                    msg.get('amcl') or 'default')
+                    msg.get('amcl') or 'default', bool(msg.get('scan_noise')))
             elif action == 'runner_stop':
                 await database_sync_to_async(runner.stop_all)()
             elif action == 'explore_start':

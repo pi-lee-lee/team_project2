@@ -20,6 +20,8 @@
 #   --controller C builtin(기본, 내장 pure pursuit) | nav2 (A* 경로를 Nav2 controller_server 가 추종)
 #                  | dwa (A* 경로를 DWA 로 추종, 추적한 움직이는 장애물의 미래 위치를 피함. tb3_nav 에서 이식)
 #                  planner/controller 를 nav2 로 주면 --nav2 는 자동으로 켜짐
+#   --scan-noise   (sim) LiDAR 를 실물 LDS-02 처럼: 빔 개수 238~244 변동, 거리 흔들림, 먼 곳 값 빠짐 (scan_noise.py)
+#                  실물과 비슷한 강당은 --world lecture_hall_real (책상 앞판 없음, 의자 무작위 배치)
 #   --amcl A       (map) 위치 추정 설정: default(기본, config/amcl_waffle_pi.yaml, 작은 방) | hall(config/amcl_hall.yaml,
 #                  책상/의자가 흩어진 강당·교실: 지도와 안 맞는 빔에 너그럽게) | yaml 파일 경로
 #
@@ -36,7 +38,7 @@ LOGS="$HOME_DIR/logs"
 PI_HOST="test@192.168.0.181"
 
 ROBOT=""; MODE=""; MAP=""; NAME=""; ENGINE=slam_toolbox; WORLD=turtlebot3_world; GUI=""; NAV2=""
-PLANNER=astar; CONTROLLER=builtin; AMCL=default
+PLANNER=astar; CONTROLLER=builtin; AMCL=default; SCAN_NOISE=false
 while [ $# -gt 0 ]; do
   case "$1" in
     --robot) ROBOT="$2"; shift ;;
@@ -50,7 +52,8 @@ while [ $# -gt 0 ]; do
     --planner) PLANNER="$2"; shift ;;
     --controller) CONTROLLER="$2"; shift ;;
     --amcl) AMCL="$2"; shift ;;
-    -h|--help) sed -n '2,31p' "$0"; exit 0 ;;
+    --scan-noise) SCAN_NOISE=true ;;
+    -h|--help) sed -n '2,33p' "$0"; exit 0 ;;
     *) echo "알 수 없는 옵션: $1 (scripts/run.sh --help)"; exit 1 ;;
   esac
   shift
@@ -126,9 +129,10 @@ WAREHOUSE_SPAWN_Y=$SPAWN_Y
 WAREHOUSE_PLANNER=$PLANNER
 WAREHOUSE_CONTROLLER=$CONTROLLER
 WAREHOUSE_AMCL=$AMCL_FILE
+WAREHOUSE_SCAN_NOISE=$([ "$ROBOT" = sim ] && echo "$SCAN_NOISE" || echo false)
 EOF
 source "$DIR/env.sh"
-echo "== 로봇 $ROBOT / 모드 $MODE / Nav2 주행 노드 $([ -n "$NAV2" ] && echo 켬 || echo 끔) / planner $PLANNER / controller $CONTROLLER / 도메인 $ROS_DOMAIN_ID"
+echo "== 로봇 $ROBOT / 모드 $MODE$([ "$SCAN_NOISE" = true ] && [ "$ROBOT" = sim ] && echo ' / LiDAR 노이즈 켬') / Nav2 주행 노드 $([ -n "$NAV2" ] && echo 켬 || echo 끔) / planner $PLANNER / controller $CONTROLLER / 도메인 $ROS_DOMAIN_ID"
 
 start() {  # start <로그이름> <명령...>
   local log="$LOGS/$1.log"; shift

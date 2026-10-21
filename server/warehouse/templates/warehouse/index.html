@@ -185,6 +185,7 @@
       </div>
       <label class="fields" id="runner-world-row">시뮬레이션 월드
         <select id="runner-world"></select>
+        <span class="check" title="빔 개수 238~244 변동, 거리 흔들림, 먼 곳 값 빠짐 (실물 LDS-02 처럼). 실물 같은 강당은 lecture_hall_real 월드"><input type="checkbox" id="runner-scan-noise"> LiDAR 를 실물처럼 (노이즈)</span>
       </label>
       <p id="runner-world-hint" class="model-note"></p>
       <label class="check" title="config/amcl_hall.yaml: 지도에 없는(옮겨진 의자, 사람 다리) 빔에 너그러운 위치 추정 설정. 작은 방은 끄세요"><input type="checkbox" id="runner-amcl-hall"> 강당/교실용 위치 추정 (AMCL)</label>

@@ -13,8 +13,8 @@ fi
 # 경로 계획/추종 방식 (run.sh 의 --planner/--controller, 기본: 직접 구현한 A* + 내장 추종기)
 PLANNER="${WAREHOUSE_PLANNER:-astar}"
 CONTROLLER="${WAREHOUSE_CONTROLLER:-builtin}"
-echo "[start_bridge] 모드 $WAREHOUSE_MODE, 맵 이름 $MAP_NAME, planner=$PLANNER, controller=$CONTROLLER, 시뮬레이션 시간 $WAREHOUSE_SIM_TIME, 도메인 $ROS_DOMAIN_ID"
+echo "[start_bridge] 모드 $WAREHOUSE_MODE, 맵 이름 $MAP_NAME, planner=$PLANNER, controller=$CONTROLLER, 시뮬레이션 시간 $WAREHOUSE_SIM_TIME, LiDAR 노이즈 ${WAREHOUSE_SCAN_NOISE:-false}, 도메인 $ROS_DOMAIN_ID"
 exec ros2 launch warehouse_robot warehouse.launch.py map_name:="$MAP_NAME" \
   mode:="$WAREHOUSE_MODE" use_sim_time:="$WAREHOUSE_SIM_TIME" allow_unknown:="$ALLOW_UNKNOWN" \
-  planner:="$PLANNER" controller:="$CONTROLLER" \
+  planner:="$PLANNER" controller:="$CONTROLLER" scan_noise:="${WAREHOUSE_SCAN_NOISE:-false}" \
   server_url:="${2:-ws://localhost:8000/ws/robot/tb3/}"
