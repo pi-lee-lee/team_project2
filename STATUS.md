@@ -303,3 +303,25 @@
 - 웹 수동 조작 패널 추가 (실물에서 회전 명령/자동 정지 확인)
 - 남은 문제: 로봇(Pi) 재부팅·bringup 재시작이면 오도메트리가 0 부터 다시 시작해 SLAM 을 처음부터 해야 함 → '이어서 그리기'(slam_toolbox 포즈 그래프 저장/불러오기 + 스캔 매칭으로 위치 찾기) 제안 중
 
+### 강당(학원) 대응: 계획용 지도 가공 · 금지 구역 · 강당용 AMCL · 실물형 sim (2026-10-21 오후, 브랜치 `hall-planning`)
+배경: 실물 강당 SLAM 지도는 책상/의자 다리가 점으로 흩어지고, 먼 곳은 빔 사이 미탐색 줄무늬가 남음 (sim 은 책상 앞판 때문에 막힌 선으로 보여서 실물보다 쉬웠음)
+- **계획용 지도 가공** (`plan_map.py`, A* 만. AMCL 은 원본 그대로): 빈 칸 사이 미탐색 줄무늬 메움 + 가로·세로 0.4m 이하 덩어리(다리 점)를 0.1m 부풀림 → 다리 사이 0.7m 미만 틈이 막힘. 닫힘 연산(점 잇기)도 해 봤으나 반경 0.35m 로도 0.5m 격자까지만 이어서 A* 반경(0.25m → 0.5m 미만 틈 이미 막힘)과 차이가 없어 뺌. 넓이 기준은 얇은 벽 조각까지 부풀려 문이 좁아져서 가로·세로 길이 기준으로. 다리 간격이 더 넓은 책상 밑은 금지 구역으로
+- **금지 구역/가상 벽** (웹): Zone 모델(마이그레이션 0005) → 서버 → 브리지 → `astar/zones` → 플래너. 출발 위치가 들어 있는 구역은 그 계획에서 빼서 빠져나옴. 서버 이동 시간 예측도 같은 가공·구역 반영
+- **강당용 AMCL** `config/amcl_hall.yaml` (`--amcl hall`, 웹 체크) + `tools/scan_check.py` (laser_max_range 를 늘려도 되는지 실물 측정)
+- **실물형 sim**: `--scan-noise` (빔 238~244, 흔들림 1cm+1%, 2.5m~ 값 빠짐, 무응답 NaN), 월드 `lecture_hall_real` (앞판 없음, 좌우 끝 세로 복도 없음 = 끝 열이 벽에 붙음, 의자 무작위, 원점 = 가로 6/세로 2)
+- mac 에서 확인한 것: 단위 테스트 43개 통과(plan_map 5, scan_noise 3 추가), Django check, 금지 구역 서비스/경로 예측(임시 sqlite), 합성 맵으로 plan_map.py, run.sh 옵션 오류 처리
+- **아직 안 한 것 (서버에서)**: ROS 노드 실행, Gazebo 회귀 시험, 실물 측정 전부
+
+서버에서 받기:
+```bash
+git fetch && git switch hall-planning && git pull
+cd server && .venv/bin/python manage.py migrate          # Zone 테이블
+cd ../ros2_ws && source /opt/ros/humble/setup.bash && colcon build --symlink-install   # 새 모듈/launch 인자
+```
+회귀 시험 (sim):
+1. 기존 그대로인지: `scripts/run.sh --robot sim --mode map --map ~/maps/hall_clean.yaml --controller dwa` → `python3 tools/delivery_demo.py --led C --to 4.44 5.74 --obstacle` (이전: 177초, 충돌 0). `logs/bridge.log` 에 "계획용 가공: 줄무늬 메움 N칸, 다리 점 부풀림 N칸" 확인
+2. 실물형: `scripts/run.sh --robot sim --mode slam --world lecture_hall_real --scan-noise --controller dwa` → 웹 자동 탐색 → "맵 저장" (예: hall_real) → `python3 tools/plan_map.py ~/maps/hall_real_clean.yaml --check <홈> <LED>` 로 미리 보기 → `scripts/run.sh --robot sim --mode map --map ~/maps/hall_real_clean.yaml --scan-noise --amcl hall --controller dwa` → 위치 등록 후 delivery_demo
+   - 주의: `save_map.sh` 의 clean_map 은 `--open 1` 로 가느다란 빈 칸(빔 줄기)을 지움. 줄무늬가 많은 맵은 원본(`hall_real.yaml`)과 비교해 볼 것
+실물:
+1. `python3 tools/scan_check.py 20` (로봇 정지, 강당 가운데) → 추천 최대 거리
+2. `scripts/run.sh --robot real --mode map --map ~/maps/<강당맵>.yaml --amcl hall` → 웹 금지 구역으로 책상 밑/좌석 줄 막기 → 홈 ↔ LED 이동

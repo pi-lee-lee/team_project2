@@ -136,6 +136,10 @@ scripts/stop_ros.sh --all
 | `--gui` | Gazebo 화면 표시 |
 | `--nav2` | Nav2 주행 노드도 실행 (SLAM 모드에서도 가능, 이때는 AMCL 없이 주행 노드만) |
 | `--planner nav2` / `--controller nav2` | Nav2 로 경로 계획+주행 / A* 경로를 Nav2 controller 로 추종 (`--nav2` 자동). tf2 0.25.24 이상 필요 (8번 참고) |
+| `--controller dwa` | A* 경로를 DWA 로 추종 (추적한 움직이는 장애물의 미래 위치를 피함) |
+| `--amcl default` / `hall` / 파일 | (map) 위치 추정 설정. `hall` = `config/amcl_hall.yaml`: 책상/의자가 흩어진 강당·교실용 (지도에 없는 빔에 너그럽게). 웹 실행 모드의 "강당/교실용 위치 추정" 체크와 같음 |
+| `--scan-noise` | (sim) LiDAR 를 실물 LDS-02 처럼: 빔 개수 238~244 변동, 거리 흔들림, 먼 곳 값 빠짐(NaN). 웹 "LiDAR 를 실물처럼" 체크와 같음 |
+| `--world lecture_hall_real` | (sim) 실제 학원과 비슷한 강당: 책상 앞판 없음(다리만 보임), 좌우 끝 열이 벽에 붙음, 의자 무작위 배치 |
 
 실행 순서: 웹 서버 → 로봇(Pi bringup 은 SSH 로 자동 실행 / Gazebo) → SLAM 또는 map_server+AMCL → A* + 브리지 → (sim+map) 초기 위치 자동 지정.
 `logs/run_mode.env` 에 현재 모드가 기록되고, `source scripts/env.sh` 를 하면 도구들도 같은 도메인/모드를 씁니다.
@@ -196,6 +200,7 @@ SIGINT → SIGTERM → SIGKILL 순서로 보내고 남은 프로세스가 없는
 | **위치 자동 찾기** | AMCL 모드에서 로봇 위치를 모를 때. 맵 전체에서 LiDAR 스캔과 가장 잘 맞는 위치를 찾아 초기 위치로 지정 (`tools/localize.py --global`, 수 초). 대칭인 방이면 "비슷한 다른 위치" 경고 |
 | **여기로 이동** | 버튼 → 지도에서 지점 클릭 (드래그하면 도착 후 바라볼 방향 지정, 클릭만 하면 진행 방향) |
 | 위치 추가 | "위치 추가" → 지도 클릭+드래그 → 이름/종류(물류 위치·홈) 저장 |
+| **금지 구역 / 가상 벽** | "금지 구역" → 지도를 끌어서 사각형, "가상 벽" → 끌어서 선(두께 0.1m). A* 가 그 안/선을 지나는 경로를 만들지 않음 (위치 추정·수동 조작에는 영향 없음). 맵별로 저장, 오른쪽 "금지 구역" 목록에서 삭제. 다리 간격이 넓은 책상 밑, 지나가면 안 되는 좌석 줄에 사용. 로봇이 구역 안에 있으면 그 구역은 빼고 계획해서 빠져나옴 |
 | 작업 실행 | 위치 목록에서 체크 → "▶ 작업 시작" (목록 순서대로 방문, 마지막에 홈 복귀 선택). 이동 중에는 "약 N초 남음" 표시 |
 | 순서 최적화 (실험) | 위치를 체크한 뒤 "⇅ 순서 최적화" → 이동 시간 합이 가장 작은 순서와 예상 시간. 이후 "작업 시작" 은 그 순서로 방문. 이동 기록이 쌓이면 시간 모델이 학습됨 (`server/warehouse/planning.py`) |
 | 적재 확인 | 물류 위치 도착 시 "적재 완료" → 다음 위치로 이동 |
@@ -277,6 +282,9 @@ SIGINT → SIGTERM → SIGKILL 순서로 보내고 남은 프로세스가 없는
 | `warehouse_bridge.stop_distance` | 0.35 | 앞쪽 ±25° 안에 이 거리 이내 물체가 있으면 정지 후 대기 |
 | `astar_planner.scan_obstacles` / `scan_memory` | true / 20.0 | AMCL 모드: LiDAR 로 본, 맵에 없는 장애물을 이 시간(초) 기억해 피함 (SLAM 모드는 SLAM 맵이 대신함) |
 | `astar_planner.bump_memory` / `bump_radius` | 120.0 / 0.15 | 부딪힌 자리를 장애물로 기억하는 시간(초)과 반경(m) |
+| `astar_planner.stripe_cells` | 2 | (기존 맵 모드) 빈 칸 사이 폭 4칸 미만 미탐색 줄무늬를 빈 칸으로 (먼 곳 LiDAR 빔 사이). 0 이면 끔 |
+| `astar_planner.cluster_inflate` / `cluster_max_size` | 0.1 / 0.4 | (기존 맵 모드) 가로·세로 0.4m 이하 장애물 덩어리(책상/의자 다리 점)를 0.1m 부풀림 → 다리 사이 0.7m 미만 틈을 막음. 벽은 그대로. 0 이면 끔. AMCL 은 원본 맵 그대로 |
+| `astar_planner.start_clear_radius` | 0.35 | 출발 위치 주변은 부풀린 점/금지 구역에서 빼고 계획 (그 안에 서 있어도 빠져나오게) |
 | `warehouse_bridge.blocked_timeout` | 5.0 | 막힌 채로 이 시간이 지나면 장애물을 피하는 경로로 재계획 |
 | `warehouse_bridge.bump_tilt_deg` | 6.0 | 평소보다 이만큼 더 기울면 부딪힘(낮은 물체에 올라탐)으로 보고 정지 후 빠져나옴 |
 | `warehouse_bridge.stall_timeout` / `backoff_distance` | 2.5 / 0.15 | 앞으로 가는데 이 시간 동안 못 나아가면 부딪힘 / 빠져나오는 거리(m) |
@@ -288,6 +296,8 @@ SIGINT → SIGTERM → SIGKILL 순서로 보내고 남은 프로세스가 없는
 
 위치 추정/SLAM 설정은 이 프로젝트 파일을 씁니다.
 - `config/amcl_waffle_pi.yaml` (`start_nav2.sh`): TurtleBot3 기본값보다 빔 수↑(180), 측정 모델을 날카롭게(sigma 0.1), 5cm 마다 갱신. `NAV2_PARAMS` 로 바꿀 수 있음
+- `config/amcl_hall.yaml` (`run.sh --amcl hall`): 위에서 z_hit/z_rand 0.75/0.15, sigma_hit 0.15, likelihood_max_dist 1.5 (강당/교실: 옮겨진 의자·사람 다리 빔에 너그럽게)
+- A* 는 맵을 받을 때 계획용으로 가공해서 씀 (`plan_map.py`, 위 표). 실제로 쓰는 격자는 `astar/plan_map` 토픽 (RViz 확인용)
 - `config/slam_toolbox.yaml` (`start_slam.sh`): 기본값에서 `scan_topic` 만 `/scan_level`
 - AMCL/slam_toolbox/A* 는 브리지가 발행하는 **`scan_level`** (차체가 평소보다 3° 넘게 기울지 않았을 때의 스캔. 3초 넘게 기울어 있으면 다시 전달)을 씁니다. **브리지 없이 AMCL/SLAM 만 띄우면 스캔을 못 받으니** 그때는 `scan_topic` 을 `scan` 으로 바꾸세요.
 
@@ -342,6 +352,9 @@ dpkg -l ros-humble-tf2 ros-humble-tf2-ros | grep ^ii   # 0.25.24 확인
 | `python3 tools/tf_rates.py [초]` | TF별 수신 빈도와 지연 측정 |
 | `python3 tools/sim_watch.py --world worlds/maze_room.world [--world 상자.sdf] [--seconds N]` | (sim) Gazebo 정답 위치와 비교한 위치 오차, 충돌, 벽 여유, 기울기 기록. Ctrl-C 로 끝내도 요약 출력 |
 | `python3 tools/make_hall_world.py` | 강당 월드 `worlds/lecture_hall.world` 다시 만들기 (강단 + 가로 복도 6 × 세로 복도 5, 책상 20개 · 의자 40개, 치수는 파일 위쪽 상수) |
+| `python3 tools/make_hall_world.py --real` | 실물형 강당 `worlds/lecture_hall_real.world` (책상 앞판 없음, 좌우 끝 세로 복도 없음, 의자 ±0.12m/±15° 무작위, `--seed` 로 배치 바꿈) |
+| `python3 tools/plan_map.py ~/maps/<맵>.yaml [--check X1 Y1 X2 Y2]...` | A* 가 쓰는 계획용 가공(줄무늬 메움 + 다리 점 부풀림)을 미리 보기 → `<맵>_plan_preview.png`. `--check` 로 홈 ↔ LED 위치 같은 두 점 사이 경로가 가공 전/후 있는지 확인 |
+| `python3 tools/scan_check.py [초]` | (실물) 로봇을 세워 두고 LiDAR 거리대별 응답률/흔들림 측정 → `laser_max_range` 를 3.5m 보다 늘려도 되는지 추천 |
 | `python3 tools/explore.py` | (SLAM) 프론티어 자동 탐색. 웹 "자동 탐색" 과 같음. 가던 방향 유지, 가는 도중 목표가 보이면 바로 다음 목표, 막힌 작은 미탐색 구멍(1 m² 미만) 무시. `--turn-weight 0 --no-early-switch --pocket-min 0` 이면 예전 방식 |
 | `python3 tools/cargo_sim.py <라벨>` | 카메라 없이 LED 인식 결과 흉내 (`''` = 비어 있음) |
 | `python3 tools/collect_travel.py [--count 30]` | 빈 곳으로 무작위 이동을 반복해 이동 시간 학습 기록 모으기 |
