@@ -88,6 +88,7 @@ main {
 
 .segmented {
   display: inline-flex;
+  flex-wrap: wrap;
   padding: 3px;
   gap: 2px;
   background: #f1f5f9;
@@ -165,6 +166,7 @@ main {
 .lgd.home { background: #7c3aed; }
 .lgd.goal { background: #ea580c; }
 .lgd.mem { background: rgba(220, 38, 38, 0.55); border-radius: 1px; }
+.lgd.zone { background: rgba(220, 38, 38, 0.13); border: 2px solid #b91c1c; border-radius: 1px; }
 .lgd-x { color: #b91c1c; font-weight: 800; margin-right: 4px; }
 .lgd.obs-still { background: rgba(100, 116, 139, 0.35); border: 2px solid #475569; border-radius: 50%; }
 .lgd.obs { background: rgba(249, 115, 22, 0.35); border: 2px solid #ea580c; border-radius: 50%; }
@@ -299,19 +301,20 @@ button[hidden] { display: none; }
 .timeline li.failed::before { background: var(--danger); }
 
 /* ---------------------------------------------------------------- 위치 목록 */
-#locations { list-style: none; margin: 0; padding: 0; max-height: 240px; overflow-y: auto; }
-#locations li {
+#locations, #zones { list-style: none; margin: 0; padding: 0; max-height: 240px; overflow-y: auto; }
+#locations li, #zones li {
   display: flex;
   align-items: center;
   gap: 8px;
   padding: 6px 4px;
   border-bottom: 1px solid #f1f5f9;
 }
-#locations li:last-child { border-bottom: 0; }
+#locations li:last-child, #zones li:last-child { border-bottom: 0; }
 #locations li:hover { background: #f8fafc; }
 #locations li .name { flex: 1; cursor: pointer; font-weight: 600; }
-#locations li .coord { color: var(--muted); font-size: 11px; font-family: ui-monospace, monospace; }
-#locations li.muted { font-weight: 400; }
+#zones li .name { flex: 1; font-weight: 600; color: #991b1b; }
+#locations li .coord, #zones li .coord { color: var(--muted); font-size: 11px; font-family: ui-monospace, monospace; }
+#locations li.muted, #zones li.muted { font-weight: 400; }
 
 .check { display: flex; align-items: center; gap: 6px; margin-top: 10px; color: #374151; font-size: 13px; }
 

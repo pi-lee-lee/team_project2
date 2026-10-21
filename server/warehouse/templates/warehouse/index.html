@@ -30,6 +30,8 @@
         <button data-mode="goto" class="mode"><span class="ico">➤</span>여기로 이동</button>
         <button data-mode="add" class="mode"><span class="ico">＋</span>위치 추가</button>
         <button data-mode="initpose" class="mode"><span class="ico">⌖</span>초기 위치 지정</button>
+        <button data-mode="zone" class="mode" title="A* 가 피하는 사각형 구역 (위치 추정에는 영향 없음)"><span class="ico">▨</span>금지 구역</button>
+        <button data-mode="wall" class="mode" title="A* 가 넘지 않는 선"><span class="ico">┃</span>가상 벽</button>
       </div>
       <span id="mode-hint">모드를 고르세요</span>
     </div>
@@ -47,6 +49,7 @@
         <span><i class="lgd obs-still"></i>멈춘 물체(지도에 없음)</span>
         <span><i class="lgd mem"></i>맵에 없는 장애물</span>
         <span><b class="lgd-x">✕</b>부딪힌 곳</span>
+        <span><i class="lgd zone"></i>금지 구역</span>
       </div>
     </div>
     <div id="cursor-pos">&nbsp;</div>
@@ -134,6 +137,12 @@
         <button id="btn-start" class="primary">▶ 작업 시작</button>
       </div>
       <p id="travel-model" class="model-note"></p>
+    </section>
+
+    <section class="card">
+      <div class="card-head"><h2>금지 구역</h2></div>
+      <ul id="zones"></ul>
+      <p class="model-note">경로 계획(A*)만 피하고, 수동 조작과 위치 추정에는 영향이 없습니다. 로봇이 구역 안에 있으면 0.35m 주변은 빼고 계획해서 빠져나옵니다.</p>
     </section>
 
     <section class="card" id="loc-form-card" hidden>

@@ -1,7 +1,7 @@
 import numpy as np
 
 from warehouse_robot.astar import GridPlanner, PlanningError
-from warehouse_robot.plan_map import fill_stripes, inflate_clusters, prepare, with_added, zone_mask
+from warehouse_robot.plan_map import fill_stripes, inflate_clusters, prepare, with_added, zone_contains, zone_mask
 
 RES = 0.05
 
@@ -83,7 +83,11 @@ def test_zone_blocks_but_robot_inside_can_leave():
         assert False, '금지 구역을 지나가면 안 됨'
     except PlanningError:
         pass
-    # 금지 구역 안에서 출발하면 출발 주변은 비워서 밖으로 나갈 수 있음
+    # 출발 위치가 들어 있는 금지 구역은 그 계획에서 뺀다 (노드/서버가 zone_contains 로 고름)
+    z = {'shape': 'rect', 'x1': 1.0, 'y1': 0.0, 'x2': 2.0, 'y2': 3.0}
+    assert zone_contains(z, (1.5, 1.5)) and zone_contains(z, (0.9, 1.5), 0.15) and not zone_contains(z, (0.5, 1.5))
+    assert zone_contains({'shape': 'line', 'x1': 0, 'y1': 0, 'x2': 1, 'y2': 0}, (0.5, 0.2), 0.2)
+    # 금지 구역 가장자리 안에서 출발하면 출발 주변은 비워서 밖으로 나갈 수 있음
     start = (1.1, 1.5)
     inside = with_added(g, zone, RES, 0.0, 0.0, start=start)
     path = planner(inside).plan(start, (0.4, 1.5))

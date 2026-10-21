@@ -8,10 +8,11 @@ const S = {
   map: null,          // {resolution, origin:[x,y], width, height, image_url}
   mapImg: null,
   locations: [],
+  zones: [],          // 금지 구역 [{id, name, shape: rect|line, x1, y1, x2, y2}] - A* 가 피함
   pose: null,         // {x, y, yaw}
   path: [],           // [[x, y], ...]
   selected: new Set(),
-  mode: 'view',       // view | add | initpose
+  mode: 'view',       // view | goto | add | initpose | deliver | zone | wall
   view: { scale: 1, ox: 0, oy: 0 },  // 맵 픽셀 -> 캔버스 픽셀 변환
   drag: null,
 };
@@ -54,6 +55,8 @@ function handle(msg) {
       S.robot = msg.robot;
       S.task = msg.task;
       S.locations = msg.locations;
+      S.zones = msg.zones || [];
+      renderZones();
       S.pose = msg.pose;
       S.path = msg.path || [];
       S.poseAt = msg.pose ? Date.now() : 0;
@@ -81,6 +84,11 @@ function handle(msg) {
     case 'cargo':
       S.cargo = msg.label;
       renderCargo();
+      break;
+    case 'zones':
+      S.zones = msg.zones || [];
+      renderZones();
+      draw();
       break;
     case 'obstacles':
       S.obstacles = msg.obstacles || [];
@@ -473,6 +481,13 @@ function draw() {
     ctx.fillText('원점(0,0)', cx + 4, cy + 14);
   }
 
+  // 금지 구역 (A* 가 피함): 사각형 = 빗금, 선 = 굵은 점선 (가상 벽)
+  for (const z of S.zones) drawZone(z, z.shape, false);
+  if (S.drag && S.drag.kind === 'zone') {
+    const d = S.drag;
+    drawZone({ ...canvasPair(d) }, S.mode === 'wall' ? 'line' : 'rect', true);
+  }
+
   // A* 가 기억 중인 장애물: 맵에 없는 LiDAR 장애물 칸(빨간 점, 20초) + 부딪힌 자리(✕, 120초)
   if (S.memory) {
     const cell = Math.max(2, 0.05 * pxPerM);
@@ -575,6 +590,47 @@ function draw() {
   }
 }
 
+function canvasPair(d) {
+  const [x1, y1] = canvasToWorld(d.sx, d.sy);
+  const [x2, y2] = canvasToWorld(d.cx, d.cy);
+  return { x1, y1, x2, y2 };
+}
+
+function drawZone(z, shape, preview) {
+  const [ax, ay] = worldToCanvas(z.x1, z.y1);
+  const [bx, by] = worldToCanvas(z.x2, z.y2);
+  ctx.save();
+  ctx.strokeStyle = '#b91c1c';
+  ctx.setLineDash(preview ? [4, 3] : []);
+  if (shape === 'line') {
+    const pxPerM = S.view.scale / S.map.resolution;
+    ctx.lineWidth = Math.max(3, 0.1 * pxPerM);
+    ctx.lineCap = 'round';
+    ctx.setLineDash([Math.max(4, 0.15 * pxPerM), Math.max(3, 0.08 * pxPerM)]);
+    ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.stroke();
+  } else {
+    const x = Math.min(ax, bx), y = Math.min(ay, by), w = Math.abs(bx - ax), h = Math.abs(by - ay);
+    ctx.fillStyle = 'rgba(220, 38, 38, 0.13)';
+    ctx.fillRect(x, y, w, h);
+    ctx.lineWidth = 2;
+    ctx.strokeRect(x, y, w, h);
+    // 빗금
+    ctx.beginPath();
+    ctx.rect(x, y, w, h);
+    ctx.clip();
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = 'rgba(185, 28, 28, 0.45)';
+    for (let k = -h; k < w; k += 10) { ctx.moveTo(x + k, y + h); ctx.lineTo(x + k + h, y); }
+    ctx.stroke();
+  }
+  ctx.restore();
+  if (!preview && z.name) {
+    ctx.fillStyle = '#991b1b';
+    ctx.font = '11px system-ui, sans-serif';
+    ctx.fillText(z.name, Math.min(ax, bx) + 3, Math.min(ay, by) - 3);
+  }
+}
+
 // 가상 맵: 1m 격자
 function drawGrid() {
   const m = S.map, v = S.view;
@@ -618,7 +674,8 @@ canvas.addEventListener('pointerdown', (ev) => {
   canvas.setPointerCapture(ev.pointerId);
   if (S.mode === 'view') return;  // 보기 모드에서는 지도 고정
   const [x, y] = eventPos(ev);
-  S.drag = { kind: 'pose', sx: x, sy: y, cx: x, cy: y };
+  const kind = S.mode === 'zone' || S.mode === 'wall' ? 'zone' : 'pose';
+  S.drag = { kind, sx: x, sy: y, cx: x, cy: y };
 });
 
 canvas.addEventListener('pointermove', (ev) => {
@@ -635,6 +692,14 @@ canvas.addEventListener('pointermove', (ev) => {
 canvas.addEventListener('pointerup', () => {
   const d = S.drag;
   S.drag = null;
+  if (d && d.kind === 'zone') {
+    // 끌어서 그린 사각형/선을 금지 구역으로 저장 (모드는 그대로 두어 이어서 그릴 수 있게)
+    if (Math.hypot(d.cx - d.sx, d.cy - d.sy) > 5) {
+      send('save_zone', { zone: { shape: S.mode === 'wall' ? 'line' : 'rect', ...canvasPair(d) } });
+    }
+    draw();
+    return;
+  }
   if (!d || d.kind !== 'pose') { draw(); return; }
   const [wx, wy] = canvasToWorld(d.sx, d.sy);
   const dx = d.cx - d.sx, dy = d.cy - d.sy;
@@ -669,6 +734,8 @@ const HINTS = {
   add: '위치를 클릭하고, 바라볼 방향으로 드래그하세요',
   initpose: '로봇의 실제 위치를 클릭하고, 로봇이 바라보는 방향으로 드래그하세요',
   deliver: 'LED 를 받을 자리를 클릭하세요 (드래그하면 도착 후 바라볼 방향)',
+  zone: '로봇이 들어가면 안 되는 곳(책상 밑, 좌석 줄)을 끌어서 사각형으로 그리세요. 오른쪽 "금지 구역" 목록에서 삭제',
+  wall: '지나가면 안 되는 선(가상 벽)을 끌어서 그리세요. 오른쪽 "금지 구역" 목록에서 삭제',
 };
 
 function setMode(mode) {
@@ -838,6 +905,33 @@ function renderLocations() {
       if (confirm(`"${loc.name}" 위치를 삭제할까요?`)) send('delete_location', { location_id: loc.id });
     });
     li.append(cb, name, coord, go, del);
+    ul.appendChild(li);
+  }
+}
+
+function renderZones() {
+  const ul = $('#zones');
+  if (!ul) return;
+  ul.innerHTML = '';
+  if (!S.zones.length) {
+    ul.innerHTML = '<li class="muted">"금지 구역"/"가상 벽" 모드에서 지도를 끌어서 그리세요</li>';
+    return;
+  }
+  for (const z of S.zones) {
+    const li = document.createElement('li');
+    const name = document.createElement('span');
+    name.className = 'name';
+    name.textContent = (z.shape === 'line' ? '┃ ' : '▨ ') + z.name;
+    const coord = document.createElement('span');
+    coord.className = 'coord';
+    coord.textContent = `${z.x1.toFixed(1)}, ${z.y1.toFixed(1)} ~ ${z.x2.toFixed(1)}, ${z.y2.toFixed(1)}`;
+    const del = document.createElement('button');
+    del.className = 'small';
+    del.textContent = '삭제';
+    del.addEventListener('click', () => {
+      if (confirm(`"${z.name}" 을(를) 삭제할까요?`)) send('delete_zone', { zone_id: z.id });
+    });
+    li.append(name, coord, del);
     ul.appendChild(li);
   }
 }

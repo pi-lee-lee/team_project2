@@ -33,7 +33,7 @@ from std_srvs.srv import Empty
 from tf2_ros import Buffer, TransformException, TransformListener
 
 from .astar import GridPlanner, PlanningError, pad_grid, path_yaws
-from .plan_map import near_mask, prepare, with_added, zone_mask
+from .plan_map import near_mask, prepare, with_added, zone_contains, zone_mask
 
 
 def yaw_from_quaternion(q):
@@ -261,11 +261,19 @@ class AStarPlannerNode(Node):
             self.bump_points.popleft()
         info = self.map_msg.info
         res, ox, oy = info.resolution, info.origin.position.x, info.origin.position.y
-        # 출발 위치가 부풀린 다리 점/금지 구역 안이면 그 주변은 빼고 다시 만든다 (빠져나올 수 있게)
+        # 출발 위치가 금지 구역 안이면 그 구역은 이번 계획에서 빼고, 부풀린 다리 점 안이면 그 주변을 빼고
+        # 다시 만든다 (그 안에 서 있는 로봇이 빠져나올 수 있게)
         clear = self.get_parameter('start_clear_radius').value
-        start_inside = bool(self.added.any() and (self.added & near_mask(
+        added = self.added
+        start_zones = [z for z in self.zones if zone_contains(z, start, clear)]
+        if start_zones:
+            added = zone_mask(self.base_grid.shape, res, ox, oy, [z for z in self.zones if z not in start_zones])
+            if self.cluster_added is not None:
+                added = added | self.cluster_added
+            self.get_logger().info(f'출발 위치가 금지 구역 {len(start_zones)}개 안에 있어 이번 계획에서는 뺍니다')
+        start_inside = bool(start_zones) or bool(added.any() and (added & near_mask(
             self.base_grid.shape, res, ox, oy, start, clear)).any())
-        data = with_added(self.base_grid, self.added, res, ox, oy, start if start_inside else None, clear).ravel()
+        data = with_added(self.base_grid, added, res, ox, oy, start if start_inside else None, clear).ravel()
         w, h = info.width, info.height
         if self.get_parameter('allow_unknown').value:
             data, w, h, ox, oy = pad_grid(data, w, h, info.resolution, ox, oy, [start, goal])

@@ -246,6 +246,8 @@ class UIConsumer(AsyncJsonWebsocketConsumer):
             'set_home': lambda: (services.set_home, float(msg['x']), float(msg['y']), float(msg['yaw'])),
             'save_location': lambda: (services.save_location, msg.get('location', {})),
             'delete_location': lambda: (services.delete_location, int(msg['location_id'])),
+            'save_zone': lambda: (services.save_zone, msg.get('zone', {})),
+            'delete_zone': lambda: (services.delete_zone, int(msg['zone_id'])),
         }
         if action not in handlers:
             await self.send_json({'type': 'error', 'message': f'알 수 없는 요청: {action}'})

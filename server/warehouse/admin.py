@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import EventLog, Location, Map, Robot, Task, TaskStep
+from .models import EventLog, Location, Map, Robot, Task, TaskStep, Zone
 
 
 @admin.register(Map)
@@ -13,6 +13,12 @@ class MapAdmin(admin.ModelAdmin):
 class LocationAdmin(admin.ModelAdmin):
     list_display = ('name', 'kind', 'map', 'x', 'y', 'yaw')
     list_filter = ('map', 'kind')
+
+
+@admin.register(Zone)
+class ZoneAdmin(admin.ModelAdmin):
+    list_display = ('name', 'shape', 'map', 'x1', 'y1', 'x2', 'y2')
+    list_filter = ('map', 'shape')
 
 
 @admin.register(Robot)

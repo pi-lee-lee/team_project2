@@ -2,7 +2,7 @@
 
 - 경로: 지금 활성 맵에서 A*(ros2_ws 의 astar.py, ROS 의존성 없음)로 경로 길이와 회전량을 계산한다.
   맵이 바뀌면(갱신 시각이 바뀌면) 플래너를 새로 만든다. 저장된 맵은 로봇의 A* 와 같게 plan_map.py 로 가공한다
-  (줄무늬 메움, 책상/의자 다리 점 부풀리기). 가공한 맵으로 경로가 없으면(출발점이 부풀린 점 안 등) 원본 맵으로 계산.
+  (줄무늬 메움, 책상/의자 다리 점 부풀리기, 금지 구역). 출발점이 금지 구역/부풀린 점 안이면 로봇처럼 그 구역/주변 0.35m 를 빼고 계산.
 - 이동 시간 모델: 시간 = 기본 + 경로 길이 x 거리 계수 + 회전량 x 회전 계수.
   지난 이동 기록(TaskStep 의 plan_length / plan_turn / 실제 걸린 시간)으로 학습한다.
   위치가 아니라 로봇의 주행 특성만 배우므로 맵이 바뀌어도 그대로 쓸 수 있다.
@@ -24,7 +24,7 @@ from .mapimage import decode_png, gray_to_occupancy
 
 sys.path.insert(0, os.path.join(os.path.dirname(settings.BASE_DIR), 'ros2_ws', 'src', 'warehouse_robot'))
 from warehouse_robot.astar import GridPlanner, PlanningError  # noqa: E402
-from warehouse_robot.plan_map import prepare, with_added  # noqa: E402
+from warehouse_robot.plan_map import near_mask, prepare, with_added, zone_contains, zone_mask  # noqa: E402
 
 # 기록이 없을 때 쓰는 기본값: 기본 2초, 0.13 m/s, 회전 0.8 rad/s
 PRIOR = np.array([2.0, 1 / 0.13, 1 / 0.8])
@@ -32,7 +32,8 @@ RIDGE = 5.0        # 기록이 적을 때 기본값 쪽으로 당기는 세기
 MIN_SAMPLES = 3
 
 _lock = threading.Lock()
-_planner_cache = {}   # (map_id, updated_at, allow_unknown) -> (가공한 맵 플래너, 원본 맵 플래너)
+_planner_cache = {}   # (map_id, updated_at, allow_unknown, 금지 구역) -> (플래너, 가공 기본 격자, 부풀린 칸, 금지 구역 목록)
+START_CLEAR = 0.35    # astar_planner_node start_clear_radius
 
 
 class PlanError(Exception):
@@ -42,20 +43,21 @@ class PlanError(Exception):
 # ---------------------------------------------------------------- 경로
 def _planner(m):
     allow_unknown = m.name == 'slam_live'   # 만드는 중인 맵은 미탐색 칸도 지나갈 수 있음 (브리지와 같게)
-    key = (m.id, m.updated_at, allow_unknown)
+    zones = [z.to_dict() for z in m.zones.all()]
+    key = (m.id, m.updated_at, allow_unknown, tuple(tuple(sorted(z.items())) for z in zones))
     with _lock:
         p = _planner_cache.get(key)
         if p is None:
             width, height, rows = decode_png(bytes(m.png))
             lut = [gray_to_occupancy(v) for v in range(256)]
             grid = np.array([[lut[v] for v in row] for row in rows], dtype=np.int16)[::-1]  # 행 0 = 아래쪽
-            raw = GridPlanner(grid.ravel(), width, height, m.resolution, m.origin_x, m.origin_y,
-                              allow_unknown=allow_unknown)
-            p = (raw, raw)
+            inflated = np.zeros(grid.shape, dtype=bool)
             if not allow_unknown:   # 로봇의 A* 와 같은 가공 (astar_planner_node 기본값)
-                filled, added, _ = prepare(grid, m.resolution)
-                grid = with_added(filled, added, m.resolution, m.origin_x, m.origin_y)
-                p = (GridPlanner(grid.ravel(), width, height, m.resolution, m.origin_x, m.origin_y), raw)
+                grid, inflated, _ = prepare(grid, m.resolution)
+            added = inflated | zone_mask(grid.shape, m.resolution, m.origin_x, m.origin_y, zones)
+            planner = GridPlanner(with_added(grid, added, m.resolution, m.origin_x, m.origin_y).ravel(),
+                                  width, height, m.resolution, m.origin_x, m.origin_y, allow_unknown=allow_unknown)
+            p = (planner, grid, inflated, zones)
             _planner_cache.clear()
             _planner_cache[key] = p
         return p
@@ -67,16 +69,18 @@ def _angle(a):
 
 def path_metrics(m, start, goal):
     """start, goal: (x, y, yaw). 반환: (경로 길이 m, 총 회전량 rad). 경로가 없으면 PlanError."""
-    planned, raw = _planner(m)
+    planner, grid, inflated, zones = _planner(m)
+    others = [z for z in zones if not zone_contains(z, start[:2], START_CLEAR)]
+    added = inflated | zone_mask(grid.shape, m.resolution, m.origin_x, m.origin_y, others)
+    if len(others) < len(zones) or (added & near_mask(grid.shape, m.resolution, m.origin_x, m.origin_y,
+                                                      start[:2], START_CLEAR)).any():
+        cleared = with_added(grid, added, m.resolution, m.origin_x, m.origin_y, start[:2], START_CLEAR)
+        planner = GridPlanner(cleared.ravel(), planner.width, planner.height, m.resolution,
+                              m.origin_x, m.origin_y, allow_unknown=m.name == 'slam_live')
     try:
-        pts = planned.plan(start[:2], goal[:2])
+        pts = planner.plan(start[:2], goal[:2])
     except PlanningError as e:
-        if raw is planned:
-            raise PlanError(str(e))
-        try:
-            pts = raw.plan(start[:2], goal[:2])
-        except PlanningError:
-            raise PlanError(str(e))
+        raise PlanError(str(e))
     length = sum(math.hypot(b[0] - a[0], b[1] - a[1]) for a, b in zip(pts, pts[1:]))
     # 진행 방향은 5칸(약 25cm) 간격으로 봐서 격자 계단에 의한 잔떨림을 줄인다
     sub = pts[::5] + ([pts[-1]] if (len(pts) - 1) % 5 else [])

@@ -14,6 +14,7 @@
    다리 간격이 이보다 넓은 책상 밑 등은 웹의 금지 구역으로 막는다
 3. zone_mask: 웹에서 그린 금지 구역(사각형/선)을 칸으로
 4. with_added: 더한 칸을 격자에 장애물로 넣되, 출발 위치 주변은 빼서 그 안에 서 있는 로봇이 빠져나올 수 있게
+   (출발 위치가 들어 있는 금지 구역은 zone_contains 로 골라 그 계획에서 통째로 뺀다)
 
 격자 값은 OccupancyGrid 와 같음: -1 미탐색, 0~100 (occupied_threshold 이상 = 장애물), 행 0 = 아래쪽.
 """
@@ -147,6 +148,18 @@ def zone_mask(shape, resolution, origin_x, origin_y, zones):
             rows = (ys >= min(y1, y2)) & (ys <= max(y1, y2))
             mask[np.ix_(rows, cols)] = True
     return mask
+
+
+def zone_contains(z, point, margin=0.0):
+    """금지 구역 z 가 point(x, y) 를 margin 안에 포함하는지."""
+    x1, y1, x2, y2 = (float(z[k]) for k in ('x1', 'y1', 'x2', 'y2'))
+    px, py = point
+    if z.get('shape') == 'line':
+        dx, dy = x2 - x1, y2 - y1
+        t = min(1.0, max(0.0, ((px - x1) * dx + (py - y1) * dy) / max(dx * dx + dy * dy, 1e-12)))
+        return math.hypot(px - (x1 + t * dx), py - (y1 + t * dy)) <= LINE_WIDTH / 2 + margin
+    return (min(x1, x2) - margin <= px <= max(x1, x2) + margin
+            and min(y1, y2) - margin <= py <= max(y1, y2) + margin)
 
 
 def with_added(grid, added, resolution, origin_x, origin_y, start=None, clear_radius=0.35):

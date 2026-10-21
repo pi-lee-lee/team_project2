@@ -17,7 +17,7 @@ from django.utils import timezone
 from . import planning
 from .live import LIVE
 from .mapimage import encode_png, grid_to_rows
-from .models import EventLog, Location, Map, Robot, Task, TaskStep
+from .models import EventLog, Location, Map, Robot, Task, TaskStep, Zone
 
 DEFAULT_ROBOT = 'tb3'
 
@@ -76,6 +76,18 @@ def push_locations(out):
     out.to_ui({'type': 'locations', 'locations': locs})
 
 
+def zones_of(m):
+    return [z.to_dict() for z in m.zones.all()] if m else []
+
+
+def push_zones(out, m=None):
+    """금지 구역을 UI 와 로봇(A* 플래너)에 보낸다."""
+    m = m or active_map()
+    zones = zones_of(m)
+    out.to_ui({'type': 'zones', 'zones': zones})
+    out.to_robot(get_robot(), {'type': 'zones', 'zones': zones})
+
+
 def snapshot(robot_name=None):
     """UI가 처음 접속했을 때 보낼 전체 상태."""
     robot = get_robot(robot_name)
@@ -87,6 +99,7 @@ def snapshot(robot_name=None):
         'task': task.to_dict() if task else None,
         'map': m.to_dict() if m else None,
         'locations': [l.to_dict() for l in m.locations.all()] if m else [],
+        'zones': zones_of(m),
         'logs': [e.to_dict() for e in EventLog.objects.all()[:30]],
     }
 
@@ -259,6 +272,10 @@ def handle_map(name, msg):
         m.save(update_fields=['session'])
     out.to_ui({'type': 'map', 'map': m.to_dict()})
     push_locations(out)
+    # 브리지가 (재)연결하면 맵부터 보내므로, 여기서 그 맵의 금지 구역을 로봇에 알린다
+    zones = zones_of(m)
+    out.to_ui({'type': 'zones', 'zones': zones})
+    out.to_robot(get_robot(name), {'type': 'zones', 'zones': zones})
     return out
 
 
@@ -629,6 +646,42 @@ def delete_location(location_id):
     return out
 
 
+@transaction.atomic
+def save_zone(data):
+    """금지 구역 추가. data: {shape: rect|line, x1, y1, x2, y2, name?}"""
+    out = Outbox()
+    m = active_map()
+    if m is None:
+        raise ServiceError('먼저 맵을 불러오세요.')
+    shape = data.get('shape', Zone.SHAPE_RECT)
+    if shape not in (Zone.SHAPE_RECT, Zone.SHAPE_LINE):
+        raise ServiceError('잘못된 금지 구역 모양입니다.')
+    x1, y1, x2, y2 = (float(data[k]) for k in ('x1', 'y1', 'x2', 'y2'))
+    if not all(math.isfinite(v) for v in (x1, y1, x2, y2)):
+        raise ServiceError('잘못된 좌표입니다.')
+    if math.hypot(x2 - x1, y2 - y1) < 0.1:
+        raise ServiceError('금지 구역이 너무 작습니다 (10cm 이상 끌어서 그리세요).')
+    n = m.zones.count() + 1
+    name = (data.get('name') or '').strip()[:100] or f'{"가상 벽" if shape == Zone.SHAPE_LINE else "금지 구역"} {n}'
+    Zone.objects.create(map=m, name=name, shape=shape, x1=x1, y1=y1, x2=x2, y2=y2)
+    log(out, None, f'{name} 추가 ({x1:.2f}, {y1:.2f})-({x2:.2f}, {y2:.2f})')
+    push_zones(out, m)
+    return out
+
+
+@transaction.atomic
+def delete_zone(zone_id):
+    out = Outbox()
+    z = Zone.objects.filter(id=zone_id).first()
+    if z is None:
+        raise ServiceError('금지 구역을 찾을 수 없습니다.')
+    m = z.map
+    z.delete()
+    log(out, None, f'{z.name} 삭제')
+    push_zones(out, m)
+    return out
+
+
 # ---------------------------------------------------------------- 맵 만들기 (SLAM 모드)
 
 MAP_NAME_RE = re.compile(r'^[A-Za-z0-9_-]{1,50}$')
@@ -687,6 +740,9 @@ def carry_over_locations(name):
         _, created = Location.objects.update_or_create(
             map=m, name=loc.name, defaults=dict(kind=loc.kind, x=loc.x, y=loc.y, yaw=loc.yaw, cargo=loc.cargo))
         copied += 1
+    for z in src.zones.all():   # 금지 구역도 같은 좌표계라 그대로 복사
+        Zone.objects.update_or_create(map=m, name=z.name, defaults=dict(
+            shape=z.shape, x1=z.x1, y1=z.y1, x2=z.x2, y2=z.y2))
     return copied
 
 

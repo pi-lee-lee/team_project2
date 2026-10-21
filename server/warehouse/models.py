@@ -60,6 +60,32 @@ class Location(models.Model):
         return self.cargo or self.name
 
 
+class Zone(models.Model):
+    """웹에서 그린 금지 구역. A* 가 장애물로 보고 피한다 (위치 추정에는 영향 없음).
+    rect: (x1, y1)~(x2, y2) 사각형 (맵 축 기준), line: (x1, y1)-(x2, y2) 선분 (두께 0.1m 가상 벽)."""
+    SHAPE_RECT = 'rect'
+    SHAPE_LINE = 'line'
+    SHAPE_CHOICES = [(SHAPE_RECT, '사각형'), (SHAPE_LINE, '선(가상 벽)')]
+
+    map = models.ForeignKey(Map, on_delete=models.CASCADE, related_name='zones')
+    name = models.CharField(max_length=100, blank=True, default='')
+    shape = models.CharField(max_length=10, choices=SHAPE_CHOICES, default=SHAPE_RECT)
+    x1 = models.FloatField()
+    y1 = models.FloatField()
+    x2 = models.FloatField()
+    y2 = models.FloatField()
+
+    class Meta:
+        ordering = ['id']
+
+    def __str__(self):
+        return f'{self.name or self.shape} ({self.x1:.2f}, {self.y1:.2f})-({self.x2:.2f}, {self.y2:.2f})'
+
+    def to_dict(self):
+        return {'id': self.id, 'name': self.name, 'shape': self.shape,
+                'x1': self.x1, 'y1': self.y1, 'x2': self.x2, 'y2': self.y2}
+
+
 class Robot(models.Model):
     STATE_OFFLINE = 'OFFLINE'
     STATE_IDLE = 'IDLE'

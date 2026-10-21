@@ -310,6 +310,9 @@ class BridgeNode(Node):
         self.create_timer(0.05, self.mux_step)
         self.bump_pub = self.create_publisher(PointStamped, 'astar/obstacle', 10)  # 부딪힌 자리 → A* 플래너
         self.clear_obstacles_client = self.create_client(Empty, 'astar/clear_obstacles')
+        # 웹에서 그린 금지 구역 → A* 플래너 (JSON 목록). 플래너가 나중에 떠도 받도록 transient local
+        self.zones_pub = self.create_publisher(String, 'astar/zones', map_qos)
+        self.zones_json = None
         self.level_scan_pub = self.create_publisher(LaserScan, 'scan_level', qos_profile_sensor_data)
         # SLAM 전용: 아무것도 안 맞은 빔(inf)을 range_max 바로 아래 값으로 바꿔서 발행 (to_slam_scan 참고)
         self.slam_scan_pub = self.create_publisher(LaserScan, 'scan_slam', qos_profile_sensor_data)
@@ -370,6 +373,8 @@ class BridgeNode(Node):
                     self.on_relocalized(msg)
                 elif kind == 'teleop':
                     self.on_teleop(float(msg.get('v', 0.0)), float(msg.get('w', 0.0)))
+                elif kind == 'zones':
+                    self.on_zones(msg.get('zones') or [])
                 elif kind == 'initial_pose':
                     self.publish_initial_pose(float(msg['x']), float(msg['y']), float(msg['yaw']),
                                               bool(msg.get('precise')))
@@ -377,6 +382,14 @@ class BridgeNode(Node):
                     self.get_logger().warn(f'알 수 없는 메시지: {kind}')
             except (KeyError, ValueError) as e:
                 self.get_logger().error(f'잘못된 메시지 {msg}: {e}')
+
+    def on_zones(self, zones):
+        data = json.dumps(zones, sort_keys=True)
+        if data == self.zones_json:
+            return   # SLAM 맵 갱신마다 같은 목록이 다시 오므로 바뀔 때만 발행
+        self.zones_json = data
+        self.zones_pub.publish(String(data=data))
+        self.get_logger().info(f'금지 구역 {len(zones)}개 → A* 플래너')
 
     # ---------------------------------------------------------- 로봇 상태 → 서버
     def on_map(self, msg):
