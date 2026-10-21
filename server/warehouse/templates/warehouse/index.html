@@ -91,6 +91,29 @@
       </div>
     </section>
 
+    <section class="card" id="teleop-card">
+      <div class="card-head"><h2>수동 조작</h2><span class="muted small">맵 만들기 등에 사용</span></div>
+      <p class="muted small">버튼을 누르고 있는 동안만 움직입니다 (키보드: 방향키 / WASD, 이 카드에서 '키보드 사용'을 켠 동안). 앞뒤가 막히면 그쪽으로는 가지 않습니다. 작업 중에는 쓸 수 없습니다.</p>
+      <div class="teleop">
+        <div class="teleop-pad">
+          <button data-tv="1" data-tw="0.6" title="앞으로 가며 왼쪽" class="diag">◤</button><button data-tv="1" data-tw="0" title="앞으로">▲</button><button data-tv="1" data-tw="-0.6" title="앞으로 가며 오른쪽" class="diag">◥</button>
+          <button data-tv="0" data-tw="1" title="제자리에서 왼쪽으로 돌기">⟲</button><button id="teleop-stop" class="danger" title="정지">■</button><button data-tv="0" data-tw="-1" title="제자리에서 오른쪽으로 돌기">⟳</button>
+          <span></span><button data-tv="-1" data-tw="0" title="뒤로">▼</button><span></span>
+        </div>
+        <div class="teleop-opts">
+          <label>속도
+            <select id="teleop-speed">
+              <option value="0.08">느리게 (0.08 m/s)</option>
+              <option value="0.15" selected>보통 (0.15 m/s)</option>
+              <option value="0.2">빠르게 (0.2 m/s)</option>
+            </select>
+          </label>
+          <label class="check"><input type="checkbox" id="teleop-keys"> 키보드 사용</label>
+          <p id="teleop-status" class="muted small"></p>
+        </div>
+      </div>
+    </section>
+
     <section class="card">
       <div class="card-head"><h2>현재 작업</h2></div>
       <ol id="task-steps" class="timeline"><li class="muted">없음</li></ol>

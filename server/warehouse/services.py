@@ -755,3 +755,13 @@ def plan_order(robot_name, location_ids, with_home):
 def travel_model_info():
     info = planning.travel_model()
     return {'type': 'travel_model', **{k: info[k] for k in ('summary', 'n', 'outliers', 'mae', 'learned', 'w')}}
+
+
+def teleop_check(robot_name):
+    """웹 수동 조작 허용 여부. 허용이면 로봇 이름, 아니면 ServiceError."""
+    robot = get_robot(robot_name)
+    require_online(robot)
+    task = active_task(robot)
+    if task:
+        raise ServiceError(f'작업 #{task.id} 진행 중에는 수동 조작을 할 수 없습니다. 먼저 작업을 취소하세요.')
+    return robot.name

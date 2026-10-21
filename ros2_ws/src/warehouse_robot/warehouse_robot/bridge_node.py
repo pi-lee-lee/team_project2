@@ -73,24 +73,37 @@ def battery_percent(voltage, cells=3, empty_voltage=11.0):
 NO_RETURN_MARGIN = 0.05  # m. inf 빔을 range_max - 이 값으로 바꿈 (slam_toolbox max_laser_range 는 이보다 작아야 함)
 
 
+SLAM_BEAMS = 240  # slam_toolbox 에 넘기는 스캔의 빔 개수 (1.5° 간격 고정). 실물 LDS-02 가 238~244 개라 빈 칸이 거의 없게
+
+
 def to_slam_scan(msg):
-    """slam_toolbox(Karto) 는 range_max 이상(inf 포함)인 빔을 통째로 버린다 → 3.5 m 안에 아무것도 없는 넓은
-    공간은 로봇이 가도 빈 칸으로 칠해지지 않아 미탐색으로 남고, 자동 탐색이 그 경계를 끝없이 다시 찾아간다.
-    inf 를 range_max 바로 아래로 바꾸면 Karto 는 max_laser_range 까지만 빈 칸으로 칠하고 끝점은 장애물로 찍지 않는다.
-    AMCL/A* 기억은 이 값을 장애물로 보므로 scan_level(원본)을 그대로 쓴다.
-    실물 LDS 는 반사 없음을 0 으로 내보내는데, 0 은 너무 가까움과 구별이 안 되므로 바꾸지 않는다 (inf 만)."""
-    r = np.asarray(msg.ranges, dtype=np.float32)
-    no_return = np.isposinf(r)
-    if not no_return.any():
-        return msg
+    """slam_toolbox 용 스캔으로 바꾼다.
+    1) 실물 LDS-02 는 빔 개수가 스캔마다 238~244 개로 바뀌는데, slam_toolbox 는 처음 등록한 개수와 다른 스캔을 전부 버린다
+       ("contains 243 range readings, expected 242") → 지도가 첫 몇 m² 에서 멈추고 로봇은 지도에 없는 벽 앞에서 막혔음.
+       → 0~360° 를 1.5° 칸 240 개로 다시 나눠 항상 같은 개수로 넘긴다 (같은 칸에 빔이 여럿이면 가장 가까운 값).
+    2) Karto 는 range_max 이상(inf 포함)인 빔을 통째로 버린다 → 3.5 m 안에 아무것도 없는 넓은 공간은 로봇이 가도 빈 칸으로
+       칠해지지 않아 미탐색으로 남는다. inf 를 range_max 바로 아래로 바꾸면 Karto 는 max_laser_range 까지만 빈 칸으로 칠하고
+       끝점은 장애물로 찍지 않는다. AMCL/A* 기억은 이 값을 장애물로 보므로 scan_level(원본)을 그대로 쓴다.
+    실물 LDS 는 반사 없음을 0 또는 NaN 으로 내보내는데, 0 은 너무 가까움과 구별이 안 되므로 바꾸지 않는다 (inf 만)."""
+    r = np.asarray(msg.ranges, dtype=np.float32).copy()
+    r[np.isposinf(r)] = msg.range_max - NO_RETURN_MARGIN
+    inc = 2.0 * math.pi / SLAM_BEAMS
+    ang = (msg.angle_min + np.arange(len(r)) * msg.angle_increment) % (2.0 * math.pi)
+    idx = np.round(ang / inc).astype(int) % SLAM_BEAMS
+    out_r = np.full(SLAM_BEAMS, np.nan, dtype=np.float32)
+    valid = np.isfinite(r)
+    # 칸마다 가장 가까운 값 (정렬 후 뒤에서부터 쓰면 마지막에 쓴 값 = 가장 작은 값)
+    order = np.argsort(-np.where(valid, r, -1.0))
+    order = order[valid[order]]
+    out_r[idx[order]] = r[order]
     out = LaserScan()
     out.header = msg.header
-    out.angle_min, out.angle_max, out.angle_increment = msg.angle_min, msg.angle_max, msg.angle_increment
-    out.time_increment, out.scan_time = msg.time_increment, msg.scan_time
+    out.angle_min, out.angle_increment = 0.0, inc
+    out.angle_max = (SLAM_BEAMS - 1) * inc
+    out.time_increment = msg.time_increment * len(r) / SLAM_BEAMS
+    out.scan_time = msg.scan_time
     out.range_min, out.range_max = msg.range_min, msg.range_max
-    r[no_return] = msg.range_max - NO_RETURN_MARGIN
-    out.ranges = r.tolist()
-    out.intensities = msg.intensities
+    out.ranges = out_r.tolist()
     return out
 
 
@@ -209,7 +222,9 @@ class BridgeNode(Node):
         # TF 는 별도 노드 + 스레드에서 받는다. 이 노드는 IMU(~200Hz)·odom·scan·타이머를 한 스레드에서 처리하는데
         # 실행기는 한 바퀴에 구독마다 메시지 하나씩만 꺼내므로, 부하가 높으면 /tf(~100Hz) 가 큐에 쌓여
         # 0.5초 넘게 밀리고 '위치 TF 끊김' 으로 멈췄다 (바깥 노드에서 잰 TF 는 정상이었음)
-        self.tf_node = rclpy.create_node('warehouse_bridge_tf', parameter_overrides=[
+        # use_global_arguments=False: launch 의 '__node:=warehouse_bridge' 가 이 노드에도 적용되어
+        # 노드 목록에 /warehouse_bridge 가 두 개로 보였음 (브리지가 둘 떠 있는 것처럼)
+        self.tf_node = rclpy.create_node('warehouse_bridge_tf', use_global_arguments=False, parameter_overrides=[
             rclpy.parameter.Parameter('use_sim_time', value=self.get_parameter('use_sim_time').value)])
         self.tf_listener = TransformListener(self.tf_buffer, self.tf_node, spin_thread=True)
 
@@ -264,7 +279,7 @@ class BridgeNode(Node):
         self.dwa_cfg.control_period = 0.1    # DWA 계산 주기 (dwa_compute)
         self.declare_parameter('dwa_follow.lookahead', 0.5)
         self.declare_parameter('dwa_follow.goal_tolerance', 0.1)
-        self.declare_parameter('dwa_follow.moving_speed', 0.05)  # 이보다 빠른 track 만 움직이는 장애물로
+        self.declare_parameter('dwa_follow.moving_speed', 0.08)  # 이보다 빠른 track 만 움직이는 장애물로 (멈춘 물체 속도 노이즈 ~0.06, 느린 사람 0.1)
         self.odom_vw = (0.0, 0.0)
         self.create_subscription(Odometry, 'odom', self.on_odom, qos_profile_sensor_data)
         # A* 가 기억 중인 장애물 (맵에 없는 LiDAR 장애물, 부딪힌 자리) → 웹 지도 표시
@@ -300,6 +315,9 @@ class BridgeNode(Node):
         self.create_timer(0.05, self.process_inbox)
         self.create_timer(1.0 / p('pose_rate'), self.send_pose)
         self.create_timer(0.1, self.publish_stop)
+        # 웹 수동 조작 (teleop): 누르고 있는 동안 0.1초마다 명령이 온다. 0.4초 넘게 안 오면 멈춤
+        self.teleop = None   # (v, w, 받은 시각)
+        self.create_timer(0.05, self.teleop_step)
         self.create_timer(0.05, self.control_step)
         self.create_timer(1.0, self.send_health)
         self.create_timer(1.0, self.flush_map)
@@ -324,6 +342,7 @@ class BridgeNode(Node):
                 elif kind == 'cancel':
                     self.cancel_goal()
                 elif kind == 'stop':
+                    self.teleop = None
                     self.cancel_goal()
                     self.stop_count = 10  # 1초 동안 정지 명령 발행
                 elif kind == 'save_map':
@@ -332,6 +351,8 @@ class BridgeNode(Node):
                     self.reset_robot()
                 elif kind == '_relocalized':
                     self.on_relocalized(msg)
+                elif kind == 'teleop':
+                    self.on_teleop(float(msg.get('v', 0.0)), float(msg.get('w', 0.0)))
                 elif kind == 'initial_pose':
                     self.publish_initial_pose(float(msg['x']), float(msg['y']), float(msg['yaw']),
                                               bool(msg.get('precise')))
@@ -501,6 +522,7 @@ class BridgeNode(Node):
     # ---------------------------------------------------------- 이동
     def start_goal(self, goal_id, x, y, yaw):
         self.cancel_goal(report=False)
+        self.teleop = None   # 목표가 오면 수동 조작은 끝
         if self.tipped:
             self.last_goal_id = goal_id
             self.server.send({'type': 'nav_status', 'goal_id': goal_id, 'status': 'failed',
@@ -923,8 +945,11 @@ class BridgeNode(Node):
         if not self.tracking:
             return
         # 지도 벽 근처 점은 정적이므로 추적하지 않는다 (판별에만 map 을 쓰므로 AMCL 이 몇 cm 틀려도 속도에는 영향 없음).
-        # 맵 밖/벽 너머 점도 뺀다: 기존 맵 모드는 맵의 빈 칸에 있는 점만, SLAM 모드는 격자 안(미탐색 포함)만
-        # (빼지 않으면 LiDAR 가 맵 가장자리 너머를 본 점이 맵 밖을 돌아다니는 장애물로 보였음)
+        # 맵 밖/벽 너머/미탐색 칸의 점도 뺀다: 지도의 빈 칸에 있는 점만 추적 (SLAM 도 같음).
+        # SLAM 중에는 아직 지도에 안 들어간 벽이 미탐색 칸에 있어 전부 '장애물' 로 잡혔고(실물 350건 중 345건),
+        # 그 속도 노이즈(중앙값 0.06 m/s)가 움직이는 물체 기준을 넘었음. 미탐색 칸의 물체도 DWA 는 스캔 점으로 피한다
+        if self.map_dist is None:
+            pts = pts[:0]   # 지도가 아직 없으면 추적하지 않음
         if self.map_dist is not None and len(pts):
             m_o = self.xyyaw(self.global_frame, 'odom')
             if m_o is not None:
@@ -935,7 +960,7 @@ class BridgeNode(Node):
                 inside = (row >= 0) & (row < info.height) & (col >= 0) & (col < info.width)
                 keep = np.zeros(len(pts), dtype=bool)
                 cell = grid[row[inside], col[inside]]
-                free = (cell >= 0) & (cell < 65) if self.mode != 'slam' else (cell < 65)
+                free = (cell >= 0) & (cell < 65)
                 keep[inside] = free & (dist[row[inside], col[inside]] > c['static_match_dist'])
                 pts = pts[keep]
         dets = detect_clusters(pts, c['cluster_gap'], c['min_points'], c['max_diameter'], c['min_radius'],
@@ -968,7 +993,10 @@ class BridgeNode(Node):
             return
         c, s = math.cos(m_o[2]), math.sin(m_o[2])
         out = []
+        moving = self.get_parameter('dwa_follow.moving_speed').value
         for t in self.tracks:
+            if math.hypot(t.x[2], t.x[3]) < moving:
+                continue   # 웹에는 움직이는 것만 (멈춘 물체는 지도/기억한 장애물로 보임)
             (x, y), = transform_points([t.x[:2]], *m_o)
             out.append({'id': t.id, 'x': round(float(x), 3), 'y': round(float(y), 3),
                         'vx': round(float(c * t.x[2] - s * t.x[3]), 3), 'vy': round(float(s * t.x[2] + c * t.x[3]), 3),
@@ -1187,6 +1215,31 @@ class BridgeNode(Node):
             return
         self.nomotion_left -= 1
         self.nomotion_client.call_async(Empty.Request())
+
+    def on_teleop(self, v, w):
+        if self.goal is not None or self.follower is not None:
+            return   # 작업 중에는 무시 (서버도 막지만 한 번 더)
+        v = max(-0.1, min(0.2, v))
+        w = max(-1.2, min(1.2, w))
+        self.teleop = (v, w, time.monotonic())
+
+    def teleop_step(self):
+        t = self.teleop
+        if t is None:
+            return
+        v, w, at = t
+        if time.monotonic() - at > 0.4 or self.goal is not None or self.tipped:
+            self.teleop = None
+            self.cmd_vel_pub.publish(Twist())
+            return
+        # 앞뒤에 물체가 가까우면 그쪽으로는 가지 않는다 (회전은 허용). LiDAR 기준 앞 0.25m / 뒤 0.3m
+        if v > 0 and self.front_clearance(math.radians(30)) < 0.25:
+            v = 0.0
+        if v < 0 and self.front_clearance(math.radians(30), center=math.pi) < 0.3:
+            v = 0.0
+        cmd = Twist()
+        cmd.linear.x, cmd.angular.z = v, w
+        self.cmd_vel_pub.publish(cmd)
 
     def publish_stop(self):
         if self.stop_count > 0:

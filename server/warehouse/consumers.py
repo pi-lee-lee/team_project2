@@ -1,3 +1,4 @@
+import time
 """WebSocket 엔드포인트.
 
 /ws/robot/<name>/ : ROS 2 브리지 노드가 접속
@@ -180,6 +181,23 @@ class UIConsumer(AsyncJsonWebsocketConsumer):
         robot = msg.get('robot')
         if action in ('runner_start', 'runner_stop', 'auto_localize', 'list_maps', 'explore_start', 'explore_stop'):
             await self.handle_runner(action, msg)
+            return
+        if action == 'teleop':
+            # 웹 수동 조작: 누르는 동안 0.1초마다 온다. DB 에 쓰지 않고 브리지로 바로 보낸다.
+            # 허용 여부(연결됨, 작업 없음)는 1초에 한 번만 DB 로 확인
+            now = time.monotonic()
+            if now > getattr(self, 'teleop_checked_until', 0.0):
+                try:
+                    self.teleop_robot = await database_sync_to_async(services.teleop_check)(robot)
+                except services.ServiceError as e:
+                    self.teleop_checked_until = now + 1.0
+                    self.teleop_robot = None
+                    await self.send_json({'type': 'error', 'message': str(e)})
+                    return
+                self.teleop_checked_until = now + 1.0
+            if self.teleop_robot:
+                await self.channel_layer.group_send(robot_group(self.teleop_robot), {'type': 'send.msg', 'msg': {
+                    'type': 'teleop', 'v': float(msg.get('v', 0.0)), 'w': float(msg.get('w', 0.0))}})
             return
         if action in ('plan_order', 'travel_model'):
             # 계산 결과는 요청한 화면에만 돌려준다 (DB 를 바꾸지 않음)

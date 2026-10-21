@@ -409,3 +409,11 @@ button[hidden] { display: none; }
 .cargo-btn.active { outline: 2px solid var(--primary, #2563eb); }
 .cargo-status { margin: 6px 0 0; font-size: 12px; color: var(--muted, #64748b); }
 .cargo-status.loaded { color: #15803d; font-weight: 700; }
+
+/* 수동 조작 */
+.teleop { display: flex; gap: 14px; align-items: flex-start; flex-wrap: wrap; }
+.teleop-pad { display: grid; grid-template-columns: repeat(3, 52px); grid-template-rows: repeat(3, 52px); gap: 6px; }
+.teleop-pad button { font-size: 20px; padding: 0; touch-action: none; user-select: none; -webkit-user-select: none; }
+.teleop-pad button.diag { font-size: 15px; opacity: 0.85; }
+.teleop-pad button:active { transform: translateY(1px); filter: brightness(0.92); }
+.teleop-opts { display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: 150px; }

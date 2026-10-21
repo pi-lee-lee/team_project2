@@ -82,4 +82,4 @@ warehouse_bridge:
     dwa_follow:
       lookahead: 0.5          # 경로 위 이 거리 앞 점을 DWA 목표로
       goal_tolerance: 0.1     # 이 안에 들면 제자리에서 도착 방향 맞춤
-      moving_speed: 0.05      # 이보다 빠른 track 만 움직이는 장애물로 예측
+      moving_speed: 0.08      # 이보다 빠른 track 만 움직이는 장애물로 예측/웹 표시 (멈춘 물체 속도 노이즈 중앙값 0.06, 느린 사람 0.1)

@@ -974,3 +974,52 @@ resizeCanvas();
 renderPanel();
 renderHealth();
 connect();
+
+// ------------------------------------------------------------------ 수동 조작 (teleop)
+// 누르고 있는 동안 0.1초마다 {v, w} 를 보낸다. 브리지는 0.4초 넘게 안 오면 멈춘다 (손을 떼거나 창을 벗어나면 정지)
+const TELEOP = { v: 0, w: 0, timer: null };
+function teleopSend() { send('teleop', { v: TELEOP.v, w: TELEOP.w }); }
+function teleopStart(dv, dw) {
+  const speed = Number($('#teleop-speed').value);
+  TELEOP.v = dv >= 0 ? dv * speed : dv * Math.min(speed, 0.1);   // 뒤로는 최대 0.1 m/s
+  TELEOP.w = dw * (speed <= 0.08 ? 0.6 : 1.0);
+  $('#teleop-status').textContent = `이동 중: ${TELEOP.v.toFixed(2)} m/s, ${TELEOP.w.toFixed(1)} rad/s`;
+  if (!TELEOP.timer) { teleopSend(); TELEOP.timer = setInterval(teleopSend, 100); }
+}
+function teleopStop() {
+  if (TELEOP.timer) { clearInterval(TELEOP.timer); TELEOP.timer = null; }
+  TELEOP.v = 0; TELEOP.w = 0;
+  send('teleop', { v: 0, w: 0 });
+  $('#teleop-status').textContent = '';
+}
+document.querySelectorAll('.teleop-pad button[data-tv]').forEach((b) => {
+  const go = (ev) => { ev.preventDefault(); teleopStart(Number(b.dataset.tv), Number(b.dataset.tw)); };
+  b.addEventListener('pointerdown', go);
+  b.addEventListener('pointerup', teleopStop);
+  b.addEventListener('pointerleave', () => { if (TELEOP.timer) teleopStop(); });
+  b.addEventListener('pointercancel', teleopStop);
+  b.addEventListener('contextmenu', (ev) => ev.preventDefault());
+});
+$('#teleop-stop').addEventListener('click', teleopStop);
+window.addEventListener('blur', () => { if (TELEOP.timer) teleopStop(); });
+
+const TELEOP_KEYS = { ArrowUp: [1, 0], w: [1, 0], ArrowDown: [-1, 0], s: [-1, 0],
+                      ArrowLeft: [0, 1], a: [0, 1], ArrowRight: [0, -1], d: [0, -1] };
+const keysDown = new Set();
+function teleopFromKeys() {
+  let v = 0, w = 0;
+  for (const k of keysDown) { v += TELEOP_KEYS[k][0]; w += TELEOP_KEYS[k][1]; }
+  if (!keysDown.size) { teleopStop(); return; }
+  teleopStart(Math.max(-1, Math.min(1, v)), Math.max(-1, Math.min(1, w)) * (v ? 0.6 : 1));
+}
+window.addEventListener('keydown', (ev) => {
+  if (!$('#teleop-keys').checked || !(ev.key in TELEOP_KEYS) || ev.target.closest('input, select, textarea')) return;
+  ev.preventDefault();
+  if (!keysDown.has(ev.key)) { keysDown.add(ev.key); teleopFromKeys(); }
+});
+window.addEventListener('keyup', (ev) => {
+  if (!(ev.key in TELEOP_KEYS) || !keysDown.has(ev.key)) return;
+  keysDown.delete(ev.key);
+  teleopFromKeys();
+});
+$('#teleop-keys').addEventListener('change', () => { keysDown.clear(); if (TELEOP.timer) teleopStop(); });
