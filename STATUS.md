@@ -311,9 +311,11 @@
 - **실물형 sim**: `--scan-noise` (빔 238~244, 흔들림 1cm+1%, 2.5m~ 값 빠짐, 무응답 NaN), 월드 `lecture_hall_real` (앞판 없음, 좌우 끝 세로 복도 없음 = 끝 열이 벽에 붙음, 의자 무작위, 원점 = 가로 6/세로 2)
 - mac 에서 확인한 것: 단위 테스트 43개 통과(plan_map 5, scan_noise 3 추가), Django check, 금지 구역 서비스/경로 예측(임시 sqlite), 합성 맵으로 plan_map.py, run.sh 옵션 오류 처리
 - **아직 안 한 것 (서버에서)**: ROS 노드 실행, Gazebo 회귀 시험, 실물 측정 전부
+- 계획용 가공은 기존 맵 모드에서 **항상 켜짐** (`--amcl hall` 과 달리 옵션 아님). 0.4m 이하 짧은 벽 조각/노이즈 점도 부풀려져 들쭉날쭉한 벽 옆 통로가 한쪽 최대 0.1m 좁아질 수 있음 → 첫 실물 주행 전에 `tools/plan_map.py <맵> --check <홈> <LED>` 로 LED 마다 확인. 끄기: params.yaml `cluster_inflate: 0`, `stripe_cells: 0` 후 브리지 재시작
 
-서버에서 받기:
+서버에서 받기 (순서 중요: 웹 서버가 새 코드로 자동 재시작되면 migrate 전까지 Zone 테이블이 없어 웹 접속/맵 저장이 실패함):
 ```bash
+scripts/stop_ros.sh --all                                # 웹 서버까지 끔
 git fetch && git switch hall-planning && git pull
 cd server && .venv/bin/python manage.py migrate          # Zone 테이블
 cd ../ros2_ws && source /opt/ros/humble/setup.bash && colcon build --symlink-install   # 새 모듈/launch 인자

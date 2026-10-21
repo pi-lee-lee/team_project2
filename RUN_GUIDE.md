@@ -70,7 +70,7 @@ run.sh ── (잠금 logs/run.lock, 동시 실행 거절)
 ### 3.2 실물 + 기존 맵 (평소 운영)
 
 ```bash
-cd ~/project2/team_project2          # 저장소 위치에 맞게
+cd ~/webserver                       # 서버 PC 의 저장소 위치 (ros2_ws/install 링크가 가리키는 곳)
 scripts/run.sh --robot real --mode map --map ~/maps/<맵>_clean.yaml [--name <DB맵이름>]
 ```
 
@@ -204,4 +204,3 @@ ssh test@192.168.0.181 pgrep -af turtlebot3             # Pi
 | 로컬화/SLAM 이 스캔을 못 받음 | AMCL·SLAM 은 브리지가 내는 `scan_level` / `scan_slam` 을 씀 → 브리지가 떠 있어야 함 |
 | 노드를 `kill` 로 하나씩 껐더니 amcl 이 남음 | 항상 `stop_ros.sh` 사용 |
 | SLAM 과 AMCL 이 같이 뜸 | map→odom TF 를 둘이 냄. `run.sh` 로만 실행하면 생기지 않음 |
-| README "끄기" 절의 `~/webserver/scripts/...` 경로 | 예전 위치. 실제로는 저장소의 `scripts/stop_ros.sh` |
