@@ -13,7 +13,8 @@ const S = {
   path: [],           // [[x, y], ...]
   selected: new Set(),
   mode: 'view',       // view | goto | add | initpose | deliver | zone | wall
-  view: { scale: 1, ox: 0, oy: 0 },  // 맵 픽셀 -> 캔버스 픽셀 변환
+  view: { scale: 1, ox: 0, oy: 0 },  // scale = 맵 한 칸의 캔버스 픽셀 수, (ox, oy) = 돌린 좌표 (0, 0) 의 캔버스 위치
+  rot: Math.PI / 2,   // 화면 회전 (rad, 반시계): 맵의 x 축이 화면 위쪽, y 축이 왼쪽 (로봇 정면 = x 가 위로 보이게, ROS 관례)
   drag: null,
 };
 
@@ -334,25 +335,21 @@ function setWsStatus(on) {
 }
 
 // ------------------------------------------------------------------ 좌표 변환
-// 월드(m) <-> 맵 이미지 픽셀. 이미지 위쪽 행이 y 최대값이다.
-function worldToImg(x, y) {
-  const m = S.map;
-  return [(x - m.origin[0]) / m.resolution, m.height - (y - m.origin[1]) / m.resolution];
+// 월드(m) -> S.rot 만큼 돌린 좌표 -> 캔버스 픽셀 (캔버스 y 는 아래로). 좌표 자체는 그대로, 보기만 돌린다
+function rotXY(x, y, a) {
+  const c = Math.cos(a), s = Math.sin(a);
+  return [c * x - s * y, s * x + c * y];
 }
-function imgToWorld(px, py) {
-  const m = S.map;
-  return [m.origin[0] + px * m.resolution, m.origin[1] + (m.height - py) * m.resolution];
+function pxPerMeter() { return S.view.scale / S.map.resolution; }
+function worldToCanvas(x, y) {
+  const v = S.view, k = pxPerMeter();
+  const [u, w] = rotXY(x, y, S.rot);
+  return [u * k + v.ox, -w * k + v.oy];
 }
-function imgToCanvas(px, py) {
-  const v = S.view;
-  return [px * v.scale + v.ox, py * v.scale + v.oy];
+function canvasToWorld(cx, cy) {
+  const v = S.view, k = pxPerMeter();
+  return rotXY((cx - v.ox) / k, -(cy - v.oy) / k, -S.rot);
 }
-function canvasToImg(cx, cy) {
-  const v = S.view;
-  return [(cx - v.ox) / v.scale, (cy - v.oy) / v.scale];
-}
-function worldToCanvas(x, y) { return imgToCanvas(...worldToImg(x, y)); }
-function canvasToWorld(cx, cy) { return imgToWorld(...canvasToImg(cx, cy)); }
 
 // ------------------------------------------------------------------ 맵
 // 맵이 아직 없을 때(SLAM 시작 직후 등): 로봇 주변 8m 를 격자로 보여주는 가상 맵.
@@ -437,17 +434,40 @@ function knownBounds(img, map) {
 // 화면을 방 범위에 맞춰 고정 (확대/축소/이동 없음)
 function fitView() {
   if (!S.map) return;
-  // 월드 범위(S.wbox)를 지금 맵의 이미지 픽셀 범위로 바꿔서 맞춘다
+  // 월드 범위(S.wbox)의 네 모서리를 화면 각도(S.rot)로 돌린 범위에 맞춘다
   const m = S.map, r = m.resolution;
   const wb = S.wbox || { x0: m.origin[0], y0: m.origin[1],
                          x1: m.origin[0] + m.width * r, y1: m.origin[1] + m.height * r };
-  const b = { x0: (wb.x0 - m.origin[0]) / r, x1: (wb.x1 - m.origin[0]) / r,
-              y0: m.height - (wb.y1 - m.origin[1]) / r, y1: m.height - (wb.y0 - m.origin[1]) / r };
+  const pts = [[wb.x0, wb.y0], [wb.x1, wb.y0], [wb.x0, wb.y1], [wb.x1, wb.y1]].map(([x, y]) => rotXY(x, y, S.rot));
+  const u0 = Math.min(...pts.map((p) => p[0])), u1 = Math.max(...pts.map((p) => p[0]));
+  const v0 = Math.min(...pts.map((p) => p[1])), v1 = Math.max(...pts.map((p) => p[1]));
   const w = canvas.clientWidth, h = canvas.clientHeight;
-  const bw = b.x1 - b.x0, bh = b.y1 - b.y0;
-  const scale = Math.min(w / bw, h / bh);
-  S.view = { scale, ox: (w - bw * scale) / 2 - b.x0 * scale, oy: (h - bh * scale) / 2 - b.y0 * scale };
+  const k = Math.min(w / (u1 - u0), h / (v1 - v0));   // 1m 당 캔버스 픽셀
+  S.view = { scale: k * r, ox: (w - (u1 - u0) * k) / 2 - u0 * k, oy: (h - (v1 - v0) * k) / 2 + v1 * k };
   draw();
+}
+
+// 맵 이미지 픽셀 (px, py) -> 캔버스: 월드 (ox + px r, oy + (H - py) r) 를 돌려서 그린다
+function drawMapImage() {
+  const m = S.map, r = m.resolution, k = pxPerMeter(), v = S.view;
+  const c = Math.cos(S.rot), s = Math.sin(S.rot);
+  const top = m.origin[1] + m.height * r;
+  ctx.save();
+  ctx.imageSmoothingEnabled = false;
+  ctx.transform(k * r * c, -k * r * s, k * r * s, k * r * c,
+                k * (c * m.origin[0] - s * top) + v.ox, -k * (s * m.origin[0] + c * top) + v.oy);
+  ctx.drawImage(S.mapImg, 0, 0);
+  ctx.restore();
+}
+
+// 월드 좌표 다각형 채우기/선 (돌린 화면에서도 맞게)
+function worldPolygon(points) {
+  ctx.beginPath();
+  points.forEach(([x, y], i) => {
+    const [cx, cy] = worldToCanvas(x, y);
+    i ? ctx.lineTo(cx, cy) : ctx.moveTo(cx, cy);
+  });
+  ctx.closePath();
 }
 
 function resizeCanvas() {
@@ -469,8 +489,7 @@ function draw() {
     drawGrid();
   } else {
     if (!S.mapImg) return;
-    ctx.imageSmoothingEnabled = false;
-    ctx.drawImage(S.mapImg, v.ox, v.oy, S.map.width * v.scale, S.map.height * v.scale);
+    drawMapImage();
   }
 
   const pxPerM = v.scale / S.map.resolution;
@@ -478,12 +497,13 @@ function draw() {
   // 맵 원점 (0, 0) = SLAM을 시작한 위치. 빨간 축 = +x(0°), 초록 축 = +y(90°)
   {
     const [cx, cy] = worldToCanvas(0, 0);
-    const len = Math.max(15, 0.3 * pxPerM);
+    const len = Math.max(15, 0.3 * pxPerM) / pxPerM;   // m
+    const [xx, xy] = worldToCanvas(len, 0), [yx, yy] = worldToCanvas(0, len);
     ctx.lineWidth = 2;
     ctx.strokeStyle = '#ef4444';
-    ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + len, cy); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(xx, xy); ctx.stroke();
     ctx.strokeStyle = '#22c55e';
-    ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx, cy - len); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(yx, yy); ctx.stroke();
     ctx.fillStyle = '#111';
     ctx.font = '11px system-ui, sans-serif';
     ctx.fillText('원점(0,0)', cx + 4, cy + 14);
@@ -584,7 +604,7 @@ function draw() {
     ctx.stroke();
     ctx.beginPath();
     ctx.moveTo(cx, cy);
-    ctx.lineTo(cx + Math.cos(S.pose.yaw) * r * 1.6, cy - Math.sin(S.pose.yaw) * r * 1.6);
+    ctx.lineTo(cx + Math.cos(S.pose.yaw + S.rot) * r * 1.6, cy - Math.sin(S.pose.yaw + S.rot) * r * 1.6);
     ctx.stroke();
   }
 
@@ -656,15 +676,20 @@ function drawZone(z, shape, preview) {
     ctx.setLineDash([Math.max(4, 0.15 * pxPerM), Math.max(3, 0.08 * pxPerM)]);
     ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.stroke();
   } else {
-    const x = Math.min(ax, bx), y = Math.min(ay, by), w = Math.abs(bx - ax), h = Math.abs(by - ay);
+    // 구역은 맵 축 기준 사각형 → 돌린 화면에서는 네 모서리를 이어서 그림
+    const corners = [[z.x1, z.y1], [z.x2, z.y1], [z.x2, z.y2], [z.x1, z.y2]];
+    const cs = corners.map(([x, y]) => worldToCanvas(x, y));
+    const x = Math.min(...cs.map((p) => p[0])), y = Math.min(...cs.map((p) => p[1]));
+    const w = Math.max(...cs.map((p) => p[0])) - x, h = Math.max(...cs.map((p) => p[1])) - y;
     ctx.fillStyle = 'rgba(220, 38, 38, 0.13)';
-    ctx.fillRect(x, y, w, h);
+    worldPolygon(corners);
+    ctx.fill();
     ctx.lineWidth = 2;
-    ctx.strokeRect(x, y, w, h);
+    ctx.stroke();
     // 빗금
-    ctx.beginPath();
-    ctx.rect(x, y, w, h);
+    worldPolygon(corners);
     ctx.clip();
+    ctx.beginPath();
     ctx.lineWidth = 1;
     ctx.strokeStyle = 'rgba(185, 28, 28, 0.45)';
     for (let k = -h; k < w; k += 10) { ctx.moveTo(x + k, y + h); ctx.lineTo(x + k + h, y); }
@@ -674,25 +699,27 @@ function drawZone(z, shape, preview) {
   if (!preview && z.name) {
     ctx.fillStyle = '#991b1b';
     ctx.font = '11px system-ui, sans-serif';
-    ctx.fillText(z.name, Math.min(ax, bx) + 3, Math.min(ay, by) - 3);
+    const [lx, ly] = worldToCanvas(Math.min(z.x1, z.x2), Math.max(z.y1, z.y2));
+    ctx.fillText(z.name, lx + 3, ly - 3);
   }
 }
 
 // 가상 맵: 1m 격자
 function drawGrid() {
-  const m = S.map, v = S.view;
+  const m = S.map;
+  const [x0w, y0w] = m.origin, x1w = x0w + VIRTUAL_SIZE_M, y1w = y0w + VIRTUAL_SIZE_M;
   ctx.fillStyle = '#e5e7eb';
-  ctx.fillRect(v.ox, v.oy, m.width * v.scale, m.height * v.scale);
+  worldPolygon([[x0w, y0w], [x1w, y0w], [x1w, y1w], [x0w, y1w]]);
+  ctx.fill();
   ctx.strokeStyle = '#cbd5e1';
   ctx.lineWidth = 1;
-  const x0 = Math.ceil(m.origin[0]), y0 = Math.ceil(m.origin[1]);
-  for (let x = x0; x <= m.origin[0] + VIRTUAL_SIZE_M; x++) {
-    const [a, b] = worldToCanvas(x, m.origin[1]), [, d] = worldToCanvas(x, m.origin[1] + VIRTUAL_SIZE_M);
-    ctx.beginPath(); ctx.moveTo(a, b); ctx.lineTo(a, d); ctx.stroke();
+  for (let x = Math.ceil(x0w); x <= x1w; x++) {
+    const [a, b] = worldToCanvas(x, y0w), [c, d] = worldToCanvas(x, y1w);
+    ctx.beginPath(); ctx.moveTo(a, b); ctx.lineTo(c, d); ctx.stroke();
   }
-  for (let y = y0; y <= m.origin[1] + VIRTUAL_SIZE_M; y++) {
-    const [a, b] = worldToCanvas(m.origin[0], y), [c] = worldToCanvas(m.origin[0] + VIRTUAL_SIZE_M, y);
-    ctx.beginPath(); ctx.moveTo(a, b); ctx.lineTo(c, b); ctx.stroke();
+  for (let y = Math.ceil(y0w); y <= y1w; y++) {
+    const [a, b] = worldToCanvas(x0w, y), [c, d] = worldToCanvas(x1w, y);
+    ctx.beginPath(); ctx.moveTo(a, b); ctx.lineTo(c, d); ctx.stroke();
   }
 }
 
@@ -703,7 +730,7 @@ function drawArrow(cx, cy, yaw, len, color, highlight) {
   ctx.beginPath();
   ctx.arc(cx, cy, highlight ? 7 : 5, 0, Math.PI * 2);
   ctx.fill();
-  const ex = cx + Math.cos(yaw) * len, ey = cy - Math.sin(yaw) * len;
+  const ex = cx + Math.cos(yaw + S.rot) * len, ey = cy - Math.sin(yaw + S.rot) * len;   // yaw: 월드 방향
   ctx.beginPath();
   ctx.moveTo(cx, cy);
   ctx.lineTo(ex, ey);
@@ -753,7 +780,7 @@ canvas.addEventListener('pointerup', () => {
   const dx = d.cx - d.sx, dy = d.cy - d.sy;
   // 드래그 없이 클릭만 하면: 이동은 로봇에서 목표를 향하는 방향, 나머지는 0°(맵의 +x 방향)
   let yaw = 0;
-  if (Math.hypot(dx, dy) > 5) yaw = Math.atan2(-dy, dx);
+  if (Math.hypot(dx, dy) > 5) yaw = Math.atan2(-dy, dx) - S.rot;   // 화면 방향 → 월드 방향
   else if (S.mode === 'goto' && S.pose) yaw = Math.atan2(wy - S.pose.y, wx - S.pose.x);
   // 마우스가 두 번 눌리는 경우 같은 명령이 연달아 가지 않도록 무시
   const now = Date.now();
