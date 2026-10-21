@@ -45,8 +45,9 @@ slam_toolbox:
     # General Parameters
     use_scan_matching: true
     use_scan_barycenter: true
-    minimum_travel_distance: 0.5
-    minimum_travel_heading: 0.5
+    minimum_travel_distance: 0.2   # (기본 0.5) 스캔을 지도에 넣는 이동 거리. 빔 간격(1.5°)이 1.9m 부터 칸(5cm)보다 넓어
+                                   # 먼 벽이 점선으로 남던 것 → 더 자주 넣어 여러 위치의 스캔으로 메움
+    minimum_travel_heading: 0.2    # (기본 0.5 rad = 29°) 회전도 약 11° 마다
     scan_buffer_size: 10
     scan_buffer_maximum_scan_distance: 10.0
     link_match_minimum_response_fine: 0.1  
