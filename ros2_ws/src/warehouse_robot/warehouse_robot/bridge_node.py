@@ -75,7 +75,7 @@ def battery_percent(voltage, cells=3, empty_voltage=11.0):
 NO_RETURN_MARGIN = 0.05  # m. inf 빔을 range_max - 이 값으로 바꿈 (slam_toolbox max_laser_range 는 이보다 작아야 함)
 
 
-SCAN_SEND_INTERVAL = 0.25  # s, 웹에 실시간 LiDAR 를 보내는 간격 (화면 표시용, 초당 4번)
+SCAN_SEND_INTERVAL = 0.15  # s, 웹에 실시간 LiDAR 를 보내는 최소 간격 (화면 표시용). LiDAR 5Hz 면 스캔마다 (0.25 면 한 번 건너 2.5Hz 였음)
 MAP_MIN_INTERVAL = 0.5  # s, SLAM 맵을 서버로 보내는 최소 간격 (갱신되면 바로 보내되 몰려 오면 이 간격으로)
 SLAM_BEAMS = 240  # slam_toolbox 에 넘기는 스캔의 빔 개수 (1.5° 간격 고정). 실물 LDS-02 가 238~244 개라 빈 칸이 거의 없게
 
@@ -809,7 +809,7 @@ class BridgeNode(Node):
 
     def send_scan(self, msg):
         """웹 화면용 실시간 LiDAR: 빔 순서대로 지도 좌표 점 (응답 없는 빔은 None). 웹이 이웃 점끼리 선으로 잇는다.
-        SCAN_SEND_INTERVAL 마다만. 지도/경로 계획에는 쓰지 않음."""
+        SCAN_SEND_INTERVAL 보다 자주는 안 보냄. 지도/경로 계획에는 쓰지 않음."""
         now = time.monotonic()
         if now - self.last_scan_sent < SCAN_SEND_INTERVAL or not self.server.connected:
             return
