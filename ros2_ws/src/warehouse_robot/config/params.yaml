@@ -13,6 +13,11 @@ astar_planner:
     scan_wall_margin: 0.15    # 맵 벽에서 이 거리 안의 점은 벽으로 보고 무시 (m)
     bump_memory: 120.0        # 부딪힌 자리(LiDAR 에 안 보이는 낮은 물체)를 장애물로 기억하는 시간 (s)
     bump_radius: 0.15         # 부딪힌 자리(로봇 앞 0.25 m) 주변을 막는 반경 (m). 크면 좁은 통로가 통째로 막힘
+    # 경로 계획용 맵 가공 (기존 맵 모드만, plan_map.py. AMCL 은 원본 맵 그대로). 결과는 astar/plan_map 토픽
+    stripe_cells: 2           # 빈 칸 사이 폭 4칸(20cm) 미만 미탐색 줄무늬 → 빈 칸 (먼 곳 LiDAR 빔 사이). 0 이면 끔
+    cluster_inflate: 0.1      # 책상/의자 다리 점(작은 덩어리)을 부풀림 → 다리 사이 2*(0.25+0.1)=0.7m 미만 틈이 막힘 (m). 0 이면 끔
+    cluster_max_size: 0.4     # 가로나 세로가 이보다 긴 장애물 덩어리(벽, 책상 앞판)는 부풀리지 않음 (m)
+    start_clear_radius: 0.35  # 출발 위치 주변은 부풀린 점/금지 구역에서 뺌 (그 안에 서 있어도 빠져나오게) (m)
 
 warehouse_bridge:
   ros__parameters:

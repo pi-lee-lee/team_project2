@@ -3,11 +3,17 @@
 구독:  map (nav_msgs/OccupancyGrid, transient local)
        scan_level (sensor_msgs/LaserScan, 브리지가 기울지 않았을 때만 발행) - 맵에 없는 장애물(새로 놓인 상자, 사람 등)을 잠시 기억해 경로 계획에 반영
        astar/obstacle (geometry_msgs/PointStamped) - 브리지가 부딪힘을 감지한 자리 (LiDAR 에 안 보이는 낮은 물체)
+       astar/zones (std_msgs/String, JSON 목록, transient local) - 웹에서 그린 금지 구역 (브리지가 서버에서 받아 발행)
 발행:  astar/remembered (geometry_msgs/PoseArray) - 지금 기억 중인 LiDAR 장애물 칸 (1초마다, 웹 표시용)
        astar/bumps (geometry_msgs/PoseArray) - 기억 중인 부딪힌 자리 중심
 서비스: astar/get_plan (nav_msgs/srv/GetPlan)
 발행:  astar/plan (nav_msgs/Path)  - RViz 확인용
+       astar/plan_map (nav_msgs/OccupancyGrid, transient local) - 실제로 계획에 쓰는 격자 (가공 + 금지 구역, RViz 확인용)
+
+기존 맵 모드에서는 맵을 plan_map.py 로 가공해서 쓴다 (미탐색 줄무늬 메움, 의자/책상 다리 점 부풀리기).
+AMCL 은 원본 맵을 그대로 쓰므로 위치 추정에는 영향 없음.
 """
+import json
 import math
 import os
 import time
@@ -22,10 +28,12 @@ from rclpy.node import Node
 from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy, qos_profile_sensor_data
 from rclpy.time import Time
 from sensor_msgs.msg import LaserScan
+from std_msgs.msg import String
 from std_srvs.srv import Empty
 from tf2_ros import Buffer, TransformException, TransformListener
 
 from .astar import GridPlanner, PlanningError, pad_grid, path_yaws
+from .plan_map import near_mask, prepare, with_added, zone_mask
 
 
 def yaw_from_quaternion(q):
@@ -57,9 +65,18 @@ class AStarPlannerNode(Node):
         self.declare_parameter('scan_persist', 2.5)       # s
         self.declare_parameter('bump_memory', 120.0)     # s, 부딪힌 자리를 장애물로 기억하는 시간
         self.declare_parameter('bump_radius', 0.15)      # m, 부딪힌 자리 주변을 이 반경만큼 막음
+        # 경로 계획용 맵 가공 (기존 맵 모드만, plan_map.py). 0 이면 끔
+        self.declare_parameter('stripe_cells', 2)            # 빈 칸 사이 폭 2*N 칸 미만 미탐색 줄무늬 → 빈 칸
+        self.declare_parameter('cluster_inflate', 0.1)       # m, 작은 덩어리(다리 점)를 부풀림 → 2*(반경+이 값) 미만 틈이 막힘
+        self.declare_parameter('cluster_max_size', 0.4)      # m, 가로/세로가 이보다 긴 장애물 덩어리(벽)는 부풀리지 않음
+        self.declare_parameter('start_clear_radius', 0.35)   # m, 출발 위치 주변은 가공/금지 구역에서 뺌 (빠져나올 수 있게)
 
         self.planner = None
         self.map_msg = None
+        self.base_grid = None     # 계획용 기본 격자 (2차원, 줄무늬 메움)
+        self.added = None         # 기본 격자에 장애물로 더할 칸 (부풀린 다리 점 | 금지 구역)
+        self.cluster_added = None
+        self.zones = []
         self.frame_id = 'map'
         self.scan_points = deque()   # (시각, xs, ys) map 좌표 - 오래 머문(정지한) 장애물만
         self.cell_seen = {}          # 5cm 칸 -> [처음 본 시각, 마지막 본 시각, 본 횟수]
@@ -76,6 +93,8 @@ class AStarPlannerNode(Node):
         self.tf_listener = TransformListener(self.tf_buffer, self)
         self.create_subscription(PointStamped, 'astar/obstacle', self.on_bump, 10)
         self.create_service(Empty, 'astar/clear_obstacles', self.on_clear)
+        self.create_subscription(String, 'astar/zones', self.on_zones, map_qos)
+        self.plan_map_pub = self.create_publisher(OccupancyGrid, 'astar/plan_map', map_qos)
         self.remembered_pub = self.create_publisher(PoseArray, 'astar/remembered', 1)
         self.bumps_pub = self.create_publisher(PoseArray, 'astar/bumps', 1)
         self.bump_centers = deque()   # (시각, x, y) 웹 표시용
@@ -99,8 +118,44 @@ class AStarPlannerNode(Node):
         info = msg.info
         self.frame_id = msg.header.frame_id or 'map'
         self.map_msg = msg
-        self.planner = self.make_planner(msg.data)
-        self.get_logger().info(f'맵 수신: {info.width}x{info.height}, {info.resolution:.3f} m/px')
+        p = lambda name: self.get_parameter(name).value  # noqa: E731
+        grid = np.asarray(msg.data, dtype=np.int16).reshape(info.height, info.width)
+        stats = None
+        if p('allow_unknown'):
+            # SLAM 모드: 맵이 계속 자라는 중이라 가공하지 않는다 (미탐색 칸도 지나가므로 줄무늬도 문제없음)
+            self.base_grid, self.cluster_added = grid, None
+        else:
+            self.base_grid, self.cluster_added, stats = prepare(
+                grid, info.resolution, p('stripe_cells'), p('cluster_inflate'), p('cluster_max_size'),
+                p('occupied_threshold'))
+        self.rebuild()
+        self.get_logger().info(f'맵 수신: {info.width}x{info.height}, {info.resolution:.3f} m/px'
+                               + (', 계획용 가공: ' + ', '.join(f'{k} {v}칸' for k, v in stats.items()) if stats else ''))
+
+    def on_zones(self, msg):
+        try:
+            zones = json.loads(msg.data)
+        except ValueError:
+            self.get_logger().error(f'금지 구역 메시지 오류: {msg.data[:100]}')
+            return
+        self.zones = zones if isinstance(zones, list) else []
+        self.get_logger().info(f'금지 구역 {len(self.zones)}개 받음')
+        if self.map_msg is not None:
+            self.rebuild()
+
+    def rebuild(self):
+        """기본 격자 + 부풀린 다리 점 + 금지 구역으로 계획용 격자를 다시 만든다 (맵/금지 구역이 바뀔 때)."""
+        info = self.map_msg.info
+        ox, oy = info.origin.position.x, info.origin.position.y
+        zones = zone_mask(self.base_grid.shape, info.resolution, ox, oy, self.zones)
+        self.added = zones if self.cluster_added is None else (self.cluster_added | zones)
+        grid = with_added(self.base_grid, self.added, info.resolution, ox, oy)
+        self.planner = self.make_planner(grid.ravel())
+        out = OccupancyGrid()
+        out.header = self.map_msg.header
+        out.info = info
+        out.data = grid.astype(np.int8).ravel().tolist()
+        self.plan_map_pub.publish(out)
 
     def on_scan(self, msg):
         """0.5초마다 LiDAR 점을 map 좌표로 바꿔, 맵의 벽이 아닌 점만 기억한다."""
@@ -205,7 +260,13 @@ class AStarPlannerNode(Node):
         while self.bump_points and now - self.bump_points[0][0] > self.get_parameter('bump_memory').value:
             self.bump_points.popleft()
         info = self.map_msg.info
-        data, w, h, ox, oy = self.map_msg.data, info.width, info.height, self.planner.origin_x, self.planner.origin_y
+        res, ox, oy = info.resolution, info.origin.position.x, info.origin.position.y
+        # 출발 위치가 부풀린 다리 점/금지 구역 안이면 그 주변은 빼고 다시 만든다 (빠져나올 수 있게)
+        clear = self.get_parameter('start_clear_radius').value
+        start_inside = bool(self.added.any() and (self.added & near_mask(
+            self.base_grid.shape, res, ox, oy, start, clear)).any())
+        data = with_added(self.base_grid, self.added, res, ox, oy, start if start_inside else None, clear).ravel()
+        w, h = info.width, info.height
         if self.get_parameter('allow_unknown').value:
             data, w, h, ox, oy = pad_grid(data, w, h, info.resolution, ox, oy, [start, goal])
         grid = np.asarray(data, dtype=np.int16).reshape(h, w).copy()
@@ -222,8 +283,8 @@ class AStarPlannerNode(Node):
             grid[rows[inside], cols[inside]] = 100
             return int(np.count_nonzero(before != 100))
 
-        plain = (self.make_planner(grid.ravel(), w, h, ox, oy) if (w, h) != (info.width, info.height)
-                 else self.planner)
+        plain = (self.make_planner(grid.ravel(), w, h, ox, oy)
+                 if start_inside or (w, h) != (info.width, info.height) else self.planner)
         base = self.make_planner(grid.ravel(), w, h, ox, oy) if mark(list(self.bump_points)) else plain
         self.plain_planner = plain   # 부딪힌 자리를 빼고 맵만 (실패 메시지 구분용)
         cells = mark(list(self.scan_points))
