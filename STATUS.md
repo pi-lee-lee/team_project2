@@ -353,3 +353,8 @@ cd ../ros2_ws && source /opt/ros/humble/setup.bash && colcon build --symlink-ins
 - SLAM 맵을 브리지가 받자마자 서버로 보냄 (예전 3초 묶음 → slam_toolbox 갱신 2초 그대로, 최소 간격 0.5초)
 - 서버 sim 확인: 15초 동안 웹 지도 갱신 7회(간격 2.0초), view_yaw 90° + 로봇 yaw 0° = 화면 위쪽. 브라우저 화면은 아직 직접 확인 못 함
 
+### 라이다 점 → 선 (2026-10-21)
+- 웹에 보이던 점선은 SLAM 지도의 벽: LDS-02 빔 간격 1.5° 가 1.9m 부터 칸(5cm)보다 넓고, slam_toolbox 가 0.5m/29° 마다만 스캔을 지도에 넣어서
+- slam_toolbox `minimum_travel_distance/heading` 0.5 → 0.2 (더 자주 넣어 메움)
+- 웹 실시간 LiDAR 선 표시 (청록): 브리지가 스캔마다(5Hz) 지도 좌표 점을 보내고 웹이 이웃 점 거리 ≤ 0.1m + 빔 간격 x 2.5 면 선으로 이음. 서버 sim: 5.1개/초, 유효 점 281 중 227 구간이 선, 메시지 약 5.4KB
+
