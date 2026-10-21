@@ -28,7 +28,8 @@ class Map(models.Model):
             'origin': [self.origin_x, self.origin_y],
             'width': self.width,
             'height': self.height,
-            'image_url': f'/map/{self.id}.png?v={int(self.updated_at.timestamp())}',
+            # SLAM 맵이 0.5~2초마다 바뀌므로 ms 단위로 (초 단위면 같은 초 안의 갱신을 브라우저 캐시가 막을 수 있음)
+            'image_url': f'/map/{self.id}.png?v={int(self.updated_at.timestamp() * 1000)}',
         }
 
 
