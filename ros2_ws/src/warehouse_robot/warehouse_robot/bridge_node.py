@@ -325,6 +325,10 @@ class BridgeNode(Node):
         # 웹에서 그린 금지 구역 → A* 플래너 (JSON 목록). 플래너가 나중에 떠도 받도록 transient local
         self.zones_pub = self.create_publisher(String, 'astar/zones', map_qos)
         self.zones_json = None
+        # A* 가 경로를 못 찾은 이유 (금지 구역 때문 등). 서비스 응답과 따로 오므로 받은 시각과 같이 둔다
+        self.plan_fail = (0.0, '')
+        self.create_subscription(String, 'astar/fail_reason',
+                                 lambda m: setattr(self, 'plan_fail', (time.monotonic(), m.data)), 10)
         self.level_scan_pub = self.create_publisher(LaserScan, 'scan_level', qos_profile_sensor_data)
         # SLAM 전용: 아무것도 안 맞은 빔(inf)을 range_max 바로 아래 값으로 바꿔서 발행 (to_slam_scan 참고)
         self.slam_scan_pub = self.create_publisher(LaserScan, 'scan_slam', qos_profile_sensor_data)
@@ -628,7 +632,16 @@ class BridgeNode(Node):
             return
         plan = future.result().plan if future.result() else None
         if plan is None or not plan.poses:
-            self.report('failed', '경로를 찾을 수 없습니다.')
+            # 실패 이유(astar/fail_reason)는 토픽으로 따로 오므로 잠깐 기다렸다가 붙인다
+            asked = time.monotonic()
+
+            def report_fail():
+                self.destroy_timer(timer)   # 한 번만
+                if gen != self.generation or self.goal is None:
+                    return
+                t, why = self.plan_fail
+                self.report('failed', f'경로를 찾을 수 없습니다{f": {why}" if why and t >= asked - 1.0 else "."}')
+            timer = self.create_timer(0.3, report_fail)
             return
         if self.controller in ('builtin', 'dwa'):
             start = self.current_pose()

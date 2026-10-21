@@ -24,7 +24,7 @@ from .mapimage import decode_png, gray_to_occupancy
 
 sys.path.insert(0, os.path.join(os.path.dirname(settings.BASE_DIR), 'ros2_ws', 'src', 'warehouse_robot'))
 from warehouse_robot.astar import GridPlanner, PlanningError  # noqa: E402
-from warehouse_robot.plan_map import near_mask, prepare, with_added, zone_contains, zone_mask  # noqa: E402
+from warehouse_robot.plan_map import INSIDE_MARGIN, near_mask, prepare, with_added, zone_contains, zone_mask  # noqa: E402
 
 # 기록이 없을 때 쓰는 기본값: 기본 2초, 0.13 m/s, 회전 0.8 rad/s
 PRIOR = np.array([2.0, 1 / 0.13, 1 / 0.8])
@@ -70,7 +70,7 @@ def _angle(a):
 def path_metrics(m, start, goal):
     """start, goal: (x, y, yaw). 반환: (경로 길이 m, 총 회전량 rad). 경로가 없으면 PlanError."""
     planner, grid, inflated, zones = _planner(m)
-    others = [z for z in zones if not zone_contains(z, start[:2], START_CLEAR)]
+    others = [z for z in zones if not zone_contains(z, start[:2], INSIDE_MARGIN)]
     added = inflated | zone_mask(grid.shape, m.resolution, m.origin_x, m.origin_y, others)
     if len(others) < len(zones) or (added & near_mask(grid.shape, m.resolution, m.origin_x, m.origin_y,
                                                       start[:2], START_CLEAR)).any():

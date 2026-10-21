@@ -31,6 +31,10 @@ except Exception:  # 라즈베리 파이 등 scipy가 없거나 numpy와 버전�
     _scipy_label = None
 
 LINE_WIDTH = 0.1  # m, 선(가상 벽) 금지 구역의 두께
+# 출발 위치가 금지 구역 '안' 이라고 볼 여유 (m). 이 안이면 그 구역을 그 계획에서 뺀다.
+# (예전엔 start_clear_radius 0.35 를 썼더니 구역 옆 통로를 지나다 다시 계획하면 구역 전체가 빠져 가로질렀음.
+#  구역 가장자리 근처는 with_added 의 출발 주변 비우기로 충분)
+INSIDE_MARGIN = 0.05
 
 
 def _dilate(mask, k):

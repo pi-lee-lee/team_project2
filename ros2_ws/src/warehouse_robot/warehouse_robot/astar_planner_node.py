@@ -9,6 +9,7 @@
 서비스: astar/get_plan (nav_msgs/srv/GetPlan)
 발행:  astar/plan (nav_msgs/Path)  - RViz 확인용
        astar/plan_map (nav_msgs/OccupancyGrid, transient local) - 실제로 계획에 쓰는 격자 (가공 + 금지 구역, RViz 확인용)
+       astar/fail_reason (std_msgs/String) - 경로 계획 실패 이유 (금지 구역 때문인지 등). 브리지가 실패 메시지에 붙임
 
 기존 맵 모드에서는 맵을 plan_map.py 로 가공해서 쓴다 (미탐색 줄무늬 메움, 의자/책상 다리 점 부풀리기).
 AMCL 은 원본 맵을 그대로 쓰므로 위치 추정에는 영향 없음.
@@ -33,7 +34,7 @@ from std_srvs.srv import Empty
 from tf2_ros import Buffer, TransformException, TransformListener
 
 from .astar import GridPlanner, PlanningError, pad_grid, path_yaws
-from .plan_map import near_mask, prepare, with_added, zone_contains, zone_mask
+from .plan_map import INSIDE_MARGIN, near_mask, prepare, with_added, zone_contains, zone_mask
 
 
 def yaw_from_quaternion(q):
@@ -95,6 +96,7 @@ class AStarPlannerNode(Node):
         self.create_service(Empty, 'astar/clear_obstacles', self.on_clear)
         self.create_subscription(String, 'astar/zones', self.on_zones, map_qos)
         self.plan_map_pub = self.create_publisher(OccupancyGrid, 'astar/plan_map', map_qos)
+        self.fail_pub = self.create_publisher(String, 'astar/fail_reason', 10)
         self.remembered_pub = self.create_publisher(PoseArray, 'astar/remembered', 1)
         self.bumps_pub = self.create_publisher(PoseArray, 'astar/bumps', 1)
         self.bump_centers = deque()   # (시각, x, y) 웹 표시용
@@ -261,11 +263,11 @@ class AStarPlannerNode(Node):
             self.bump_points.popleft()
         info = self.map_msg.info
         res, ox, oy = info.resolution, info.origin.position.x, info.origin.position.y
-        # 출발 위치가 금지 구역 안이면 그 구역은 이번 계획에서 빼고, 부풀린 다리 점 안이면 그 주변을 빼고
-        # 다시 만든다 (그 안에 서 있는 로봇이 빠져나올 수 있게)
+        # 출발 위치가 금지 구역 안이면 그 구역은 이번 계획에서 빼고, 구역 가장자리/부풀린 다리 점 근처면
+        # 출발 주변(start_clear_radius)만 빼고 다시 만든다 (그 안에 서 있는 로봇이 빠져나올 수 있게)
         clear = self.get_parameter('start_clear_radius').value
         added = self.added
-        start_zones = [z for z in self.zones if zone_contains(z, start, clear)]
+        start_zones = [z for z in self.zones if zone_contains(z, start, INSIDE_MARGIN)]
         if start_zones:
             added = zone_mask(self.base_grid.shape, res, ox, oy, [z for z in self.zones if z not in start_zones])
             if self.cluster_added is not None:
@@ -300,6 +302,26 @@ class AStarPlannerNode(Node):
             return base, None, 0
         self.last_grid = (grid.copy(), ox, oy, info.resolution)
         return base, self.make_planner(grid.ravel(), w, h, ox, oy), cells
+
+    def fail_reason(self, start, goal, tolerance, error):
+        """경로가 없을 때 금지 구역 때문인지. 반환: 설명 문자열 또는 None (금지 구역과 상관없음)."""
+        if not self.zones:
+            return None
+        if any(zone_contains(z, goal, 0.0) for z in self.zones):
+            return '목표가 금지 구역 안에 있습니다'
+        info = self.map_msg.info
+        res, ox, oy = info.resolution, info.origin.position.x, info.origin.position.y
+        clear = self.get_parameter('start_clear_radius').value
+        added = self.cluster_added if self.cluster_added is not None else np.zeros(self.base_grid.shape, dtype=bool)
+        data = with_added(self.base_grid, added, res, ox, oy, start, clear).ravel()
+        w, h = info.width, info.height
+        if self.get_parameter('allow_unknown').value:
+            data, w, h, ox, oy = pad_grid(data, w, h, res, ox, oy, [start, goal])
+        try:
+            self.make_planner(data, w, h, ox, oy).plan(start, goal, goal_tolerance=tolerance)
+        except PlanningError:
+            return None
+        return '금지 구역에 막혀 갈 수 있는 경로가 없습니다'
 
     def dump_grid(self, start, goal):
         """진단용: LiDAR 장애물 때문에 경로가 없었을 때의 격자를 logs/astar_fail.npz 로 남긴다."""
@@ -339,8 +361,11 @@ class AStarPlannerNode(Node):
             except PlanningError as e:
                 # 부딪혔던 자리를 지나는 경로는 쓰지 않는다 (맵만으로 다시 계획하면 같은 물체에 계속 부딪혔음).
                 # 기억은 bump_memory 초 뒤 또는 웹 '상태 초기화'(astar/clear_obstacles)로 지워진다
-                self.get_logger().warn(f'경로 계획 실패: {e}'
-                                       f'{" (부딪혔던 자리 때문일 수 있음)" if base is not self.plain_planner else ""}')
+                reason = self.fail_reason(start, goal, tolerance, e)
+                if reason is None and base is not self.plain_planner:
+                    reason = '부딪혔던 자리 때문일 수 있음'
+                self.get_logger().warn(f'경로 계획 실패: {e}{f" ({reason})" if reason else ""}')
+                self.fail_pub.publish(String(data=reason or str(e)))
                 return response
 
         for (x, y), yaw in zip(points, path_yaws(points, yaw_from_quaternion(g.orientation))):

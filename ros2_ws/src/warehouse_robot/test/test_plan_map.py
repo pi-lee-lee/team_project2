@@ -1,7 +1,8 @@
 import numpy as np
 
 from warehouse_robot.astar import GridPlanner, PlanningError
-from warehouse_robot.plan_map import fill_stripes, inflate_clusters, prepare, with_added, zone_contains, zone_mask
+from warehouse_robot.plan_map import (INSIDE_MARGIN, fill_stripes, inflate_clusters, prepare, with_added, zone_contains,
+                                      zone_mask)
 
 RES = 0.05
 
@@ -100,3 +101,17 @@ def test_zone_blocks_but_robot_inside_can_leave():
     inside = with_added(g, zone, RES, 0.0, 0.0, start=start)
     path = planner(inside).plan(start, (0.4, 1.5))
     assert path[-1] == (0.4, 1.5)
+
+
+def test_robot_beside_zone_does_not_cross_it():
+    """구역 바로 옆(0.2m 밖)에서 다시 계획해도 구역을 빼지 않는다 (출발 주변만 비움) → 구역을 가로지르지 않음.
+    예전엔 0.35m 안이면 구역 전체를 빼서 옆 통로를 지나다 다시 계획하면 구역 위로 경로가 났다."""
+    g = np.zeros((cell(3.0), cell(4.0)), dtype=np.int16)
+    g[0, :] = g[-1, :] = g[:, 0] = g[:, -1] = 100
+    z = {'shape': 'rect', 'x1': 1.5, 'y1': 0.0, 'x2': 2.5, 'y2': 2.2}   # 위쪽 0.8m 만 열림
+    start = (1.3, 1.0)                                                  # 구역 왼쪽 0.2m 밖
+    assert not zone_contains(z, start, INSIDE_MARGIN)
+    zone = zone_mask(g.shape, RES, 0.0, 0.0, [z])
+    path = planner(with_added(g, zone, RES, 0.0, 0.0, start=start)).plan(start, (3.0, 1.0))
+    inside = [(x, y) for x, y in path if 1.6 < x < 2.4 and y < 2.1]
+    assert not inside and max(y for _, y in path) > 2.2
