@@ -9,7 +9,9 @@ consumer에서 database_sync_to_async로 호출한다. 각 함수는 DB를 바�
 import base64
 import math
 import re
+import time
 import zlib
+from datetime import timedelta
 
 from django.db import transaction
 from django.utils import timezone
@@ -53,9 +55,38 @@ def active_task(robot):
     return robot.tasks.filter(status=Task.STATUS_RUNNING).first()
 
 
+LOG_DEDUP_SEC = 10   # 같은 문구는 이 시간 안에 한 번만 기록 (같은 실패가 빠르게 반복될 때 로그가 넘치지 않게)
+
+
 def log(out, robot, message):
+    since = timezone.now() - timedelta(seconds=LOG_DEDUP_SEC)
+    if EventLog.objects.filter(message=message, created_at__gte=since).exists():
+        return
     entry = EventLog.objects.create(robot=robot, message=message)
     out.to_ui({'type': 'log', 'log': entry.to_dict()})
+
+
+# 같은 지점 반복 실패 막기: 이 시간 안에 같은 곳(반경 안) 이동이 이만큼 실패하면 그 지점 요청을 잠시 거절
+REPEAT_FAIL_SEC, REPEAT_FAIL_COUNT, REPEAT_FAIL_RADIUS = 30.0, 3, 0.3
+RECENT_FAILS = {}   # robot_name -> [(시각, x, y)]
+
+
+def recent_fails(robot_name, x, y):
+    now = time.monotonic()
+    fails = [f for f in RECENT_FAILS.get(robot_name, []) if now - f[0] < REPEAT_FAIL_SEC]
+    RECENT_FAILS[robot_name] = fails
+    return sum(1 for _, fx, fy in fails if math.hypot(fx - x, fy - y) < REPEAT_FAIL_RADIUS)
+
+
+def check_goal_allowed(robot, x, y):
+    """금지 구역 안 목표, 같은 곳 반복 실패를 플래너까지 보내지 않고 바로 거절."""
+    m = active_map()
+    zone = next((z for z in m.zones.all() if planning.zone_contains(z.to_dict(), (x, y))), None) if m else None
+    if zone is not None:
+        raise ServiceError(f'목표가 금지 구역 "{zone.name}" 안에 있습니다. 구역 밖을 고르세요.')
+    if recent_fails(robot.name, x, y) >= REPEAT_FAIL_COUNT:
+        raise ServiceError(f'같은 지점({x:.2f}, {y:.2f})이 {REPEAT_FAIL_SEC:.0f}초 안에 {REPEAT_FAIL_COUNT}번 실패했습니다. '
+                           '잠시 뒤 다시 시도하거나 다른 곳을 고르세요.')
 
 
 def set_state(robot, state, message=''):
@@ -339,6 +370,7 @@ def handle_nav_status(name, goal_id, status, message=''):
     elif status == 'failed':
         step.status = TaskStep.STATUS_FAILED
         step.save(update_fields=['status'])
+        RECENT_FAILS.setdefault(robot.name, []).append((time.monotonic(), step.x, step.y))
         log(out, robot, f'{step.name} 이동 실패: {message}')
         if task.steps.count() == 1:
             # 단일 이동("여기로 이동", 위치 하나로 이동)은 바로 실패로 끝내서 다음 명령을 막지 않는다
@@ -381,6 +413,7 @@ def goto_point(robot_name, x, y, yaw, replace=False):
     out = Outbox()
     robot = get_robot(robot_name)
     require_online(robot)
+    check_goal_allowed(robot, x, y)
     task = active_task(robot)
     if task:
         steps = list(task.steps.all())
@@ -469,6 +502,7 @@ def start_delivery(robot_name, location_id, x, y, yaw):
     loc = Location.objects.filter(map=active_map(), id=location_id).first()
     if loc is None or loc.kind == Location.KIND_HOME:
         raise ServiceError('요청할 물건(LED) 위치를 고르세요.')
+    check_goal_allowed(robot, x, y)
     if LIVE.get(robot.name, {}).get('cargo'):
         raise ServiceError(f'로봇에 이미 물건({LIVE[robot.name]["cargo"]})이 실려 있습니다. 먼저 꺼내 주세요.')
     label = loc.cargo_label()

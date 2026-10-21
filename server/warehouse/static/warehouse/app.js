@@ -699,6 +699,7 @@ canvas.addEventListener('pointerup', () => {
     // 끌어서 그린 사각형/선을 금지 구역으로 저장 (모드는 그대로 두어 이어서 그릴 수 있게)
     if (Math.hypot(d.cx - d.sx, d.cy - d.sy) > 5) {
       send('save_zone', { zone: { shape: S.mode === 'wall' ? 'line' : 'rect', ...canvasPair(d) } });
+      notifyExploreZones();
     }
     draw();
     return;
@@ -912,6 +913,11 @@ function renderLocations() {
   }
 }
 
+// 자동 탐색 중에 금지 구역을 바꾸면 탐색기(tools/explore.py)가 받아서 목표를 다시 고른다
+function notifyExploreZones() {
+  if (S.runnerBusy === '자동 탐색') toast('자동 탐색 중: 바뀐 금지 구역을 반영해 탐색 목표를 다시 고릅니다 (구역 안/뒤로는 가지 않음)');
+}
+
 function renderZones() {
   const ul = $('#zones');
   if (!ul) return;
@@ -932,7 +938,10 @@ function renderZones() {
     del.className = 'small';
     del.textContent = '삭제';
     del.addEventListener('click', () => {
-      if (confirm(`"${z.name}" 을(를) 삭제할까요?`)) send('delete_zone', { zone_id: z.id });
+      if (confirm(`"${z.name}" 을(를) 삭제할까요?`)) {
+        send('delete_zone', { zone_id: z.id });
+        notifyExploreZones();
+      }
     });
     li.append(name, coord, del);
     ul.appendChild(li);
