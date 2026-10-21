@@ -667,6 +667,25 @@ class BridgeNode(Node):
             self.server.send({'type': 'cargo', 'label': label})
             self.get_logger().info(f'카메라 인식: {label or "없음"}')
 
+    def fill_no_return(self, msg):
+        """아무것도 못 맞힌 빔(inf)을 센서 최대 거리보다 1cm 짧게 바꾼다 (scan_level 용).
+        slam_toolbox 는 inf 빔을 빈 공간으로 칠하지 않아서, 넓은 창고(sim LiDAR 3.5m)에서 빔의 절반이 버려지고
+        선반이 가까운 쪽만 지도에 드러났다. Karto 는 센서 최대 거리(range_max) 이상인 빔은 버리고,
+        max_laser_range 이상 range_max 미만인 빔은 'max_laser_range 까지 비어 있음, 끝점은 벽 아님' 으로 칠한다
+        → range_max - 0.01 로 넘기고 max_laser_range = range_max - 0.1 (start_slam.sh).
+        (range_max 나 그보다 큰 값으로 넘기면 전부 버려졌음)"""
+        r = np.asarray(msg.ranges, dtype=np.float32)
+        inf = np.isinf(r)
+        if not inf.any():
+            return msg
+        out = LaserScan()
+        out.header, out.angle_min, out.angle_max = msg.header, msg.angle_min, msg.angle_max
+        out.angle_increment, out.time_increment, out.scan_time = msg.angle_increment, msg.time_increment, msg.scan_time
+        out.range_min, out.range_max, out.intensities = msg.range_min, msg.range_max, msg.intensities
+        r[inf] = msg.range_max - 0.01
+        out.ranges = r.tolist()
+        return out
+
     def on_scan(self, msg):
         self.scan = msg
         # AMCL/SLAM/A* 기억에는 평소보다 기울지 않았을 때의 스캔만 넘긴다 (scan_level).
@@ -678,7 +697,7 @@ class BridgeNode(Node):
         elif self.scan_gated_since is None:
             self.scan_gated_since = now
         if self.scan_gated_since is None or now - self.scan_gated_since > 3.0:
-            self.level_scan_pub.publish(msg)
+            self.level_scan_pub.publish(self.fill_no_return(msg))
             self.update_tracks(msg)   # 기울어진 스캔은 바닥을 보므로 추적/DWA 에도 쓰지 않음
 
     def on_imu(self, msg):

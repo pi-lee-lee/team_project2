@@ -32,7 +32,7 @@ slam_toolbox:
     map_update_interval: 5.0
     resolution: 0.05
     min_laser_range: 0.0 #for rastering images
-    max_laser_range: 20.0 #for rastering images
+    max_laser_range: 3.4 # 센서 최대 거리 - 0.1 (start_slam.sh 가 실물이면 7.9). 브리지가 못 맞힌 빔을 '최대 - 0.01' 로 넘겨 빈 공간으로 칠함
     minimum_time_interval: 0.5
     transform_timeout: 0.2
     tf_buffer_duration: 30.

@@ -35,6 +35,13 @@ WORLD_FILE="$WAREHOUSE_HOME/worlds/$WORLD.world"
 [ -f "$WORLD_FILE" ] || WORLD_FILE="$AWS_WAREHOUSE_DIR/worlds/$WORLD/$WORLD.world"
 [ -f "$WORLD_FILE" ] || WORLD_FILE="$GZ/worlds/$WORLD.world"
 [ -f "$WORLD_FILE" ] || { echo "[start_sim] 월드 파일 없음: $WORLD_FILE"; exit 1; }
+# 모델 위치를 서비스로 바꿀 수 있게(/set_entity_state, tools/sim_mover.py) gazebo_ros_state 플러그인이 없으면 넣은 사본을 쓴다
+if ! grep -q gazebo_ros_state "$WORLD_FILE"; then
+  COPY="$WAREHOUSE_HOME/logs/world_$WORLD.world"
+  sed '0,/<world name="[^"]*">/s//&\n    <plugin name="gazebo_ros_state" filename="libgazebo_ros_state.so"><ros><namespace>\/<\/namespace><\/ros><update_rate>20.0<\/update_rate><\/plugin>/' \
+    "$WORLD_FILE" > "$COPY"
+  WORLD_FILE="$COPY"
+fi
 echo "[start_sim] 월드 $WORLD, 출발 위치 ($X, $Y), 화면 $([ $GUI = 1 ] && echo 표시 || echo 없음), 도메인 $ROS_DOMAIN_ID"
 
 GZROS=$(ros2 pkg prefix gazebo_ros)/share/gazebo_ros/launch
