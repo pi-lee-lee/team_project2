@@ -111,12 +111,14 @@ def inflate_clusters(grid, resolution, inflate=0.1, max_blob_size=0.4, occupied_
     np.minimum.at(c_min, lab, cols)
     np.maximum.at(c_max, lab, cols)
     extent = (np.maximum(r_max - r_min, c_max - c_min) + 1) * resolution
-    small = extent <= max_blob_size + 1e-9
+    # 해상도는 OccupancyGrid 에서 float32 로 와서(0.0500000007) 경계값 비교가 틀어지므로 칸 크기의 1% 여유
+    eps = 0.01 * resolution
+    small = extent <= max_blob_size + eps
     small[0] = False
     blobs = small[labels]
     if not blobs.any():
         return np.zeros(grid.shape, dtype=bool)
-    return (obstacle_distance(blobs, resolution, inflate + resolution) <= inflate + 1e-9) & ~occ
+    return (obstacle_distance(blobs, resolution, inflate + resolution) <= inflate + eps) & ~occ
 
 
 def zone_mask(shape, resolution, origin_x, origin_y, zones):

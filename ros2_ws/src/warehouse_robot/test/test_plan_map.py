@@ -53,6 +53,14 @@ def test_walls_are_not_inflated():
     planner(with_added(g, added, RES, 0.0, 0.0)).plan((0.5, 1.5), (2.5, 1.5))
 
 
+def test_float32_resolution_gives_same_result():
+    """OccupancyGrid 의 해상도는 float32 (0.05 → 0.0500000007). yaml 의 0.05 와 결과가 같아야 한다."""
+    g = hall()
+    a = prepare(g, 0.05)[1]
+    b = prepare(g, float(np.float32(0.05)))[1]
+    assert a.sum() > 0 and (a == b).all()
+
+
 def test_fill_stripes_only_between_free_cells():
     g = np.full((40, 40), -1, dtype=np.int16)
     g[10:30, 10:30] = 0
