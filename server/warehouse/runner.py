@@ -27,7 +27,7 @@ if not os.path.isdir(TB3_WORLDS):  # 소스 빌드 대신 apt 로 설치한 PC
 WORLD_LABELS = {
     'maze_room': '미로 방 (실제 방 복제)',
     'lecture_hall': '강당 (강단 + 복도 6×5, 책상 20·의자 40)',
-    'lecture_hall_real': '강당 실물형 (책상 앞판 없음, 의자 무작위 배치)',
+    'lecture_hall_real': '강당 실물형 (책상 앞판 없음, 좌석 줄 사이 0.25m 로 못 지나감, 의자 무작위)',
     'turtlebot3_world': 'TurtleBot3 기본 (육각형)',
     'turtlebot3_house': 'TurtleBot3 집',
     'empty_world': '빈 공간',

@@ -139,7 +139,7 @@ scripts/stop_ros.sh --all
 | `--controller dwa` | A* 경로를 DWA 로 추종 (추적한 움직이는 장애물의 미래 위치를 피함) |
 | `--amcl default` / `hall` / 파일 | (map) 위치 추정 설정. `hall` = `config/amcl_hall.yaml`: 책상/의자가 흩어진 강당·교실용 (지도에 없는 빔에 너그럽게). 웹 실행 모드의 "강당/교실용 위치 추정" 체크와 같음 |
 | `--scan-noise` | (sim) LiDAR 를 실물 LDS-02 처럼: 빔 개수 238~244 변동, 거리 흔들림, 먼 곳 값 빠짐(NaN). 웹 "LiDAR 를 실물처럼" 체크와 같음 |
-| `--world lecture_hall_real` | (sim) 실제 학원과 비슷한 강당: 책상 앞판 없음(다리만 보임), 좌우 끝 열이 벽에 붙음, 의자 무작위 배치 |
+| `--world lecture_hall_real` | (sim) 실제 학원과 비슷한 강당: 책상 앞판 없음(다리만 보임), 좌우 끝 열이 벽에 붙음, 좌석 줄 사이 빈 틈 0.25m(로봇 폭 0.31m 보다 좁아 세로 복도와 맨 앞/뒤 가로 복도로만 다님), 의자 무작위 배치 |
 
 실행 순서: 웹 서버 → 로봇(Pi bringup 은 SSH 로 자동 실행 / Gazebo) → SLAM 또는 map_server+AMCL → A* + 브리지 → (sim+map) 초기 위치 자동 지정.
 `logs/run_mode.env` 에 현재 모드가 기록되고, `source scripts/env.sh` 를 하면 도구들도 같은 도메인/모드를 씁니다.
@@ -352,7 +352,7 @@ dpkg -l ros-humble-tf2 ros-humble-tf2-ros | grep ^ii   # 0.25.24 확인
 | `python3 tools/tf_rates.py [초]` | TF별 수신 빈도와 지연 측정 |
 | `python3 tools/sim_watch.py --world worlds/maze_room.world [--world 상자.sdf] [--seconds N]` | (sim) Gazebo 정답 위치와 비교한 위치 오차, 충돌, 벽 여유, 기울기 기록. Ctrl-C 로 끝내도 요약 출력 |
 | `python3 tools/make_hall_world.py` | 강당 월드 `worlds/lecture_hall.world` 다시 만들기 (강단 + 가로 복도 6 × 세로 복도 5, 책상 20개 · 의자 40개, 치수는 파일 위쪽 상수) |
-| `python3 tools/make_hall_world.py --real` | 실물형 강당 `worlds/lecture_hall_real.world` (책상 앞판 없음, 좌우 끝 세로 복도 없음, 의자 ±0.12m/±15° 무작위, `--seed` 로 배치 바꿈) |
+| `python3 tools/make_hall_world.py --real` | 실물형 강당 `worlds/lecture_hall_real.world` (책상 앞판 없음, 좌우 끝 세로 복도 없음, 좌석 줄 사이 0.25m `--row-gap`, 의자 ±0.12m/±15° 무작위, `--seed` 로 배치 바꿈) |
 | `python3 tools/plan_map.py ~/maps/<맵>.yaml [--check X1 Y1 X2 Y2]...` | A* 가 쓰는 계획용 가공(줄무늬 메움 + 다리 점 부풀림)을 미리 보기 → `<맵>_plan_preview.png`. `--check` 로 홈 ↔ LED 위치 같은 두 점 사이 경로가 가공 전/후 있는지 확인 |
 | `python3 tools/scan_check.py [초]` | (실물) 로봇을 세워 두고 LiDAR 거리대별 응답률/흔들림 측정 → `laser_max_range` 를 3.5m 보다 늘려도 되는지 추천 |
 | `python3 tools/explore.py` | (SLAM) 프론티어 자동 탐색. 웹 "자동 탐색" 과 같음. 가던 방향 유지, 가는 도중 목표가 보이면 바로 다음 목표, 막힌 작은 미탐색 구멍(1 m² 미만) 무시. `--turn-weight 0 --no-early-switch --pocket-min 0` 이면 예전 방식 |

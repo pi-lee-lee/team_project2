@@ -2,12 +2,14 @@
 
     python3 tools/make_hall_world.py [-o worlds/lecture_hall.world]
     python3 tools/make_hall_world.py --real        # 실제 학원과 비슷하게 → worlds/lecture_hall_real.world
-           (= --no-panel --no-side-aisles --jitter 0.12 --yaw-jitter 15 --seed 1 --name lecture_hall_real)
+           (= --no-panel --no-side-aisles --row-gap 0.25 --jitter 0.12 --yaw-jitter 15 --seed 1 --name lecture_hall_real)
 
 실제 학원과 다른 점 (lecture_hall 기본): 책상 앞판이 LiDAR 에 막힌 선으로 보이고, 의자가 줄을 맞춰 놓여 있다.
   --no-panel     책상 앞판 없음 → 실물처럼 좌석 줄이 다리 점으로만 보임
   --no-side-aisles  맨 왼쪽/오른쪽 세로 복도 없음 → 좌우 끝 열 좌석이 벽에 붙음 (실제 학원). 실내 폭 8.3m,
                  원점(출발 위치) = 가로 6 / 세로 2 교차점
+  --row-gap M    좌석 줄 사이(의자 등받이 ~ 다음 줄 책상) 빈 틈을 M m 로 → 0.31m(로봇 폭)보다 좁으면 로봇은 좌석 줄 사이로
+                 못 다니고 세로 복도와 맨 앞(강단 쪽)/맨 뒤(출발) 가로 복도만 다님 (실제 학원). 맨 앞/뒤 가로 복도는 0.9m 그대로
   --jitter M     의자를 ±M m 안에서 무작위로 옮김 (사람이 쓰고 난 뒤처럼), --yaw-jitter 도(°) 만큼 돌림
   --seed N       무작위 배치 번호 (같은 번호면 같은 배치)
 
@@ -41,6 +43,17 @@ W = NV * L + (NV - 1) * S        # 10.1
 HA = NH * L + (NH - 1) * B       # 좌석 구역 10.4
 H = HA + STAGE                   # 12.4
 X0, Y0 = -L / 2, -L / 2          # 실내 왼쪽 아래 모서리 (원점이 출발 교차점 가운데가 되게)
+
+
+def layout(row_gap=None):
+    """(가로 복도 폭 목록 [위(강단 쪽) → 아래], 좌석 구역 높이, 실내 높이).
+    row_gap: 좌석 줄 사이 빈 틈 (의자 등받이 ~ 다음 줄 책상, m). 의자/책상이 좌석 줄 끝에서 EDGE 씩 들어가 있으므로
+    줄 사이 띠 폭 = row_gap - 2 x EDGE. None 이면 모든 가로 복도 L."""
+    aisles = [L] * NH
+    if row_gap is not None:
+        aisles[1:-1] = [max(0.0, row_gap - 2 * EDGE)] * (NH - 2)
+    ha = sum(aisles) + (NH - 1) * B
+    return aisles, ha, ha + STAGE
 
 
 def room(side_aisles=True):
@@ -79,15 +92,15 @@ def box(sx, sy, sz):
     return f'<box><size>{sx:.3f} {sy:.3f} {sz:.3f}</size></box>'
 
 
-def walls(xl=X0, w=W):
-    cx, cy = xl + w / 2, Y0 + H / 2
+def walls(xl=X0, w=W, ha=HA, h=H):
+    cx, cy = xl + w / 2, Y0 + h / 2
     z = WALL_H / 2
     body = part('s', (cx, Y0 - WALL_T / 2, z), box(w + 2 * WALL_T, WALL_T, WALL_H), GRAY)
-    body += part('n', (cx, Y0 + H + WALL_T / 2, z), box(w + 2 * WALL_T, WALL_T, WALL_H), GRAY)
-    body += part('w', (xl - WALL_T / 2, cy, z), box(WALL_T, H, WALL_H), GRAY)
-    body += part('e', (xl + w + WALL_T / 2, cy, z), box(WALL_T, H, WALL_H), GRAY)
+    body += part('n', (cx, Y0 + h + WALL_T / 2, z), box(w + 2 * WALL_T, WALL_T, WALL_H), GRAY)
+    body += part('w', (xl - WALL_T / 2, cy, z), box(WALL_T, h, WALL_H), GRAY)
+    body += part('e', (xl + w + WALL_T / 2, cy, z), box(WALL_T, h, WALL_H), GRAY)
     # 강단 바닥 표시 (얇은 색칠, 충돌 없음)
-    body += part('stage', (cx, Y0 + HA + STAGE / 2, 0.002), box(w, STAGE, 0.004), STAGE_MAT, collide=False)
+    body += part('stage', (cx, Y0 + ha + STAGE / 2, 0.002), box(w, STAGE, 0.004), STAGE_MAT, collide=False)
     return f'''    <model name="walls">
       <static>true</static>
       <link name="link">
@@ -137,13 +150,16 @@ def desk(name, x, y, panel=True):
 '''
 
 
-def seats(panel=True, jitter=0.0, yaw_jitter=0.0, seed=0, x0=X0):
+def seats(panel=True, jitter=0.0, yaw_jitter=0.0, seed=0, x0=X0, row_gap=None):
     """좌석 줄마다, 세로 복도 사이 칸마다 책상 1개(북쪽) + 의자 2개(남쪽). 반환: (sdf, 책상 수, 의자 수)
     jitter/yaw_jitter(rad): 의자를 무작위로 옮기고 돌림. 책상 쪽(북쪽)으로는 앞 다리가 책상에 닿지 않을 만큼만."""
     rnd = random.Random(seed)
     out, nd, nc = [], 0, 0
+    aisles, ha, _ = layout(row_gap)
+    # 의자가 남쪽으로 밀려도 다음 줄 책상과 겹치지 않게 (좁은 줄 사이에서)
+    south = min(jitter, aisles[1] + 2 * EDGE - 0.02) if row_gap is not None else jitter
+    top = Y0 + ha - aisles[0]
     for i in range(NH - 1):                       # 가로 i+1 과 i+2 사이 좌석 줄
-        top = Y0 + HA - L - i * (L + B)           # 좌석 줄 북쪽 끝
         bottom = top - B
         desk_y = top - EDGE - DESK_D / 2
         chair_y = bottom + EDGE + C / 2
@@ -154,23 +170,26 @@ def seats(panel=True, jitter=0.0, yaw_jitter=0.0, seed=0, x0=X0):
             for k, off in enumerate((-(C + G) / 2, (C + G) / 2)):
                 # 의자는 강단을 바라본다: 등받이가 남쪽(로봇 출발 쪽)
                 dx = rnd.uniform(-jitter, jitter)
-                dy = rnd.uniform(-jitter, min(jitter, 0.03))   # 책상 쪽으로는 거의 안 밀림
+                dy = rnd.uniform(-south, min(jitter, 0.03))   # 책상 쪽으로는 거의 안 밀림
                 out.append(chair(f'chair_{i + 1}_{j + 1}_{k + 1}', xc + off + dx, chair_y + dy, back_north=True,
                                  yaw=rnd.uniform(-yaw_jitter, yaw_jitter)))
                 nc += 1
+        top = bottom - aisles[i + 1]
     return ''.join(out), nd, nc
 
 
-def world_sdf(name='lecture_hall', panel=True, jitter=0.0, yaw_jitter=0.0, seed=0, side_aisles=True):
+def world_sdf(name='lecture_hall', panel=True, jitter=0.0, yaw_jitter=0.0, seed=0, side_aisles=True, row_gap=None):
     x0, xl, w, start_col = room(side_aisles)
-    body, nd, n = seats(panel, jitter, yaw_jitter, seed, x0)
-    extra = '' if panel and not jitter and side_aisles else (
+    _, ha, h = layout(row_gap)
+    body, nd, n = seats(panel, jitter, yaw_jitter, seed, x0, row_gap)
+    extra = '' if panel and not jitter and side_aisles and row_gap is None else (
         f'\n     실물처럼: 책상 앞판 {"있음" if panel else "없음"}, 좌우 끝 세로 복도 {"있음" if side_aisles else "없음(끝 열이 벽에 붙음)"}, '
-        f'의자 ±{jitter:.2f}m / ±{math.degrees(yaw_jitter):.0f}° 무작위 (seed {seed})')
+        + (f'좌석 줄 사이 빈 틈 {row_gap:.2f}m (로봇 폭 0.31m 보다 좁아 못 지나감, 맨 앞/뒤 가로 복도만 {L}m), ' if row_gap is not None else '')
+        + f'의자 ±{jitter:.2f}m / ±{math.degrees(yaw_jitter):.0f}° 무작위 (seed {seed})')
     return f'''<?xml version="1.0"?>
 <!-- tools/make_hall_world.py 로 만든 월드: {name}
      강단(위, 공터 {STAGE}m) + 가로 복도 {NH} x 세로 복도 {NV if side_aisles else NV - 2} (폭 {L}m), 가로 복도 사이 좌석 줄({B}m)에 칸마다 책상 1개 + 의자 2개 (책상 {nd}개, 의자 {n}개)
-     실내 {w:.1f} x {H:.1f}m, 원점 = 가로 {NH} / 세로 {start_col} 교차점 (로봇 출발 위치){extra} -->
+     실내 {w:.1f} x {h:.1f}m, 원점 = 가로 {NH} / 세로 {start_col} 교차점 (로봇 출발 위치){extra} -->
 <sdf version="1.6">
   <world name="{name}">
     <!-- 모델 위치를 서비스로 바꿀 수 있게 (/set_entity_state): tools/sim_mover.py 로 움직이는 장애물 시험 -->
@@ -188,7 +207,7 @@ def world_sdf(name='lecture_hall', panel=True, jitter=0.0, yaw_jitter=0.0, seed=
       <max_step_size>0.001</max_step_size>
       <real_time_factor>1</real_time_factor>
     </physics>
-{walls(xl, w)}{body}  </world>
+{walls(xl, w, ha, h)}{body}  </world>
 </sdf>
 ''', nd, n
 
@@ -200,25 +219,30 @@ def main():
     ap.add_argument('--name', default='lecture_hall', help='월드 이름 (기본 출력 worlds/<이름>.world)')
     ap.add_argument('--no-panel', action='store_true', help='책상 앞판 없음 (실물처럼 다리만)')
     ap.add_argument('--no-side-aisles', action='store_true', help='맨 왼쪽/오른쪽 세로 복도 없음 (끝 열 좌석이 벽에 붙음)')
+    ap.add_argument('--row-gap', type=float, default=None,
+                    help='좌석 줄 사이 빈 틈 m (의자 등받이 ~ 다음 줄 책상). 0.31 보다 작으면 로봇이 못 지나감')
     ap.add_argument('--jitter', type=float, default=0.0, help='의자 위치 무작위 범위 ±m')
     ap.add_argument('--yaw-jitter', type=float, default=0.0, help='의자 방향 무작위 범위 ±도')
     ap.add_argument('--seed', type=int, default=0)
     ap.add_argument('--real', action='store_true',
-                    help='실제 학원처럼: --no-panel --no-side-aisles --jitter 0.12 --yaw-jitter 15 --seed 1 --name lecture_hall_real')
+                    help='실제 학원처럼: --no-panel --no-side-aisles --row-gap 0.25 --jitter 0.12 --yaw-jitter 15 --seed 1 '
+                         '--name lecture_hall_real')
     args = ap.parse_args()
     if args.real:
         args.no_panel, args.no_side_aisles, args.jitter, args.yaw_jitter = True, True, 0.12, 15.0
+        args.row_gap = 0.25 if args.row_gap is None else args.row_gap
         args.seed = args.seed or 1
         args.name = 'lecture_hall_real' if args.name == 'lecture_hall' else args.name
     if not args.output:
         args.output = os.path.join(here, '..', 'worlds', f'{args.name}.world')
     sdf, nd, n = world_sdf(args.name, not args.no_panel, args.jitter, math.radians(args.yaw_jitter), args.seed,
-                           not args.no_side_aisles)
+                           not args.no_side_aisles, args.row_gap)
     _, xl, w, _ = room(not args.no_side_aisles)
+    _, _, h = layout(args.row_gap)
     with open(args.output, 'w') as f:
         f.write(sdf)
-    print(f'{os.path.normpath(args.output)}: 실내 {w:.1f} x {H:.1f}m, 책상 {nd}개, 의자 {n}개, '
-          f'x {xl:.2f}~{xl + w:.2f}, y {Y0:.2f}~{Y0 + H:.2f}')
+    print(f'{os.path.normpath(args.output)}: 실내 {w:.1f} x {h:.1f}m, 책상 {nd}개, 의자 {n}개, '
+          f'x {xl:.2f}~{xl + w:.2f}, y {Y0:.2f}~{Y0 + h:.2f}')
 
 
 if __name__ == '__main__':
