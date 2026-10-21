@@ -358,3 +358,10 @@ cd ../ros2_ws && source /opt/ros/humble/setup.bash && colcon build --symlink-ins
 - slam_toolbox `minimum_travel_distance/heading` 0.5 → 0.2 (더 자주 넣어 메움)
 - 웹 실시간 LiDAR 선 표시 (청록): 브리지가 스캔마다(5Hz) 지도 좌표 점을 보내고 웹이 이웃 점 거리 ≤ 0.1m + 빔 간격 x 2.5 면 선으로 이음. 서버 sim: 5.1개/초, 유효 점 281 중 227 구간이 선, 메시지 약 5.4KB
 
+### 원점 x 축 = 로봇 정면, 웹은 x 위쪽 / y 왼쪽 (2026-10-21)
+- 원인: SLAM 원점 = 오도메트리 원점(bringup 을 켠 자리). 실측 오도메트리 x −4.73, y 1.21, −19° 인 채로 SLAM 시작 → 원점이 로봇에서 4.9m, x 축이 19° 틀어짐
+- `run.sh --robot real --mode slam`(웹 맵 만들기 포함)이 SLAM 직전에 Pi 에서 `/reset_odometry` 호출 → 원점 = 시작 때 로봇 자리, x 축 = 로봇 정면.
+  PC(Cyclone)에서 부르면 요청은 가는데 응답이 안 와서(20초 시간 초과) SSH 로 Pi 에서 부름 (4초)
+- 실물 확인: 초기화 후 오도메트리 0, SLAM 지도 속 로봇 방향 0.3°
+- 웹 지도 표시: 고정 90° 회전으로 x 축이 화면 위쪽, y 축이 왼쪽 (좌표는 그대로, 보기만). 첫 번째 시도(SLAM 마다 각도 저장)는 되돌림
+
