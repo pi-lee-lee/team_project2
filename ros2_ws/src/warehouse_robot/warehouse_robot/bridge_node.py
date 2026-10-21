@@ -40,6 +40,7 @@ from std_srvs.srv import Empty
 from tf2_ros import Buffer, TransformException, TransformListener
 
 from .astar import obstacle_distance
+from .cmd_mux import CmdMux
 from .astar_planner_node import quaternion_from_yaw, yaw_from_quaternion
 from .dwa import DWAConfig, DWAFollower, transform_points
 from .follower import PurePursuit
@@ -159,6 +160,16 @@ class ServerConnection:
             self.ws.close()
 
 
+class _AutoCmd:
+    """자동 이동 명령을 선택기에 넣는 창구. 예전 코드의 self.cmd_vel_pub.publish(Twist) 를 그대로 쓰게 한다."""
+
+    def __init__(self, mux):
+        self.mux = mux
+
+    def publish(self, msg):
+        self.mux.auto(msg.linear.x, msg.angular.z, time.monotonic())
+
+
 class BridgeNode(Node):
     def __init__(self):
         super().__init__('warehouse_bridge')
@@ -213,7 +224,7 @@ class BridgeNode(Node):
         self.backoff_distance = p('backoff_distance')
         self.mode = p('mode')
         # 이 브리지 실행 번호. 서버는 SLAM 실행이 바뀐 것을 알고 이전 SLAM 맵/위치(다른 좌표계)를 지운다
-        self.session = f'{int(time.time())}-{os.getpid()}'
+        self.session = self.run_session()
         self.map_dirty = False      # SLAM 모드: 서버로 보낼 새 맵이 있음
         self.last_map_sent = 0.0
         self.script_running = None  # 실행 중인 scripts/*.sh 이름
@@ -290,7 +301,13 @@ class BridgeNode(Node):
         self.nomotion_client = self.create_client(Empty, 'request_nomotion_update')  # AMCL
         self.nomotion_left = 0
         self.create_timer(0.3, self.nomotion_step)
-        self.cmd_vel_pub = self.create_publisher(Twist, 'cmd_vel', 1)
+        # /cmd_vel 은 브리지만 내보낸다. 자동 이동은 self.cmd_vel_pub.publish(...) 로 선택기(CmdMux)에 넣고,
+        # 수동 조작(웹 teleop, 외부 키보드 cmd_vel_teleop)·정지와 우선순위를 가려 20Hz 로 내보낸다
+        self._cmd_out = self.create_publisher(Twist, 'cmd_vel', 1)
+        self.mux = CmdMux()
+        self.cmd_vel_pub = _AutoCmd(self.mux)
+        self.create_subscription(Twist, 'cmd_vel_teleop', self.on_external_teleop, 10)
+        self.create_timer(0.05, self.mux_step)
         self.bump_pub = self.create_publisher(PointStamped, 'astar/obstacle', 10)  # 부딪힌 자리 → A* 플래너
         self.clear_obstacles_client = self.create_client(Empty, 'astar/clear_obstacles')
         self.level_scan_pub = self.create_publisher(LaserScan, 'scan_level', qos_profile_sensor_data)
@@ -317,7 +334,7 @@ class BridgeNode(Node):
         self.create_timer(0.1, self.publish_stop)
         # 웹 수동 조작 (teleop): 누르고 있는 동안 0.1초마다 명령이 온다. 0.4초 넘게 안 오면 멈춤
         self.teleop = None   # (v, w, 받은 시각)
-        self.create_timer(0.05, self.teleop_step)
+        # (수동 조작 목표는 mux_step 에서 선택기로 넣음)
         self.create_timer(0.05, self.control_step)
         self.create_timer(1.0, self.send_health)
         self.create_timer(1.0, self.flush_map)
@@ -995,10 +1012,10 @@ class BridgeNode(Node):
         out = []
         moving = self.get_parameter('dwa_follow.moving_speed').value
         for t in self.tracks:
-            if math.hypot(t.x[2], t.x[3]) < moving:
-                continue   # 웹에는 움직이는 것만 (멈춘 물체는 지도/기억한 장애물로 보임)
+            # 추적은 지도의 빈 칸에서만 하므로 멈춘 track 은 '지도에 없는 멈춘 물체' (상자, 서 있는 사람 등)
             (x, y), = transform_points([t.x[:2]], *m_o)
             out.append({'id': t.id, 'x': round(float(x), 3), 'y': round(float(y), 3),
+                        'moving': bool(math.hypot(t.x[2], t.x[3]) >= moving),
                         'vx': round(float(c * t.x[2] - s * t.x[3]), 3), 'vy': round(float(s * t.x[2] + c * t.x[3]), 3),
                         'r': round(float(t.radius), 3)})
         self.server.send({'type': 'obstacles', 'obstacles': out})
@@ -1216,35 +1233,73 @@ class BridgeNode(Node):
         self.nomotion_left -= 1
         self.nomotion_client.call_async(Empty.Request())
 
+    @staticmethod
+    def run_session():
+        """SLAM 실행 번호 = run.sh 가 시작한 시각 (logs/run_mode.env 첫 줄). 브리지만 다시 떠도 같은 값이라
+        서버가 SLAM 지도/위치를 지우지 않는다 (예전에는 브리지 실행마다 달라서 브리지 재시작만으로 위치가 지워졌음)."""
+        path = os.path.join(os.environ.get('WAREHOUSE_HOME', ''), 'logs', 'run_mode.env')
+        try:
+            with open(path, encoding='utf-8') as f:
+                first = f.readline().strip()
+            if first.startswith('#') and '(' in first:
+                return 'run-' + first[first.rindex('(') + 1:].rstrip(')')
+        except OSError:
+            pass
+        return f'{int(time.time())}-{os.getpid()}'
+
     def on_teleop(self, v, w):
+        """웹 수동 조작 (서버가 작업 중에는 막는다)."""
         if self.goal is not None or self.follower is not None:
-            return   # 작업 중에는 무시 (서버도 막지만 한 번 더)
+            return
         v = max(-0.1, min(0.2, v))
         w = max(-1.2, min(1.2, w))
         self.teleop = (v, w, time.monotonic())
 
-    def teleop_step(self):
+    def on_external_teleop(self, msg):
+        """외부 키보드 조작 (ros2 run turtlebot3_teleop teleop_keyboard --ros-args -r cmd_vel:=cmd_vel_teleop).
+        키보드 프로그램은 키를 안 눌러도 0 을 계속 보내므로, 0 이 아닌 명령이 올 때만 수동 조작으로 본다
+        (0 은 이미 수동 조작 중일 때만 = 멈춤). 자동 이동 중에 움직이면 자동 이동을 멈춘다 (수동이 우선)."""
+        v, w = msg.linear.x, msg.angular.z
+        moving = abs(v) > 1e-3 or abs(w) > 1e-3
+        if not moving and self.teleop is None:
+            return
+        if moving and (self.goal is not None or self.follower is not None):
+            self.get_logger().warn('외부 수동 조작(cmd_vel_teleop)이 들어와 자동 이동을 멈춥니다')
+            self.cancel_goal(report=False)
+            self.server.send({'type': 'nav_status', 'goal_id': self.last_goal_id, 'status': 'failed',
+                              'message': '수동 조작(키보드)으로 중단했습니다.'})
+        self.on_teleop(v, w)
+
+    def teleop_step(self, now):
+        """수동 조작 목표를 선택기에 넣는다 (안전 확인 후). 0.4초 넘게 명령이 없으면 선택기가 부드럽게 멈춘다."""
         t = self.teleop
         if t is None:
             return
         v, w, at = t
-        if time.monotonic() - at > 0.4 or self.goal is not None or self.tipped:
+        if now - at > 0.4 or self.goal is not None or self.tipped:
             self.teleop = None
-            self.cmd_vel_pub.publish(Twist())
             return
         # 앞뒤에 물체가 가까우면 그쪽으로는 가지 않는다 (회전은 허용). LiDAR 기준 앞 0.25m / 뒤 0.3m
         if v > 0 and self.front_clearance(math.radians(30)) < 0.25:
             v = 0.0
         if v < 0 and self.front_clearance(math.radians(30), center=math.pi) < 0.3:
             v = 0.0
+        self.mux.manual(v, w, now)
+
+    def mux_step(self):
+        now = time.monotonic()
+        self.teleop_step(now)
+        out = self.mux.step(now)
+        if out is None:
+            return
         cmd = Twist()
-        cmd.linear.x, cmd.angular.z = v, w
-        self.cmd_vel_pub.publish(cmd)
+        cmd.linear.x, cmd.angular.z = out
+        self._cmd_out.publish(cmd)
 
     def publish_stop(self):
         if self.stop_count > 0:
             self.stop_count -= 1
-            self.cmd_vel_pub.publish(Twist())
+            self.mux.stop(time.monotonic(), hold=0.1)
 
 
 def main(args=None):

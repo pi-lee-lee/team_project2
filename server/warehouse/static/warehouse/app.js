@@ -497,14 +497,16 @@ function draw() {
   if (S.obstacles && S.obstacles.length && Date.now() - (S.obstaclesAt || 0) < 2000) {
     for (const o of S.obstacles) {
       const [cx, cy] = worldToCanvas(o.x, o.y);
+      // 움직이는 물체: 주황 + 1초 뒤 위치 화살표, 지도에 없는 멈춘 물체: 회색
+      const moving = o.moving === undefined ? Math.hypot(o.vx, o.vy) > 0.08 : o.moving;
       ctx.beginPath();
       ctx.arc(cx, cy, Math.max(4, o.r * pxPerM), 0, 2 * Math.PI);
-      ctx.fillStyle = 'rgba(249, 115, 22, 0.35)';
+      ctx.fillStyle = moving ? 'rgba(249, 115, 22, 0.35)' : 'rgba(100, 116, 139, 0.35)';
       ctx.fill();
-      ctx.strokeStyle = '#ea580c';
+      ctx.strokeStyle = moving ? '#ea580c' : '#475569';
       ctx.lineWidth = 2;
       ctx.stroke();
-      if (Math.hypot(o.vx, o.vy) > 0.05) {
+      if (moving) {
         const [ex, ey] = worldToCanvas(o.x + o.vx, o.y + o.vy);
         ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(ex, ey); ctx.stroke();
         ctx.beginPath(); ctx.arc(ex, ey, 3, 0, 2 * Math.PI); ctx.fillStyle = '#ea580c'; ctx.fill();
