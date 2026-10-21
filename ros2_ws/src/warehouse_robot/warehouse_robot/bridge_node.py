@@ -75,6 +75,7 @@ def battery_percent(voltage, cells=3, empty_voltage=11.0):
 NO_RETURN_MARGIN = 0.05  # m. inf 빔을 range_max - 이 값으로 바꿈 (slam_toolbox max_laser_range 는 이보다 작아야 함)
 
 
+MAP_MIN_INTERVAL = 0.5  # s, SLAM 맵을 서버로 보내는 최소 간격 (갱신되면 바로 보내되 몰려 오면 이 간격으로)
 SLAM_BEAMS = 240  # slam_toolbox 에 넘기는 스캔의 빔 개수 (1.5° 간격 고정). 실물 LDS-02 가 238~244 개라 빈 칸이 거의 없게
 
 
@@ -356,7 +357,7 @@ class BridgeNode(Node):
         # (수동 조작 목표는 mux_step 에서 선택기로 넣음)
         self.create_timer(0.05, self.control_step)
         self.create_timer(1.0, self.send_health)
-        self.create_timer(1.0, self.flush_map)
+        self.create_timer(0.1, self.flush_map)
         self.get_logger().info(f'브리지 시작 (planner={self.planner_mode}, controller={self.controller})')
 
     # ---------------------------------------------------------- 서버 메시지 처리
@@ -412,14 +413,16 @@ class BridgeNode(Node):
         self.map_msg = msg
         self.update_map_dist(msg)
         if self.mode == 'slam':
-            # SLAM 은 1~5초마다 맵을 갱신하므로 서버에는 3초에 한 번만 보낸다 (flush_map)
+            # SLAM 이 맵을 갱신하면(2초마다) 바로 보낸다. 짧은 간격으로 몰려 오면 MAP_MIN_INTERVAL 마다 최신 것만 (flush_map)
+            # (예전: 3초에 한 번만 보내서 웹 지도가 최대 3초 늦었음)
             self.map_dirty = True
+            self.flush_map()
             return
         self.get_logger().info(f'맵 수신 {msg.info.width}x{msg.info.height}')
         self.send_map()
 
     def flush_map(self):
-        if self.map_dirty and time.monotonic() - self.last_map_sent >= 3.0:
+        if self.map_dirty and time.monotonic() - self.last_map_sent >= MAP_MIN_INTERVAL:
             self.map_dirty = False
             self.last_map_sent = time.monotonic()
             self.send_map()
