@@ -163,6 +163,18 @@ else
     sleep 12; grep -q "Run!" ~/warehouse_bringup.log && echo "   bringup 시작됨" || echo "   bringup 확인 필요: Pi ~/warehouse_bringup.log"; }'
 fi
 
+# 2-1) 실물 + 맵 만들기: SLAM 지도 원점 = 오도메트리 원점(= bringup 을 켠 자리)이라, bringup 을 켜 둔 채 로봇을
+#      옮기면 원점이 로봇에서 떨어지고 x 축이 로봇 정면과 틀어진다 (예: 4.9m, -19°).
+#      SLAM 을 켜기 직전에 오도메트리를 0 으로 → 원점 = 지금 로봇 자리, x 축 = 로봇 정면.
+#      (turtlebot3_node 의 /reset_odometry: x, y, 방향을 0 으로. 방향은 IMU 변화량을 더하므로 초기화 후에도 맞음)
+if [ "$ROBOT" = real ] && [ "$MODE" = slam ]; then
+  if timeout 20 ros2 service call /reset_odometry std_srvs/srv/Trigger "{}" 2>/dev/null | grep -q "success=True"; then
+    echo "   오도메트리 초기화: SLAM 원점 = 지금 로봇 위치, x 축 = 로봇 정면"
+  else
+    echo "   경고: 오도메트리 초기화 실패 (/reset_odometry 응답 없음). 원점이 로봇과 어긋날 수 있음"
+  fi
+fi
+
 # 3) 위치 추정 또는 SLAM
 if [ "$MODE" = slam ]; then
   echo "3) SLAM ($ENGINE)"; start slam "$DIR/start_slam.sh" "$ENGINE"
