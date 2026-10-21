@@ -66,6 +66,8 @@ class RobotConsumer(AsyncJsonWebsocketConsumer):
             live['pose'] = {'x': msg['x'], 'y': msg['y'], 'yaw': msg['yaw']}
             await self.channel_layer.group_send(UI_GROUP, {'type': 'send.msg', 'msg': {
                 'type': 'pose', 'robot': self.robot_name, **live['pose']}})
+            if self.robot_name in services.SLAM_VIEW_PENDING:   # 새 SLAM 실행의 첫 위치: 화면 각도 정하기
+                await self.run(services.set_slam_view, self.robot_name, msg['yaw'])
         elif kind == 'pose_lost':
             if live.pop('pose', None) is not None:
                 await self.broadcast({'type': 'pose', 'robot': self.robot_name, 'lost': True})

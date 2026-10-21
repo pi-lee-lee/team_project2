@@ -16,6 +16,9 @@ class Map(models.Model):
     # SLAM 맵(slam_live)을 만든 브리지 실행 번호. SLAM 좌표계(원점 = 시작 때 로봇 위치)는 실행마다 다르므로
     # 새 실행이면 이전 맵과 위치를 지운다
     session = models.CharField(max_length=40, blank=True, default='')
+    # 웹 화면에서 맵을 돌려 보여 줄 각도 (rad, 반시계). SLAM 을 새로 시작하면 그때 로봇이 바라보는 방향이
+    # 화면 위쪽이 되도록 정한다 (좌표는 그대로, 보기만 돌림). SLAM 맵을 저장하면 같이 복사
+    view_yaw = models.FloatField(default=0.0)
 
     def __str__(self):
         return self.name
@@ -28,7 +31,9 @@ class Map(models.Model):
             'origin': [self.origin_x, self.origin_y],
             'width': self.width,
             'height': self.height,
-            'image_url': f'/map/{self.id}.png?v={int(self.updated_at.timestamp())}',
+            'view_yaw': self.view_yaw,
+            # 맵이 2초마다 바뀌므로 ms 단위로 (초 단위면 같은 초 안의 갱신을 브라우저 캐시가 막을 수 있음)
+            'image_url': f'/map/{self.id}.png?v={int(self.updated_at.timestamp() * 1000)}',
         }
 
 
