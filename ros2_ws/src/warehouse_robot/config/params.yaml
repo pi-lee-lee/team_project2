@@ -44,15 +44,15 @@ warehouse_bridge:
       enabled: true
       max_range: 3.0
       static_match_dist: 0.15 # 지도 벽에서 이 거리 이내 점은 정적 (AMCL 오차 감안)
-      cluster_gap: 0.15
-      min_points: 3
+      cluster_gap: 0.25
+      min_points: 2
       max_diameter: 0.8       # 이보다 큰 덩어리(벽 등)는 장애물로 보지 않음
       min_radius: 0.05
-      gate: 0.5               # 이전 track 과 이 거리 안이면 같은 물체
-      min_hits: 3             # 이만큼 연속으로 보여야 확정
+      gate: 0.55              # 이전 track 과 이 거리 안이면 같은 물체
+      min_hits: 5             # 이만큼 연속으로 보여야 확정
       max_misses: 5
-      accel_noise: 1.0
-      meas_noise: 0.05
+      accel_noise: 1.8
+      meas_noise: 0.13
       max_speed: 1.5
     # controller: dwa 일 때 (tb3_nav local_planner 이식). 실수는 소수점을 붙일 것
     dwa:
@@ -73,10 +73,10 @@ warehouse_bridge:
       dynamic_margin: 0.15    # 움직이는 장애물 추가 여유. sim 추적 오차(95% 10cm)보다 크게. 0.25 는 너무 오래 기다림
       dynamic_growth: 0.03    # 예측 1초당 반경 증가
       obstacle_influence: 0.5
-      w_heading: 0.4
-      w_path: 1.0
-      w_goal: 1.0
-      w_obstacle: 0.6
+      w_heading: 0.3
+      w_path: 1.5
+      w_goal: 2.3
+      w_obstacle: 1.2
       w_speed: 0.3
       w_collision: 2.0        # 1.0~6.0 사이에서 결과 차이 없음 (tools/dwa_tune.py), 덜 극단적인 값
     dwa_follow:
