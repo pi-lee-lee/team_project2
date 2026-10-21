@@ -276,12 +276,7 @@ def start_slam_session(out, robot, session):
     브리지가 재연결만 한 것(같은 실행 번호)이면 그대로 둔다."""
     SLAM_SESSION[robot.name] = session
     m = Map.objects.filter(name=SLAM_MAP).first()
-    if m is not None and m.session == session:
-        return
-    # 새 실행: 첫 위치를 받으면 로봇 정면이 화면 위쪽이 되게 화면 각도를 정한다 (set_slam_view)
-    SLAM_VIEW.pop(robot.name, None)
-    SLAM_VIEW_PENDING.add(robot.name)
-    if m is None:
+    if m is None or m.session == session:
         return
     n = m.locations.count()
     m.delete()
@@ -306,9 +301,6 @@ def handle_map(name, msg):
     if m.name == SLAM_MAP and SLAM_SESSION.get(name) and m.session != SLAM_SESSION[name]:
         m.session = SLAM_SESSION[name]
         m.save(update_fields=['session'])
-    if m.name == SLAM_MAP and name in SLAM_VIEW and m.view_yaw != SLAM_VIEW[name]:
-        m.view_yaw = SLAM_VIEW[name]
-        m.save(update_fields=['view_yaw'])
     out.to_ui({'type': 'map', 'map': m.to_dict()})
     push_locations(out)
     # 브리지가 (재)연결하면 맵부터 보내므로, 여기서 그 맵의 금지 구역을 로봇에 알린다
@@ -688,23 +680,6 @@ def delete_location(location_id):
     return out
 
 
-def set_slam_view(name, yaw):
-    """새 SLAM 실행의 첫 로봇 위치(yaw): 로봇 정면이 웹 화면 위쪽(90°)이 되도록 맵 화면 각도를 정한다."""
-    out = Outbox()
-    if name not in SLAM_VIEW_PENDING:
-        return out
-    SLAM_VIEW_PENDING.discard(name)
-    view = math.atan2(math.sin(math.pi / 2 - yaw), math.cos(math.pi / 2 - yaw))
-    SLAM_VIEW[name] = view
-    m = Map.objects.filter(name=SLAM_MAP).first()
-    if m is not None and m.view_yaw != view:
-        m.view_yaw = view
-        m.save(update_fields=['view_yaw'])
-        out.to_ui({'type': 'map', 'map': m.to_dict()})
-    out.to_ui({'type': 'view_yaw', 'view_yaw': view})   # 맵이 아직 없을 때(격자 화면)도 바로 돌림
-    return out
-
-
 @transaction.atomic
 def save_zone(data):
     """금지 구역 추가. data: {shape: rect|line, x1, y1, x2, y2, name?}"""
@@ -747,8 +722,6 @@ MAP_NAME_RE = re.compile(r'^[A-Za-z0-9_-]{1,50}$')
 PENDING_SAVE = {}  # robot_name -> 저장 요청한 맵 이름
 SLAM_MAP = 'slam_live'
 SLAM_SESSION = {}  # robot_name -> 지금 연결된 브리지의 SLAM 실행 번호
-SLAM_VIEW_PENDING = set()  # 새 SLAM 실행: 첫 로봇 위치를 받으면 화면 각도(view_yaw)를 정할 로봇
-SLAM_VIEW = {}             # robot_name -> 이번 SLAM 실행의 화면 각도 (rad)
 
 
 @transaction.atomic
@@ -796,8 +769,6 @@ def carry_over_locations(name):
     src = Map.objects.filter(name='slam_live').first()
     if src is None:
         return 0
-    m.view_yaw = src.view_yaw   # 저장한 맵도 SLAM 때와 같은 방향으로 보이게
-    m.save(update_fields=['view_yaw'])
     copied = 0
     for loc in src.locations.all():
         _, created = Location.objects.update_or_create(
