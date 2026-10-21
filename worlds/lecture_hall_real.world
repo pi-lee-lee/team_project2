@@ -1,8 +1,8 @@
 <?xml version="1.0"?>
 <!-- tools/make_hall_world.py 로 만든 월드: lecture_hall_real
-     강단(위, 공터 2.0m) + 가로 복도 6 x 세로 복도 5 (폭 0.9m), 가로 복도 사이 좌석 줄(1.0m)에 칸마다 책상 1개 + 의자 2개 (책상 20개, 의자 40개)
-     실내 10.1 x 12.4m, 원점 = 가로 6 / 세로 1 교차점 (로봇 출발 위치)
-     실물처럼: 책상 앞판 없음, 의자 ±0.12m / ±15° 무작위 (seed 1) -->
+     강단(위, 공터 2.0m) + 가로 복도 6 x 세로 복도 3 (폭 0.9m), 가로 복도 사이 좌석 줄(1.0m)에 칸마다 책상 1개 + 의자 2개 (책상 20개, 의자 40개)
+     실내 8.3 x 12.4m, 원점 = 가로 6 / 세로 2 교차점 (로봇 출발 위치)
+     실물처럼: 책상 앞판 없음, 좌우 끝 세로 복도 없음(끝 열이 벽에 붙음), 의자 ±0.12m / ±15° 무작위 (seed 1) -->
 <sdf version="1.6">
   <world name="lecture_hall_real">
     <!-- 모델 위치를 서비스로 바꿀 수 있게 (/set_entity_state): tools/sim_mover.py 로 움직이는 장애물 시험 -->
@@ -24,51 +24,51 @@
       <static>true</static>
       <link name="link">
         <collision name="c_s">
-          <pose>4.600 -0.500 0.250 0 0 0</pose>
-          <geometry><box><size>10.300 0.100 0.500</size></box></geometry>
+          <pose>2.300 -0.500 0.250 0 0 0</pose>
+          <geometry><box><size>8.500 0.100 0.500</size></box></geometry>
         </collision>
         <visual name="v_s">
-          <pose>4.600 -0.500 0.250 0 0 0</pose>
-          <geometry><box><size>10.300 0.100 0.500</size></box></geometry>
+          <pose>2.300 -0.500 0.250 0 0 0</pose>
+          <geometry><box><size>8.500 0.100 0.500</size></box></geometry>
           <material><ambient>0.6 0.6 0.6 1</ambient><diffuse>0.7 0.7 0.7 1</diffuse></material>
         </visual>
         <collision name="c_n">
-          <pose>4.600 12.000 0.250 0 0 0</pose>
-          <geometry><box><size>10.300 0.100 0.500</size></box></geometry>
+          <pose>2.300 12.000 0.250 0 0 0</pose>
+          <geometry><box><size>8.500 0.100 0.500</size></box></geometry>
         </collision>
         <visual name="v_n">
-          <pose>4.600 12.000 0.250 0 0 0</pose>
-          <geometry><box><size>10.300 0.100 0.500</size></box></geometry>
+          <pose>2.300 12.000 0.250 0 0 0</pose>
+          <geometry><box><size>8.500 0.100 0.500</size></box></geometry>
           <material><ambient>0.6 0.6 0.6 1</ambient><diffuse>0.7 0.7 0.7 1</diffuse></material>
         </visual>
         <collision name="c_w">
-          <pose>-0.500 5.750 0.250 0 0 0</pose>
+          <pose>-1.900 5.750 0.250 0 0 0</pose>
           <geometry><box><size>0.100 12.400 0.500</size></box></geometry>
         </collision>
         <visual name="v_w">
-          <pose>-0.500 5.750 0.250 0 0 0</pose>
+          <pose>-1.900 5.750 0.250 0 0 0</pose>
           <geometry><box><size>0.100 12.400 0.500</size></box></geometry>
           <material><ambient>0.6 0.6 0.6 1</ambient><diffuse>0.7 0.7 0.7 1</diffuse></material>
         </visual>
         <collision name="c_e">
-          <pose>9.700 5.750 0.250 0 0 0</pose>
+          <pose>6.500 5.750 0.250 0 0 0</pose>
           <geometry><box><size>0.100 12.400 0.500</size></box></geometry>
         </collision>
         <visual name="v_e">
-          <pose>9.700 5.750 0.250 0 0 0</pose>
+          <pose>6.500 5.750 0.250 0 0 0</pose>
           <geometry><box><size>0.100 12.400 0.500</size></box></geometry>
           <material><ambient>0.6 0.6 0.6 1</ambient><diffuse>0.7 0.7 0.7 1</diffuse></material>
         </visual>
         <visual name="v_stage">
-          <pose>4.600 10.950 0.002 0 0 0</pose>
-          <geometry><box><size>10.100 2.000 0.004</size></box></geometry>
+          <pose>2.300 10.950 0.002 0 0 0</pose>
+          <geometry><box><size>8.300 2.000 0.004</size></box></geometry>
           <material><ambient>0.5 0.4 0.6 1</ambient><diffuse>0.6 0.5 0.7 1</diffuse></material>
         </visual>
       </link>
     </model>
     <model name="desk_1_1">
       <static>true</static>
-      <pose>1.150 8.800 0 0 0 0</pose>
+      <pose>-1.150 8.800 0 0 0 0</pose>
       <link name="link">
         <collision name="c_leg0">
           <pose>-0.550 -0.175 0.345 0 0 0</pose>
@@ -119,7 +119,7 @@
     </model>
     <model name="chair_1_1_1">
       <static>true</static>
-      <pose>0.712 8.332 0 0 0 0.138</pose>
+      <pose>-1.588 8.332 0 0 0 0.138</pose>
       <link name="link">
         <collision name="c_leg0">
           <pose>-0.200 -0.200 0.225 0 0 0</pose>
@@ -179,7 +179,7 @@
     </model>
     <model name="chair_1_1_2">
       <static>true</static>
-      <pose>1.441 8.279 0 0 0 -0.026</pose>
+      <pose>-0.859 8.279 0 0 0 -0.026</pose>
       <link name="link">
         <collision name="c_leg0">
           <pose>-0.200 -0.200 0.225 0 0 0</pose>
@@ -239,7 +239,7 @@
     </model>
     <model name="desk_1_2">
       <static>true</static>
-      <pose>3.450 8.800 0 0 0 0</pose>
+      <pose>1.150 8.800 0 0 0 0</pose>
       <link name="link">
         <collision name="c_leg0">
           <pose>-0.550 -0.175 0.345 0 0 0</pose>
@@ -290,7 +290,7 @@
     </model>
     <model name="chair_1_2_1">
       <static>true</static>
-      <pose>3.136 8.323 0 0 0 -0.213</pose>
+      <pose>0.836 8.323 0 0 0 -0.213</pose>
       <link name="link">
         <collision name="c_leg0">
           <pose>-0.200 -0.200 0.225 0 0 0</pose>
@@ -350,7 +350,7 @@
     </model>
     <model name="chair_1_2_2">
       <static>true</static>
-      <pose>3.687 8.330 0 0 0 -0.035</pose>
+      <pose>1.387 8.330 0 0 0 -0.035</pose>
       <link name="link">
         <collision name="c_leg0">
           <pose>-0.200 -0.200 0.225 0 0 0</pose>
@@ -410,7 +410,7 @@
     </model>
     <model name="desk_1_3">
       <static>true</static>
-      <pose>5.750 8.800 0 0 0 0</pose>
+      <pose>3.450 8.800 0 0 0 0</pose>
       <link name="link">
         <collision name="c_leg0">
           <pose>-0.550 -0.175 0.345 0 0 0</pose>
@@ -461,7 +461,7 @@
     </model>
     <model name="chair_1_3_1">
       <static>true</static>
-      <pose>5.463 8.205 0 0 0 -0.029</pose>
+      <pose>3.163 8.205 0 0 0 -0.029</pose>
       <link name="link">
         <collision name="c_leg0">
           <pose>-0.200 -0.200 0.225 0 0 0</pose>
@@ -521,7 +521,7 @@
     </model>
     <model name="chair_1_3_2">
       <static>true</static>
-      <pose>6.153 8.239 0 0 0 0.233</pose>
+      <pose>3.853 8.239 0 0 0 0.233</pose>
       <link name="link">
         <collision name="c_leg0">
           <pose>-0.200 -0.200 0.225 0 0 0</pose>
@@ -581,7 +581,7 @@
     </model>
     <model name="desk_1_4">
       <static>true</static>
-      <pose>8.050 8.800 0 0 0 0</pose>
+      <pose>5.750 8.800 0 0 0 0</pose>
       <link name="link">
         <collision name="c_leg0">
           <pose>-0.550 -0.175 0.345 0 0 0</pose>
@@ -632,7 +632,7 @@
     </model>
     <model name="chair_1_4_1">
       <static>true</static>
-      <pose>7.796 8.210 0 0 0 -0.248</pose>
+      <pose>5.496 8.210 0 0 0 -0.248</pose>
       <link name="link">
         <collision name="c_leg0">
           <pose>-0.200 -0.200 0.225 0 0 0</pose>
@@ -692,7 +692,7 @@
     </model>
     <model name="chair_1_4_2">
       <static>true</static>
-      <pose>8.410 8.346 0 0 0 -0.062</pose>
+      <pose>6.110 8.346 0 0 0 -0.062</pose>
       <link name="link">
         <collision name="c_leg0">
           <pose>-0.200 -0.200 0.225 0 0 0</pose>
@@ -752,7 +752,7 @@
     </model>
     <model name="desk_2_1">
       <static>true</static>
-      <pose>1.150 6.900 0 0 0 0</pose>
+      <pose>-1.150 6.900 0 0 0 0</pose>
       <link name="link">
         <collision name="c_leg0">
           <pose>-0.550 -0.175 0.345 0 0 0</pose>
@@ -803,7 +803,7 @@
     </model>
     <model name="chair_2_1_1">
       <static>true</static>
-      <pose>0.732 6.368 0 0 0 -0.247</pose>
+      <pose>-1.568 6.368 0 0 0 -0.247</pose>
       <link name="link">
         <collision name="c_leg0">
           <pose>-0.200 -0.200 0.225 0 0 0</pose>
@@ -863,7 +863,7 @@
     </model>
     <model name="chair_2_1_2">
       <static>true</static>
-      <pose>1.433 6.371 0 0 0 -0.002</pose>
+      <pose>-0.867 6.371 0 0 0 -0.002</pose>
       <link name="link">
         <collision name="c_leg0">
           <pose>-0.200 -0.200 0.225 0 0 0</pose>
@@ -923,7 +923,7 @@
     </model>
     <model name="desk_2_2">
       <static>true</static>
-      <pose>3.450 6.900 0 0 0 0</pose>
+      <pose>1.150 6.900 0 0 0 0</pose>
       <link name="link">
         <collision name="c_leg0">
           <pose>-0.550 -0.175 0.345 0 0 0</pose>
@@ -974,7 +974,7 @@
     </model>
     <model name="chair_2_2_1">
       <static>true</static>
-      <pose>3.036 6.340 0 0 0 -0.147</pose>
+      <pose>0.736 6.340 0 0 0 -0.147</pose>
       <link name="link">
         <collision name="c_leg0">
           <pose>-0.200 -0.200 0.225 0 0 0</pose>
@@ -1034,7 +1034,7 @@
     </model>
     <model name="chair_2_2_2">
       <static>true</static>
-      <pose>3.790 6.348 0 0 0 -0.251</pose>
+      <pose>1.490 6.348 0 0 0 -0.251</pose>
       <link name="link">
         <collision name="c_leg0">
           <pose>-0.200 -0.200 0.225 0 0 0</pose>
@@ -1094,7 +1094,7 @@
     </model>
     <model name="desk_2_3">
       <static>true</static>
-      <pose>5.750 6.900 0 0 0 0</pose>
+      <pose>3.450 6.900 0 0 0 0</pose>
       <link name="link">
         <collision name="c_leg0">
           <pose>-0.550 -0.175 0.345 0 0 0</pose>
@@ -1145,7 +1145,7 @@
     </model>
     <model name="chair_2_3_1">
       <static>true</static>
-      <pose>5.481 6.388 0 0 0 0.075</pose>
+      <pose>3.181 6.388 0 0 0 0.075</pose>
       <link name="link">
         <collision name="c_leg0">
           <pose>-0.200 -0.200 0.225 0 0 0</pose>
@@ -1205,7 +1205,7 @@
     </model>
     <model name="chair_2_3_2">
       <static>true</static>
-      <pose>6.025 6.454 0 0 0 0.188</pose>
+      <pose>3.725 6.454 0 0 0 0.188</pose>
       <link name="link">
         <collision name="c_leg0">
           <pose>-0.200 -0.200 0.225 0 0 0</pose>
@@ -1265,7 +1265,7 @@
     </model>
     <model name="desk_2_4">
       <static>true</static>
-      <pose>8.050 6.900 0 0 0 0</pose>
+      <pose>5.750 6.900 0 0 0 0</pose>
       <link name="link">
         <collision name="c_leg0">
           <pose>-0.550 -0.175 0.345 0 0 0</pose>
@@ -1316,7 +1316,7 @@
     </model>
     <model name="chair_2_4_1">
       <static>true</static>
-      <pose>7.609 6.355 0 0 0 0.116</pose>
+      <pose>5.309 6.355 0 0 0 0.116</pose>
       <link name="link">
         <collision name="c_leg0">
           <pose>-0.200 -0.200 0.225 0 0 0</pose>
@@ -1376,7 +1376,7 @@
     </model>
     <model name="chair_2_4_2">
       <static>true</static>
-      <pose>8.451 6.445 0 0 0 -0.041</pose>
+      <pose>6.151 6.445 0 0 0 -0.041</pose>
       <link name="link">
         <collision name="c_leg0">
           <pose>-0.200 -0.200 0.225 0 0 0</pose>
@@ -1436,7 +1436,7 @@
     </model>
     <model name="desk_3_1">
       <static>true</static>
-      <pose>1.150 5.000 0 0 0 0</pose>
+      <pose>-1.150 5.000 0 0 0 0</pose>
       <link name="link">
         <collision name="c_leg0">
           <pose>-0.550 -0.175 0.345 0 0 0</pose>
@@ -1487,7 +1487,7 @@
     </model>
     <model name="chair_3_1_1">
       <static>true</static>
-      <pose>0.879 4.506 0 0 0 -0.103</pose>
+      <pose>-1.421 4.506 0 0 0 -0.103</pose>
       <link name="link">
         <collision name="c_leg0">
           <pose>-0.200 -0.200 0.225 0 0 0</pose>
@@ -1547,7 +1547,7 @@
     </model>
     <model name="chair_3_1_2">
       <static>true</static>
-      <pose>1.521 4.537 0 0 0 0.181</pose>
+      <pose>-0.779 4.537 0 0 0 0.181</pose>
       <link name="link">
         <collision name="c_leg0">
           <pose>-0.200 -0.200 0.225 0 0 0</pose>
@@ -1607,7 +1607,7 @@
     </model>
     <model name="desk_3_2">
       <static>true</static>
-      <pose>3.450 5.000 0 0 0 0</pose>
+      <pose>1.150 5.000 0 0 0 0</pose>
       <link name="link">
         <collision name="c_leg0">
           <pose>-0.550 -0.175 0.345 0 0 0</pose>
@@ -1658,7 +1658,7 @@
     </model>
     <model name="chair_3_2_1">
       <static>true</static>
-      <pose>3.101 4.493 0 0 0 -0.244</pose>
+      <pose>0.801 4.493 0 0 0 -0.244</pose>
       <link name="link">
         <collision name="c_leg0">
           <pose>-0.200 -0.200 0.225 0 0 0</pose>
@@ -1718,7 +1718,7 @@
     </model>
     <model name="chair_3_2_2">
       <static>true</static>
-      <pose>3.738 4.525 0 0 0 -0.045</pose>
+      <pose>1.438 4.525 0 0 0 -0.045</pose>
       <link name="link">
         <collision name="c_leg0">
           <pose>-0.200 -0.200 0.225 0 0 0</pose>
@@ -1778,7 +1778,7 @@
     </model>
     <model name="desk_3_3">
       <static>true</static>
-      <pose>5.750 5.000 0 0 0 0</pose>
+      <pose>3.450 5.000 0 0 0 0</pose>
       <link name="link">
         <collision name="c_leg0">
           <pose>-0.550 -0.175 0.345 0 0 0</pose>
@@ -1829,7 +1829,7 @@
     </model>
     <model name="chair_3_3_1">
       <static>true</static>
-      <pose>5.322 4.487 0 0 0 0.106</pose>
+      <pose>3.022 4.487 0 0 0 0.106</pose>
       <link name="link">
         <collision name="c_leg0">
           <pose>-0.200 -0.200 0.225 0 0 0</pose>
@@ -1889,7 +1889,7 @@
     </model>
     <model name="chair_3_3_2">
       <static>true</static>
-      <pose>6.142 4.461 0 0 0 -0.032</pose>
+      <pose>3.842 4.461 0 0 0 -0.032</pose>
       <link name="link">
         <collision name="c_leg0">
           <pose>-0.200 -0.200 0.225 0 0 0</pose>
@@ -1949,7 +1949,7 @@
     </model>
     <model name="desk_3_4">
       <static>true</static>
-      <pose>8.050 5.000 0 0 0 0</pose>
+      <pose>5.750 5.000 0 0 0 0</pose>
       <link name="link">
         <collision name="c_leg0">
           <pose>-0.550 -0.175 0.345 0 0 0</pose>
@@ -2000,7 +2000,7 @@
     </model>
     <model name="chair_3_4_1">
       <static>true</static>
-      <pose>7.702 4.522 0 0 0 0.011</pose>
+      <pose>5.402 4.522 0 0 0 0.011</pose>
       <link name="link">
         <collision name="c_leg0">
           <pose>-0.200 -0.200 0.225 0 0 0</pose>
@@ -2060,7 +2060,7 @@
     </model>
     <model name="chair_3_4_2">
       <static>true</static>
-      <pose>8.374 4.478 0 0 0 -0.246</pose>
+      <pose>6.074 4.478 0 0 0 -0.246</pose>
       <link name="link">
         <collision name="c_leg0">
           <pose>-0.200 -0.200 0.225 0 0 0</pose>
@@ -2120,7 +2120,7 @@
     </model>
     <model name="desk_4_1">
       <static>true</static>
-      <pose>1.150 3.100 0 0 0 0</pose>
+      <pose>-1.150 3.100 0 0 0 0</pose>
       <link name="link">
         <collision name="c_leg0">
           <pose>-0.550 -0.175 0.345 0 0 0</pose>
@@ -2171,7 +2171,7 @@
     </model>
     <model name="chair_4_1_1">
       <static>true</static>
-      <pose>0.690 2.611 0 0 0 0.253</pose>
+      <pose>-1.610 2.611 0 0 0 0.253</pose>
       <link name="link">
         <collision name="c_leg0">
           <pose>-0.200 -0.200 0.225 0 0 0</pose>
@@ -2231,7 +2231,7 @@
     </model>
     <model name="chair_4_1_2">
       <static>true</static>
-      <pose>1.522 2.564 0 0 0 -0.173</pose>
+      <pose>-0.778 2.564 0 0 0 -0.173</pose>
       <link name="link">
         <collision name="c_leg0">
           <pose>-0.200 -0.200 0.225 0 0 0</pose>
@@ -2291,7 +2291,7 @@
     </model>
     <model name="desk_4_2">
       <static>true</static>
-      <pose>3.450 3.100 0 0 0 0</pose>
+      <pose>1.150 3.100 0 0 0 0</pose>
       <link name="link">
         <collision name="c_leg0">
           <pose>-0.550 -0.175 0.345 0 0 0</pose>
@@ -2342,7 +2342,7 @@
     </model>
     <model name="chair_4_2_1">
       <static>true</static>
-      <pose>3.101 2.652 0 0 0 0.142</pose>
+      <pose>0.801 2.652 0 0 0 0.142</pose>
       <link name="link">
         <collision name="c_leg0">
           <pose>-0.200 -0.200 0.225 0 0 0</pose>
@@ -2402,7 +2402,7 @@
     </model>
     <model name="chair_4_2_2">
       <static>true</static>
-      <pose>3.810 2.634 0 0 0 -0.14</pose>
+      <pose>1.510 2.634 0 0 0 -0.14</pose>
       <link name="link">
         <collision name="c_leg0">
           <pose>-0.200 -0.200 0.225 0 0 0</pose>
@@ -2462,7 +2462,7 @@
     </model>
     <model name="desk_4_3">
       <static>true</static>
-      <pose>5.750 3.100 0 0 0 0</pose>
+      <pose>3.450 3.100 0 0 0 0</pose>
       <link name="link">
         <collision name="c_leg0">
           <pose>-0.550 -0.175 0.345 0 0 0</pose>
@@ -2513,7 +2513,7 @@
     </model>
     <model name="chair_4_3_1">
       <static>true</static>
-      <pose>5.403 2.648 0 0 0 0.041</pose>
+      <pose>3.103 2.648 0 0 0 0.041</pose>
       <link name="link">
         <collision name="c_leg0">
           <pose>-0.200 -0.200 0.225 0 0 0</pose>
@@ -2573,7 +2573,7 @@
     </model>
     <model name="chair_4_3_2">
       <static>true</static>
-      <pose>6.090 2.545 0 0 0 0.025</pose>
+      <pose>3.790 2.545 0 0 0 0.025</pose>
       <link name="link">
         <collision name="c_leg0">
           <pose>-0.200 -0.200 0.225 0 0 0</pose>
@@ -2633,7 +2633,7 @@
     </model>
     <model name="desk_4_4">
       <static>true</static>
-      <pose>8.050 3.100 0 0 0 0</pose>
+      <pose>5.750 3.100 0 0 0 0</pose>
       <link name="link">
         <collision name="c_leg0">
           <pose>-0.550 -0.175 0.345 0 0 0</pose>
@@ -2684,7 +2684,7 @@
     </model>
     <model name="chair_4_4_1">
       <static>true</static>
-      <pose>7.810 2.506 0 0 0 0.149</pose>
+      <pose>5.510 2.506 0 0 0 0.149</pose>
       <link name="link">
         <collision name="c_leg0">
           <pose>-0.200 -0.200 0.225 0 0 0</pose>
@@ -2744,7 +2744,7 @@
     </model>
     <model name="chair_4_4_2">
       <static>true</static>
-      <pose>8.477 2.638 0 0 0 0.126</pose>
+      <pose>6.177 2.638 0 0 0 0.126</pose>
       <link name="link">
         <collision name="c_leg0">
           <pose>-0.200 -0.200 0.225 0 0 0</pose>
@@ -2804,7 +2804,7 @@
     </model>
     <model name="desk_5_1">
       <static>true</static>
-      <pose>1.150 1.200 0 0 0 0</pose>
+      <pose>-1.150 1.200 0 0 0 0</pose>
       <link name="link">
         <collision name="c_leg0">
           <pose>-0.550 -0.175 0.345 0 0 0</pose>
@@ -2855,7 +2855,7 @@
     </model>
     <model name="chair_5_1_1">
       <static>true</static>
-      <pose>0.874 0.683 0 0 0 0.032</pose>
+      <pose>-1.426 0.683 0 0 0 0.032</pose>
       <link name="link">
         <collision name="c_leg0">
           <pose>-0.200 -0.200 0.225 0 0 0</pose>
@@ -2915,7 +2915,7 @@
     </model>
     <model name="chair_5_1_2">
       <static>true</static>
-      <pose>1.482 0.613 0 0 0 0.194</pose>
+      <pose>-0.818 0.613 0 0 0 0.194</pose>
       <link name="link">
         <collision name="c_leg0">
           <pose>-0.200 -0.200 0.225 0 0 0</pose>
@@ -2975,7 +2975,7 @@
     </model>
     <model name="desk_5_2">
       <static>true</static>
-      <pose>3.450 1.200 0 0 0 0</pose>
+      <pose>1.150 1.200 0 0 0 0</pose>
       <link name="link">
         <collision name="c_leg0">
           <pose>-0.550 -0.175 0.345 0 0 0</pose>
@@ -3026,7 +3026,7 @@
     </model>
     <model name="chair_5_2_1">
       <static>true</static>
-      <pose>3.117 0.635 0 0 0 0.002</pose>
+      <pose>0.817 0.635 0 0 0 0.002</pose>
       <link name="link">
         <collision name="c_leg0">
           <pose>-0.200 -0.200 0.225 0 0 0</pose>
@@ -3086,7 +3086,7 @@
     </model>
     <model name="chair_5_2_2">
       <static>true</static>
-      <pose>3.796 0.659 0 0 0 -0.081</pose>
+      <pose>1.496 0.659 0 0 0 -0.081</pose>
       <link name="link">
         <collision name="c_leg0">
           <pose>-0.200 -0.200 0.225 0 0 0</pose>
@@ -3146,7 +3146,7 @@
     </model>
     <model name="desk_5_3">
       <static>true</static>
-      <pose>5.750 1.200 0 0 0 0</pose>
+      <pose>3.450 1.200 0 0 0 0</pose>
       <link name="link">
         <collision name="c_leg0">
           <pose>-0.550 -0.175 0.345 0 0 0</pose>
@@ -3197,7 +3197,7 @@
     </model>
     <model name="chair_5_3_1">
       <static>true</static>
-      <pose>5.409 0.699 0 0 0 0.059</pose>
+      <pose>3.109 0.699 0 0 0 0.059</pose>
       <link name="link">
         <collision name="c_leg0">
           <pose>-0.200 -0.200 0.225 0 0 0</pose>
@@ -3257,7 +3257,7 @@
     </model>
     <model name="chair_5_3_2">
       <static>true</static>
-      <pose>6.090 0.609 0 0 0 -0.142</pose>
+      <pose>3.790 0.609 0 0 0 -0.142</pose>
       <link name="link">
         <collision name="c_leg0">
           <pose>-0.200 -0.200 0.225 0 0 0</pose>
@@ -3317,7 +3317,7 @@
     </model>
     <model name="desk_5_4">
       <static>true</static>
-      <pose>8.050 1.200 0 0 0 0</pose>
+      <pose>5.750 1.200 0 0 0 0</pose>
       <link name="link">
         <collision name="c_leg0">
           <pose>-0.550 -0.175 0.345 0 0 0</pose>
@@ -3368,7 +3368,7 @@
     </model>
     <model name="chair_5_4_1">
       <static>true</static>
-      <pose>7.623 0.693 0 0 0 0.189</pose>
+      <pose>5.323 0.693 0 0 0 0.189</pose>
       <link name="link">
         <collision name="c_leg0">
           <pose>-0.200 -0.200 0.225 0 0 0</pose>
@@ -3428,7 +3428,7 @@
     </model>
     <model name="chair_5_4_2">
       <static>true</static>
-      <pose>8.472 0.725 0 0 0 0.166</pose>
+      <pose>6.172 0.725 0 0 0 0.166</pose>
       <link name="link">
         <collision name="c_leg0">
           <pose>-0.200 -0.200 0.225 0 0 0</pose>

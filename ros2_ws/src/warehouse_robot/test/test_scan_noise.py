@@ -29,17 +29,17 @@ def test_noise_and_dropout_grow_with_distance():
         near.append(degrade(*sim_scan(1.0), 0.12, rng)[0])
         far.append(degrade(*sim_scan(3.2), 0.12, rng)[0])
     near, far = np.concatenate(near), np.concatenate(far)
-    drop_near, drop_far = (near == 0).mean(), (far == 0).mean()
+    drop_near, drop_far = np.isnan(near).mean(), np.isnan(far).mean()
     assert drop_near < 0.05 and drop_far > 0.15
-    std_near = np.std(near[near > 0])
-    std_far = np.std(far[np.isfinite(far) & (far > 0)])
+    std_near = np.std(near[np.isfinite(near)])
+    std_far = np.std(far[np.isfinite(far)])
     assert 0.01 < std_near < 0.04 and std_far > std_near
 
 
-def test_beyond_max_range_is_no_return_and_inf_kept():
+def test_no_return_is_nan_like_real_lds02():
     rng = np.random.default_rng(2)
     cfg = ScanNoiseConfig(drop_base=0.0, drop_far=0.0)
-    r, _, _ = degrade(*sim_scan(5.0), 0.12, rng, cfg)
-    assert np.isinf(r).all()
-    r, _, _ = degrade([math.inf] * 360, 0.0, 2 * math.pi / 360, 0.12, rng, cfg)
-    assert np.isinf(r).all()
+    r, _, _ = degrade(*sim_scan(5.0), 0.12, rng, cfg)      # max_range 3.5 보다 멂
+    assert np.isnan(r).all()
+    r, _, _ = degrade([math.inf] * 360, 0.0, 2 * math.pi / 360, 0.12, rng, cfg)   # Gazebo: 아무것도 안 맞음
+    assert np.isnan(r).all()
