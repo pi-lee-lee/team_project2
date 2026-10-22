@@ -33,7 +33,7 @@ warehouse_bridge:
     max_retries: 2
     arrive_tolerance: 0.3     # Nav2가 성공이라고 해도 목표와 이 거리 이상이면 실패로 처리
     controller: hybrid        # hybrid(기본): 평소 pure pursuit, 경로 앞 장애물이 가까우면 DWA / mppi: 항상 MPPI / dwa: 항상 DWA / builtin: 항상 pure pursuit / nav2: Nav2 controller_server
-    max_speed: 0.26           # m/s (pure pursuit). Waffle Pi 하드웨어 한계 (2026-10-22: 0.1 이 느리다고 해서 올림, 실물 미시험)
+    max_speed: 0.18           # m/s (pure pursuit). Waffle Pi 하드웨어 한계 (2026-10-22: 0.1 이 느리다고 해서 올림, 실물 미시험)
     max_turn_speed: 1.82      # rad/s (pure pursuit 회전, 제자리 회전). 하드웨어 한계 (예전 1.0 → 0.6 → 1.82)
     max_accel: 0.3            # m/s² (pure pursuit). 출발은 이 가속으로 점점 빨라지고, 목표 앞은 이 감속으로 멈춤 (0.26 m/s 까지 0.9초, 정지 거리 약 11cm)
     max_turn_accel: 1.5       # rad/s² (pure pursuit 제자리 회전). DWA 의 max_acc_v / max_acc_w 와 같은 값
