@@ -349,7 +349,7 @@ class BridgeNode(Node):
         self.declare_parameter('dwa_follow.moving_speed', 0.08)  # 이보다 빠른 track 만 움직이는 장애물로 (멈춘 물체 속도 노이즈 ~0.06, 느린 사람 0.1)
         # controller=hybrid: 평소 pure pursuit, 장애물이 가까우면 DWA
         self.declare_parameter('hybrid.trigger_distance', 1.0)  # 로봇에서 이 거리 안 + 앞쪽 경로 가까이에 track 이 있으면 DWA (m)
-        self.declare_parameter('hybrid.moving_distance', 1.5)   # 움직이는 track 은 경로와 상관없이 이 거리 안이면 DWA (m)
+        self.declare_parameter('hybrid.moving_distance', 1.5)   # (box_trigger=false 일 때) 움직이는 track 이 이 거리 안이면 DWA (m)
         self.declare_parameter('hybrid.path_width', 0.4)        # track 가장자리가 앞쪽 경로에서 이 거리 안이면 '경로 위' (m)
         self.declare_parameter('hybrid.path_ahead', 1.5)        # 앞쪽 경로를 이 길이만큼 본다 (m)
         self.declare_parameter('hybrid.release_time', 2.0)      # 장애물이 이 시간 동안 안 보이면 pure pursuit 로 (s)
@@ -362,6 +362,9 @@ class BridgeNode(Node):
         self.declare_parameter('hybrid.box_half_width', 0.25)   # 좌우 반폭 (m): 차체 반폭 0.153 + 여유
         self.declare_parameter('hybrid.box_min_points', 3)      # 사각형 안 점이 이만큼 이상이어야 (AMCL 오차로 벽 점 몇 개가 새는 것 무시)
         self.declare_parameter('hybrid.box_min_scans', 2)       # 이만큼 연속 스캔에서 보여야 전환 (깜빡임 방지)
+        # 움직이는 track (box_trigger 일 때): 지금 ~ 이 시간 뒤까지 속도로 예측한 위치가 사각형과 겹치면 전환 (s).
+        # 로봇도 지금 속도로 직진한다고 보고 사각형을 같이 옮긴다. 0 이면 지금 위치만 (= 정적인 물체와 같음)
+        self.declare_parameter('hybrid.moving_predict', 2.0)
         self.box_streak = 0      # 사각형 안에 점이 있던 연속 스캔 수
         self.box_count = 0       # 마지막 스캔에서 사각형 안 점 수
         self.box_near = math.inf # 그중 차체에서 가장 가까운 거리 (m, 로그용)
@@ -905,7 +908,7 @@ class BridgeNode(Node):
         names += ['dwa_follow.lookahead', 'dwa_follow.goal_tolerance', 'dwa_follow.moving_speed',
                   'dwa_follow.target_clear', 'dwa_follow.target_max']
         names += [f'hybrid.{k}' for k in ('box_trigger', 'box_front', 'box_back', 'box_half_width', 'box_min_points',
-                                          'box_min_scans', 'trigger_distance', 'moving_distance', 'path_width',
+                                          'box_min_scans', 'moving_predict', 'trigger_distance', 'moving_distance', 'path_width',
                                           'path_ahead', 'release_time', 'rejoin_offset')]
         return names
 
@@ -1310,16 +1313,51 @@ class BridgeNode(Node):
         r3 = lambda a: [[round(float(u), 3), round(float(v), 3)] for u, v in a]
         corners = transform_points([[bx0, -hw], [bx1, -hw], [bx1, hw], [bx0, hw]], *pose)
         info = self.hybrid_info if self.follower and 'pp' in self.follower and 'dwa' in self.follower else {}
+        # 움직이는 track 의 예측 선 (지금 → moving_predict 초 뒤, map) 과 사각형에 들어오는 시각
+        movers = []
+        odom_pose = self.xyyaw('odom', self.base_frame)
+        horizon = p('moving_predict')
+        for t in self.tracks:
+            if math.hypot(t.x[2], t.x[3]) < self.get_parameter('dwa_follow.moving_speed').value:
+                continue
+            a, b = transform_points([t.x[:2], [t.x[0] + t.x[2] * horizon, t.x[1] + t.x[3] * horizon]], *m_o)
+            movers.append({'from': r3([a])[0], 'to': r3([b])[0], 'r': round(float(t.radius), 3),
+                           'enter': self.moving_into_box(t, odom_pose) if p('box_trigger') else None})
         self.server.send({
             'type': 'hybrid_box', 'corners': r3(corners),
             'points': r3(transform_points(self.box_pts[:80], *m_o)) if len(self.box_pts) else [],
             'others': r3(transform_points(self.unmapped_near[:150], *m_o)) if len(self.unmapped_near) else [],
             'count': self.box_count, 'min_points': p('box_min_points'), 'enabled': bool(p('box_trigger')),
             'active': bool(p('box_trigger')) and self.box_streak >= p('box_min_scans'),
-            'moving_distance': p('moving_distance'),
+            'moving_distance': None if p('box_trigger') else p('moving_distance'),
+            'movers': movers, 'moving_predict': horizon,
             'driving': bool(info), 'dwa': bool(info.get('use_dwa')), 'why': info.get('why'),
             'clear_for': info.get('clear_for'), 'release_time': p('release_time'),
             'offset': info.get('offset'), 'rejoin_offset': p('rejoin_offset')})
+
+    def box_bounds(self):
+        """hybrid 사각형 (로봇 좌표 x_min, x_max, 반폭)."""
+        x0, x1, _ = self.dwa_cfg.footprint if self.dwa_cfg.footprint else (-0.197, 0.069, 0.153)
+        p = lambda n: self.get_parameter(f'hybrid.{n}').value
+        return x0 - p('box_back'), x1 + p('box_front'), p('box_half_width')
+
+    def moving_into_box(self, t, pose=None):
+        """움직이는 track t (odom) 가 지금 ~ moving_predict 초 뒤 사이에 사각형과 겹치는 첫 시각 (s), 없으면 None.
+        물체는 지금 속도로, 로봇은 지금 선속도로 직진한다고 본다 (사각형도 로봇과 같이 움직임)."""
+        pose = pose or self.xyyaw('odom', self.base_frame)
+        if pose is None:
+            return None
+        x, y, yaw = pose
+        v = self.odom_vw[0]
+        ts = np.arange(0.0, self.get_parameter('hybrid.moving_predict').value + 1e-9, 0.1)
+        c, s = math.cos(yaw), math.sin(yaw)
+        dx = t.x[0] + t.x[2] * ts - (x + v * c * ts)
+        dy = t.x[1] + t.x[3] * ts - (y + v * s * ts)
+        lx, ly = c * dx + s * dy, -s * dx + c * dy
+        bx0, bx1, hw = self.box_bounds()
+        gap = np.hypot(np.maximum(np.maximum(bx0 - lx, lx - bx1), 0.0), np.maximum(np.abs(ly) - hw, 0.0))
+        hit = gap <= t.radius
+        return float(ts[int(np.argmax(hit))]) if hit.any() else None
 
     def hybrid_obstacle(self, f, x, y):
         """DWA 로 피해야 할 장애물이 있으면 설명 글자, 없으면 None. x, y: 로봇 (map)."""
@@ -1341,10 +1379,17 @@ class BridgeNode(Node):
         moving_d = self.get_parameter('hybrid.moving_distance').value
         width = self.get_parameter('hybrid.path_width').value
         moving_v = self.get_parameter('dwa_follow.moving_speed').value
+        pose = self.xyyaw('odom', self.base_frame)
         for t in self.tracks:
             (ox, oy), = transform_points([t.x[:2]], *m_o)
             d = math.hypot(ox - x, oy - y) - t.radius
-            if math.hypot(t.x[2], t.x[3]) >= moving_v and d < moving_d:
+            moving = math.hypot(t.x[2], t.x[3]) >= moving_v
+            if moving and box:
+                # 사각형에 지금 있거나 곧 들어올 움직이는 물체 (옆/뒤에서 다가오는 사람은 미리, 멀어지거나 나란히 가는 사람은 무시)
+                when = self.moving_into_box(t, pose)
+                if when is not None:
+                    return f'움직이는 장애물 {when:.1f}초 뒤 사각형 ({d:.2f} m)'
+            elif moving and d < moving_d:
                 return f'움직이는 장애물 {d:.2f} m'
             if not box and d < trigger and len(pts) and \
                     float(np.min(np.hypot(pts[:, 0] - ox, pts[:, 1] - oy))) - t.radius < width:

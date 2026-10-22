@@ -122,8 +122,10 @@ warehouse_bridge:
       box_half_width: 0.25    # 좌우 반폭 (m): 차체 반폭 0.153 + 여유 0.1. 0.33 은 경로 옆을 지나는 물체에도 DWA 로 바뀌어 느려짐 (sim 17/21 → 18/21)
       box_min_points: 3       # AMCL 오차로 벽 점 몇 개가 '지도에 없는 점' 으로 새는 것 무시
       box_min_scans: 2        # 깜빡임 방지 (스캔 약 9 Hz → 약 0.2초)
+      moving_predict: 2.0     # 움직이는 track: 지금 ~ 이 시간(s) 뒤 예측 위치가 사각형과 겹치면 DWA (로봇도 지금 속도로 직진한다고 봄).
+                              # 옆/뒤에서 다가오는 사람은 미리 잡고, 멀어지거나 나란히 가는 사람은 무시. box_trigger=false 면 moving_distance 원
       trigger_distance: 1.0   # 이 거리 안 + 앞쪽 경로 가까이에 track 이 있으면 DWA (m)
-      moving_distance: 1.5    # 움직이는 track 은 경로와 상관없이 이 거리 안이면 DWA (m)
+      moving_distance: 1.5    # (box_trigger=false 일 때만) 움직이는 track 이 이 거리 안이면 DWA (m)
       path_width: 0.25        # track 가장자리가 앞쪽 경로에서 이 거리 안이면 '경로 위' (m). 차체 반폭 + 여유 정도:
                               # A* 가 이미 장애물을 피해 낸 경로는 pure pursuit 가 정확히 따라감 (0.4 면 DWA 로 바뀌어 좁은 틈에서 섰음)
       path_ahead: 1.5         # 앞쪽 경로를 이 길이만큼 봄 (m)

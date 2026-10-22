@@ -778,7 +778,8 @@ function draw() {
   }
 
   // hybrid → DWA 전환 조건 (브리지가 실제로 쓰는 값 그대로). 1.5초 넘게 안 오면 숨김
-  //  ① 움직이는 물체 반경 (moving_distance, 로봇 중심 기준 보라 점선 원): 이 안에 움직이는 track 이 들어오면 전환
+  //  ① 움직이는 물체: 지금 → moving_predict 초 뒤 예측 선 (사각형에 들어오면 빨강 + 'n초 뒤', 아니면 회색).
+  //     box_trigger 를 끈 예전 방식이면 대신 moving_distance 원 (로봇 중심 보라 점선)
   //  ② 사각형 (box_*): 점선. 안에 지도에 없는 점 → 주황, 전환 조건(점 수 + 연속 스캔) 넘음 → 빨강 + 채움
   //     실제로 센 점 = 빨간 점, 사각형 밖의 지도에 없는 점(2m 안) = 회색 점. 지도 벽에서 0.15m 안의 점은 벽으로 보고 안 셈
   //  ③ 글자: 지금 PP/DWA, 전환 이유, DWA → PP 복귀 조건 (장애물 없음 release_time 초 + 경로에서 rejoin_offset 안)
@@ -793,6 +794,22 @@ function draw() {
       ctx.beginPath();
       ctx.arc(rx, ry, S.hbox.moving_distance * pxPerM, 0, 2 * Math.PI);
       ctx.stroke();
+    }
+    for (const m of S.hbox.movers || []) {
+      const [ax, ay] = worldToCanvas(...m.from);
+      const [bx, by] = worldToCanvas(...m.to);
+      const hit = m.enter !== null && m.enter !== undefined;
+      ctx.setLineDash([4, 4]);
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = hit ? '#dc2626' : '#9ca3af';
+      ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.beginPath(); ctx.arc(bx, by, Math.max(2, m.r * pxPerM), 0, 2 * Math.PI); ctx.stroke();
+      if (hit) {
+        ctx.font = '11px system-ui, sans-serif';
+        ctx.fillStyle = '#dc2626';
+        ctx.fillText(`${(+m.enter).toFixed(1)}초 뒤 사각형`, bx + 4, by - 4);
+      }
     }
     for (const [list, c, r] of [[S.hbox.others || [], '#9ca3af', 1.5], [S.hbox.points || [], '#dc2626', 2.5]]) {
       ctx.fillStyle = c;

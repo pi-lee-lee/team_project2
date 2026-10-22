@@ -50,6 +50,21 @@ EXTRA = (-0.277, -0.197, 0.04)   # 뒤에 붙인 물건 (x_min, x_max, 반폭)
 
 STRATEGIES = {
     'A': dict(local='dwa', hybrid=True, replan=False, desc='hybrid PP↔DWA (params.yaml 그대로 = 기본)'),
+    'A_circle': dict(local='dwa', hybrid=True, replan=False, hybrid_cfg=dict(moving_predict=None),
+                     desc='사각형 + 움직이는 물체 1.5m 원 (hall-planning)'),
+    'A_circle0': dict(local='dwa', hybrid=True, replan=False, hybrid_cfg=dict(moving_predict=None, moving_distance=0.0),
+                      desc='사각형만 (움직이는 물체도 사각형 안일 때)'),
+    'A_pred1': dict(local='dwa', hybrid=True, replan=False, hybrid_cfg=dict(moving_predict=1.0), desc='예측 1초'),
+    'A_pred3': dict(local='dwa', hybrid=True, replan=False, hybrid_cfg=dict(moving_predict=3.0), desc='예측 3초'),
+    'P_front1': dict(local='dwa', hybrid=True, replan=False, hybrid_cfg=dict(box_front=1.0), desc='예측 2초 + box_front 1.0'),
+    'P_accw': dict(local='dwa', hybrid=True, replan=False, dwa=dict(max_acc_w=1.5), desc='예측 2초 + max_acc_w 1.5'),
+    'P_pp26': dict(local='dwa', hybrid=True, replan=False, pp_speed=0.26, desc='예측 2초 + PP 0.26'),
+    'P_all': dict(local='dwa', hybrid=True, replan=False, hybrid_cfg=dict(box_front=1.0), dwa=dict(max_acc_w=1.5),
+                  pp_speed=0.26, desc='예측 2초 + 셋 다 예전 값'),
+    'C_all': dict(local='dwa', hybrid=True, replan=False, hybrid_cfg=dict(box_front=1.0, moving_predict=None),
+                  dwa=dict(max_acc_w=1.5), pp_speed=0.26, desc='원 1.5m + 셋 다 예전 값'),
+    'C_accw': dict(local='dwa', hybrid=True, replan=False, hybrid_cfg=dict(moving_predict=None), dwa=dict(max_acc_w=1.5),
+                   desc='원 1.5m + max_acc_w 1.5'),
     'A_path': dict(local='dwa', hybrid=True, replan=False, hybrid_cfg=dict(box_trigger=False),
                    desc='A, 전환 = 경로 가까이 track'),
     'A_box': dict(local='dwa', hybrid=True, replan=False, hybrid_cfg=dict(box_trigger=True, box_front=1.0, box_back=0.2,
@@ -428,7 +443,7 @@ class Run:
         f['local'].target_clear = self.st.get('target_clear', self.b['dwa_follow'].get('target_clear', 0.0))
         f['local'].target_max = self.b['dwa_follow'].get('target_max', 2.0)
         if self.st['hybrid']:
-            f['pp'] = PurePursuit(path, 0.0, max_v=self.b['max_speed'], max_w=self.b['max_turn_speed'],
+            f['pp'] = PurePursuit(path, 0.0, max_v=self.st.get('pp_speed', self.b['max_speed']), max_w=self.b['max_turn_speed'],
                                   max_acc=self.b['max_accel'], max_acc_w=self.b['max_turn_accel'])
         f['use_local'] = not self.st['hybrid']
         f['clear_since'] = None
@@ -454,9 +469,22 @@ class Run:
         if len(ahead) > 1:
             s = np.concatenate([[0.0], np.cumsum(np.hypot(*np.diff(ahead, axis=0).T))])
             ahead = ahead[s <= h['path_ahead']]
+        rx, ry, ryaw, rv = self.cur
         for mx, my, vx, vy, r in self.wd.mover_state(t):
-            d = math.hypot(mx - x, my - y) - r
-            if math.hypot(vx, vy) >= self.b['dwa_follow']['moving_speed'] and d < h['moving_distance']:
+            if math.hypot(vx, vy) < self.b['dwa_follow']['moving_speed']:
+                continue
+            if box and h.get('moving_predict') is not None:
+                # 브리지 moving_into_box 와 같음: 물체/로봇을 지금 속도로 moving_predict 초까지 옮겨 사각형과 겹치는지
+                ts = np.arange(0.0, h['moving_predict'] + 1e-9, 0.1)
+                c, s_ = math.cos(ryaw), math.sin(ryaw)
+                dx = mx + vx * ts - (rx + rv * c * ts)
+                dy = my + vy * ts - (ry + rv * s_ * ts)
+                lx, ly = c * dx + s_ * dy, -s_ * dx + c * dy
+                bx0, bx1 = BODY[0] - h['box_back'], BODY[1] + h['box_front']
+                gap = np.hypot(np.maximum(np.maximum(bx0 - lx, lx - bx1), 0.0), np.maximum(np.abs(ly) - h['box_half_width'], 0.0))
+                if np.any(gap <= r):
+                    return True
+            elif math.hypot(mx - x, my - y) - r < h['moving_distance']:
                 return True
         um = self.wd.unmapped(pts)
         if not box and len(um) and len(ahead):
@@ -528,6 +556,7 @@ class Run:
                             if self.st['hybrid'] and use_local:
                                 f['use_local'] = True
                 if self.st['hybrid']:
+                    self.cur = (x, y, yaw, v)
                     trig = self.hybrid_trigger(f, x, y, pts, t)
                     if not f['use_local']:
                         if trig and not f['pp'].at_goal:

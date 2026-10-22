@@ -439,3 +439,11 @@ cd ../ros2_ws && source /opt/ros/humble/setup.bash && colcon build --symlink-ins
   움직이는 물체 전환 반경(moving_distance 1.5m, 보라 점선 원), 지금 상태 글자('PP 주행' / 'DWA: 앞쪽 장애물 0.42 m (점 5개)' /
   'DWA → PP 대기: 장애물 없음 1.2/2.0s, 경로 0.31/0.25m') 추가. 지도 벽에서 0.15m 안의 점은 벽으로 보고 세지 않음(static_match_dist)
 
+### (브랜치 hybrid-predict-box) 움직이는 물체 전환을 '1.5m 원' → '2초 안에 사각형에 들어오는지' 로 (2026-10-22)
+- `bridge_node.moving_into_box()`: 움직이는 track 과 로봇을 지금 속도로 `hybrid.moving_predict`(2.0초)까지 옮겨 사각형과 겹치는 첫 시각.
+  겹치면 'DWA: 움직이는 장애물 1.2초 뒤 사각형 (0.90 m)'. `box_trigger=false` 면 예전 moving_distance 원
+- 웹: 움직이는 track 마다 지금 → 2초 뒤 예측 점선 (사각형에 들어오면 빨강 + 'n초 뒤 사각형'), 원은 box_trigger=false 일 때만
+- sim (21개, 지금 params.yaml = PP 0.18 / box_front 0.5 / max_acc_w 4.0): 원 13/21 충돌 3, 사각형만 14/21 충돌 2, **예측 2초 14/21 충돌 2 (가장 빠름)**, 예측 1초/3초 14/21
+- 예전 값(PP 0.26 / box_front 1.0 / max_acc_w 1.5)에서는 원 18/21 충돌 0 (사람 6개 중 5/6 충돌 0, 220초) vs 예측 18/21 충돌 1 (5/6 충돌 1, 282초) → **어느 쪽이 낫다고 하기 어려움**
+- 같이 확인: sim 에서 성공을 가장 많이 떨어뜨린 건 `dwa.max_acc_w` 4.0 (1.5 로 두면 14 → 17/21). box_front 0.5 → 1.0 은 14 → 15/21. 실물에서는 지금 값이 잘 된다고 해서 바꾸지 않음
+
