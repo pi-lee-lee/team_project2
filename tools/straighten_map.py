@@ -7,10 +7,16 @@
   2. 기울기 추정: 벽 점들을 돌려 보며 가로/세로 줄에 가장 잘 모이는 각도 탐색
   3. 그 각도만큼 반대로 회전 (맵 원점 (0,0) 은 그대로 유지)
   4. 가로/세로 벽 구간을 찾아 1칸 두께 직선으로 다시 그림, 모서리 끝점 맞물림
-  5. 방 안 = 빈 칸, 밖 = 미탐색, 바깥 경계 봉합
+     (두꺼운 벽에서 나란히 겹쳐 나온 짧은 직선은 버림)
+  5. 방 안 = 빈 칸, 밖 = 미탐색, 바깥 경계 봉합. 방 안에 갇힌 물체는 1칸 사각형 테두리,
+     방과 맞닿지 않은 벽 조각(방 밖 노이즈)은 지움
 
-회전했으므로 이 맵에서 등록한 위치 좌표도 같은 각도로 돌려야 한다.
-출력되는 각도(rotation_deg)로 서버에서:  python manage.py rotate_locations <각도>
+--auto: 벽 점 중 직선에 맞는 비율이 --min-coverage 보다 낮으면(대각선 벽, 원기둥 등) 회전/직선화 없이
+        clean_map.py 정리(1칸 외곽선)로 저장한다. scripts/save_map.sh 의 기본 (<이름>_clean)
+
+회전했으므로 이 맵에서 등록한 위치 좌표도 같은 각도로 돌려야 한다. yaml 에 '# rotation_deg: <각도>' 로 남기고,
+웹 '맵 저장' 은 SLAM 중 등록한 위치/금지 구역을 이 각도로 돌려 복사한다 (services.carry_over_locations).
+이미 등록된 맵을 나중에 돌렸다면 서버에서:  python manage.py rotate_locations <각도>
 """
 import argparse
 import math
@@ -22,6 +28,7 @@ from clean_map import FREE, OCC, UNKNOWN, clean, components, dilate, preview, re
 
 MIN_LEN = 6        # 이 칸 수(30cm) 이상 이어진 것만 벽 직선으로 인정
 SNAP = 3           # 모서리 끝점을 맞물리게 붙이는 거리(칸)
+MIN_ROTATE_DEG = 0.2   # 이보다 작게 기울었으면 돌리지 않음 (5m 벽 끝에서 2cm 미만 = 반 칸 미만, 좌표를 그대로 두는 편이 나음)
 
 
 def estimate_angle(points, res, max_deg=15.0, step=0.05):
@@ -118,6 +125,17 @@ def extract_segments(occ):
     return segments, remaining
 
 
+def drop_parallel(segments):
+    """두꺼운 벽에서 나란히(2줄 이내) 겹쳐 나온 직선 중 짧은 쪽을 버린다 (벽 안쪽에 생기던 짧은 선)."""
+    kept = []
+    for s in sorted(segments, key=lambda s: abs(s[3] - s[2]), reverse=True):
+        if not any(t[0] == s[0] and abs(t[1] - s[1]) <= 2
+                   and min(t[2], t[3]) - SNAP <= min(s[2], s[3]) and max(s[2], s[3]) <= max(t[2], t[3]) + SNAP
+                   for t in kept):
+            kept.append(s)
+    return kept
+
+
 def snap_segments(segments):
     """끝점이 수직 벽 근처(SNAP 칸 이내)면 그 벽까지 늘리거나 줄여 모서리를 맞물리게."""
     segs = [list(s) for s in segments]
@@ -156,7 +174,7 @@ def extend_segments(segments, rot, max_ext=20):
 
 
 def fill_enclosed(region, walls, max_cells=400):
-    """방 안에 갇힌 미탐색 영역(물체 안쪽 등)을 경계 사각형째 벽(장애물)으로 채운다."""
+    """방 안에 갇힌 미탐색 영역(물체 안쪽 등)을 감싸는 사각형을 1칸 테두리 벽으로 (안쪽은 미탐색 = 경로 계획에서 장애물)."""
     unknown = ~region & ~walls
     labels, sizes = components(unknown)
     h, w = unknown.shape
@@ -178,7 +196,9 @@ def fill_enclosed(region, walls, max_cells=400):
                 c1 += 1
             if c0 > 0 and walls[r0:r1 + 1, c0 - 1].any():
                 c0 -= 1
-        walls[r0:r1 + 1, c0:c1 + 1] = True
+        walls[r0:r1 + 1, c0:c1 + 1] = False
+        walls[[r0, r1], c0:c1 + 1] = True
+        walls[r0:r1 + 1, [c0, c1]] = True
         filled += size
     return filled
 
@@ -220,13 +240,30 @@ def world_to_rc(x, y, origin, res, h):
     return h - 1 - int(math.floor((y - origin[1]) / res)), int(math.floor((x - origin[0]) / res))
 
 
+def write_map(base, out, res, origin, rotation_deg=0.0, source=None):
+    write_pgm(base + '.pgm', out)
+    with open(base + '.yaml', 'w', encoding='utf-8') as f:
+        f.write(f'image: {os.path.basename(base)}.pgm\nmode: trinary\nresolution: {res}\n'
+                f'origin: [{origin[0]:.4f}, {origin[1]:.4f}, 0.0]\n'
+                f'negate: 0\noccupied_thresh: 0.65\nfree_thresh: 0.196\n')
+        if rotation_deg:
+            f.write(f'# straighten_map.py: 원본 {source} 을 원점 기준 {rotation_deg:+.2f}도 회전\n'
+                    f'# rotation_deg: {rotation_deg:.4f}\n')
+    print(f'저장: {base}.yaml, {base}.pgm')
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('yaml_path')
     ap.add_argument('-o', '--output', help='출력 경로(확장자 제외). 기본: <원본>_straight')
     ap.add_argument('--seed', nargs=2, type=float, default=[0.0, 0.0], metavar=('X', 'Y'))
     ap.add_argument('--angle', type=float, help='기울기(도)를 직접 지정 (기본: 자동 추정)')
+    ap.add_argument('--auto', action='store_true',
+                    help='벽이 가로/세로 직선에 잘 안 맞으면 clean_map.py 정리(회전 없음)로 대신 저장')
+    ap.add_argument('--min-coverage', type=float, default=0.85,
+                    help='--auto: 벽 점 중 직선(1칸 이내)에 맞아야 하는 비율')
     args = ap.parse_args()
+    base = os.path.expanduser(args.output) if args.output else os.path.splitext(os.path.expanduser(args.yaml_path))[0] + '_straight'
 
     yaml_path = os.path.expanduser(args.yaml_path)
     conf = read_yaml(yaml_path)
@@ -244,7 +281,11 @@ def main():
     rows, cols = np.nonzero(cleaned == OCC)
     pts = np.column_stack([origin[0] + (cols + 0.5) * res, origin[1] + (h - rows - 0.5) * res])
     theta = math.radians(args.angle) if args.angle is not None else estimate_angle(pts, res)
-    print(f'기울기: {math.degrees(theta):+.2f}° → 반대로 돌려서 바로잡음 (rotation_deg = {-math.degrees(theta):+.2f})')
+    if args.angle is None and abs(math.degrees(theta)) < MIN_ROTATE_DEG:
+        print(f'기울기: {math.degrees(theta):+.2f}° → {MIN_ROTATE_DEG}° 미만이라 돌리지 않음')
+        theta = 0.0
+    else:
+        print(f'기울기: {math.degrees(theta):+.2f}° → 반대로 돌려서 바로잡음 (rotation_deg = {-math.degrees(theta):+.2f})')
 
     # 3. 회전
     rot, new_origin = rotate_grid(cleaned, res, origin, theta)
@@ -254,10 +295,21 @@ def main():
 
     # 4. 벽 직선화
     segments, leftover = extract_segments(occ)
+    segments = drop_parallel(segments)
+    coverage = float((occ & dilate(draw_segments(occ.shape, segments), 1)).sum()) / max(int(occ.sum()), 1)
+    print(f'벽 점 중 직선에 맞는 비율: {coverage:.0%}')
+    if args.auto and coverage < args.min_coverage:
+        print(f'{args.min_coverage:.0%} 미만 (대각선 벽/둥근 물체가 많음) → 회전/직선화 없이 정리만 (1칸 외곽선)')
+        out, stats = clean(raw, world_to_rc(args.seed[0], args.seed[1], origin, res, h), 2, 30, 3, thin=True)
+        for k, v in stats.items():
+            print(f'{k}: {v}칸')
+        write_map(base, out, res, origin)
+        preview(base + '_preview.png', raw, out)
+        return
     segments = snap_segments(extend_segments(segments, rot))
     walls = draw_segments(occ.shape, segments)
-    # 직선에 안 속한 점 중 직선 바로 옆(1칸)은 들쑥날쑥한 벽 조각이므로 버리고, 떨어진 것(물체)은 유지
-    leftover &= ~dilate(walls, 1)
+    # 직선에 안 속한 점 중 직선 바로 옆(2칸)은 들쑥날쑥한 벽 조각이므로 버리고, 떨어진 것(물체)은 유지
+    leftover &= ~dilate(walls, 2)
     walls |= leftover
     print(f'벽 직선 {len(segments)}개 (가로 {sum(s[0] == "h" for s in segments)}, '
           f'세로 {sum(s[0] == "v" for s in segments)}), 직선 밖 물체 점 {int(leftover.sum())}칸')
@@ -271,20 +323,15 @@ def main():
         print(f'갇힌 미탐색 영역 {enclosed}칸 → 사각형 장애물로 채움')
     border = dilate(region, 1) & ~region & ~walls
     walls |= border
+    stray = walls & ~dilate(region, 1)          # 방과 맞닿지 않은 벽 조각 (방 밖 노이즈, 바깥으로 삐져나간 직선 끝)
+    walls &= ~stray
     out = np.full(rot.shape, UNKNOWN, dtype=np.uint8)
     out[region] = FREE
     out[walls] = OCC
-    print(f'빈 칸 {int((cleaned == FREE).sum())} → {int(region.sum())}, 바깥 경계 봉합 {int(border.sum())}칸')
+    print(f'빈 칸 {int((cleaned == FREE).sum())} → {int(region.sum())}, 바깥 경계 봉합 {int(border.sum())}칸, '
+          f'방 밖 벽 조각 제거 {int(stray.sum())}칸')
 
-    base = os.path.expanduser(args.output) if args.output else os.path.splitext(yaml_path)[0] + '_straight'
-    write_pgm(base + '.pgm', out)
-    with open(base + '.yaml', 'w', encoding='utf-8') as f:
-        f.write(f'image: {os.path.basename(base)}.pgm\nmode: trinary\nresolution: {res}\n'
-                f'origin: [{new_origin[0]:.4f}, {new_origin[1]:.4f}, 0.0]\n'
-                f'negate: 0\noccupied_thresh: 0.65\nfree_thresh: 0.196\n'
-                f'# straighten_map.py: 원본 {os.path.basename(yaml_path)} 을 원점 기준 '
-                f'{-math.degrees(theta):+.2f}도 회전 (rotation_deg)\n')
-    print(f'저장: {base}.yaml, {base}.pgm')
+    write_map(base, out, res, new_origin, -math.degrees(theta), os.path.basename(yaml_path))
     # 비교 이미지: 회전 전 정리본과 결과를 같은 크기로
     pad_h, pad_w = max(cleaned.shape[0], out.shape[0]), max(cleaned.shape[1], out.shape[1])
 

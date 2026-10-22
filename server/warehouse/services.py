@@ -772,8 +772,11 @@ def map_saved(robot_name, ok, message):
 
 def carry_over_locations(name):
     """저장한 SLAM 맵 파일을 DB 맵으로 등록하고(활성화는 안 함), slam_live 에 등록한 위치를 복사한다.
-    같은 SLAM 좌표계에서 저장한 맵이므로 좌표를 그대로 쓸 수 있다 (--straighten 으로 돌린 맵은 제외)."""
+    같은 SLAM 좌표계에서 저장한 맵이므로 좌표를 그대로 쓰되, 저장 때 기울기를 바로잡아 돌린 맵
+    (yaml 의 '# rotation_deg: <각도>', tools/straighten_map.py)이면 위치/금지 구역도 원점 기준으로 같이 돌린다."""
+    import math
     import os
+    import re
     from .management.commands.import_map import parse_yaml
     from .mapimage import read_pgm
     path = os.path.expanduser(f'~/maps/{name}_clean.yaml')
@@ -782,6 +785,13 @@ def carry_over_locations(name):
     if not os.path.exists(path):
         return None
     conf = parse_yaml(path)
+    with open(path, encoding='utf-8') as f:
+        found = re.search(r'^#\s*rotation_deg:\s*([-+0-9.]+)', f.read(), re.M)
+    t = math.radians(float(found.group(1))) if found else 0.0
+    c, s = math.cos(t), math.sin(t)
+
+    def rot(x, y):
+        return c * x - s * y, s * x + c * y
     width, height, rows = read_pgm(os.path.join(os.path.dirname(path), conf['image'].strip('\'"')))
     origin = [float(v) for v in conf['origin'].strip('[]').split(',')]
     m = save_map(name, float(conf['resolution']), origin[0], origin[1], width, height,
@@ -791,12 +801,19 @@ def carry_over_locations(name):
         return 0
     copied = 0
     for loc in src.locations.all():
+        x, y = rot(loc.x, loc.y)
+        yaw = math.atan2(math.sin(loc.yaw + t), math.cos(loc.yaw + t))
         _, created = Location.objects.update_or_create(
-            map=m, name=loc.name, defaults=dict(kind=loc.kind, x=loc.x, y=loc.y, yaw=loc.yaw, cargo=loc.cargo))
+            map=m, name=loc.name, defaults=dict(kind=loc.kind, x=x, y=y, yaw=yaw, cargo=loc.cargo))
         copied += 1
-    for z in src.zones.all():   # 금지 구역도 같은 좌표계라 그대로 복사
+    for z in src.zones.all():   # 금지 구역도 같은 좌표계. 사각형은 맵 축 기준이라 돌린 네 꼭짓점을 감싸는 사각형으로
+        if z.shape == Zone.SHAPE_RECT and t:
+            xs, ys = zip(*(rot(x, y) for x in (z.x1, z.x2) for y in (z.y1, z.y2)))
+            x1, y1, x2, y2 = min(xs), min(ys), max(xs), max(ys)
+        else:
+            (x1, y1), (x2, y2) = rot(z.x1, z.y1), rot(z.x2, z.y2)
         Zone.objects.update_or_create(map=m, name=z.name, defaults=dict(
-            shape=z.shape, x1=z.x1, y1=z.y1, x2=z.x2, y2=z.y2))
+            shape=z.shape, x1=x1, y1=y1, x2=x2, y2=y2))
     return copied
 
 

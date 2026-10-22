@@ -150,7 +150,8 @@ scripts/stop_ros.sh --all
 2. 웹 "여기로 이동" 으로 로봇을 움직이며 탐색 (SLAM 모드에서는 A*가 미탐색 칸도 지나갈 수 있음, 장애물은 LiDAR 안전장치가 막음)
 3. 웹 **"맵 저장"** (SLAM 모드에서만 보임) 또는 `scripts/save_map.sh <이름>`
    → `~/maps/<이름>.yaml` (원본) + `~/maps/<이름>_clean.yaml` (정리본). 정리 기준점은 저장할 때 로봇 위치
-   → 벽이 가로/세로뿐인 창고·방이면 `scripts/save_map.sh <이름> --straighten` (기울기 보정 + 벽 직선화)
+   → 정리본은 기울기 보정 + 벽 1칸 직선 + 직각 모서리 + 물체 1칸 테두리 (`straighten_map.py --auto`).
+     벽이 가로/세로 직선에 잘 안 맞는 곳(대각선 벽, 원기둥)은 자동으로 회전 없이 1칸 외곽선 정리만
 4. `scripts/run.sh --robot ... --mode map --map ~/maps/<이름>_clean.yaml`
 
 SLAM 모드에서는 서버에 맵을 **`slam_live`** 라는 별도 이름으로 보내므로, 저장된 맵과 등록 위치(홈 등)를 덮어쓰지 않습니다.
@@ -173,7 +174,7 @@ SLAM 맵의 원점(0,0)은 **SLAM 을 시작한 순간의 로봇 위치**라 실
 | `start_slam.sh [slam_toolbox\|cartographer]` | SLAM |
 | `start_nav2.sh <map.yaml> [--with-navigation]` | map_server + AMCL (맵 파일이 없으면 바로 오류로 종료) |
 | `start_bridge.sh [맵 이름]` | A* 플래너 + 브리지 |
-| `save_map.sh <이름> [--straighten]` | SLAM 맵 저장 + 정리 |
+| `save_map.sh <이름> [--plain \| --straighten]` | SLAM 맵 저장 + 정리 (기본: 자동 직선화, `--plain`: 회전 없이 정리만) |
 | `stop_ros.sh [--server] [--daemon] [--all]` | 정리 (Gazebo 포함, Pi bringup 은 건드리지 않음) |
 
 초기 위치 (기존 맵 모드): 웹 "초기 위치 지정" 또는 `source scripts/env.sh && python3 tools/localize.py <x> <y> <방향°>`
@@ -400,7 +401,8 @@ SLAM 맵에서 방 밖 노이즈를 지우고, 로봇이 다니는 공간만 남
 4. 공간에 둘러싸인 30칸 이하 미탐색 구멍 → 빈 칸 (`--hole`)
 5. 같은 행/열에서 벽 사이 3칸(15cm) 이하 틈 이음 (`--gap`, 로봇이 못 지나가는 폭이라 주행 공간은 그대로)
 6. 경계 봉합: 빈 공간과 맞닿은(대각선 포함) 미탐색 칸을 벽으로 → 바깥 벽이 끊김 없이 이어짐 (`--no-seal` 로 끔)
-7. `free_thresh: 0.196` 으로 저장 (미탐색이 빈 칸으로 읽히지 않게)
+7. 1칸 외곽선: 벽 = 빈 공간을 둘러싼 1칸 테두리만, 두꺼운 벽 바깥쪽/물체 안쪽은 미탐색 (`--thick` 로 끔)
+8. `free_thresh: 0.196` 으로 저장 (미탐색이 빈 칸으로 읽히지 않게)
 
 결과는 `_preview.png` 로 확인. 원본 maze_map 기준 로봇 이동 가능 칸 2,139 → 정리본 2,138 (차이 없음).
 
@@ -409,10 +411,14 @@ SLAM 맵에서 방 밖 노이즈를 지우고, 로봇이 다니는 공간만 남
 1. `clean_map.py` 와 같은 정리
 2. 기울기 추정: 벽 점을 -15°~+15° 로 돌려 보며 가로/세로 줄에 가장 잘 모이는 각도 → maze_map 은 **-2.40°** 기울어져 있었음
 3. 원점 (0,0) 기준으로 반대로 회전 (맵 크기도 방에 맞게 잘라 73×91)
-4. 가로/세로 벽 구간(30cm 이상)을 1칸 두께 직선으로 다시 그림, 모서리 끝점 맞물림, 물체 뒤처럼 못 본 곳의 끊긴 바깥 벽은 이어 그림
-5. 방 안에 갇힌 미탐색 영역(물체 안쪽)은 직사각형 장애물로 채움, 바깥 경계 봉합
+4. 가로/세로 벽 구간(30cm 이상)을 1칸 두께 직선으로 다시 그림, 모서리 끝점 맞물림, 물체 뒤처럼 못 본 곳의 끊긴 바깥 벽은 이어 그림.
+   두꺼운 벽에서 나란히 겹쳐 나온 짧은 직선은 버림
+5. 방 안에 갇힌 미탐색 영역(물체 안쪽)은 1칸 사각형 테두리, 바깥 경계 봉합, 방과 맞닿지 않은 벽 조각 지움
+- 0.2° 미만으로 기울었으면 돌리지 않음 (좌표 그대로)
+- `--auto` (`save_map.sh` 기본, 출력 `<이름>_clean`): 벽 점 중 직선에 맞는 비율이 85%(`--min-coverage`) 미만이면 회전/직선화 없이 `clean_map.py` 정리
+- 돌린 맵 yaml 에는 `# rotation_deg: <각도>` 가 남고, 웹 "맵 저장" 은 SLAM 중 등록한 위치/금지 구역을 같은 각도로 돌려 복사 (`services.carry_over_locations`)
 
-**회전했으므로 위치 좌표도 돌려야 함**: 출력되는 `rotation_deg` 로 `python manage.py rotate_locations 2.40` (적용 완료).
+**이미 위치를 등록한 맵을 나중에 돌렸다면 위치 좌표도 돌려야 함**: 출력되는 `rotation_deg` 로 `python manage.py rotate_locations 2.40` (maze_map 적용 완료).
 초기 위치를 지정할 때도 새 좌표 기준 (홈 = (0.20, 0.01, 2.4°)).
 
 현재 사용 맵: `~/maps/maze_map_straight.yaml` (`scripts/start_nav2.sh` 기본값). 서버 DB 맵 이름은 `maze_map` 그대로라 등록한 위치가 유지됩니다.

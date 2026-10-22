@@ -184,10 +184,13 @@ Django(HTTP + WebSocket) 를 `0.0.0.0:8000` 으로. 보통 `run.sh` 가 부름. 
 
 ### `save_map.sh` — 지도 저장
 ```bash
-source scripts/env.sh && scripts/save_map.sh <이름> [--straighten]
+source scripts/env.sh && scripts/save_map.sh <이름> [--plain | --straighten]
 ```
-- `/map` 을 `~/maps/<이름>.yaml/.pgm` 으로 저장 (`free_thresh 0.196`: 미탐색이 빈 칸으로 읽히지 않게) 후 `tools/clean_map.py` 로 `<이름>_clean` 정리본
-- `--straighten`: 벽이 가로/세로뿐인 방에서만 (기울기 보정 + 벽 직선화 → `<이름>_straight`). 강당처럼 책상·의자가 흩어진 곳은 쓰지 마세요
+- `/map` 을 `~/maps/<이름>.yaml/.pgm` 으로 저장 (`free_thresh 0.196`: 미탐색이 빈 칸으로 읽히지 않게) 후 `<이름>_clean` 정리본:
+  기울기 보정 + 벽 1칸 직선 + 직각 모서리 + 물체 1칸 테두리 (`tools/straighten_map.py --auto`).
+  벽 점이 가로/세로 직선에 85% 미만으로 맞으면(대각선 벽, 원기둥, 흩어진 책상·의자) 자동으로 회전 없이 1칸 외곽선 정리만
+- 돌렸으면 yaml 에 `# rotation_deg` 가 남고, 웹 "맵 저장" 은 SLAM 중 등록한 위치/금지 구역도 같은 각도로 돌려 복사
+- `--plain`: 회전/직선화 없이 정리만 (`tools/clean_map.py`). `--straighten`: 직선 비율과 상관없이 직선화 (`<이름>_straight`)
 - 이름은 영문/숫자/`_`/`-`, 이미 있으면 거절. 웹 "맵 저장" 도 브리지가 이 스크립트를 실행
 
 ### `reset_robot.sh` — 상태 초기화

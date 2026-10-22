@@ -1,14 +1,18 @@
 #!/bin/bash
 # SLAM 으로 만든 맵을 저장하고 정리한다.
-#   사용: scripts/save_map.sh <이름> [--straighten]
+#   사용: scripts/save_map.sh <이름> [--plain | --straighten]
 # 결과: ~/maps/<이름>.yaml/.pgm (원본) + ~/maps/<이름>_clean.yaml/.pgm (정리, 기본 사용)
-#   --straighten: 정리 대신 기울기 보정 + 벽 직선화 (<이름>_straight). 벽이 가로/세로로만 된
-#                 창고·방에서만 쓰세요. 대각선 벽이나 원기둥이 있는 곳에서는 맵이 망가집니다.
+#   기본: 기울기 보정 + 벽을 1칸 직선으로 + 모서리 직각 + 물체는 1칸 테두리 (tools/straighten_map.py --auto).
+#         벽 점이 가로/세로 직선에 잘 안 맞으면(대각선 벽, 원기둥) 자동으로 회전 없이 정리만 (1칸 외곽선).
+#         돌렸으면 yaml 에 '# rotation_deg' 가 남고, 웹 '맵 저장' 은 SLAM 중 등록한 위치도 같이 돌린다
+#   --plain:      회전/직선화 없이 정리만 (clean_map.py, 1칸 외곽선)
+#   --straighten: 직선 비율과 상관없이 무조건 직선화 (<이름>_straight)
 # 이후: scripts/run.sh --robot ... --mode map --map ~/maps/<이름>_clean.yaml
 source "$(dirname "$0")/env.sh"
 NAME="$1"
-STRAIGHTEN=0
-[ "$2" = "--straighten" ] && STRAIGHTEN=1
+STYLE=auto
+[ "$2" = "--straighten" ] && STYLE=straighten
+[ "$2" = "--plain" ] && STYLE=plain
 if [ -z "$NAME" ] || [[ ! "$NAME" =~ ^[A-Za-z0-9_-]+$ ]]; then
   echo "[save_map] 이름은 영문/숫자/_/- 만 쓸 수 있습니다: scripts/save_map.sh office_1f"
   exit 1
@@ -32,12 +36,12 @@ fi
 # 로봇이 다니던 공간을 기준으로 정리 (SLAM 원점 = 로봇 시작 위치 근처)
 SEED_ARGS=()
 if [ -n "$SEED_X" ]; then SEED_ARGS=(--seed "$SEED_X" "$SEED_Y"); fi
-if [ "$STRAIGHTEN" = 1 ]; then
-  TOOL=straighten_map.py; FINAL="$MAP_DIR/${NAME}_straight.yaml"
-else
-  TOOL=clean_map.py; FINAL="$MAP_DIR/${NAME}_clean.yaml"
-fi
-if ! python3 "$WAREHOUSE_HOME/tools/$TOOL" "$MAP_DIR/$NAME.yaml" "${SEED_ARGS[@]}"; then
+case "$STYLE" in
+  straighten) TOOL=(straighten_map.py); FINAL="$MAP_DIR/${NAME}_straight.yaml" ;;
+  plain)      TOOL=(clean_map.py); FINAL="$MAP_DIR/${NAME}_clean.yaml" ;;
+  *)          TOOL=(straighten_map.py --auto -o "$MAP_DIR/${NAME}_clean"); FINAL="$MAP_DIR/${NAME}_clean.yaml" ;;
+esac
+if ! python3 "$WAREHOUSE_HOME/tools/${TOOL[0]}" "$MAP_DIR/$NAME.yaml" "${TOOL[@]:1}" "${SEED_ARGS[@]}"; then
   echo "[save_map] 정리 실패, 원본 맵을 사용하세요: $MAP_DIR/$NAME.yaml"
   FINAL="$MAP_DIR/$NAME.yaml"
 fi

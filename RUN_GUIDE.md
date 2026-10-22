@@ -48,7 +48,7 @@ run.sh ── (잠금 logs/run.lock, 동시 실행 거절)
 | `start_slam.sh` | SLAM. `config/slam_toolbox.yaml` (`/scan_slam` 사용) | **AMCL 과 같이 띄우면 안 됨** |
 | `start_nav2.sh` | AMCL(`config/amcl_waffle_pi.yaml`) + map_server, 선택적으로 Nav2 주행 노드 | 주행 노드는 map→odom TF 가 나온 뒤 시작 |
 | `start_bridge.sh` | A* + 브리지. SLAM 모드는 맵 이름 `slam_live`, 미탐색 통과 허용 | |
-| `save_map.sh` | `/map` 저장 → `clean_map.py`(또는 `--straighten`) 정리 | `~/maps/<이름>.yaml` + `_clean.yaml` |
+| `save_map.sh` | `/map` 저장 → 기울기 보정 + 1칸 직선 정리 (`straighten_map.py --auto`, 직선이 아닌 공간은 자동으로 `clean_map.py`) | `~/maps/<이름>.yaml` + `_clean.yaml` |
 | `reset_robot.sh` | 정지 명령 1초 (sim 은 월드 초기화 + 위치 재지정) | 웹 "상태 초기화" 가 브리지를 통해 실행 |
 | `stop_ros.sh` | PC 쪽 노드/Gazebo 정리 | Pi bringup 은 건드리지 않음 |
 
@@ -89,7 +89,7 @@ scripts/run.sh --robot real --mode slam
 1. 웹 "여기로 이동" 또는 수동 조작 패널로 천천히 돌며 탐색 (SLAM 모드는 미탐색 칸도 지나가게 계획).
 2. 웹 **"맵 저장"** 또는 `source scripts/env.sh && scripts/save_map.sh <이름>`
    - 이름은 영문/숫자/`_`/`-` 만, 이미 있으면 거절.
-   - 벽이 가로/세로뿐인 방에서만 `--straighten`. 강당처럼 책상·의자가 흩어진 곳은 기본(`_clean`)을 쓰세요.
+   - 기본 `_clean` 은 벽을 1칸 직선/직각으로 반듯하게 하고, 직선이 아닌 공간(강당 책상·의자 등)은 자동으로 회전 없이 정리만 합니다. 강제로 고르려면 `--plain` / `--straighten`.
 3. 기존 맵 모드로 다시 실행: `scripts/run.sh --robot real --mode map --map ~/maps/<이름>_clean.yaml`
    (`run.sh` 가 이전 노드를 먼저 정리하므로 stop 없이 바로 실행해도 됩니다)
 4. 홈/LED 위치 등록은 **저장 후 기존 맵 모드에서** 합니다 (SLAM 중 등록한 위치는 루프 클로저 후 어긋날 수 있음).

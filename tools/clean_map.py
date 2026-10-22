@@ -10,6 +10,8 @@
   4. 빈 공간에 둘러싸인 작은 미탐색 구멍(--hole 칸 이하)은 빈 칸으로
   5. 같은 행/열에서 벽 사이 --gap 칸 이하 틈 메우기 (점선처럼 끊긴 벽)
   6. 경계 봉합: 빈 공간과 맞닿은 미탐색 칸을 벽으로 (바깥 벽이 끊김 없이 이어짐, --no-seal 로 끔)
+  7. 1칸 외곽선: 벽 = 빈 공간을 둘러싼 1칸 테두리만. 두꺼운 벽의 바깥쪽과 물체 안쪽은 미탐색으로
+     (경로 계획은 미탐색도 장애물로 보므로 지나갈 곳은 그대로, --thick 로 끔)
 비교 이미지(<출력>_preview.png): 왼쪽 원본, 오른쪽 정리본
 """
 import argparse
@@ -100,7 +102,7 @@ def erode(mask, k=1):
     return ~dilate(~mask, k)
 
 
-def clean(img, seed_rc, speck, hole, max_gap=3, seal=True, opening=1):
+def clean(img, seed_rc, speck, hole, max_gap=3, seal=True, opening=1, thin=False):
     # map_saver 값: 254 빈 칸, 205 미탐색, 0 장애물.
     # 주의: free_thresh가 0.196보다 크면(예: 0.25) map_server가 205(미탐색)를 빈 칸으로 읽는다
     occ = img < 89            # occupied_thresh 0.65
@@ -182,6 +184,12 @@ def clean(img, seed_rc, speck, hole, max_gap=3, seal=True, opening=1):
         stats['바깥 경계 봉합'] = int(border.sum())
         occ |= border
 
+    # 7. 1칸 외곽선: 빈 공간과 맞닿은(대각선 포함) 칸만 벽. LiDAR 가 실제로 닿는 면이 이 줄이다
+    if thin:
+        outline = dilate(region, 1) & ~region
+        stats['두꺼운 벽 1칸으로'] = int((occ & ~outline).sum())
+        occ = outline
+
     out = np.full(img.shape, UNKNOWN, dtype=np.uint8)
     out[region] = FREE
     out[occ] = OCC
@@ -210,6 +218,7 @@ def main():
     ap.add_argument('--gap', type=int, default=3, help='같은 행/열에서 이 칸 수 이하로 끊긴 벽은 이음')
     ap.add_argument('--no-seal', action='store_true', help='바깥 경계 봉합 안 함')
     ap.add_argument('--open', type=int, default=1, help='열림 연산 칸 수 (가느다란 빈 칸 제거, 0 이면 끔)')
+    ap.add_argument('--thick', action='store_true', help='벽을 1칸 외곽선으로 줄이지 않음 (예전 방식)')
     args = ap.parse_args()
 
     yaml_path = os.path.expanduser(args.yaml_path)
@@ -224,7 +233,7 @@ def main():
     h = img.shape[0]
     seed_rc = (h - 1 - int(math.floor((args.seed[1] - origin[1]) / res)),
                int(math.floor((args.seed[0] - origin[0]) / res)))
-    out, stats = clean(img, seed_rc, args.speck, args.hole, args.gap, not args.no_seal, args.open)
+    out, stats = clean(img, seed_rc, args.speck, args.hole, args.gap, not args.no_seal, args.open, not args.thick)
 
     base = os.path.expanduser(args.output) if args.output else os.path.splitext(yaml_path)[0] + '_clean'
     write_pgm(base + '.pgm', out)

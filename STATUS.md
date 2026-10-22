@@ -382,3 +382,9 @@ cd ../ros2_ws && source /opt/ros/humble/setup.bash && colcon build --symlink-ins
 - 속도: pure pursuit `max_speed` 0.15 → 0.1 m/s, `max_turn_speed` 1.0 → 0.6 rad/s, DWA `max_w` 1.0 → 0.6 (`max_v` 는 0.1 그대로)
 - 같이 커밋: 정규화된 DWA 비용항(`dwa.py`, `w_path` 0.75 / `w_goal` 0.86), 움직이는 물체 앞 제동 궤적 검사, 옆 차선 비키기
 - 확인: 단위 테스트 49개 통과, 전환 판단을 가짜 track 으로 확인. **실물 주행 미확인**
+
+### 지도 정리 1칸 직선/직각 (2026-10-22)
+- `save_map.sh` 기본 정리본(`_clean`)을 `straighten_map.py --auto` 로: 기울기 보정(0.2° 미만은 안 돌림) + 벽 1칸 직선 + 직각 모서리 + 물체 1칸 테두리, 방 밖 벽 조각 제거, 나란히 겹친 짧은 직선 제거
+- 벽 점이 직선에 85% 미만으로 맞으면 회전 없이 `clean_map.py` 정리 (새 7단계: 1칸 외곽선)
+- 돌린 맵은 yaml `# rotation_deg`, 웹 "맵 저장" 이 SLAM 중 등록한 위치/금지 구역을 같은 각도로 돌려 복사
+- 서버 맵 `map.yaml`(직선 비율 96%, 0.05° → 안 돌림), `maze_map.yaml`(97%, 2.40° 보정)으로 확인. 웹 저장 → 위치 복사 흐름은 실물 미시험
