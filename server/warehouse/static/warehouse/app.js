@@ -90,6 +90,9 @@ function handle(msg) {
       renderCargo();
       break;
     case 'yolo':
+      // 개수 글자가 새로 온 시각 (bridge 의 age 가 작으면 새 결과)
+      msg.countsAt = msg.counts && msg.age !== null && msg.age < 0.3 ? Date.now()
+        : (S.yolo && msg.counts ? S.yolo.countsAt : null);
       S.yolo = msg;
       renderYolo();
       break;
@@ -903,9 +906,50 @@ function renderYolo() {
     : total ? `검출 ${total}개 · ${found.map(([name, n]) => `${name} ${n}`).join(', ')}` : '검출 없음 (0개)';
   $('#yolo-counts').textContent = counts;
 }
-$('#btn-yolo-on').addEventListener('click', () => send('yolo_set', { enabled: true }));
-$('#btn-yolo-off').addEventListener('click', () => send('yolo_set', { enabled: false }));
-$('#btn-yolo-capture').addEventListener('click', () => { send('yolo_set', { capture: true }); toast('다음 검출 장면을 저장합니다 (~/camera_dataset/captures)'); });
+// 버튼을 누른 뒤 결과까지 걸린 시간 (로딩 표시). 켜기: 설정 응답 → 첫 검출 결과, 끄기: 설정 응답, 캡처: 다음 검출 결과
+const YOLO_JOB = {
+  on: { title: '검출 켜는 중', limit: 20000 },
+  off: { title: '검출 끄는 중', limit: 10000 },
+  capture: { title: '장면 캡처 중', limit: 15000 },
+};
+function yoloStart(kind, data) {
+  if (S.yoloJob) return;
+  S.yoloJob = { kind, t0: performance.now(), ack: null, countsAt: S.yolo && S.yolo.countsAt };
+  $('#yolo-loading-title').textContent = YOLO_JOB[kind].title;
+  $('#yolo-loading').hidden = false;
+  S.yoloTimer = setInterval(yoloTick, 100);
+  send('yolo_set', data);
+}
+function yoloFinish(text, ok = true) {
+  clearInterval(S.yoloTimer);
+  S.yoloJob = null;
+  $('#yolo-loading').hidden = true;
+  $('#yolo-timing').textContent = text;
+  addLog({ created_at: new Date().toISOString(), message: `YOLO ${text}${ok ? '' : ' ⚠'}` });
+}
+function yoloTick() {
+  const j = S.yoloJob;
+  if (!j) return;
+  const now = performance.now();
+  const sec = (ms) => (ms / 1000).toFixed(1);
+  const y = S.yolo || {};
+  if (j.ack === null && y.available && ((j.kind === 'on' && y.enabled === true) || (j.kind === 'off' && y.enabled === false)
+      || j.kind === 'capture')) j.ack = now;
+  const fresh = y.countsAt && y.countsAt !== j.countsAt;   // 버튼 뒤 새 검출 결과
+  $('#yolo-loading-time').textContent = `${sec(now - j.t0)}초` + (j.ack !== null && j.kind === 'on' ? ` · 설정 ${sec(j.ack - j.t0)}초, 첫 결과 기다리는 중` : '');
+  if (j.kind === 'off' && j.ack !== null) return yoloFinish(`끄기 완료: ${sec(j.ack - j.t0)}초`);
+  if (j.kind !== 'off' && j.ack !== null && fresh) {
+    return yoloFinish(j.kind === 'on' ? `켜기 완료: 설정 ${sec(j.ack - j.t0)}초, 첫 검출 결과 ${sec(now - j.t0)}초`
+      : `캡처 완료: ${sec(now - j.t0)}초 (~/camera_dataset/captures)`);
+  }
+  if (now - j.t0 > YOLO_JOB[j.kind].limit) {
+    yoloFinish(`${YOLO_JOB[j.kind].title.replace(' 중', '')} 시간 초과 (${sec(now - j.t0)}초)`
+      + (j.ack === null ? ': 검출기 응답 없음' : ': 검출 결과 없음, 카메라 영상(/csi/image_raw) 확인'), false);
+  }
+}
+$('#btn-yolo-on').addEventListener('click', () => yoloStart('on', { enabled: true }));
+$('#btn-yolo-off').addEventListener('click', () => yoloStart('off', { enabled: false }));
+$('#btn-yolo-capture').addEventListener('click', () => yoloStart('capture', { capture: true }));
 
 const STEP_LABEL = {
   pending: '대기', moving: '이동 중', arrived: '도착(적재 대기)', done: '완료', failed: '실패', skipped: '건너뜀',

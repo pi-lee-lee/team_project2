@@ -418,6 +418,14 @@ button[hidden] { display: none; }
 /* YOLO 검출 */
 .yolo-summary { margin: 8px 0 2px; font-size: 14px; font-weight: 700; }
 .yolo-counts { margin: 0; word-break: break-word; }
+.yolo-timing { margin: 4px 0 0; }
+#yolo-card { position: relative; }
+.yolo-loading { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; gap: 12px;
+  background: color-mix(in srgb, var(--card, #fff) 88%, transparent); border-radius: inherit; z-index: 2; text-align: left; }
+.yolo-loading[hidden] { display: none; }
+.spinner { width: 28px; height: 28px; border: 3px solid #cbd5e1; border-top-color: var(--primary, #2563eb);
+  border-radius: 50%; animation: spin 0.8s linear infinite; flex: none; }
+@keyframes spin { to { transform: rotate(360deg); } }
 
 /* 수동 조작 */
 .teleop { display: flex; gap: 14px; align-items: flex-start; flex-wrap: wrap; }
