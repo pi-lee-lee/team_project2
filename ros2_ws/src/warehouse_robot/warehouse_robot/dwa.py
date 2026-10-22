@@ -389,6 +389,12 @@ class DWAFollower:
         self.turning = False      # 출발 전 돌아서는 중 (45° 안으로 들어오면 끝)
         # 돌아서기 회전 속도 (rad/s): LiDAR(5Hz) 한 바퀴 동안 많이 돌면 스캔이 휘어 SLAM 매칭이 나빠짐
         self.rotate_speed = 0.6
+        # 목표점을 장애물 너머로: lookahead 점 근처에 장애물이 있으면 경로를 따라 더 앞의, 장애물에서 이 거리 넘게
+        # 떨어진 첫 경로점(target_max 까지)을 목표로 한다. 0 이면 끔.
+        # 경로 이탈 비용(w_path)을 빼면 목표점만이 경로 쪽으로 당기는 힘인데, 목표점이 상자 바로 뒤에 있으면
+        # '상자 쪽으로 가기' 와 '피하기' 가 싸워 상자 앞에 멈췄다 → 장애물 너머의 점을 보면 옆으로 돌아가는 궤적이 싸짐
+        self.target_clear = 0.0
+        self.target_max = 2.0
 
     def local_target(self, path, x, y):
         window = path[self.progress:self.progress + 60]
@@ -398,6 +404,32 @@ class DWAFollower:
         s = np.concatenate([[0.0], np.cumsum(seg)])
         idx = np.searchsorted(s, self.lookahead)
         return ahead[s <= self.local_path_length], ahead[min(idx, len(ahead) - 1)]
+
+    def clear_target(self, path, x, y, pts, local_path, local_goal):
+        """local_goal 이 장애물에 가까우면 경로를 따라 장애물에서 target_clear 넘게 떨어진 첫 점으로 옮긴다."""
+        if self.target_clear <= 0.0 or not len(pts):
+            return local_path, local_goal
+        ahead = path[self.progress:]
+        if len(ahead) < 2:
+            return local_path, local_goal
+        s = np.concatenate([[0.0], np.cumsum(np.hypot(*np.diff(ahead, axis=0).T))])
+        sel = (s >= self.lookahead) & (s <= self.target_max)
+        cand = ahead[sel]
+        if not len(cand):
+            return local_path, local_goal
+        near = pts[np.hypot(pts[:, 0] - x, pts[:, 1] - y) < self.target_max + self.target_clear]
+        if not len(near):
+            return local_path, local_goal
+        d = np.hypot(cand[:, None, 0] - near[None, :, 0], cand[:, None, 1] - near[None, :, 1]).min(axis=1)
+        blocked = d < self.target_clear
+        if not blocked.any():
+            return local_path, local_goal
+        # 앞쪽 경로가 장애물에 걸리면 처음 막힌 구간 다음의 빈 점 (없으면 target_max 끝점)
+        j = int(np.argmax(blocked))
+        free = np.flatnonzero(~blocked[j:])
+        i = j + int(free[0]) if len(free) else len(cand) - 1
+        goal = cand[i]
+        return ahead[s <= s[sel][i] + 0.2], goal
 
     def _rotation_clear(self, x, y, yaw, w, pts, horizon=1.0):
         """제자리에서 w 로 horizon 초 도는 동안 차체가 정적 점에 닿지 않는지."""
@@ -467,9 +499,12 @@ class DWAFollower:
         self.sidestep = max(cands, key=lambda sh: (min(room(here + sh), 1.0), -np.sign(rel @ n_path) * np.sign(sh @ n_path)))
         return self.sidestep
 
-    def compute(self, pose, v0, w0, map_to_odom, static_points, dynamic_obstacles, moving_speed=0.05):
+    def compute(self, pose, v0, w0, map_to_odom, static_points, dynamic_obstacles, moving_speed=0.05,
+                unmapped_points=None):
         """pose: odom 프레임 (x, y, yaw), map_to_odom: map 점을 odom 으로 옮기는 (x, y, yaw).
-        static_points: odom 스캔 점, dynamic_obstacles: odom [x, y, vx, vy, r]. 반환 (v, w, state)."""
+        static_points: odom 스캔 점, dynamic_obstacles: odom [x, y, vx, vy, r]. 반환 (v, w, state).
+        unmapped_points: 지도에 없는 물체의 스캔 점 (odom). 목표점을 장애물 너머로 옮길 때만 씀 (벽은 빼야
+        좁은 통로/모서리에서 목표가 멀리 튀지 않음). None 이면 static_points 전체."""
         x, y, yaw = pose
         self.last_trajectory = None   # 이번 주기에 DWA 로 고른 궤적만 남김 (제자리 회전/빠져나오기는 None)
         path = transform_points(self.path_map, *map_to_odom)
@@ -498,6 +533,12 @@ class DWAFollower:
             pts = pts[np.all(d > moving[None, :, 4] + 0.1, axis=1)]
         ahead = path[min(self.progress + 6, len(path) - 1)] - path[self.progress]
         path_dir = ahead / np.hypot(*ahead) if np.hypot(*ahead) > 1e-6 else np.array([np.cos(yaw), np.sin(yaw)])
+        # 움직이는 물체는 넣지 않는다 (옆 차선 비키기/예측이 맡음. 넣었더니 목표가 사람 너머로 튀어 제자리에서 돌다 부딪힘)
+        obst = pts if unmapped_points is None else np.asarray(unmapped_points, dtype=float).reshape(-1, 2)
+        if len(moving) and len(obst):
+            obst = obst[np.all(np.hypot(obst[:, None, 0] - moving[None, :, 0], obst[:, None, 1] - moving[None, :, 1])
+                               > moving[None, :, 4] + 0.1, axis=1)]
+        local_path, local_goal = self.clear_target(path, x, y, obst, local_path, local_goal)
         side = self.sidestep_target(x, y, moving, pts, path_dir) if self.sidestep_enabled else None
         if side is not None:
             local_path, local_goal = local_path + side, local_goal + side

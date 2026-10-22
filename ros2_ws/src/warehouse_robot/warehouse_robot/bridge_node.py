@@ -5,8 +5,8 @@
 
 이동 방식
   planner=astar : astar_planner 노드로 경로 계획 후
-      controller=mppi    : 이 노드의 MPPI 로 추종 (기본). DWA 와 입력/안전 검사가 같고 궤적만 시점마다 다른 (v, w) 순서
-      controller=hybrid  : 평소 pure pursuit, 경로 앞에 지도에 없는 장애물(추적 track)이 가까우면 DWA 로 바꿔 피함
+      controller=hybrid  : 평소 pure pursuit, 경로 앞에 지도에 없는 장애물(추적 track)이 가까우면 DWA 로 바꿔 피함 (기본)
+      controller=mppi    : 이 노드의 MPPI 로 추종. DWA 와 입력/안전 검사가 같고 궤적만 시점마다 다른 (v, w) 순서
       controller=dwa     : 이 노드의 DWA 로 추종, 움직이는 장애물의 미래 위치를 피함
       controller=builtin : 이 노드의 pure pursuit 추종기로 cmd_vel 직접 발행
       controller=nav2    : Nav2 controller_server(FollowPath)로 추종
@@ -195,7 +195,7 @@ class BridgeNode(Node):
         # FollowPath에 넘길 경로 좌표계. odom이면 controller_server가 map->odom TF 없이 주행한다
         self.declare_parameter('follow_frame', 'odom')
         # 경로 추종기 (controller=builtin)
-        self.declare_parameter('controller', 'mppi')  # mppi | hybrid | dwa | builtin | nav2
+        self.declare_parameter('controller', 'hybrid')  # hybrid | mppi | dwa | builtin | nav2
         self.declare_parameter('max_speed', 0.1)           # m/s
         self.declare_parameter('max_turn_speed', 0.6)      # rad/s
         self.declare_parameter('max_accel', 0.3)           # m/s², pure pursuit 출발 가속/정지 감속
@@ -320,6 +320,7 @@ class BridgeNode(Node):
                                           meas_noise=tp('meas_noise', 0.05), max_speed=tp('max_speed', 1.5))
         self.tracks = []                   # 확정된 track (odom)
         self.scan_odom = np.empty((0, 2))  # 최근 스캔 점 (odom) - DWA 정적 장애물
+        self.scan_unmapped = np.empty((0, 2))
         self.map_dist = None               # 지도 벽까지 거리 (벽 근처 점 = 정적) (dist, msg)
         self.last_obstacles_sent = 0.0
         self.last_dwa_sent = 0.0
@@ -342,6 +343,9 @@ class BridgeNode(Node):
                                       for k, v in vars(MPPIConfig()).items() if k != 'seed'})
         self.declare_parameter('dwa_follow.lookahead', 0.5)
         self.declare_parameter('dwa_follow.goal_tolerance', 0.1)
+        # 앞쪽 경로가 지도에 없는 장애물에서 이 거리 안을 지나면 목표점을 그 너머 경로점으로 (m, 0 이면 끔), target_max 까지
+        self.declare_parameter('dwa_follow.target_clear', 0.233)
+        self.declare_parameter('dwa_follow.target_max', 2.0)
         self.declare_parameter('dwa_follow.moving_speed', 0.08)  # 이보다 빠른 track 만 움직이는 장애물로 (멈춘 물체 속도 노이즈 ~0.06, 느린 사람 0.1)
         # controller=hybrid: 평소 pure pursuit, 장애물이 가까우면 DWA
         self.declare_parameter('hybrid.trigger_distance', 1.0)  # 로봇에서 이 거리 안 + 앞쪽 경로 가까이에 track 이 있으면 DWA (m)
@@ -732,6 +736,9 @@ class BridgeNode(Node):
             elif self.controller == 'mppi':
                 # 지역 계획기 자리('dwa' 키)를 같이 쓴다: 막힘/회복/웹 궤적 표시가 DWA 와 같은 경로로 처리됨
                 self.follower['dwa'] = MPPIFollower(points, self.goal['yaw'], self.dwa_cfg, self.mppi_cfg, **follow_kw)
+            if 'dwa' in self.follower:
+                self.follower['dwa'].target_clear = self.get_parameter('dwa_follow.target_clear').value
+                self.follower['dwa'].target_max = self.get_parameter('dwa_follow.target_max').value
             if self.controller in ('builtin', 'hybrid'):
                 self.follower['pp'] = PurePursuit(points, self.goal['yaw'], max_v=self.max_speed,
                                                   max_w=self.max_turn_speed, max_acc=self.max_accel,
@@ -880,7 +887,8 @@ class BridgeNode(Node):
         names += [f'dwa.{k}' for k, v in vars(self.dwa_cfg).items()
                   if k != 'control_period' and not isinstance(v, tuple)]
         names += [f'mppi.{k}' for k in vars(self.mppi_cfg) if k != 'seed']
-        names += ['dwa_follow.lookahead', 'dwa_follow.goal_tolerance', 'dwa_follow.moving_speed']
+        names += ['dwa_follow.lookahead', 'dwa_follow.goal_tolerance', 'dwa_follow.moving_speed',
+                  'dwa_follow.target_clear', 'dwa_follow.target_max']
         names += [f'hybrid.{k}' for k in ('trigger_distance', 'moving_distance', 'path_width', 'path_ahead',
                                           'release_time', 'rejoin_offset')]
         return names
@@ -908,7 +916,8 @@ class BridgeNode(Node):
             elif n.startswith('mppi.'):
                 # MPPIController 들이 같은 MPPIConfig 객체를 쓰므로 주행 중에도 바로 적용
                 setattr(self.mppi_cfg, n[5:], v)
-            elif n in ('dwa_follow.lookahead', 'dwa_follow.goal_tolerance') and 'dwa' in f:
+            elif n in ('dwa_follow.lookahead', 'dwa_follow.goal_tolerance', 'dwa_follow.target_clear',
+                       'dwa_follow.target_max') and 'dwa' in f:
                 setattr(f['dwa'], n.split('.')[1], v)
             self.get_logger().info(f'파라미터 변경: {n} = {v}')
         if 'pp' in f:
@@ -1317,6 +1326,7 @@ class BridgeNode(Node):
         ok = np.isfinite(r) & (r >= scan.range_min) & (r <= min(scan.range_max, c['max_range']))
         pts = transform_points(np.column_stack([r[ok] * np.cos(a[ok]), r[ok] * np.sin(a[ok])]), *sensor)
         self.scan_odom = pts
+        self.scan_unmapped = pts[:0]   # 지도에 없는 물체의 스캔 점 (odom) - DWA 목표점을 장애물 너머로 옮길 때
         if not self.tracking:
             return
         # 지도 벽 근처 점은 정적이므로 추적하지 않는다 (판별에만 map 을 쓰므로 AMCL 이 몇 cm 틀려도 속도에는 영향 없음).
@@ -1338,6 +1348,7 @@ class BridgeNode(Node):
                 free = (cell >= 0) & (cell < 65)
                 keep[inside] = free & (dist[row[inside], col[inside]] > c['static_match_dist'])
                 pts = pts[keep]
+        self.scan_unmapped = pts
         dets = detect_clusters(pts, c['cluster_gap'], c['min_points'], c['max_diameter'], c['min_radius'],
                                sensor[:2])
         self.tracks = self.tracker.update(dets, Time.from_msg(scan.header.stamp).nanoseconds * 1e-9)
@@ -1390,6 +1401,7 @@ class BridgeNode(Node):
             return 0.0, 0.0, 'blocked'
         dyn = np.array([[t.x[0], t.x[1], t.x[2], t.x[3], t.radius] for t in self.tracks]).reshape(-1, 5)
         result = follower.compute(pose, *self.odom_vw, map_to_odom, self.scan_odom, dyn,
+                                  unmapped_points=self.scan_unmapped,
                                   moving_speed=self.get_parameter('dwa_follow.moving_speed').value)
         follower.last_cmd = (now, result)
         self.send_dwa(follower, result)

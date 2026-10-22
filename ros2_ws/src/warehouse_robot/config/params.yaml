@@ -1,7 +1,9 @@
 astar_planner:
   ros__parameters:
     map_topic: map
-    robot_radius: 0.20       # 외곽 반경 (m): 차체 뒤 모서리 (0.197, 0.153) → 0.25, 뒤에 붙인 8x8cm (0.277, 0.04) → 0.28. 제자리 회전 때 닿지 않게
+    robot_radius: 0.24        # (m) 차체 반폭 0.153 + DWA safety_margin 0.08 = 0.233 이상: A* 가 낸 틈을 DWA 도 들어갈 수 있게.
+                              # 0.20 이면 A* 는 장애물 옆 0.40 m 틈으로 경로를 내는데 DWA 는 0.47 m 미만이라 못 들어가 재계획해도 같은 길에서 멈춤
+                              # (tools/planner_compare.py 2026-10-22). 제자리 회전 원(뒤 모서리 0.238, 뒤 부착물 0.28)은 회전 전 검사가 맡음
     inflation_radius: 0.55    # 이 거리까지는 벽에서 멀어지도록 비용 부여
     cost_weight: 3.0
     occupied_threshold: 65
@@ -30,7 +32,7 @@ warehouse_bridge:
     pose_rate: 5.0
     max_retries: 2
     arrive_tolerance: 0.3     # Nav2가 성공이라고 해도 목표와 이 거리 이상이면 실패로 처리
-    controller: mppi          # mppi(기본): 항상 MPPI / hybrid: 평소 pure pursuit, 경로 앞 장애물이 가까우면 DWA / dwa: 항상 DWA / builtin: 항상 pure pursuit / nav2: Nav2 controller_server
+    controller: hybrid        # hybrid(기본): 평소 pure pursuit, 경로 앞 장애물이 가까우면 DWA / mppi: 항상 MPPI / dwa: 항상 DWA / builtin: 항상 pure pursuit / nav2: Nav2 controller_server
     max_speed: 0.26           # m/s (pure pursuit). Waffle Pi 하드웨어 한계 (2026-10-22: 0.1 이 느리다고 해서 올림, 실물 미시험)
     max_turn_speed: 1.82      # rad/s (pure pursuit 회전, 제자리 회전). 하드웨어 한계 (예전 1.0 → 0.6 → 1.82)
     max_accel: 0.3            # m/s² (pure pursuit). 출발은 이 가속으로 점점 빨라지고, 목표 앞은 이 감속으로 멈춤 (0.26 m/s 까지 0.9초, 정지 거리 약 11cm)
@@ -65,7 +67,7 @@ warehouse_bridge:
     # controller: dwa 일 때 (tb3_nav local_planner 이식). 실수는 소수점을 붙일 것
     dwa:
       max_v: 0.13           # 하드웨어 한계 (2026-10-22: 0.07 이 느리다고 해서 올림. 튜닝은 0.15 에서 했음, 0.26 은 실물/sim 미시험)
-      min_v: -0.05            # 느린 후진 (다가오는 장애물에서 물러나기)
+      min_v: -0.1             # 후진 (다가오는 장애물에서 물러나기). -0.05 는 마주 오는 사람(0.15 m/s)보다 느려 sim 에서 부딪혔음
       max_w: 1.82             # 하드웨어 한계 (2026-10-22 올림). 돌아서기 회전은 dwa.py rotate_speed 0.6 이하
       max_acc_v: 0.3          # sim 실측 1.0~1.2 m/s² (tools/step_test.py). 실물 미측정이라 보수적으로
       max_acc_w: 1.5          # sim 실측 7~12 rad/s². 보수적으로
@@ -80,11 +82,12 @@ warehouse_bridge:
       safety_margin: 0.08
       dynamic_margin: 0.15    # 움직이는 장애물 추가 여유. sim 추적 오차(95% 10cm)보다 크게. 0.25 는 너무 오래 기다림
       dynamic_growth: 0.03    # 예측 1초당 반경 증가
-      obstacle_influence: 0.5
+      obstacle_influence: 0.3   # 이 거리 안쪽부터 장애물 비용 (0.5 는 좁은 통로에서 항상 비용이 붙어 상자 앞에서 섰음)
       w_heading: 0.3
-      w_path: 0.75
+      w_path: 0.0             # 경로 복귀 비용 없음: 피하는 동안 경로 쪽(장애물 쪽)으로 끌어당기지 않음. 경로로 돌아오는 건
+                              # 장애물 너머의 목표점(dwa_follow.target_clear) + 진행 비용 + pure pursuit 복귀가 맡음
       w_goal: 0.86
-      w_obstacle: 1.8
+      w_obstacle: 1.0
       w_speed: 0.2
       w_collision: 2.0        # 1.0~6.0 사이에서 결과 차이 없음 (tools/dwa_tune.py), 덜 극단적인 값
     # controller: mppi 일 때 (mppi.py). 속도/가속/외곽(footprint)/여유(safety/dynamic margin)/predict_time/obstacle_influence/path_scale 은
@@ -104,12 +107,16 @@ warehouse_bridge:
     dwa_follow:
       lookahead: 0.3          # 경로 위 이 거리 앞 점을 DWA 목표로
       goal_tolerance: 0.1     # 이 안에 들면 제자리에서 도착 방향 맞춤
+      target_clear: 0.233     # 앞쪽 경로(lookahead ~ target_max)가 지도에 없는 장애물에서 이 거리 안을 지나면 목표점을 그 너머의
+                              # 첫 경로점으로 (차체 반폭 + safety_margin). 0 이면 끔. 목표가 상자 바로 뒤면 '다가가기' 와 '피하기' 가 싸워 멈췄음
+      target_max: 2.0         # 목표점을 옮기는 최대 거리 (경로를 따라, m)
       moving_speed: 0.08      # 이보다 빠른 track 만 움직이는 장애물로 예측/웹 표시 (멈춘 물체 속도 노이즈 중앙값 0.06, 느린 사람 0.1)
     # controller: hybrid 일 때 pure pursuit ↔ DWA 전환 (track = 지도에 없는 물체: 상자, 사람)
     hybrid:
       trigger_distance: 1.0   # 이 거리 안 + 앞쪽 경로 가까이에 track 이 있으면 DWA (m)
       moving_distance: 1.5    # 움직이는 track 은 경로와 상관없이 이 거리 안이면 DWA (m)
-      path_width: 0.4         # track 가장자리가 앞쪽 경로에서 이 거리 안이면 '경로 위' (m)
+      path_width: 0.25        # track 가장자리가 앞쪽 경로에서 이 거리 안이면 '경로 위' (m). 차체 반폭 + 여유 정도:
+                              # A* 가 이미 장애물을 피해 낸 경로는 pure pursuit 가 정확히 따라감 (0.4 면 DWA 로 바뀌어 좁은 틈에서 섰음)
       path_ahead: 1.5         # 앞쪽 경로를 이 길이만큼 봄 (m)
       release_time: 2.0       # 장애물이 이 시간 동안 안 보이면 pure pursuit 로 (s)
       rejoin_offset: 0.25     # 경로에서 이 거리 안으로 돌아왔을 때만 pure pursuit 로 (m)

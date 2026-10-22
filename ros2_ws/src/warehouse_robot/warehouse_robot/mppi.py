@@ -40,6 +40,9 @@ class MPPIConfig:
     w_obstacle: float = 1.0
     w_collision: float = 50.0
     w_smooth: float = 0.02
+    w_speed: float = 0.0          # 최고 속도보다 느린 정도 (시점별 평균). 잡음 평균으로 속도가 깎이는 것을 보정
+    max_v: float = 0.0            # 최고 선속도 [m/s]. 0 이면 dwa.max_v
+    noise_smooth: int = 1         # 잡음을 이 스텝 수로 이동 평균 (1 = 끔). 크면 한 방향으로 길게 꺾는 후보가 많아짐
     seed: int = 0
 
 
@@ -55,6 +58,10 @@ class MPPIController(DWAController):
     def reset(self):
         self.U[:] = 0.0
 
+    @property
+    def vmax(self):
+        return self.mcfg.max_v if self.mcfg.max_v > 0.0 else self.cfg.max_v
+
     def _rollout_seq(self, state, V, W):
         """시점별 (v, w) 순서 (K, T) 를 가속 한계로 자르고 굴린 궤적 (K, T, 3), 잘린 V, W."""
         c = self.cfg
@@ -64,7 +71,7 @@ class MPPIController(DWAController):
         v, w = np.full(K, state.v), np.full(K, state.w)
         dv, dw = c.max_acc_v * dt, c.max_acc_w * dt
         for k in range(T):
-            v = np.clip(V[:, k], np.maximum(c.min_v, v - dv), np.minimum(c.max_v, v + dv))
+            v = np.clip(V[:, k], np.maximum(c.min_v, v - dv), np.minimum(self.vmax, v + dv))
             w = np.clip(W[:, k], np.maximum(-c.max_w, w - dw), np.minimum(c.max_w, w + dw))
             V[:, k], W[:, k] = v, w
         yaw = state.yaw + np.cumsum(W * dt, axis=1)
@@ -80,9 +87,9 @@ class MPPIController(DWAController):
             self.U = np.zeros((T, 2))
         U = np.vstack([self.U[1:], self.U[-1:]])          # 한 칸 밀기 (warm start)
         n = max(m.samples, 1)
-        V = U[None, :, 0] + self.rng.normal(0.0, m.noise_v, (n, T))
-        W = U[None, :, 1] + self.rng.normal(0.0, m.noise_w, (n, T))
-        arcs_v = np.array([c.max_v, 0.5 * c.max_v, 0.0, c.min_v])
+        V = U[None, :, 0] + self._noise(n, T, m.noise_v)
+        W = U[None, :, 1] + self._noise(n, T, m.noise_w)
+        arcs_v = np.array([self.vmax, 0.5 * self.vmax, 0.0, c.min_v])
         arcs_w = np.linspace(-c.max_w, c.max_w, 9) * 0.5
         av, aw = np.meshgrid(arcs_v, arcs_w, indexing='ij')
         self.stop_index = n + 1
@@ -90,10 +97,19 @@ class MPPIController(DWAController):
         W = np.vstack([W, U[None, :, 1], np.zeros((1, T)), np.repeat(aw.ravel()[:, None], T, axis=1)])
         return V, W
 
+    def _noise(self, n, T, std):
+        """(n, T) 가우시안 잡음. noise_smooth > 1 이면 시간 방향 이동 평균 (표준편차는 std 로 유지)."""
+        k = max(int(self.mcfg.noise_smooth), 1)
+        e = self.rng.normal(0.0, std, (n, T + k - 1))
+        if k == 1:
+            return e
+        cs = np.cumsum(np.pad(e, ((0, 0), (1, 0))), axis=1)
+        return (cs[:, k:] - cs[:, :-k]) / math.sqrt(k)
+
     def _costs(self, state, traj, V, W, local_path, goal, hard_t, soft_t):
         c, m = self.cfg, self.mcfg
         K, T, _ = traj.shape
-        reach = max(c.max_v * c.predict_time, 1e-6)
+        reach = max(self.vmax * c.predict_time, 1e-6)
         xy = traj[:, :, :2]
         if len(local_path):
             d = np.linalg.norm(xy[:, :, None, :] - local_path[None, None, :, :], axis=3)   # (K, T, P)
@@ -127,6 +143,7 @@ class MPPIController(DWAController):
             'obstacle': m.w_obstacle * obstacle,
             'collision': m.w_collision * collision,
             'smooth': m.w_smooth * smooth,
+            'speed': m.w_speed * ((self.vmax - V) / max(self.vmax, 1e-6)).mean(axis=1),
         }
         return sum(terms.values()), terms
 
@@ -159,7 +176,7 @@ class MPPIController(DWAController):
         local_path = np.asarray(local_path, dtype=float).reshape(-1, 2)
         goal = np.asarray(local_goal, dtype=float)
         if len(static_points):
-            reach = c.max_v * c.predict_time + c.robot_radius + c.obstacle_influence + 0.3
+            reach = self.vmax * c.predict_time + c.robot_radius + c.obstacle_influence + 0.3
             near = np.hypot(static_points[:, 0] - state.x, static_points[:, 1] - state.y) < reach
             static_points = static_points[near]
 

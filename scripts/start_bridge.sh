@@ -16,7 +16,7 @@ fi
 # YOLO 부품 검출기도 같이 실행 (scripts/start_yolo.sh, enabled=false 로 시작). 끄려면 WAREHOUSE_YOLO=0
 # 경로 계획/추종 방식 (run.sh 의 --planner/--controller, 기본: 직접 구현한 A* + 내장 추종기)
 PLANNER="${WAREHOUSE_PLANNER:-astar}"
-CONTROLLER="${WAREHOUSE_CONTROLLER:-mppi}"
+CONTROLLER="${WAREHOUSE_CONTROLLER:-hybrid}"
 ROBOT_NAME="${WAREHOUSE_ROBOT_NAME:-tb3}"
 echo "[start_bridge] 로봇 $ROBOT_NAME, 네임스페이스 ${WAREHOUSE_NAMESPACE:-(없음)}, 모드 $WAREHOUSE_MODE, 맵 이름 $MAP_NAME, planner=$PLANNER, controller=$CONTROLLER, 시뮬레이션 시간 $WAREHOUSE_SIM_TIME, LiDAR 노이즈 ${WAREHOUSE_SCAN_NOISE:-false}, 도메인 $ROS_DOMAIN_ID"
 # ros2 launch 는 값이 빈 인자(namespace:=)를 받지 않으므로 값이 있을 때만 넘긴다 (없으면 launch 기본값 '')

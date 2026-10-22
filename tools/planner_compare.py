@@ -43,19 +43,53 @@ from warehouse_robot.mppi import MPPIConfig, MPPIFollower  # noqa: E402
 PARAMS = os.path.join(HERE, '..', 'ros2_ws', 'src', 'warehouse_robot', 'config', 'params.yaml')
 DT = 0.1
 RES = 0.05          # 지도 / A* 해상도
-TRUTH = 0.02        # LiDAR 를 쏘는 실제 세계 해상도
+TRUTH = 0.025       # LiDAR 를 쏘는 실제 세계 해상도 (지도 칸의 1/2)
 LIDAR_X = -0.064
 BODY = (-0.197, 0.069, 0.153)
 EXTRA = (-0.277, -0.197, 0.04)   # 뒤에 붙인 물건 (x_min, x_max, 반폭)
 
 STRATEGIES = {
-    'A': dict(local='dwa', hybrid=True, replan=False, desc='hybrid PP↔DWA (지금 기본)'),
+    'A': dict(local='dwa', hybrid=True, replan=False, desc='hybrid PP↔DWA (params.yaml 그대로 = 기본)'),
+    # 2026-10-22 비용 함수 다시 정의하기 전 기본값 (비교용)
+    'A_old': dict(local='dwa', hybrid=True, replan=False, target_clear=0.0, astar=dict(robot_radius=0.20),
+                  dwa=dict(w_path=0.75, obstacle_influence=0.5, w_obstacle=1.8, min_v=-0.05),
+                  hybrid_cfg=dict(path_width=0.4), desc='hybrid PP↔DWA (이전 값)'),
     'B': dict(local='mppi', hybrid=True, replan=False, desc='hybrid PP↔MPPI'),
     'C': dict(local='dwa', hybrid=False, replan=False, desc='DWA 만'),
     'D': dict(local='mppi', hybrid=False, replan=False, desc='MPPI 만'),
     'E': dict(local='dwa', hybrid=False, replan=True, desc='DWA + 1초 재계획'),
     'F': dict(local='mppi', hybrid=False, replan=True, desc='MPPI + 1초 재계획'),
     'G': dict(local='mppi', hybrid=True, replan=True, desc='hybrid PP↔MPPI + 1초 재계획'),
+    # hybrid DWA 비용 함수 다시 정의 (경로 복귀 비용 w_path 빼기)
+    'H0': dict(local='dwa', hybrid=True, replan=False, dwa=dict(w_path=0.0), desc='hybrid, w_path 0'),
+    'H1': dict(local='dwa', hybrid=True, replan=False, dwa=dict(w_path=0.0), target_clear=0.233,
+               desc='hybrid, w_path 0 + 목표 장애물 너머'),
+    'H2': dict(local='dwa', hybrid=True, replan=False, dwa=dict(w_path=0.0, w_progress=0.5), target_clear=0.233,
+               desc='H1 + 진행 0.5'),
+    'H3': dict(local='dwa', hybrid=True, replan=False, dwa=dict(w_path=0.0, obstacle_influence=0.3, w_obstacle=1.0),
+               target_clear=0.233, desc='H1 + 장애물 범위 0.3 / 1.0'),
+    'H4': dict(local='dwa', hybrid=True, replan=False, dwa=dict(w_path=0.0, w_progress=0.5, obstacle_influence=0.3,
+               w_obstacle=1.0), target_clear=0.233, desc='H1 + 진행 0.5 + 장애물 0.3 / 1.0'),
+    # A* 반경과 DWA 여유 맞추기: A* 가 낸 틈을 DWA 가 못 들어가면(반폭 0.153 + 여유 0.08 = 0.233 > A* 0.20) 재계획해도 같은 길
+    'Ar': dict(local='dwa', hybrid=True, replan=False, astar=dict(robot_radius=0.24), desc='A + A* 반경 0.24'),
+    'H3r': dict(local='dwa', hybrid=True, replan=False, dwa=dict(w_path=0.0, obstacle_influence=0.3, w_obstacle=1.0),
+                target_clear=0.233, astar=dict(robot_radius=0.24), desc='H3 + A* 반경 0.24'),
+    'H5': dict(local='dwa', hybrid=True, replan=False, dwa=dict(w_path=0.0, obstacle_influence=0.3, w_obstacle=1.0),
+               target_clear=0.233, astar=dict(robot_radius=0.24), hybrid_cfg=dict(path_width=0.25),
+               desc='H3r + 전환 폭 0.25 (경로가 이미 피하면 PP)'),
+    'H5a': dict(local='dwa', hybrid=True, replan=False, dwa=dict(w_path=0.0, obstacle_influence=0.3, w_obstacle=1.0, dynamic_margin=0.08),
+               target_clear=0.233, astar=dict(robot_radius=0.24), hybrid_cfg=dict(path_width=0.25), desc='H5 + 동적 여유 0.08'),
+    'H5b': dict(local='dwa', hybrid=True, replan=False, dwa=dict(w_path=0.0, obstacle_influence=0.3, w_obstacle=1.0, dynamic_growth=0.0),
+               target_clear=0.233, astar=dict(robot_radius=0.24), hybrid_cfg=dict(path_width=0.25), desc='H5 + 동적 여유 증가 0'),
+    'H5c': dict(local='dwa', hybrid=True, replan=False, dwa=dict(w_path=0.0, obstacle_influence=0.3, w_obstacle=1.0, min_v=-0.1),
+               target_clear=0.233, astar=dict(robot_radius=0.24), hybrid_cfg=dict(path_width=0.25), desc='H5 + 후진 0.1'),
+    'H5d': dict(local='dwa', hybrid=True, replan=False, dwa=dict(w_path=0.0, obstacle_influence=0.3, w_obstacle=1.0, dynamic_margin=0.08, dynamic_growth=0.0, min_v=-0.1),
+               target_clear=0.233, astar=dict(robot_radius=0.24), hybrid_cfg=dict(path_width=0.25), desc='H5 + 위 셋'),
+    'H3m': dict(local='dwa', hybrid=True, replan=False, dwa=dict(w_path=0.0, obstacle_influence=0.3, w_obstacle=1.0,
+                safety_margin=0.05), target_clear=0.203, desc='H3 + DWA 여유 0.05 (A* 0.20 그대로)'),
+    'H3rp': dict(local='dwa', hybrid=True, replan=False, dwa=dict(w_path=0.0, obstacle_influence=0.3, w_obstacle=1.0,
+                 predict_time=2.0), target_clear=0.233, astar=dict(robot_radius=0.24),
+                 desc='H3r + predict_time 2.0'),
 }
 
 
@@ -113,21 +147,113 @@ def scenarios():
              rect(2.5, 2.6, -0.6, 3.1), rect(1.5, 1.6, 0.5, 2.0), rect(-0.5, 1.6, 2.0, 2.1),
              rect(-0.6, 2.6, 3.0, 3.1), rect(-0.7, -0.6, 2.0, 3.1)]
     S['s_corridor'] = dict(walls=walls, boxes=[], start=(0.0, 0.0, 0.0), goal=(0.0, 2.55))
+    # --- 극한 시나리오 ---
+    # 10. 폭 1.4m 통로에 상자 3개가 좌우 번갈아 (슬라럼)
+    S['x_slalom'] = dict(walls=room_walls(-0.6, 4.6, -0.7, 0.7),
+                         boxes=[rect(1.0, 1.3, -0.05, 0.3), rect(2.0, 2.3, -0.3, 0.05), rect(3.0, 3.3, -0.05, 0.3)],
+                         start=(0.0, 0.0, 0.0), goal=(4.2, 0.0))
+    # 11. 폭 1.0m 통로, 벽에 붙은 상자로 남은 틈 0.5m
+    S['x_tight_gap'] = dict(walls=room_walls(-0.6, 4.6, -0.5, 0.5), boxes=[rect(1.8, 2.1, -0.5, 0.0)],
+                            start=(0.0, 0.0, 0.0), goal=(4.0, 0.0))
+    # 12. 방 가운데 ㄷ자 상자 함정 (입구가 로봇 쪽): 들어가면 뒤로 나와 돌아가야 함
+    S['x_trap'] = dict(walls=room_walls(-0.6, 4.6, -1.5, 1.5),
+                       boxes=[rect(2.2, 2.35, -0.6, 0.6), rect(1.4, 2.35, 0.45, 0.6), rect(1.4, 2.35, -0.6, -0.45)],
+                       start=(0.0, 0.0, 0.0), goal=(4.0, 0.0))
+    # 13. 폭 1.4m 통로, 로봇이 0.8m 앞까지 오면 경로 위에 물체가 갑자기 나타남 (반경 0.2)
+    S['x_sudden'] = dict(walls=room_walls(-0.6, 4.6, -0.7, 0.7), boxes=[], start=(0.0, 0.0, 0.0), goal=(4.0, 0.0),
+                         movers=[dict(kind='appear', p=(2.0, 0.0), r=0.2, near=0.8)])
+    # 14. 방에서 사람 3명이 경로를 가로질러 왔다 갔다 + 상자 1개
+    S['x_crowd'] = dict(walls=room_walls(-0.6, 4.6, -1.5, 1.5), boxes=[rect(2.45, 2.75, -0.15, 0.15)],
+                        start=(0.0, 0.0, 0.0), goal=(4.0, 0.0),
+                        movers=[dict(kind='pingpong', p0=(1.2, 1.2), p1=(1.2, -1.2), speed=0.25, r=0.2, pause=3.0),
+                                dict(kind='pingpong', p0=(3.3, -1.2), p1=(3.3, 1.2), speed=0.2, r=0.2, pause=5.0),
+                                dict(kind='line', p0=(4.3, 0.4), v=(-0.12, 0.0), r=0.2, until=60.0)])
+    # 15. 폭 1.2m 통로, 마주 오는 사람 + 그 뒤 상자
+    S['x_headon_box'] = dict(walls=room_walls(-0.6, 4.6, -0.6, 0.6), boxes=[rect(2.8, 3.1, -0.15, 0.15)],
+                             start=(0.0, 0.0, 0.0), goal=(4.0, 0.0),
+                             movers=[dict(kind='line', p0=(2.5, 0.0), v=(-0.15, 0.0), r=0.2, until=40.0)])
+    S.update(real_map_scenarios())
     return S
+
+
+REAL_MAP = '/home/abc/maps/map2_clean.yaml'
+
+
+def real_map_scenarios(n=6, seed=3):
+    """실물 지도(map2_clean) 위 무작위 출발/목표 + 경로 위에 상자 1~2개 (지도에 없음). 상자를 넣어도 A* 경로가 있는 것만."""
+    if not os.path.exists(REAL_MAP):
+        return {}
+    from PIL import Image
+    meta = yaml.safe_load(open(REAL_MAP))
+    img = np.flipud(np.array(Image.open(os.path.join(os.path.dirname(REAL_MAP), meta['image']))))
+    grid = img < 100        # 0 = 벽, 205 = 미탐색 (벽 바깥), 254 = 빈 칸
+    unknown = (img > 100) & (img < 250)
+    ox, oy = meta['origin'][:2]
+    a = yaml.safe_load(open(PARAMS))['astar_planner']['ros__parameters']
+    rng = np.random.default_rng(seed)
+    occ = np.where(grid | unknown, 100, 0).astype(np.int16)
+    base = GridPlanner(occ.ravel().tolist(), grid.shape[1], grid.shape[0], RES, ox, oy,
+                       robot_radius=0.3, inflation_radius=0.55)
+    free = np.argwhere(~base.lethal)
+    out = {}
+    tries = 0
+    while len(out) < n and tries < 500:
+        tries += 1
+        (r0, c0), (r1, c1) = free[rng.integers(len(free), size=2)]
+        start, goal = base.cell_to_world(r0, c0), base.cell_to_world(r1, c1)
+        try:
+            path = np.asarray(base.plan(start, goal))
+        except PlanningError:
+            continue
+        L = np.hypot(*np.diff(path, axis=0).T).sum()
+        if L < 3.0:
+            continue
+        s = np.concatenate([[0.0], np.cumsum(np.hypot(*np.diff(path, axis=0).T))])
+        boxes = []
+        for frac in rng.uniform(0.3, 0.75, size=rng.integers(1, 3)):
+            i = int(np.searchsorted(s, frac * L))
+            bx, by = path[i] + rng.uniform(-0.12, 0.12, 2)
+            half = rng.uniform(0.12, 0.18)
+            boxes.append(rect(bx - half, bx + half, by - half, by + half))
+        # 상자를 넣어도 갈 수 있어야 함 (반경 0.25: 차체 반폭 0.153 + DWA 여유 0.08 이 지나가는 틈), 출발/목표가 상자에 걸리면 안 됨
+        g2 = occ.copy()
+        for x0, x1, y0, y1 in boxes:
+            c_0, c_1 = int((x0 - ox) / RES), int(math.ceil((x1 - ox) / RES))
+            r_0, r_1 = int((y0 - oy) / RES), int(math.ceil((y1 - oy) / RES))
+            g2[r_0:r_1, c_0:c_1] = 100
+        chk = GridPlanner(g2.ravel().tolist(), grid.shape[1], grid.shape[0], RES, ox, oy,
+                          robot_radius=0.25, inflation_radius=a['inflation_radius'])
+        if not chk.is_free(*start) or not chk.is_free(*goal):
+            continue
+        try:
+            chk.plan(start, goal)
+        except PlanningError:
+            continue
+        yaw0 = math.atan2(path[min(5, len(path) - 1)][1] - start[1], path[min(5, len(path) - 1)][0] - start[0])
+        out[f'map2_{len(out)}'] = dict(grid=(grid | unknown, ox, oy), walls=[], boxes=boxes,
+                                       start=(start[0], start[1], yaw0), goal=goal)
+    return out
 
 
 class World:
     def __init__(self, sc):
         self.sc = sc
-        rects = sc['walls'] + sc['boxes']
-        xs = [r[0] for r in rects] + [r[1] for r in rects]
-        ys = [r[2] for r in rects] + [r[3] for r in rects]
-        self.ox, self.oy = min(xs) - 0.2, min(ys) - 0.2
-        self.w = int(math.ceil((max(xs) + 0.2 - self.ox) / RES))
-        self.h = int(math.ceil((max(ys) + 0.2 - self.oy) / RES))
-        self.map = self._raster(sc['walls'], RES, self.w, self.h)          # A* / 지도 (상자 없음)
-        tw, th = int(self.w * RES / TRUTH), int(self.h * RES / TRUTH)
-        self.truth = self._raster(rects, TRUTH, tw, th)
+        if 'grid' in sc:
+            # 실제 지도 (pgm) + 지도에 없는 상자
+            grid, self.ox, self.oy = sc['grid']
+            self.h, self.w = grid.shape
+            self.map = grid.copy()
+            self.truth = np.kron(grid, np.ones((2, 2), dtype=bool)) | \
+                self._raster(sc['boxes'], TRUTH, self.w * 2, self.h * 2)
+        else:
+            rects = sc['walls'] + sc['boxes']
+            xs = [r[0] for r in rects] + [r[1] for r in rects]
+            ys = [r[2] for r in rects] + [r[3] for r in rects]
+            self.ox, self.oy = min(xs) - 0.2, min(ys) - 0.2
+            self.w = int(math.ceil((max(xs) + 0.2 - self.ox) / RES))
+            self.h = int(math.ceil((max(ys) + 0.2 - self.oy) / RES))
+            self.map = self._raster(sc['walls'], RES, self.w, self.h)          # A* / 지도 (상자 없음)
+            self.truth = self._raster(rects, TRUTH, self.w * 2, self.h * 2)
         self.map_dist = obstacle_distance(self.map, RES, 0.5)
         occ = np.argwhere(self.truth)
         self.occ_pts = np.column_stack([self.ox + (occ[:, 1] + 0.5) * TRUTH, self.oy + (occ[:, 0] + 0.5) * TRUTH])
@@ -136,6 +262,7 @@ class World:
         ang = np.radians(np.arange(360))
         self.ray_dir = np.column_stack([np.cos(ang), np.sin(ang)])
         self.ray_s = np.arange(0.02, 3.5, TRUTH / 1.5)
+        self.robot_xy = sc['start'][:2]
 
     def _raster(self, rects, res, w, h):
         g = np.zeros((h, w), dtype=bool)
@@ -149,6 +276,13 @@ class World:
         """[[x, y, vx, vy, r], ...] (정답)."""
         out = []
         for m in self.movers:
+            if m['kind'] == 'appear':
+                # 로봇이 near 만큼 다가오면 그 자리에 갑자기 나타나는 물체 (사람이 상자를 내려놓음 등)
+                if not m.get('_on') and math.hypot(self.robot_xy[0] - m['p'][0], self.robot_xy[1] - m['p'][1]) < m['near']:
+                    m['_on'] = True
+                if m.get('_on'):
+                    out.append([m['p'][0], m['p'][1], 0.0, 0.0, m['r']])
+                continue
             if m['kind'] == 'line':
                 k = min(t, m['until'])
                 moving = t < m['until']
@@ -228,12 +362,15 @@ class Run:
     def __init__(self, world, strat, params, verbose=False):
         self.wd, self.st, self.verbose = world, strat, verbose
         self.a, self.b, dwa = params
-        self.cfg = DWAConfig(**dwa)
-        self.mcfg = MPPIConfig()
+        self.a = {**self.a, **strat.get('astar', {})}
+        self.cfg = DWAConfig(**{**dwa, **strat.get('dwa', {})})
+        self.mcfg = MPPIConfig(**{k: v for k, v in yaml.safe_load(open(PARAMS))['warehouse_bridge']['ros__parameters']
+                                  .get('mppi', {}).items()})
         self.memory = {}          # 칸 → (처음 본 시각, 마지막 본 시각)
         self.log = []
         self.replans = 0
         self.switches = 0
+        self.odo = 0.0
 
     def say(self, t, msg):
         self.log.append(f'{t:6.1f}s {msg}')
@@ -283,6 +420,8 @@ class Run:
             f['local'] = MPPIFollower(path, 0.0, self.cfg, self.mcfg, controller=ctrl, **kw)
         else:
             f['local'] = DWAFollower(path, 0.0, self.cfg, **kw)
+        f['local'].target_clear = self.st.get('target_clear', self.b['dwa_follow'].get('target_clear', 0.0))
+        f['local'].target_max = self.b['dwa_follow'].get('target_max', 2.0)
         if self.st['hybrid']:
             f['pp'] = PurePursuit(path, 0.0, max_v=self.b['max_speed'], max_w=self.b['max_turn_speed'],
                                   max_acc=self.b['max_accel'], max_acc_w=self.b['max_turn_accel'])
@@ -291,7 +430,7 @@ class Run:
         return f
 
     def hybrid_trigger(self, f, x, y, pts, t):
-        h = self.b['hybrid']
+        h = {**self.b['hybrid'], **self.st.get('hybrid_cfg', {})}
         idx = f['local'].progress if f['use_local'] else f['pp'].index
         ahead = f['path'][idx:]
         if len(ahead) > 1:
@@ -392,7 +531,8 @@ class Run:
                                 self.say(t, '→ pure pursuit')
                 if f['use_local']:
                     v, w, state = f['local'].compute((x, y, yaw), v, w, (0.0, 0.0, 0.0), pts, dyn,
-                                                     moving_speed=self.b['dwa_follow']['moving_speed'])
+                                                     moving_speed=self.b['dwa_follow']['moving_speed'],
+                                                     unmapped_points=wd.unmapped(pts))
                 else:
                     v, w, state = f['pp'].compute(x, y, yaw, now=t)
                 if state == 'done':
@@ -454,11 +594,14 @@ class Run:
             x += v * math.cos(yaw) * DT
             y += v * math.sin(yaw) * DT
             t += DT
+            self.odo += abs(v) * DT
+            wd.robot_xy = (x, y)
             min_gap = min(min_gap, wd.body_gap(x, y, yaw, t))
         return self.result('시간 초과', t, min_gap, x, y)
 
     def result(self, outcome, t, gap, x, y):
         return dict(outcome=outcome, time=round(t, 1), gap=round(gap, 3), pos=(round(x, 2), round(y, 2)),
+                    speed=round(self.odo / max(t, 1e-6), 3),
                     replans=self.replans, switches=self.switches, log=self.log)
 
 
@@ -473,28 +616,44 @@ def job(args):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument('--only', default=''.join(STRATEGIES))
+    ap.add_argument('--only', default=','.join(STRATEGIES), help='쉼표로 구분 (예: A,H1)')
     ap.add_argument('--scen', default='')
     ap.add_argument('-v', action='store_true')
     ap.add_argument('--workers', type=int, default=10)
     args = ap.parse_args()
     names = args.scen.split(',') if args.scen else list(scenarios())
-    jobs = [(k, n, args.v) for k in args.only for n in names]
+    keys = args.only.split(',')
+    jobs = [(k, n, args.v) for k in keys for n in names]
     with ProcessPoolExecutor(args.workers) as ex:
         res = list(ex.map(job, jobs))
     table = {}
     for k, n, r in res:
         table.setdefault(k, {})[n] = r
-    print('방식 | ' + ' | '.join(names))
-    for k in args.only:
-        row = []
-        for n in names:
+    # 시나리오가 많아 표를 세로로: 행 = 시나리오, 열 = 방식. 칸 = ✓시간 또는 ✗결과, 충돌이면 '!'
+    w = 13
+    print(f"{'시나리오':16s}" + ''.join(f'{k:>{w}s}' for k in keys))
+    for n in names:
+        cells = []
+        for k in keys:
             r = table[k][n]
-            mark = '✓' if r['outcome'] == '도착' else '✗'
-            hit = ' 충돌' if r['gap'] < 0 else ''
-            row.append(f"{mark}{r['time']:.0f}s g{r['gap']:.2f}{hit} rp{r['replans']}")
-        ok = sum(table[k][n]['outcome'] == '도착' and table[k][n]['gap'] >= 0 for n in names)
-        print(f"{k} {STRATEGIES[k]['desc']:28s} [{ok}/{len(names)}] | " + ' | '.join(row))
+            c = (f"{r['time']:.0f}s" if r['outcome'] == '도착' else '✗' + r['outcome'][:2]) + ('!' if r['gap'] < 0 else '')
+            cells.append(f'{c:>{w}s}')
+        print(f'{n:16s}' + ''.join(cells))
+    print()
+    for k in keys:
+        rs = [table[k][n] for n in names]
+        ok = sum(r['outcome'] == '도착' and r['gap'] >= 0 for r in rs)
+        hit = sum(r['gap'] < 0 for r in rs)
+        both = [n for n in names if all(table[q][n]['outcome'] == '도착' for q in keys)]
+        tsum = sum(table[k][n]['time'] for n in both)
+        gaps = [r['gap'] for r in rs if r['outcome'] == '도착' and r['gap'] >= 0]
+        print(f"{k:4s} {STRATEGIES[k]['desc']:34s} 성공 {ok}/{len(names)}  충돌 {hit}  "
+              f"공통 성공 {len(both)}개 시간합 {tsum:.0f}s  평균 속도 {np.mean([r['speed'] for r in rs]):.3f} m/s  "
+              f"최소 여유 {min(gaps) if gaps else float('nan'):.3f} m  재계획 {sum(r['replans'] for r in rs)}")
+    import json
+    with open(os.path.join(HERE, '..', 'logs', 'planner_compare.json'), 'w') as fp:
+        json.dump({k: {n: {kk: vv for kk, vv in r.items() if kk != 'log'} for n, r in t.items()} for k, t in table.items()},
+                  fp, ensure_ascii=False, indent=1)
     if args.v or len(jobs) <= 3:
         for k, n, r in res:
             print(k, n, r['outcome'], r['pos'], r['cpu'], 's cpu')

@@ -138,3 +138,21 @@ def test_follower_blocked_by_wall():
     v, w, state = f.compute((0.0, 0.0, 0.0), 0.0, 0.0, (0, 0, 0), wall, [])
     # 바로 앞 벽: 앞으로는 못 감 (멈추거나 돌거나 막힘)
     assert v <= 0.05
+
+
+def test_target_moves_beyond_obstacle_on_path():
+    # 앞쪽 경로가 지도에 없는 상자에 걸리면 목표점을 상자 너머의 경로점으로 (w_path 0 인 hybrid DWA 가 상자 앞에 서지 않게)
+    import numpy as np
+    from warehouse_robot.dwa import DWAConfig, DWAFollower
+    path = np.array([[x, 0.0] for x in np.linspace(0, 3.0, 61)])
+    f = DWAFollower(path, 0.0, DWAConfig(), lookahead=0.3)
+    f.target_clear = 0.233
+    box = np.array([[x, y] for x in np.linspace(0.9, 1.1, 5) for y in np.linspace(-0.1, 0.1, 5)])
+    lp, goal = f.local_target(path, 0.0, 0.0)
+    assert abs(goal[0] - 0.3) < 0.06
+    lp2, goal2 = f.clear_target(path, 0.0, 0.0, box, lp, goal)
+    assert goal2[0] > 1.1 + 0.2 and len(lp2) >= len(lp)
+    # 장애물이 없거나 끔(0)이면 그대로
+    assert f.clear_target(path, 0.0, 0.0, box[:0], lp, goal)[1] is goal
+    f.target_clear = 0.0
+    assert f.clear_target(path, 0.0, 0.0, box, lp, goal)[1] is goal
