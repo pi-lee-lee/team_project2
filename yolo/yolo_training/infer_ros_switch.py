@@ -31,7 +31,7 @@ class Detector(Node):
         self.declare_parameter('confidence',0.35)
         self.declare_parameter('imgsz',320)
         self.declare_parameter('person_only',False)
-        self.declare_parameter('enabled',False)  # 웹 '검출 켜기' 버튼이 true 로
+        self.declare_parameter('enabled',False)  # 웹 'YOLO 시작' 버튼이 true, 'YOLO 정지' 가 false
         self.declare_parameter('capture_once',False)
         self.capture_dir=Path.home()/'camera_dataset/captures'
         self.add_on_set_parameters_callback(self.validate_switch)
@@ -43,8 +43,10 @@ class Detector(Node):
         self.last_count_log=None
         qos=QoSProfile(depth=1,reliability=ReliabilityPolicy.BEST_EFFORT,
                        durability=DurabilityPolicy.VOLATILE)
-        self.sub=self.create_subscription(Image,self.get_parameter('input_topic').value,
-                                          self.receive,qos)
+        # 카메라 영상은 실행 중(enabled)일 때만 구독한다. 정지하면 구독을 끊어 원본 영상을 받지도 않음 (Wi-Fi, CPU 절약)
+        self.qos=qos
+        self.sub=None
+        self.sync_input()
         self.pub=self.create_publisher(Image,'/yolo/image_raw',qos)
         self.pub_counts=self.create_publisher(String,'/yolo/counts',10)
         self.timer=self.create_timer(0.05,self.detect)
@@ -108,7 +110,18 @@ class Detector(Node):
             # One request consumes one frame, including failed saves.
             self.set_parameters([Parameter('capture_once', value=False)])
 
+    def sync_input(self):
+        enabled=self.get_parameter('enabled').value
+        if enabled and self.sub is None:
+            self.sub=self.create_subscription(Image,self.get_parameter('input_topic').value,
+                                              self.receive,self.qos)
+            self.last_received=self.get_clock().now()
+        elif not enabled and self.sub is not None:
+            self.destroy_subscription(self.sub)
+            self.sub=None
+
     def detect(self):
+        self.sync_input()
         if not self.get_parameter('enabled').value:
             self.latest=None
             return

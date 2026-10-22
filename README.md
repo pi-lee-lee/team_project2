@@ -223,10 +223,10 @@ SIGINT → SIGTERM → SIGKILL 순서로 보내고 남은 프로세스가 없는
 - `yolo/` = [team_project2](https://github.com/obloodobladeo-spec/team_project2) 를 합친 것 (YOLO11n 부품 검출기, 가중치, Colab 학습 노트북). 자세한 설명은 `yolo/README.md`
 - 검출기(`/component_detector_switch`)는 **브리지와 같이 자동 실행**됩니다 (`start_bridge.sh` → `scripts/start_yolo.sh`, 출력은 `logs/bridge.log` 의 `[yolo-3]`). 빼려면 `WAREHOUSE_YOLO=0`
 - 입력 영상 `/csi/image_raw`: Pi 에서 `bash yolo/camera.sh /dev/video0` (카메라 장치는 `v4l2-ctl --list-devices` 로 확인)
-- `enabled` (추론 + 검출 영상 `/yolo/image_raw` + 개수 `/yolo/counts` 발행) **기본값 false**. 웹 **"카메라 검출 (YOLO)"** 카드:
-  - **▶ 검출 켜기 / ■ 검출 끄기** = `enabled` true / false (브리지가 검출기 파라미터 서비스로 바꿈)
+- `enabled` (카메라 영상 구독 + 추론 + 검출 영상 `/yolo/image_raw` + 개수 `/yolo/counts` 발행) **기본값 false**. false 면 카메라 영상 구독도 끊어 추론하지 않음 (모델은 메모리에 남아 다시 시작이 빠름). 웹 **"카메라 검출 (YOLO)"** 카드:
+  - **▶ YOLO 시작 / ■ YOLO 정지** = `enabled` true / false (브리지가 검출기 파라미터 서비스로 바꿈)
   - **📷 장면 캡처** = `capture_once` (다음 검출 장면을 `~/camera_dataset/captures/` 에 PNG 로)
-  - 상태 배지 (검출기 없음 / 꺼짐 / 켜짐 · 영상 대기 / 검출 중), 개수 요약 (예: `검출 4개 · led_red 2, usb 2`), `/yolo/counts` 원문 글자
+  - 상태 배지 (검출기 없음 / 정지 / 실행 중 · 영상 대기 / 실행 중), 버튼 위 클래스별 개수 칸, 버튼 아래 검출 영상 (브리지가 `/yolo/image_raw` 를 JPEG 로 줄여 보냄), 개수 요약 (예: `검출 4개 · led_red 2, usb 2`), `/yolo/counts` 원문 글자
 - 검출 대상: DHT11, bluetooth, led_green, led_red, led_yellow, usb (rgb 는 제외). 아직 LED 배달(`cargo/detected`)과는 연결하지 않았습니다
 
 ### LED 배달 (서빙 로봇처럼)

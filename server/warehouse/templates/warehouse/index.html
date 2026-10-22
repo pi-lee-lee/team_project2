@@ -78,8 +78,8 @@
       <div class="card-head"><h2>카메라 검출 (YOLO)</h2><span id="yolo-state" class="badge">-</span></div>
       <div id="yolo-classes" class="yolo-classes" title="/yolo/counts 의 클래스별 개수 (현재 프레임)" hidden></div>
       <div class="btn-row three">
-        <button id="btn-yolo-on" title="검출기 enabled=true: 추론과 검출 영상(/yolo/image_raw), 개수(/yolo/counts) 발행 시작">▶ 검출 켜기</button>
-        <button id="btn-yolo-off" title="검출기 enabled=false: 추론과 발행 중지 (로봇 카메라 발행은 그대로)">■ 검출 끄기</button>
+        <button id="btn-yolo-on" title="검출기 enabled=true: 카메라 영상을 받아 추론, 검출 영상(/yolo/image_raw)과 개수(/yolo/counts) 발행">▶ YOLO 시작</button>
+        <button id="btn-yolo-off" title="검출기 enabled=false: 카메라 영상 구독, 추론, 발행을 모두 멈춤 (모델은 메모리에 남아 다시 시작이 빠름, 로봇 카메라 발행은 그대로)">■ YOLO 정지</button>
         <button id="btn-yolo-capture" class="ghost" title="다음 검출 장면을 PNG 한 장으로 저장 (~/camera_dataset/captures)">📷 장면 캡처</button>
       </div>
       <img id="yolo-image" class="yolo-image" alt="검출 결과 영상" title="/yolo/image_raw (브리지가 줄여서 보냄, 초당 최대 5장)" hidden>

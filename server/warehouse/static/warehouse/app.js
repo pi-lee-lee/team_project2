@@ -1025,8 +1025,8 @@ function renderYolo() {
   let label = '브리지 없음';
   let cls = 'badge off';
   if (bridge && y && !y.available) label = '검출기 없음';
-  else if (bridge && y && y.enabled) { label = y.counts ? '검출 중' : '켜짐 · 영상 대기'; cls = 'badge on'; }
-  else if (bridge && y && y.enabled === false) label = '꺼짐';
+  else if (bridge && y && y.enabled) { label = y.counts ? '실행 중' : '실행 중 · 영상 대기'; cls = 'badge on'; }
+  else if (bridge && y && y.enabled === false) label = '정지';
   badge.textContent = label;
   badge.className = cls;
   const on = !!(bridge && y && y.available);
@@ -1044,7 +1044,7 @@ function renderYolo() {
   $('#yolo-summary').textContent = counts
     ? (total ? `검출 ${total}개 · ${found.map(([name, n]) => `${name} ${n}`).join(', ')}` : '검출 없음 (0개)')
     : !on ? (bridge && y ? '검출기 노드 없음 (브리지와 같이 실행됨: logs/bridge.log 확인)' : '')
-    : !y.enabled ? '검출 꺼짐'
+    : !y.enabled ? 'YOLO 정지됨 (추론 안 함)'
     : '카메라 영상을 기다리는 중';
   $('#yolo-counts').textContent = counts;
 }
@@ -1078,8 +1078,8 @@ function renderYoloClasses(items) {
 }
 // 버튼을 누른 뒤 결과까지 걸린 시간 (로딩 표시). 켜기: 설정 응답 → 첫 검출 결과, 끄기: 설정 응답, 캡처: 다음 검출 결과
 const YOLO_JOB = {
-  on: { title: '검출 켜는 중', limit: 20000 },
-  off: { title: '검출 끄는 중', limit: 10000 },
+  on: { title: 'YOLO 시작 중', limit: 20000 },
+  off: { title: 'YOLO 정지 중', limit: 10000 },
   capture: { title: '장면 캡처 중', limit: 15000 },
 };
 function yoloStart(kind, data) {
@@ -1107,9 +1107,9 @@ function yoloTick() {
       || j.kind === 'capture')) j.ack = now;
   const fresh = y.countsAt && y.countsAt !== j.countsAt;   // 버튼 뒤 새 검출 결과
   $('#yolo-loading-time').textContent = `${sec(now - j.t0)}초` + (j.ack !== null && j.kind === 'on' ? ` · 설정 ${sec(j.ack - j.t0)}초, 첫 결과 기다리는 중` : '');
-  if (j.kind === 'off' && j.ack !== null) return yoloFinish(`끄기 완료: ${sec(j.ack - j.t0)}초`);
+  if (j.kind === 'off' && j.ack !== null) return yoloFinish(`정지 완료: ${sec(j.ack - j.t0)}초`);
   if (j.kind !== 'off' && j.ack !== null && fresh) {
-    return yoloFinish(j.kind === 'on' ? `켜기 완료: 설정 ${sec(j.ack - j.t0)}초, 첫 검출 결과 ${sec(now - j.t0)}초`
+    return yoloFinish(j.kind === 'on' ? `시작 완료: 설정 ${sec(j.ack - j.t0)}초, 첫 검출 결과 ${sec(now - j.t0)}초`
       : `캡처 완료: ${sec(now - j.t0)}초 (~/camera_dataset/captures)`);
   }
   if (now - j.t0 > YOLO_JOB[j.kind].limit) {
