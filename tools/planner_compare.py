@@ -1,26 +1,16 @@
-"""지역 계획기 + 재계획 방식 비교 시뮬레이션 (ROS 없음, A* / DWA / MPPI / pure pursuit 모듈만 사용).
+"""hybrid 주행 (pure pursuit ↔ DWA) 비교 시뮬레이션 (ROS 없음, A* / DWA / pure pursuit 모듈만 사용).
 
-    python3 tools/planner_compare.py                 # 전체 (방식 x 시나리오)
-    python3 tools/planner_compare.py --only F --scen box_center -v
+    python3 tools/planner_compare.py                    # params.yaml 그대로 + 변형들 x 전체 시나리오
+    python3 tools/planner_compare.py --only A,pred0 --scen box_center -v
 
 브리지(bridge_node.py)의 주행 로직을 단순화해 흉내 낸다:
   - A* 는 지도(벽) + LiDAR 로 2.5초 넘게 같은 칸에 보인 '지도에 없는 점'(scan_persist, 20초 기억)으로 계획.
     그걸로 경로가 없으면 지도만으로 계획 (astar_planner_node 와 같음)
-  - 진행 없음 15초 / 막힘 5초 → (지역 계획기면) 뒤로 15cm → 재계획, 재시도 2번 넘으면 실패
-  - pure pursuit 는 앞쪽 ±25° 0.35m 정지 규칙
+  - 평소 pure pursuit (앞쪽 ±25° 0.35m 정지 규칙). 로봇 앞 사각형(hybrid.box_*) 안에 지도에 없는 점이 있거나
+    움직이는 물체가 hybrid.moving_predict 초 안에 사각형에 들어오면 DWA, 지나가면 pure pursuit (브리지 hybrid_switch 와 같음)
+  - 진행 없음 15초 / 막힘 5초 → (DWA 면) 뒤로 15cm → 재계획, 재시도 2번 넘으면 실패
 LiDAR 는 360개 빔(최대 3.5m, 0.2초마다)을 벽/상자/사람에 직접 쏴서 만든다. 상자는 지도에 없다 (출발 때 A* 가 모름).
 움직이는 사람은 추적 결과 대신 정답 위치/속도를 준다 (dwa_tune 과 같음).
-
-방식:
-  A  hybrid: pure pursuit, 경로 앞 장애물이 가까우면 DWA (지금 기본값)
-  B  hybrid: pure pursuit ↔ MPPI
-  C  DWA 만
-  D  MPPI 만
-  E  DWA + 1초마다 전역 재계획
-  F  MPPI + 1초마다 전역 재계획
-  G  hybrid(pure pursuit ↔ MPPI) + 1초마다 전역 재계획
-1초 재계획: A*(LiDAR 장애물 포함)가 성공했고, 지금 경로의 남은 부분이 새 장애물에 막혔거나 새 경로가 15% 넘게 짧을 때만 바꿈
-(안 그러면 비슷한 두 경로 사이를 왔다 갔다 함). LiDAR 장애물로는 길이 없어서 지도만으로 나온 경로는 받지 않는다.
 """
 import argparse
 import math
@@ -38,7 +28,6 @@ from scipy.spatial import cKDTree  # noqa: E402
 from warehouse_robot.astar import GridPlanner, PlanningError, obstacle_distance  # noqa: E402
 from warehouse_robot.dwa import DWAConfig, DWAFollower  # noqa: E402
 from warehouse_robot.follower import PurePursuit  # noqa: E402
-from warehouse_robot.mppi import MPPIConfig, MPPIFollower  # noqa: E402
 
 PARAMS = os.path.join(HERE, '..', 'ros2_ws', 'src', 'warehouse_robot', 'config', 'params.yaml')
 DT = 0.1
@@ -48,67 +37,16 @@ LIDAR_X = -0.064
 BODY = (-0.197, 0.069, 0.153)
 EXTRA = (-0.277, -0.197, 0.04)   # 뒤에 붙인 물건 (x_min, x_max, 반폭)
 
+# 변형: dwa / astar / hybrid_cfg = params.yaml 값 덮어쓰기, pp_speed = pure pursuit 최고 속도
 STRATEGIES = {
-    'A': dict(local='dwa', hybrid=True, replan=False, desc='hybrid PP↔DWA (params.yaml 그대로 = 기본)'),
-    'A_circle': dict(local='dwa', hybrid=True, replan=False, hybrid_cfg=dict(moving_predict=None),
-                     desc='사각형 + 움직이는 물체 1.5m 원 (hall-planning)'),
-    'A_circle0': dict(local='dwa', hybrid=True, replan=False, hybrid_cfg=dict(moving_predict=None, moving_distance=0.0),
-                      desc='사각형만 (움직이는 물체도 사각형 안일 때)'),
-    'A_pred1': dict(local='dwa', hybrid=True, replan=False, hybrid_cfg=dict(moving_predict=1.0), desc='예측 1초'),
-    'A_pred3': dict(local='dwa', hybrid=True, replan=False, hybrid_cfg=dict(moving_predict=3.0), desc='예측 3초'),
-    'P_front1': dict(local='dwa', hybrid=True, replan=False, hybrid_cfg=dict(box_front=1.0), desc='예측 2초 + box_front 1.0'),
-    'P_accw': dict(local='dwa', hybrid=True, replan=False, dwa=dict(max_acc_w=1.5), desc='예측 2초 + max_acc_w 1.5'),
-    'P_pp26': dict(local='dwa', hybrid=True, replan=False, pp_speed=0.26, desc='예측 2초 + PP 0.26'),
-    'P_all': dict(local='dwa', hybrid=True, replan=False, hybrid_cfg=dict(box_front=1.0), dwa=dict(max_acc_w=1.5),
-                  pp_speed=0.26, desc='예측 2초 + 셋 다 예전 값'),
-    'C_all': dict(local='dwa', hybrid=True, replan=False, hybrid_cfg=dict(box_front=1.0, moving_predict=None),
-                  dwa=dict(max_acc_w=1.5), pp_speed=0.26, desc='원 1.5m + 셋 다 예전 값'),
-    'C_accw': dict(local='dwa', hybrid=True, replan=False, hybrid_cfg=dict(moving_predict=None), dwa=dict(max_acc_w=1.5),
-                   desc='원 1.5m + max_acc_w 1.5'),
-    'A_path': dict(local='dwa', hybrid=True, replan=False, hybrid_cfg=dict(box_trigger=False),
-                   desc='A, 전환 = 경로 가까이 track'),
-    'A_box': dict(local='dwa', hybrid=True, replan=False, hybrid_cfg=dict(box_trigger=True, box_front=1.0, box_back=0.2,
-                  box_half_width=0.33, box_min_points=3, box_min_scans=2), desc='전환 = 로봇 앞 사각형 반폭 0.33'),
-    # 2026-10-22 비용 함수 다시 정의하기 전 기본값 (비교용)
-    'A_old': dict(local='dwa', hybrid=True, replan=False, target_clear=0.0, astar=dict(robot_radius=0.20),
-                  dwa=dict(w_path=0.75, obstacle_influence=0.5, w_obstacle=1.8, min_v=-0.05),
-                  hybrid_cfg=dict(path_width=0.4), desc='hybrid PP↔DWA (이전 값)'),
-    'B': dict(local='mppi', hybrid=True, replan=False, desc='hybrid PP↔MPPI'),
-    'C': dict(local='dwa', hybrid=False, replan=False, desc='DWA 만'),
-    'D': dict(local='mppi', hybrid=False, replan=False, desc='MPPI 만'),
-    'E': dict(local='dwa', hybrid=False, replan=True, desc='DWA + 1초 재계획'),
-    'F': dict(local='mppi', hybrid=False, replan=True, desc='MPPI + 1초 재계획'),
-    'G': dict(local='mppi', hybrid=True, replan=True, desc='hybrid PP↔MPPI + 1초 재계획'),
-    # hybrid DWA 비용 함수 다시 정의 (경로 복귀 비용 w_path 빼기)
-    'H0': dict(local='dwa', hybrid=True, replan=False, dwa=dict(w_path=0.0), desc='hybrid, w_path 0'),
-    'H1': dict(local='dwa', hybrid=True, replan=False, dwa=dict(w_path=0.0), target_clear=0.233,
-               desc='hybrid, w_path 0 + 목표 장애물 너머'),
-    'H2': dict(local='dwa', hybrid=True, replan=False, dwa=dict(w_path=0.0, w_progress=0.5), target_clear=0.233,
-               desc='H1 + 진행 0.5'),
-    'H3': dict(local='dwa', hybrid=True, replan=False, dwa=dict(w_path=0.0, obstacle_influence=0.3, w_obstacle=1.0),
-               target_clear=0.233, desc='H1 + 장애물 범위 0.3 / 1.0'),
-    'H4': dict(local='dwa', hybrid=True, replan=False, dwa=dict(w_path=0.0, w_progress=0.5, obstacle_influence=0.3,
-               w_obstacle=1.0), target_clear=0.233, desc='H1 + 진행 0.5 + 장애물 0.3 / 1.0'),
-    # A* 반경과 DWA 여유 맞추기: A* 가 낸 틈을 DWA 가 못 들어가면(반폭 0.153 + 여유 0.08 = 0.233 > A* 0.20) 재계획해도 같은 길
-    'Ar': dict(local='dwa', hybrid=True, replan=False, astar=dict(robot_radius=0.24), desc='A + A* 반경 0.24'),
-    'H3r': dict(local='dwa', hybrid=True, replan=False, dwa=dict(w_path=0.0, obstacle_influence=0.3, w_obstacle=1.0),
-                target_clear=0.233, astar=dict(robot_radius=0.24), desc='H3 + A* 반경 0.24'),
-    'H5': dict(local='dwa', hybrid=True, replan=False, dwa=dict(w_path=0.0, obstacle_influence=0.3, w_obstacle=1.0),
-               target_clear=0.233, astar=dict(robot_radius=0.24), hybrid_cfg=dict(path_width=0.25),
-               desc='H3r + 전환 폭 0.25 (경로가 이미 피하면 PP)'),
-    'H5a': dict(local='dwa', hybrid=True, replan=False, dwa=dict(w_path=0.0, obstacle_influence=0.3, w_obstacle=1.0, dynamic_margin=0.08),
-               target_clear=0.233, astar=dict(robot_radius=0.24), hybrid_cfg=dict(path_width=0.25), desc='H5 + 동적 여유 0.08'),
-    'H5b': dict(local='dwa', hybrid=True, replan=False, dwa=dict(w_path=0.0, obstacle_influence=0.3, w_obstacle=1.0, dynamic_growth=0.0),
-               target_clear=0.233, astar=dict(robot_radius=0.24), hybrid_cfg=dict(path_width=0.25), desc='H5 + 동적 여유 증가 0'),
-    'H5c': dict(local='dwa', hybrid=True, replan=False, dwa=dict(w_path=0.0, obstacle_influence=0.3, w_obstacle=1.0, min_v=-0.1),
-               target_clear=0.233, astar=dict(robot_radius=0.24), hybrid_cfg=dict(path_width=0.25), desc='H5 + 후진 0.1'),
-    'H5d': dict(local='dwa', hybrid=True, replan=False, dwa=dict(w_path=0.0, obstacle_influence=0.3, w_obstacle=1.0, dynamic_margin=0.08, dynamic_growth=0.0, min_v=-0.1),
-               target_clear=0.233, astar=dict(robot_radius=0.24), hybrid_cfg=dict(path_width=0.25), desc='H5 + 위 셋'),
-    'H3m': dict(local='dwa', hybrid=True, replan=False, dwa=dict(w_path=0.0, obstacle_influence=0.3, w_obstacle=1.0,
-                safety_margin=0.05), target_clear=0.203, desc='H3 + DWA 여유 0.05 (A* 0.20 그대로)'),
-    'H3rp': dict(local='dwa', hybrid=True, replan=False, dwa=dict(w_path=0.0, obstacle_influence=0.3, w_obstacle=1.0,
-                 predict_time=2.0), target_clear=0.233, astar=dict(robot_radius=0.24),
-                 desc='H3r + predict_time 2.0'),
+    'A': dict(desc='params.yaml 그대로 (기본)'),
+    'pred0': dict(hybrid_cfg=dict(moving_predict=0.0), desc='움직이는 물체도 지금 위치만 (예측 없음)'),
+    'pred1': dict(hybrid_cfg=dict(moving_predict=1.0), desc='예측 1초'),
+    'pred3': dict(hybrid_cfg=dict(moving_predict=3.0), desc='예측 3초'),
+    'front1': dict(hybrid_cfg=dict(box_front=1.0), desc='box_front 1.0'),
+    'accw15': dict(dwa=dict(max_acc_w=1.5), desc='dwa.max_acc_w 1.5'),
+    'old3': dict(hybrid_cfg=dict(box_front=1.0), dwa=dict(max_acc_w=1.5), pp_speed=0.26,
+                 desc='box_front 1.0 + max_acc_w 1.5 + PP 0.26'),
 }
 
 
@@ -383,8 +321,7 @@ class Run:
         self.a, self.b, dwa = params
         self.a = {**self.a, **strat.get('astar', {})}
         self.cfg = DWAConfig(**{**dwa, **strat.get('dwa', {})})
-        self.mcfg = MPPIConfig(**{k: v for k, v in yaml.safe_load(open(PARAMS))['warehouse_bridge']['ros__parameters']
-                                  .get('mppi', {}).items()})
+        self.h = {**self.b['hybrid'], **strat.get('hybrid_cfg', {})}
         self.memory = {}          # 칸 → (처음 본 시각, 마지막 본 시각)
         self.log = []
         self.replans = 0
@@ -419,39 +356,33 @@ class Run:
                            robot_radius=self.a['robot_radius'], inflation_radius=self.a['inflation_radius'],
                            cost_weight=self.a['cost_weight'])
 
-    def plan(self, x, y, t, allow_fallback=True):
+    def plan(self, x, y, t):
         """(경로, LiDAR 장애물 반영 여부) 또는 (None, None)."""
         goal = self.wd.sc['goal']
         try:
             return self.planner(t).plan((x, y), goal), True
         except PlanningError:
-            if not allow_fallback:
-                return None, None
+            pass
         try:
             return self.planner(t, with_scan=False).plan((x, y), goal), False
         except PlanningError:
             return None, None
 
-    def make_follower(self, path, keep=None):
+    def make_follower(self, path):
         f = {'path': np.asarray(path, dtype=float)}
-        kw = dict(goal_tolerance=self.b['dwa_follow']['goal_tolerance'], lookahead=self.b['dwa_follow']['lookahead'])
-        if self.st['local'] == 'mppi':
-            ctrl = keep['local'].dwa if keep and 'local' in keep else None
-            f['local'] = MPPIFollower(path, 0.0, self.cfg, self.mcfg, controller=ctrl, **kw)
-        else:
-            f['local'] = DWAFollower(path, 0.0, self.cfg, **kw)
-        f['local'].target_clear = self.st.get('target_clear', self.b['dwa_follow'].get('target_clear', 0.0))
-        f['local'].target_max = self.b['dwa_follow'].get('target_max', 2.0)
-        if self.st['hybrid']:
-            f['pp'] = PurePursuit(path, 0.0, max_v=self.st.get('pp_speed', self.b['max_speed']), max_w=self.b['max_turn_speed'],
-                                  max_acc=self.b['max_accel'], max_acc_w=self.b['max_turn_accel'])
-        f['use_local'] = not self.st['hybrid']
+        f['local'] = DWAFollower(path, 0.0, self.cfg, goal_tolerance=self.b['dwa_follow']['goal_tolerance'],
+                                 lookahead=self.b['dwa_follow']['lookahead'])
+        f['local'].target_clear = self.b['dwa_follow']['target_clear']
+        f['local'].target_max = self.b['dwa_follow']['target_max']
+        f['pp'] = PurePursuit(path, 0.0, max_v=self.st.get('pp_speed', self.b['max_speed']), max_w=self.b['max_turn_speed'],
+                              max_acc=self.b['max_accel'], max_acc_w=self.b['max_turn_accel'])
+        f['use_local'] = False
         f['clear_since'] = None
         return f
 
     def update_box(self, pts, x, y, yaw):
         """브리지 update_box 와 같음: 스캔마다 로봇 앞(+뒤 조금) 사각형 안의 지도에 없는 점 → 연속 스캔 수."""
-        h = {**self.b['hybrid'], **self.st.get('hybrid_cfg', {})}
+        h = self.h
         um = self.wd.unmapped(pts)
         c, s = math.cos(yaw), math.sin(yaw)
         lx = c * (um[:, 0] - x) + s * (um[:, 1] - y)
@@ -459,51 +390,22 @@ class Run:
         inside = (lx >= BODY[0] - h['box_back']) & (lx <= BODY[1] + h['box_front']) & (np.abs(ly) <= h['box_half_width'])
         self.box_streak = self.box_streak + 1 if np.count_nonzero(inside) >= h['box_min_points'] else 0
 
-    def hybrid_trigger(self, f, x, y, pts, t):
-        h = {**self.b['hybrid'], **self.st.get('hybrid_cfg', {})}
-        box = h.get('box_trigger', False)
-        if box and self.box_streak >= h['box_min_scans']:
+    def hybrid_trigger(self, x, y, yaw, v, t):
+        """브리지 hybrid_obstacle 과 같음: 사각형 조건 또는 움직이는 물체가 moving_predict 초 안에 사각형과 겹침."""
+        h = self.h
+        if self.box_streak >= h['box_min_scans']:
             return True
-        idx = f['local'].progress if f['use_local'] else f['pp'].index
-        ahead = f['path'][idx:]
-        if len(ahead) > 1:
-            s = np.concatenate([[0.0], np.cumsum(np.hypot(*np.diff(ahead, axis=0).T))])
-            ahead = ahead[s <= h['path_ahead']]
-        rx, ry, ryaw, rv = self.cur
+        ts = np.arange(0.0, h['moving_predict'] + 1e-9, 0.1)
+        c, s = math.cos(yaw), math.sin(yaw)
+        bx0, bx1 = BODY[0] - h['box_back'], BODY[1] + h['box_front']
         for mx, my, vx, vy, r in self.wd.mover_state(t):
             if math.hypot(vx, vy) < self.b['dwa_follow']['moving_speed']:
                 continue
-            if box and h.get('moving_predict') is not None:
-                # 브리지 moving_into_box 와 같음: 물체/로봇을 지금 속도로 moving_predict 초까지 옮겨 사각형과 겹치는지
-                ts = np.arange(0.0, h['moving_predict'] + 1e-9, 0.1)
-                c, s_ = math.cos(ryaw), math.sin(ryaw)
-                dx = mx + vx * ts - (rx + rv * c * ts)
-                dy = my + vy * ts - (ry + rv * s_ * ts)
-                lx, ly = c * dx + s_ * dy, -s_ * dx + c * dy
-                bx0, bx1 = BODY[0] - h['box_back'], BODY[1] + h['box_front']
-                gap = np.hypot(np.maximum(np.maximum(bx0 - lx, lx - bx1), 0.0), np.maximum(np.abs(ly) - h['box_half_width'], 0.0))
-                if np.any(gap <= r):
-                    return True
-            elif math.hypot(mx - x, my - y) - r < h['moving_distance']:
-                return True
-        um = self.wd.unmapped(pts)
-        if not box and len(um) and len(ahead):
-            near = um[np.hypot(um[:, 0] - x, um[:, 1] - y) < h['trigger_distance']]
-            if len(near):
-                dp = np.hypot(near[:, None, 0] - ahead[None, :, 0], near[:, None, 1] - ahead[None, :, 1]).min()
-                if dp < h['path_width']:
-                    return True
-        return False
-
-    def path_blocked(self, f, planner):
-        """지금 경로의 남은 부분(3m)이 새 플래너 기준 통과 불가 칸을 지나는지."""
-        idx = f['local'].progress if f['use_local'] else f['pp'].index
-        rest = f['path'][idx:]
-        s = np.concatenate([[0.0], np.cumsum(np.hypot(*np.diff(rest, axis=0).T))]) if len(rest) > 1 else [0.0]
-        for (px, py), si in zip(rest, s):
-            if si > 3.0:
-                break
-            if si > 0.3 and not planner.is_free(px, py):
+            dx = mx + vx * ts - (x + v * c * ts)
+            dy = my + vy * ts - (y + v * s * ts)
+            lx, ly = c * dx + s * dy, -s * dx + c * dy
+            gap = np.hypot(np.maximum(np.maximum(bx0 - lx, lx - bx1), 0.0), np.maximum(np.abs(ly) - h['box_half_width'], 0.0))
+            if np.any(gap <= r):
                 return True
         return False
 
@@ -523,7 +425,6 @@ class Run:
         blocked_since = None
         backing = None
         min_gap = math.inf
-        next_replan = 1.0
         last_scan = 0.0
         while t < limit:
             if t - last_scan >= 0.2 - 1e-9:
@@ -540,43 +441,26 @@ class Run:
                     backing = None
                     outcome = 'replan'
             else:
-                if self.st['replan'] and t >= next_replan:
-                    next_replan = t + 1.0
-                    newp, scan_ok = self.plan(x, y, t, allow_fallback=False)
-                    if newp is not None and len(newp) > 1:
-                        idx = f['local'].progress if f['use_local'] else f['pp'].index
-                        rest = f['path'][idx:]
-                        rest_len = float(np.hypot(*np.diff(rest, axis=0).T).sum()) if len(rest) > 1 else 0.0
-                        new_len = float(np.hypot(*np.diff(np.asarray(newp), axis=0).T).sum())
-                        if self.path_blocked(f, self.planner(t)) or new_len < 0.85 * rest_len:
-                            self.replans += 1
-                            self.say(t, f'재계획 (남은 {rest_len:.2f} m → 새 {new_len:.2f} m)')
-                            use_local = f['use_local']
-                            f = self.make_follower(newp, keep=f)
-                            if self.st['hybrid'] and use_local:
-                                f['use_local'] = True
-                if self.st['hybrid']:
-                    self.cur = (x, y, yaw, v)
-                    trig = self.hybrid_trigger(f, x, y, pts, t)
-                    if not f['use_local']:
-                        if trig and not f['pp'].at_goal:
-                            f['local'].progress = f['pp'].index
-                            f['local'].turning = False
-                            f['use_local'] = True
-                            f['clear_since'] = None
-                            self.switches += 1
-                            self.say(t, '→ 지역 계획기')
-                    elif trig or f['local'].arrived:
+                trig = self.hybrid_trigger(x, y, yaw, v, t)
+                if not f['use_local']:
+                    if trig and not f['pp'].at_goal:
+                        f['local'].progress = f['pp'].index
+                        f['local'].turning = False
+                        f['use_local'] = True
                         f['clear_since'] = None
-                    else:
-                        f['clear_since'] = f['clear_since'] or t
-                        if t - f['clear_since'] >= self.b['hybrid']['release_time']:
-                            rest = f['path'][f['local'].progress:f['local'].progress + 60]
-                            if np.hypot(rest[:, 0] - x, rest[:, 1] - y).min() < self.b['hybrid']['rejoin_offset']:
-                                f['pp'].index = f['local'].progress
-                                f['pp'].set_speed(v, w)
-                                f['use_local'] = False
-                                self.say(t, '→ pure pursuit')
+                        self.switches += 1
+                        self.say(t, '→ DWA')
+                elif trig or f['local'].arrived:
+                    f['clear_since'] = None
+                else:
+                    f['clear_since'] = f['clear_since'] or t
+                    if t - f['clear_since'] >= self.h['release_time']:
+                        rest = f['path'][f['local'].progress:f['local'].progress + 60]
+                        if np.hypot(rest[:, 0] - x, rest[:, 1] - y).min() < self.h['rejoin_offset']:
+                            f['pp'].index = f['local'].progress
+                            f['pp'].set_speed(v, w)
+                            f['use_local'] = False
+                            self.say(t, '→ pure pursuit')
                 if f['use_local']:
                     v, w, state = f['local'].compute((x, y, yaw), v, w, (0.0, 0.0, 0.0), pts, dyn,
                                                      moving_speed=self.b['dwa_follow']['moving_speed'],
@@ -634,7 +518,7 @@ class Run:
                     return self.result('실패 (A*)', t, min_gap, x, y)
                 self.replans += 1
                 self.say(t, f'재시도 {retries}: 재계획 ({"LiDAR 장애물 포함" if scan_ok else "지도만"})')
-                f = self.make_follower(newp, keep=f)
+                f = self.make_follower(newp)
                 v = w = 0.0
                 mark = (x, y, t)
                 blocked_since = None

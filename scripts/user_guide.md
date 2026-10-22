@@ -50,7 +50,7 @@ cd ros2_ws && source /opt/ros/humble/setup.bash && colcon build --symlink-instal
 ### 2.3 실물: 저장된 지도로 운영
 
 ```bash
-scripts/run.sh --robot real --mode map --map ~/maps/<맵>_clean.yaml [--name <DB맵이름>] [--amcl hall] [--controller dwa]
+scripts/run.sh --robot real --mode map --map ~/maps/<맵>_clean.yaml [--name <DB맵이름>] [--amcl hall]
 ```
 1. 끝나면 웹 **"초기 위치 지정"** (지도에서 로봇 자리를 찍고 정면 방향으로 끌기) 또는 "위치 자동 찾기".
 2. 웹에 빨간 원(로봇)이 나오고 청록색 실시간 LiDAR 선이 지도의 벽과 겹치면 준비 완료.
@@ -94,7 +94,7 @@ ssh test@192.168.0.181 tail -n 30 ~/warehouse_bringup.log    # Pi bringup ("Run!
 | `server.log` | 웹 서버 (Django) |
 | `sim.log` | Gazebo |
 | `slam.log` | SLAM |
-| `nav2.log` | map_server + AMCL (+ Nav2 주행 노드) |
+| `nav2.log` | map_server + AMCL |
 | `bridge.log` | A* 플래너 + 브리지 |
 | `run_mode.env` | `run.sh` 가 기록한 지금 실행 모드 (아래 4절) |
 
@@ -137,9 +137,6 @@ scripts/run.sh --robot real|sim --mode slam|map [옵션]
 | `--gui` | (sim) Gazebo 화면 표시 |
 | `--amcl A` | (map) 위치 추정 설정: `default`(작은 방) / `hall`(강당·교실, `config/amcl_hall.yaml`) / yaml 경로 |
 | `--scan-noise` | (sim) LiDAR 를 실물 LDS-02 처럼 (빔 개수 238~244 변동, 거리 흔들림, 먼 곳 값 빠짐) |
-| `--controller C` | `hybrid`(기본, pure pursuit + 장애물 가까우면 DWA) / `mppi`(항상 MPPI) / `dwa`(항상 DWA) / `builtin`(항상 pure pursuit) / `nav2` |
-| `--planner P` | `astar`(기본) / `nav2` |
-| `--nav2` | Nav2 주행 노드도 실행 (planner/controller 를 nav2 로 주면 자동) |
 
 실행 순서:
 1. 다른 `run.sh` 가 실행 중이면 거절 (`logs/run.lock`, 웹과 터미널 동시 실행 방지)
@@ -152,7 +149,7 @@ scripts/run.sh --robot real|sim --mode slam|map [옵션]
 8. A* 플래너 + 브리지 (`start_bridge.sh`)
 9. sim + map: `tools/localize.py` 로 초기 위치 자동 지정 / 실물 + map: 웹에서 지정
 
-`logs/run_mode.env` 항목: `WAREHOUSE_ROBOT`, `MODE`, `MAP`, `MAP_NAME`, `WORLD`, `NAV2`, `SLAM_ENGINE`, `SPAWN_X/Y`, `PLANNER`, `CONTROLLER`, `AMCL`, `SCAN_NOISE` (앞에 `WAREHOUSE_`).
+`logs/run_mode.env` 항목: `WAREHOUSE_ROBOT`, `MODE`, `MAP`, `MAP_NAME`, `WORLD`, `SLAM_ENGINE`, `SPAWN_X/Y`, `AMCL`, `SCAN_NOISE` (앞에 `WAREHOUSE_`).
 
 ### `stop_ros.sh` — 정리
 `scripts/stop_ros.sh [--server] [--daemon] [--all]` — 3절 참고.
@@ -175,10 +172,10 @@ Django(HTTP + WebSocket) 를 `0.0.0.0:8000` 으로. 보통 `run.sh` 가 부름. 
 `scripts/start_slam.sh [slam_toolbox|cartographer]` — 설정 `config/slam_toolbox.yaml` (브리지가 내는 `/scan_slam` 사용, 0.2m / 약 11° 마다 스캔을 지도에 넣음, 2초마다 지도 갱신). **AMCL 과 같이 띄우면 안 됨** (`run.sh` 로만 실행하면 생기지 않음).
 
 ### `start_nav2.sh` — 위치 추정 (map_server + AMCL)
-`scripts/start_nav2.sh <map.yaml> [--with-navigation]` / `--navigation-only`(SLAM 과 같이, 주행 노드만). AMCL 설정은 `run.sh --amcl` 이 정한 파일(기본 `config/amcl_waffle_pi.yaml`). 맵 파일이 없으면 바로 오류로 끝남.
+`scripts/start_nav2.sh <map.yaml>` — Nav2 의 map_server + AMCL 만 (주행은 브리지). AMCL 설정은 `run.sh --amcl` 이 정한 파일(기본 `config/amcl_waffle_pi.yaml`). 맵 파일이 없으면 바로 오류로 끝남.
 
 ### `start_bridge.sh` — A* 플래너 + 브리지
-`scripts/start_bridge.sh [맵이름] [서버 URL]` — `warehouse.launch.py` 실행. SLAM 모드는 맵 이름 `slam_live`, 미탐색 칸 통과 허용. `run_mode.env` 의 planner/controller/LiDAR 노이즈를 따름.
+`scripts/start_bridge.sh [맵이름] [서버 URL]` — `warehouse.launch.py` 실행. SLAM 모드는 맵 이름 `slam_live`, 미탐색 칸 통과 허용. `run_mode.env` 의 LiDAR 노이즈 설정을 따름. 주행은 항상 A* + hybrid (pure pursuit / 장애물 근처 DWA).
 - 브리지: 웹 서버와 WebSocket 으로 연결, 목표 주행, 안전 정지, 웹에 위치·지도·실시간 LiDAR 전송
 - A* 플래너: 기존 맵 모드에서 지도를 계획용으로 가공(미탐색 줄무늬 메움, 책상/의자 다리 점 부풀림)하고 웹의 금지 구역을 피함 (`ros2_ws/src/warehouse_robot/config/params.yaml`)
 

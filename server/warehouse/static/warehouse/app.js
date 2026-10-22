@@ -778,23 +778,13 @@ function draw() {
   }
 
   // hybrid → DWA 전환 조건 (브리지가 실제로 쓰는 값 그대로). 1.5초 넘게 안 오면 숨김
-  //  ① 움직이는 물체: 지금 → moving_predict 초 뒤 예측 선 (사각형에 들어오면 빨강 + 'n초 뒤', 아니면 회색).
-  //     box_trigger 를 끈 예전 방식이면 대신 moving_distance 원 (로봇 중심 보라 점선)
+  //  ① 움직이는 물체: 지금 → moving_predict 초 뒤 예측 선 (사각형에 들어오면 빨강 + 'n초 뒤', 아니면 회색)
   //  ② 사각형 (box_*): 점선. 안에 지도에 없는 점 → 주황, 전환 조건(점 수 + 연속 스캔) 넘음 → 빨강 + 채움
   //     실제로 센 점 = 빨간 점, 사각형 밖의 지도에 없는 점(2m 안) = 회색 점. 지도 벽에서 0.15m 안의 점은 벽으로 보고 안 셈
   //  ③ 글자: 지금 PP/DWA, 전환 이유, DWA → PP 복귀 조건 (장애물 없음 release_time 초 + 경로에서 rejoin_offset 안)
   if (S.hbox && S.hbox.corners && S.hbox.corners.length === 4 && Date.now() - (S.hboxAt || 0) < 1500) {
-    const col = !S.hbox.enabled ? '#94a3b8' : S.hbox.active ? '#dc2626' : S.hbox.count > 0 ? '#f59e0b' : '#0ea5e9';
+    const col = S.hbox.active ? '#dc2626' : S.hbox.count > 0 ? '#f59e0b' : '#0ea5e9';
     ctx.save();
-    if (S.pose && S.hbox.moving_distance) {
-      const [rx, ry] = worldToCanvas(S.pose.x, S.pose.y);
-      ctx.setLineDash([3, 5]);
-      ctx.lineWidth = 1;
-      ctx.strokeStyle = '#a855f7';
-      ctx.beginPath();
-      ctx.arc(rx, ry, S.hbox.moving_distance * pxPerM, 0, 2 * Math.PI);
-      ctx.stroke();
-    }
     for (const m of S.hbox.movers || []) {
       const [ax, ay] = worldToCanvas(...m.from);
       const [bx, by] = worldToCanvas(...m.to);
@@ -833,7 +823,7 @@ function draw() {
     const [fx, fy] = worldToCanvas(...S.hbox.corners[2]);
     ctx.font = '11px system-ui, sans-serif';
     ctx.fillStyle = col;
-    const lines = [`사각형 점 ${S.hbox.count}/${S.hbox.min_points}${S.hbox.enabled ? '' : ' (꺼짐)'}`];
+    const lines = [`사각형 점 ${S.hbox.count}/${S.hbox.min_points}`];
     if (S.hbox.driving) {
       if (!S.hbox.dwa) lines.push('PP 주행');
       else if (S.hbox.why) lines.push(`DWA: ${S.hbox.why}`);
@@ -847,7 +837,7 @@ function draw() {
     ctx.restore();
   }
 
-  // DWA/MPPI 가 고른 궤적 (predict_time 동안 굴려 본 best): 보라 굵은 선 + 끝점, 옆에 명령 속도/상태. 1초 넘게 안 오면 숨김
+  // DWA 가 고른 궤적 (predict_time 동안 굴려 본 best): 보라 굵은 선 + 끝점, 옆에 명령 속도/상태. 1초 넘게 안 오면 숨김
   if (S.dwa && Date.now() - (S.dwaAt || 0) < 1000) {
     const t = S.dwa.traj || [];
     let lx, ly;
@@ -869,7 +859,7 @@ function draw() {
       const name = { driving: '주행', blocked: '막힘', rotating: '회전', done: '도착' }[S.dwa.state] || S.dwa.state;
       ctx.font = '11px system-ui, sans-serif';
       ctx.fillStyle = '#7e22ce';
-      ctx.fillText(`${S.dwa.name || 'DWA'} ${name} v=${(+S.dwa.v).toFixed(2)} w=${(+S.dwa.w).toFixed(2)}`, lx + 8, ly - 8);
+      ctx.fillText(`DWA ${name} v=${(+S.dwa.v).toFixed(2)} w=${(+S.dwa.w).toFixed(2)}`, lx + 8, ly - 8);
     }
   }
 
@@ -1189,8 +1179,7 @@ function renderCargo() {
 }
 // 주행 파라미터: 브리지가 보낸 목록(params: 이름, 지금 값, 시작 값)을 묶음별 입력칸으로.
 // 값을 바꾸면 param_set → 브리지가 ROS 파라미터로 바꾸고 결과(param_result)와 새 목록을 보낸다
-const PARAM_GROUPS = [['dwa_follow.', 'DWA/MPPI 경로 따라가기'], ['dwa.', 'DWA (MPPI 도 속도/외곽/여유/predict_time 을 같이 씀)'],
-                      ['mppi.', 'MPPI 샘플링/비용'], ['hybrid.', 'hybrid 전환'], ['', '속도 / 안전 (pure pursuit 등)']];
+const PARAM_GROUPS = [['dwa_follow.', 'DWA 경로 따라가기'], ['dwa.', 'DWA'], ['hybrid.', 'hybrid 전환'], ['', '속도 / 안전 (pure pursuit 등)']];
 const paramGroup = (name) => PARAM_GROUPS.find(([p]) => name.startsWith(p));
 S.paramRows = new Map();      // 이름 → {row, input, item}
 S.paramPending = new Set();   // 이 화면에서 보내고 답을 기다리는 이름

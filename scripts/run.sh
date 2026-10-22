@@ -14,14 +14,6 @@
 #   --world WORLD  (sim) turtlebot3_world(기본) | turtlebot3_house | empty_world | maze_room(worlds/, 실제 방 복제) | lecture_hall(강당)
 #                  | no_roof_small_warehouse (AWS 창고, ~/sim_ws 에 받아야 함) ...
 #   --gui          (sim) Gazebo 화면 표시
-#   --nav2         Nav2 주행 노드(planner/controller_server, bt_navigator)도 실행. slam/map 모두 가능
-#                  (slam: SLAM 이 맵과 위치를 내므로 AMCL/map_server 없이 주행 노드만)
-#   --planner P    astar(기본, 직접 구현한 A*) | nav2 (Nav2 가 계획+주행, NavigateToPose)
-#   --controller C hybrid(기본, 평소 pure pursuit, 경로 앞에 지도에 없는 장애물이 가까우면 DWA 로 피함)
-#                  | mppi (항상 MPPI: 정적 LiDAR 점 + 추적한 움직이는 장애물의 미래 위치를 피하며 경로 추종)
-#                  | dwa (항상 DWA, 추적한 움직이는 장애물의 미래 위치를 피함. tb3_nav 에서 이식)
-#                  | builtin (항상 pure pursuit, 앞쪽 장애물이면 정지 후 대기) | nav2 (A* 경로를 Nav2 controller_server 가 추종)
-#                  planner/controller 를 nav2 로 주면 --nav2 는 자동으로 켜짐
 #   --scan-noise   (sim) LiDAR 를 실물 LDS-02 처럼: 빔 개수 238~244 변동, 거리 흔들림, 먼 곳 값 빠짐 (scan_noise.py)
 #                  실물과 비슷한 강당은 --world lecture_hall_real (책상 앞판 없음, 의자 무작위 배치)
 #   --amcl A       (map) 위치 추정 설정: default(기본, config/amcl_waffle_pi.yaml, 작은 방) | hall(config/amcl_hall.yaml,
@@ -32,15 +24,16 @@
 #   scripts/run.sh --robot sim --mode map
 #   scripts/run.sh --robot real --mode map --map ~/maps/backup/maze_map_straight.yaml
 #   scripts/run.sh --robot real --mode slam
-#   scripts/run.sh --robot sim --mode slam --nav2 --planner nav2     (SLAM + Nav2 로 탐색 주행)
+#
+# 주행: 브리지의 A* + hybrid (평소 pure pursuit, 로봇 앞 사각형에 장애물이 보이면 DWA 로 피함)
 set -e
 DIR="$(cd "$(dirname "$0")" && pwd)"
 HOME_DIR="$(cd "$DIR/.." && pwd)"
 LOGS="$HOME_DIR/logs"
 PI_HOST="test@192.168.0.181"
 
-ROBOT=""; MODE=""; MAP=""; NAME=""; ENGINE=slam_toolbox; WORLD=turtlebot3_world; GUI=""; NAV2=""
-PLANNER=astar; CONTROLLER=hybrid; AMCL=default; SCAN_NOISE=false
+ROBOT=""; MODE=""; MAP=""; NAME=""; ENGINE=slam_toolbox; WORLD=turtlebot3_world; GUI=""
+AMCL=default; SCAN_NOISE=false
 while [ $# -gt 0 ]; do
   case "$1" in
     --robot) ROBOT="$2"; shift ;;
@@ -50,21 +43,15 @@ while [ $# -gt 0 ]; do
     --slam) ENGINE="$2"; shift ;;
     --world) WORLD="$2"; WORLD_SET=1; shift ;;
     --gui) GUI=--gui ;;
-    --nav2) NAV2=1 ;;
-    --planner) PLANNER="$2"; shift ;;
-    --controller) CONTROLLER="$2"; shift ;;
     --amcl) AMCL="$2"; shift ;;
     --scan-noise) SCAN_NOISE=true ;;
-    -h|--help) sed -n '2,33p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,28p' "$0"; exit 0 ;;
     *) echo "알 수 없는 옵션: $1 (scripts/run.sh --help)"; exit 1 ;;
   esac
   shift
 done
 [[ "$ROBOT" =~ ^(real|sim)$ ]] || { echo "--robot real|sim 을 지정하세요"; exit 1; }
 [[ "$MODE" =~ ^(slam|map)$ ]] || { echo "--mode slam|map 을 지정하세요"; exit 1; }
-[[ "$PLANNER" =~ ^(astar|nav2)$ ]] || { echo "--planner astar|nav2"; exit 1; }
-[[ "$CONTROLLER" =~ ^(mppi|hybrid|builtin|nav2|dwa)$ ]] || { echo "--controller hybrid|mppi|dwa|builtin|nav2"; exit 1; }
-if [ "$PLANNER" = nav2 ] || [ "$CONTROLLER" = nav2 ]; then NAV2=1; fi
 case "$AMCL" in
   default) AMCL_FILE="$HOME_DIR/config/amcl_waffle_pi.yaml" ;;
   hall) AMCL_FILE="$HOME_DIR/config/amcl_hall.yaml" ;;
@@ -124,17 +111,14 @@ WAREHOUSE_MODE=$MODE
 WAREHOUSE_MAP=$MAP
 WAREHOUSE_MAP_NAME=$NAME
 WAREHOUSE_WORLD=$WORLD
-WAREHOUSE_NAV2=${NAV2:-0}
 WAREHOUSE_SLAM_ENGINE=$ENGINE
 WAREHOUSE_SPAWN_X=$SPAWN_X
 WAREHOUSE_SPAWN_Y=$SPAWN_Y
-WAREHOUSE_PLANNER=$PLANNER
-WAREHOUSE_CONTROLLER=$CONTROLLER
 WAREHOUSE_AMCL=$AMCL_FILE
 WAREHOUSE_SCAN_NOISE=$([ "$ROBOT" = sim ] && echo "$SCAN_NOISE" || echo false)
 EOF
 source "$DIR/env.sh"
-echo "== 로봇 $ROBOT / 모드 $MODE$([ "$SCAN_NOISE" = true ] && [ "$ROBOT" = sim ] && echo ' / LiDAR 노이즈 켬') / Nav2 주행 노드 $([ -n "$NAV2" ] && echo 켬 || echo 끔) / planner $PLANNER / controller $CONTROLLER / 도메인 $ROS_DOMAIN_ID"
+echo "== 로봇 $ROBOT / 모드 $MODE$([ "$SCAN_NOISE" = true ] && [ "$ROBOT" = sim ] && echo ' / LiDAR 노이즈 켬') / 도메인 $ROS_DOMAIN_ID"
 
 start() {  # start <로그이름> <명령...>
   local log="$LOGS/$1.log"; shift
@@ -183,12 +167,9 @@ fi
 # 3) 위치 추정 또는 SLAM
 if [ "$MODE" = slam ]; then
   echo "3) SLAM ($ENGINE)"; start slam "$DIR/start_slam.sh" "$ENGINE"
-  if [ -n "$NAV2" ]; then
-    echo "   + Nav2 주행 노드 (map TF 가 나오면 시작)"; start nav2 "$DIR/start_nav2.sh" --navigation-only
-  fi
 else
-  echo "3) 위치 추정 (맵 $MAP, AMCL 설정 $(basename "$AMCL_FILE"))$([ -n "$NAV2" ] && echo ' + Nav2 주행 노드 (초기 위치 지정 후 시작)')"
-  start nav2 "$DIR/start_nav2.sh" "$MAP" ${NAV2:+--with-navigation}
+  echo "3) 위치 추정 (맵 $MAP, AMCL 설정 $(basename "$AMCL_FILE"))"
+  start nav2 "$DIR/start_nav2.sh" "$MAP"
 fi
 sleep 8
 

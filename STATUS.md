@@ -447,3 +447,16 @@ cd ../ros2_ws && source /opt/ros/humble/setup.bash && colcon build --symlink-ins
 - 예전 값(PP 0.26 / box_front 1.0 / max_acc_w 1.5)에서는 원 18/21 충돌 0 (사람 6개 중 5/6 충돌 0, 220초) vs 예측 18/21 충돌 1 (5/6 충돌 1, 282초) → **어느 쪽이 낫다고 하기 어려움**
 - 같이 확인: sim 에서 성공을 가장 많이 떨어뜨린 건 `dwa.max_acc_w` 4.0 (1.5 로 두면 14 → 17/21). box_front 0.5 → 1.0 은 14 → 15/21. 실물에서는 지금 값이 잘 된다고 해서 바꾸지 않음
 
+### (브랜치 hybrid-predict-box) 안 쓰는 기능/파일 정리 (2026-10-22)
+이 브랜치는 주행을 **A* + hybrid (평소 pure pursuit, 사각형/예측 조건이면 DWA)** 하나로 고정하고 나머지를 뺐다. 다른 방식이 필요하면 `hall-planning` / `hybrid-box-stable` 브랜치.
+- 지운 파일: `warehouse_robot/mppi.py`, `test/test_mppi.py` (MPPI), `config/nav2_waffle_pi.yaml` (Nav2 주행 실험 설정), `system_flow.html` (Nav2 follow_path 시절 흐름 설명, 아무 데서도 안 씀)
+- 브리지(`bridge_node.py`): `controller` (mppi/dwa/builtin/nav2) / `planner` (nav2) 선택, Nav2 `NavigateToPose`·`FollowPath` 액션과 결과 처리(`on_goal_accepted`, `on_result`, `goal_error`, `path_in_frame`, `on_nav2_plan`, `plan` 토픽 구독), `follow_frame`, `arrive_tolerance`, `mppi.*` 파라미터,
+  예전 경로 기준 전환(`hybrid.box_trigger` false, `trigger_distance`, `path_width`, `path_ahead`)과 움직이는 물체 1.5m 원(`moving_distance`) 제거. `on_plan` 은 항상 pp + dwa
+- 스크립트: `run.sh` 의 `--nav2` / `--planner` / `--controller` 와 run_mode.env 의 `NAV2` / `PLANNER` / `CONTROLLER`, `start_bridge.sh` 의 planner/controller 인자,
+  `start_nav2.sh` 의 Nav2 주행 노드(`--with-navigation`, `--navigation-only`) 제거 → map_server + AMCL 만. launch 의 planner/controller 인자, package.xml 의 nav2_msgs 의존 제거
+- 웹: MPPI 파라미터 묶음, 궤적 글자의 MPPI 이름, 1.5m 원 표시 제거. 서버 dwa 중계에서 name 필드 제거
+- `tools/planner_compare.py`: MPPI / DWA 단독 / 1초 재계획 / 경로 기준 전환 제거, hybrid 변형(예측 0/1/3초, box_front 1.0, max_acc_w 1.5, 예전 값 3개)만
+- 문서: CLAUDE.md / README / RUN_GUIDE / user_guide 에서 위 옵션 설명 제거, README 기본값 표(robot_radius 0.24, max_speed 0.18) 갱신
+- 남긴 것: `tools/dwa_tune.py` (DWA 계수 튜닝, hybrid 의 DWA 가 그대로 씀), Nav2 의 map_server/AMCL (`start_nav2.sh`, tf2 0.25.24 주의는 AMCL 에도 해당)
+- 확인: 단위 테스트 55개, pyflakes/vulture 깨끗, bash -n, 이 브랜치 코드로 브리지를 다른 도메인에서 기동(hybrid.* 8개만, moving_predict 실행 중 변경), planner_compare / dwa_tune 실행. **실물 미확인**
+

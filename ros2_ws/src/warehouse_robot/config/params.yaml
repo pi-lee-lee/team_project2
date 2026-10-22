@@ -28,11 +28,8 @@ warehouse_bridge:
     map_topic: map
     global_frame: map
     base_frame: base_footprint
-    planner: astar            # astar: 직접 구현한 A* + FollowPath / nav2: NavigateToPose
     pose_rate: 5.0
     max_retries: 2
-    arrive_tolerance: 0.3     # Nav2가 성공이라고 해도 목표와 이 거리 이상이면 실패로 처리
-    controller: hybrid        # hybrid(기본): 평소 pure pursuit, 경로 앞 장애물이 가까우면 DWA / mppi: 항상 MPPI / dwa: 항상 DWA / builtin: 항상 pure pursuit / nav2: Nav2 controller_server
     max_speed: 0.18           # m/s (pure pursuit). Waffle Pi 하드웨어 한계 (2026-10-22: 0.1 이 느리다고 해서 올림, 실물 미시험)
     max_turn_speed: 1.82      # rad/s (pure pursuit 회전, 제자리 회전). 하드웨어 한계 (예전 1.0 → 0.6 → 1.82)
     max_accel: 0.3            # m/s² (pure pursuit). 출발은 이 가속으로 점점 빨라지고, 목표 앞은 이 감속으로 멈춤 (0.26 m/s 까지 0.9초, 정지 거리 약 11cm)
@@ -48,8 +45,7 @@ warehouse_bridge:
     backoff_distance: 0.15    # 부딪힌 뒤 뒤로 물러나는 거리 (m). 이후 부딪힌 자리를 피해 재계획
     battery_cells: 3          # 배터리 % 계산용 LiPo 셀 수 (TurtleBot3 11.1V = 3셀)
     battery_empty_v: 11.0     # 이 전압을 0% 로 표시 (TurtleBot3 는 11V 아래에서 충전 경고)
-    follow_frame: odom        # FollowPath 경로 좌표계 (odom: controller_server가 map->odom TF 없이 주행)
-    # 움직이는 장애물 추적 (tb3_nav obstacle_tracker 이식). 웹 지도에 주황 원 + 속도 화살표, controller=dwa 가 사용
+    # 움직이는 장애물 추적 (tb3_nav obstacle_tracker 이식). 웹 지도에 주황 원 + 속도 화살표, hybrid 전환/DWA 가 사용
     tracking:
       enabled: true
       max_range: 5.0          # 추적 + DWA 정적 장애물에 쓰는 LiDAR 거리 (m). SLAM/AMCL 과 같은 5 m (예전 3.0)
@@ -64,7 +60,7 @@ warehouse_bridge:
       accel_noise: 1.8
       meas_noise: 0.13
       max_speed: 1.5
-    # controller: dwa 일 때 (tb3_nav local_planner 이식). 실수는 소수점을 붙일 것
+    # DWA (hybrid 에서 장애물 피할 때, tb3_nav local_planner 이식). 실수는 소수점을 붙일 것
     dwa:
       max_v: 0.13           # 하드웨어 한계 (2026-10-22: 0.07 이 느리다고 해서 올림. 튜닝은 0.15 에서 했음, 0.26 은 실물/sim 미시험)
       min_v: -0.1             # 후진 (다가오는 장애물에서 물러나기). -0.05 는 마주 오는 사람(0.15 m/s)보다 느려 sim 에서 부딪혔음
@@ -90,20 +86,6 @@ warehouse_bridge:
       w_obstacle: 1.0
       w_speed: 0.2
       w_collision: 2.0        # 1.0~6.0 사이에서 결과 차이 없음 (tools/dwa_tune.py), 덜 극단적인 값
-    # controller: mppi 일 때 (mppi.py). 속도/가속/외곽(footprint)/여유(safety/dynamic margin)/predict_time/obstacle_influence/path_scale 은
-    # 위 dwa.* 를 같이 쓰고, 여기는 샘플링과 비용 계수만. tools/planner_compare.py 9개 시나리오에서 이 값으로 비교함 (2026-10-22)
-    mppi:
-      samples: 500            # 잡음 샘플 수. PC 에서 주기당 35~57 ms (0.1초 주기 안)
-      noise_v: 0.04           # 선속도 잡음 표준편차 (m/s)
-      noise_w: 0.6            # 각속도 잡음 표준편차 (rad/s)
-      temperature: 0.05       # λ: 작을수록 비용 최소 샘플 쪽으로 몰림
-      w_path: 1.0             # 경로에서 떨어진 거리 (시점별 평균, path_scale 로 나눔)
-      w_progress: 1.0         # 경로를 따라 전진한 정도
-      w_goal: 0.5             # 끝점 ~ lookahead 목표점
-      w_heading: 0.2
-      w_obstacle: 1.0         # obstacle_influence 안쪽 근접 비용 (제곱)
-      w_collision: 50.0       # safety_margin 침범 벌점
-      w_smooth: 0.02          # 각속도 변화
     dwa_follow:
       lookahead: 0.3          # 경로 위 이 거리 앞 점을 DWA 목표로
       goal_tolerance: 0.1     # 이 안에 들면 제자리에서 도착 방향 맞춤
@@ -111,23 +93,19 @@ warehouse_bridge:
                               # 첫 경로점으로 (차체 반폭 + safety_margin). 0 이면 끔. 목표가 상자 바로 뒤면 '다가가기' 와 '피하기' 가 싸워 멈췄음
       target_max: 2.0         # 목표점을 옮기는 최대 거리 (경로를 따라, m)
       moving_speed: 0.08      # 이보다 빠른 track 만 움직이는 장애물로 예측/웹 표시 (멈춘 물체 속도 노이즈 중앙값 0.06, 느린 사람 0.1)
-    # controller: hybrid 일 때 pure pursuit ↔ DWA 전환 (track = 지도에 없는 물체: 상자, 사람)
+    # hybrid: pure pursuit ↔ DWA 전환
     hybrid:
-      # 전환 조건: true = 로봇 앞(+뒤 조금) 사각형 안에 지도에 없는 LiDAR 점이 box_min_points 개 이상, box_min_scans 번 연속이면 DWA
-      #           false = 지도에 없는 물체(track)가 trigger_distance 안 + 앞쪽 경로 path_width 안이면 DWA (예전 방식)
-      # 움직이는 track 이 moving_distance 안이면 둘 다 DWA. 사각형은 track(지름 0.8m 이하, 5번 연속 확정)을 거치지 않아 큰 물체도 바로 잡음
-      box_trigger: true
+      # DWA 로 바뀌는 조건 (둘 중 하나):
+      #  ① 로봇 앞(+뒤 조금) 사각형 안에 지도에 없는 LiDAR 점이 box_min_points 개 이상, box_min_scans 번 연속 (정적/동적 구분 없음).
+      #     track(지름 0.8m 이하, 5번 연속 확정)을 거치지 않아 큰 물체도 바로 잡음
+      #  ② 움직이는 track 의 moving_predict 초 안 예측 위치가 사각형과 겹침
+      # pure pursuit 로 돌아오는 조건: release_time 동안 둘 다 없고 경로에서 rejoin_offset 안
       box_front: 0.5          # 차체 앞 끝에서 앞으로 (m)
       box_back: 0.2           # 차체 뒤 끝에서 뒤로 (m). 뒤 부착물/후진/제자리 회전 여유
       box_half_width: 0.25    # 좌우 반폭 (m): 차체 반폭 0.153 + 여유 0.1. 0.33 은 경로 옆을 지나는 물체에도 DWA 로 바뀌어 느려짐 (sim 17/21 → 18/21)
       box_min_points: 3       # AMCL 오차로 벽 점 몇 개가 '지도에 없는 점' 으로 새는 것 무시
       box_min_scans: 2        # 깜빡임 방지 (스캔 약 9 Hz → 약 0.2초)
       moving_predict: 2.0     # 움직이는 track: 지금 ~ 이 시간(s) 뒤 예측 위치가 사각형과 겹치면 DWA (로봇도 지금 속도로 직진한다고 봄).
-                              # 옆/뒤에서 다가오는 사람은 미리 잡고, 멀어지거나 나란히 가는 사람은 무시. box_trigger=false 면 moving_distance 원
-      trigger_distance: 1.0   # 이 거리 안 + 앞쪽 경로 가까이에 track 이 있으면 DWA (m)
-      moving_distance: 1.5    # (box_trigger=false 일 때만) 움직이는 track 이 이 거리 안이면 DWA (m)
-      path_width: 0.25        # track 가장자리가 앞쪽 경로에서 이 거리 안이면 '경로 위' (m). 차체 반폭 + 여유 정도:
-                              # A* 가 이미 장애물을 피해 낸 경로는 pure pursuit 가 정확히 따라감 (0.4 면 DWA 로 바뀌어 좁은 틈에서 섰음)
-      path_ahead: 1.5         # 앞쪽 경로를 이 길이만큼 봄 (m)
+                              # 옆/뒤에서 다가오는 사람은 미리 잡고, 멀어지거나 나란히 가는 사람은 무시
       release_time: 2.0       # 장애물이 이 시간 동안 안 보이면 pure pursuit 로 (s)
       rejoin_offset: 0.25     # 경로에서 이 거리 안으로 돌아왔을 때만 pure pursuit 로 (m)

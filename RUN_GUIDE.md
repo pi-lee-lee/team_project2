@@ -29,12 +29,12 @@
 ```
 run.sh ── (잠금 logs/run.lock, 동시 실행 거절)
   ├─ stop_ros.sh            이미 떠 있는 노드/Gazebo 먼저 정리 (서버는 유지)
-  ├─ logs/run_mode.env 기록  → env.sh 가 읽음 (도메인, sim 시간, 맵 이름, planner/controller)
+  ├─ logs/run_mode.env 기록  → env.sh 가 읽음 (도메인, sim 시간, 맵 이름, AMCL 설정)
   ├─ 1) start_server.sh      Django :8000  (이미 응답하면 건너뜀)
   ├─ 2) real: ssh Pi → turtlebot3_bringup robot.launch.py   (이미 실행 중이면 건너뜀)
   │     sim : start_sim.sh   Gazebo + 로봇 생성
-  ├─ 3) slam: start_slam.sh  slam_toolbox | cartographer  (+ --nav2 면 start_nav2.sh --navigation-only)
-  │     map : start_nav2.sh  map_server + AMCL           (+ --nav2 면 주행 노드)
+  ├─ 3) slam: start_slam.sh  slam_toolbox | cartographer
+  │     map : start_nav2.sh  map_server + AMCL
   ├─ 4) start_bridge.sh      A* 플래너 + 브리지 (warehouse.launch.py)
   └─ 5) sim+map: tools/localize.py 로 초기 위치 자동 지정 / real+map: 웹에서 직접
 ```
@@ -46,7 +46,7 @@ run.sh ── (잠금 logs/run.lock, 동시 실행 거절)
 | `start_server.sh` | `manage.py runserver 0.0.0.0:8000` | |
 | `start_sim.sh` | gzserver(+gzclient), robot_state_publisher, 로봇 생성 | `gazebo_ros_state` 플러그인 없으면 넣은 사본 `logs/world_*.world` 사용 |
 | `start_slam.sh` | SLAM. `config/slam_toolbox.yaml` (`/scan_slam` 사용) | **AMCL 과 같이 띄우면 안 됨** |
-| `start_nav2.sh` | AMCL(`config/amcl_waffle_pi.yaml`) + map_server, 선택적으로 Nav2 주행 노드 | 주행 노드는 map→odom TF 가 나온 뒤 시작 |
+| `start_nav2.sh` | AMCL(`config/amcl_waffle_pi.yaml`) + map_server (Nav2 localization_launch) | 주행은 브리지가 함 |
 | `start_bridge.sh` | A* + 브리지. SLAM 모드는 맵 이름 `slam_live`, 미탐색 통과 허용 | |
 | `save_map.sh` | `/map` 저장 → 기울기 보정 + 1칸 직선 정리 (`straighten_map.py --auto`, 직선이 아닌 공간은 자동으로 `clean_map.py`) | `~/maps/<이름>.yaml` + `_clean.yaml` |
 | `reset_robot.sh` | 정지 명령 1초 (sim 은 월드 초기화 + 위치 재지정) | 웹 "상태 초기화" 가 브리지를 통해 실행 |
@@ -104,16 +104,10 @@ scripts/run.sh --robot sim --mode map --map ~/maps/<이름>_clean.yaml   # 저�
 - 기존 맵 모드는 출발 위치를 알고 있어 초기 위치를 자동 지정합니다 (5단계).
 - 화면 없이 돌리면(`--gui` 생략) gzserver 만 뜹니다.
 
-### 3.5 주행 방식 옵션
+### 3.5 실행 옵션 (주행은 항상 A* + hybrid)
 
 | 옵션 | 의미 |
 |---|---|
-| (기본) `--planner astar --controller hybrid` | 직접 구현한 A* + 평소 pure pursuit, 로봇 앞 1m (좌우 ±0.25m, 뒤 0.2m) 안에 지도에 없는 장애물(상자, 사람)이 보이면 DWA 로 피하고 지나가면 pure pursuit 로 복귀 |
-| `--controller mppi` | 항상 MPPI (경로를 정면으로 막은 상자는 혼자 못 돌아가 15초 뒤 재계획) |
-| `--controller dwa` | 항상 DWA (추적한 움직이는 장애물의 미래 위치를 피함) |
-| `--controller builtin` | 항상 pure pursuit (앞쪽 ±25° 장애물이면 정지 후 대기) |
-| `--controller nav2` / `--planner nav2` | Nav2 controller_server / NavigateToPose 사용 (`--nav2` 자동). **tf2 ≥ 0.25.24 필요** |
-| `--nav2` | Nav2 주행 노드만 추가로 띄움 |
 | `--slam cartographer` | SLAM 엔진 변경 (기본 slam_toolbox) |
 | `--amcl hall` | 강당/교실용 위치 추정 설정 (`config/amcl_hall.yaml`). 웹 실행 모드의 체크와 같음 |
 | `--scan-noise` | (sim) LiDAR 를 실물 LDS-02 처럼 (빔 개수 변동, 흔들림, 값 빠짐) |
@@ -136,7 +130,7 @@ ssh test@192.168.0.181 tail -n 30 ~/warehouse_bringup.log   # Pi bringup ("Run!"
 | `logs/server.log` | Django |
 | `logs/sim.log` | Gazebo |
 | `logs/slam.log` | SLAM |
-| `logs/nav2.log` | map_server + AMCL (+ Nav2 주행 노드) |
+| `logs/nav2.log` | map_server + AMCL |
 | `logs/bridge.log` | A* 플래너 + 브리지 |
 
 ---

@@ -134,9 +134,6 @@ scripts/stop_ros.sh --all
 | `--slam slam_toolbox` / `cartographer` | SLAM 엔진 (기본 slam_toolbox). 좌표 원점: slam_toolbox = 오도메트리 원점, cartographer = 로봇 출발 위치 |
 | `--world` | 시뮬레이션 월드: turtlebot3_world(기본), turtlebot3_house, empty_world 등 |
 | `--gui` | Gazebo 화면 표시 |
-| `--nav2` | Nav2 주행 노드도 실행 (SLAM 모드에서도 가능, 이때는 AMCL 없이 주행 노드만) |
-| `--planner nav2` / `--controller nav2` | Nav2 로 경로 계획+주행 / A* 경로를 Nav2 controller 로 추종 (`--nav2` 자동). tf2 0.25.24 이상 필요 (8번 참고) |
-| `--controller hybrid` (기본) / `mppi` / `dwa` / `builtin` | 평소 pure pursuit, 경로 앞에 지도에 없는 장애물이 가까우면 DWA 로 피함 / 항상 MPPI / 항상 DWA / 항상 pure pursuit (앞쪽 장애물이면 정지 후 대기) |
 | `--amcl default` / `hall` / 파일 | (map) 위치 추정 설정. `hall` = `config/amcl_hall.yaml`: 책상/의자가 흩어진 강당·교실용 (지도에 없는 빔에 너그럽게). 웹 실행 모드의 "강당/교실용 위치 추정" 체크와 같음 |
 | `--scan-noise` | (sim) LiDAR 를 실물 LDS-02 처럼: 빔 개수 238~244 변동, 거리 흔들림, 먼 곳 값 빠짐(NaN). 웹 "LiDAR 를 실물처럼" 체크와 같음 |
 | `--world lecture_hall_real` | (sim) 실제 학원과 비슷한 강당: 책상 앞판 없음(다리만 보임), 좌우 끝 열이 벽에 붙음, 좌석 줄 사이 빈 틈 0.25m(로봇 폭 0.31m 보다 좁아 세로 복도와 맨 앞/뒤 가로 복도로만 다님), 의자 무작위 배치 |
@@ -304,10 +301,10 @@ SIGINT → SIGTERM → SIGKILL 순서로 보내고 남은 프로세스가 없는
 
 | 파라미터 | 기본값 | 설명 |
 |---|---|---|
-| `astar_planner.robot_radius` | 0.25 | Waffle Pi 반경(뒤쪽 모서리까지). 이 안쪽은 통과 불가 |
+| `astar_planner.robot_radius` | 0.24 | 차체 반폭 0.153 + DWA 여유 0.08 이상. 이 안쪽은 통과 불가 (A* 가 낸 틈을 DWA 도 들어갈 수 있게) |
 | `astar_planner.inflation_radius` | 0.55 | 이 거리까지 벽에서 멀어지도록 비용 부여 |
-| `warehouse_bridge.controller` | hybrid | hybrid: pure pursuit + 장애물 가까우면 DWA (`hybrid.*`) / mppi: 내장 MPPI (`mppi.*` + 속도/외곽은 `dwa.*`) / dwa: 내장 DWA / builtin: 내장 pure pursuit / nav2: Nav2 controller_server |
-| `warehouse_bridge.max_speed` | 0.1 | pure pursuit 최고 속도 (m/s). 회전은 `max_turn_speed` 0.6 rad/s, DWA 는 `dwa.max_v` 0.1 / `dwa.max_w` 0.6 |
+| `warehouse_bridge.hybrid.*` | | 주행은 항상 A* + hybrid: 평소 pure pursuit, 로봇 앞 사각형(`box_front`/`box_back`/`box_half_width`) 안에 지도에 없는 점이 `box_min_points` 개 이상 `box_min_scans` 번 연속이거나, 움직이는 물체가 `moving_predict` 초 안에 사각형에 들어오면 DWA. `release_time` 동안 없고 경로에서 `rejoin_offset` 안이면 pure pursuit |
+| `warehouse_bridge.max_speed` | 0.18 | pure pursuit 최고 속도 (m/s). 회전은 `max_turn_speed` 1.82 rad/s, DWA 는 `dwa.max_v` 0.13 / `dwa.max_w` 1.82 |
 | `warehouse_bridge.stop_distance` | 0.35 | 앞쪽 ±25° 안에 이 거리 이내 물체가 있으면 정지 후 대기 |
 | `astar_planner.scan_obstacles` / `scan_memory` | true / 20.0 | AMCL 모드: LiDAR 로 본, 맵에 없는 장애물을 이 시간(초) 기억해 피함 (SLAM 모드는 SLAM 맵이 대신함) |
 | `astar_planner.bump_memory` / `bump_radius` | 120.0 / 0.15 | 부딪힌 자리를 장애물로 기억하는 시간(초)과 반경(m) |
@@ -350,7 +347,7 @@ SIGINT → SIGTERM → SIGKILL 순서로 보내고 남은 프로세스가 없는
 | "홈 위치가 등록되어 있지 않습니다" | 로봇을 홈에 두고 웹에서 "현재 위치를 홈으로" |
 | `ssh-copy-id: ERROR: No identities found` | 다른 계정에서 실행함. `abc` 계정에서 `ssh-copy-id -i ~/.ssh/id_ed25519.pub test@192.168.0.181` |
 
-### Nav2 노드 안에서 TF 가 멈추던 문제 (원인 확인, 해결)
+### Nav2 노드(AMCL) 안에서 TF 가 멈추던 문제 (원인 확인, 해결)
 
 증상: Nav2 controller_server/AMCL 이 몇 초~몇 분 뒤 TF 를 더 이상 받지 못함 → 로봇이 움직이는데 "진행 없음",
 목표를 지나쳐 계속 주행(실물에서 0.62m 목표를 지나 2.8m), 움직이지 않았는데 "Reached the goal", AMCL 위치 갱신 멈춤.
@@ -366,9 +363,8 @@ sudo apt update && sudo apt install --only-upgrade ros-humble-tf2 ros-humble-tf2
 dpkg -l ros-humble-tf2 ros-humble-tf2-ros | grep ^ii   # 0.25.24 확인
 ```
 
-이 문제 때문에 경로 추종을 브리지의 내장 추종기(`follower.py`)로 만들었고, 지금도 기본값입니다.
-업데이트 후에는 `--planner nav2` / `--controller nav2` 로 Nav2 주행도 쓸 수 있습니다 (시뮬레이션에서 확인).
-브리지는 어느 방식이든 Nav2 가 "도착"이라고 해도 실제 위치가 목표에서 0.3m 이상이면 실패 처리합니다.
+이 문제 때문에 경로 추종을 브리지의 내장 추종기(`follower.py` + `dwa.py`, hybrid)로 만들었습니다.
+지금은 Nav2 의 map_server + AMCL 만 쓰고 Nav2 주행 노드(planner/controller_server)는 쓰지 않습니다.
 
 ## 9. 점검 도구 (`tools/`)
 

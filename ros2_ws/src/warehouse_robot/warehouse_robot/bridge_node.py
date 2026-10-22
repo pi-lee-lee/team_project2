@@ -1,18 +1,13 @@
-"""Django 서버(WebSocket)와 ROS 2 / Nav2를 잇는 브리지 노드.
+"""Django 서버(WebSocket)와 ROS 2 를 잇는 브리지 노드.
 
 서버 → 로봇: goto, cancel, stop, initial_pose
 로봇 → 서버: hello, map, pose, battery, path, nav_status
 
-이동 방식
-  planner=astar : astar_planner 노드로 경로 계획 후
-      controller=hybrid  : 평소 pure pursuit, 경로 앞에 지도에 없는 장애물(추적 track)이 가까우면 DWA 로 바꿔 피함 (기본)
-      controller=mppi    : 이 노드의 MPPI 로 추종. DWA 와 입력/안전 검사가 같고 궤적만 시점마다 다른 (v, w) 순서
-      controller=dwa     : 이 노드의 DWA 로 추종, 움직이는 장애물의 미래 위치를 피함
-      controller=builtin : 이 노드의 pure pursuit 추종기로 cmd_vel 직접 발행
-      controller=nav2    : Nav2 controller_server(FollowPath)로 추종
-  planner=nav2  : Nav2 NavigateToPose (Nav2 기본 플래너 사용, 비교/예비용)
+이동 방식: astar_planner 노드로 경로 계획 후 hybrid 추종
+  평소 pure pursuit, 로봇 앞 사각형(hybrid.box_*) 안에 지도에 없는 물체가 보이거나 움직이는 물체가
+  hybrid.moving_predict 초 안에 사각형에 들어올 것 같으면 DWA 로 바꿔 피하고, 지나가면 pure pursuit 로 복귀.
 
-builtin 추종기 안전장치: 위치 TF가 끊기면 정지, 앞쪽 장애물이 있으면 정지 후 대기,
+안전장치: 위치 TF가 끊기면 정지, (pure pursuit) 앞쪽 장애물이 있으면 정지 후 대기,
 경로 이탈/진행 없음/장애물로 오래 막힘 → 정지 후 재계획 또는 실패.
 """
 import base64
@@ -28,14 +23,11 @@ import zlib
 import numpy as np
 import rclpy
 import websocket
-from action_msgs.msg import GoalStatus
 from rcl_interfaces.msg import Parameter as ParamMsg, ParameterType, ParameterValue, SetParametersResult
 from rcl_interfaces.srv import GetParameters, SetParameters
 from geometry_msgs.msg import PointStamped, PoseArray, PoseStamped, PoseWithCovarianceStamped, Twist
-from nav2_msgs.action import FollowPath, NavigateToPose
-from nav_msgs.msg import OccupancyGrid, Odometry, Path
+from nav_msgs.msg import OccupancyGrid, Odometry
 from nav_msgs.srv import GetPlan
-from rclpy.action import ActionClient
 from rclpy.node import Node
 from rclpy.parameter import Parameter
 from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy, qos_profile_sensor_data
@@ -50,7 +42,6 @@ from .cmd_mux import CmdMux
 from .astar_planner_node import quaternion_from_yaw, yaw_from_quaternion
 from .dwa import DWAConfig, DWAFollower, transform_points
 from .follower import PurePursuit
-from .mppi import MPPIConfig, MPPIFollower
 from .scan_noise import ScanNoiseConfig, degrade
 from .tracker import MultiObjectTracker, detect_clusters
 
@@ -188,14 +179,9 @@ class BridgeNode(Node):
         self.declare_parameter('map_topic', 'map')
         self.declare_parameter('global_frame', 'map')
         self.declare_parameter('base_frame', 'base_footprint')
-        self.declare_parameter('planner', 'astar')  # astar | nav2
         self.declare_parameter('pose_rate', 5.0)
         self.declare_parameter('max_retries', 2)   # 이동 실패 시 재계획 횟수
-        self.declare_parameter('arrive_tolerance', 0.3)  # 도착으로 인정할 목표와의 거리 (m)
-        # FollowPath에 넘길 경로 좌표계. odom이면 controller_server가 map->odom TF 없이 주행한다
-        self.declare_parameter('follow_frame', 'odom')
-        # 경로 추종기 (controller=builtin)
-        self.declare_parameter('controller', 'hybrid')  # hybrid | mppi | dwa | builtin | nav2
+        # 경로 추종기 (pure pursuit)
         self.declare_parameter('max_speed', 0.1)           # m/s
         self.declare_parameter('max_turn_speed', 0.6)      # rad/s
         self.declare_parameter('max_accel', 0.3)           # m/s², pure pursuit 출발 가속/정지 감속
@@ -228,11 +214,7 @@ class BridgeNode(Node):
         p = lambda name: self.get_parameter(name).value  # noqa: E731
         self.global_frame = p('global_frame')
         self.base_frame = p('base_frame')
-        self.planner_mode = p('planner')
         self.max_retries = p('max_retries')
-        self.arrive_tolerance = p('arrive_tolerance')
-        self.follow_frame = p('follow_frame')
-        self.controller = p('controller')
         self.max_speed = p('max_speed')
         self.max_turn_speed = p('max_turn_speed')
         self.max_accel = p('max_accel')
@@ -273,7 +255,6 @@ class BridgeNode(Node):
         self.map_msg = None
         self.create_subscription(OccupancyGrid, p('map_topic'), self.on_map, map_qos)
         self.create_subscription(BatteryState, 'battery_state', self.on_battery, qos_profile_sensor_data)
-        self.create_subscription(Path, 'plan', self.on_nav2_plan, 1)  # nav2 모드 경로 표시용
         self.scan = None
         self.last_scan_sent = 0.0   # 웹 실시간 LiDAR (send_scan)
         self.create_subscription(LaserScan, 'scan', self.on_scan, qos_profile_sensor_data)
@@ -324,7 +305,7 @@ class BridgeNode(Node):
         self.map_dist = None               # 지도 벽까지 거리 (벽 근처 점 = 정적) (dist, msg)
         self.last_obstacles_sent = 0.0
         self.last_dwa_sent = 0.0
-        # DWA (controller=dwa). 기본값은 tb3_nav 값에서 속도/외곽(직사각형)/여유를 이 프로젝트에 맞춤 (params.yaml 과 같음)
+        # DWA (hybrid 에서 장애물 피할 때). 기본값은 tb3_nav 값에서 속도/외곽(직사각형)/여유를 이 프로젝트에 맞춤 (params.yaml 과 같음)
         defaults = DWAConfig(max_v=0.15, max_w=1.0, max_acc_v=0.3, max_acc_w=1.5, robot_radius=0.17, footprint=(-0.197, 0.069, 0.153), allow_escape=True,
                              safety_margin=0.08, dynamic_margin=0.15, dynamic_growth=0.03, predict_time=2.5,
                              w_collision=2.0, reverse_only_when_needed=True)
@@ -338,31 +319,23 @@ class BridgeNode(Node):
         # DWA 충돌 검사(dwa.footprint 직사각형)에는 아직 안 들어감
         ex = [float(v) for v in self.declare_parameter('footprint_extra', [-0.277, -0.197, -0.04, 0.04]).value]
         self.footprint_extra = [tuple(ex[i:i + 4]) for i in range(0, len(ex) - 3, 4)]
-        # MPPI (controller=mppi). 속도/가속/외곽/여유/predict_time 은 위 dwa.* 를 같이 쓰고, 샘플링/비용 계수만 mppi.*
-        self.mppi_cfg = MPPIConfig(**{k: type(v)(self.declare_parameter(f'mppi.{k}', v).value)
-                                      for k, v in vars(MPPIConfig()).items() if k != 'seed'})
         self.declare_parameter('dwa_follow.lookahead', 0.5)
         self.declare_parameter('dwa_follow.goal_tolerance', 0.1)
         # 앞쪽 경로가 지도에 없는 장애물에서 이 거리 안을 지나면 목표점을 그 너머 경로점으로 (m, 0 이면 끔), target_max 까지
         self.declare_parameter('dwa_follow.target_clear', 0.233)
         self.declare_parameter('dwa_follow.target_max', 2.0)
         self.declare_parameter('dwa_follow.moving_speed', 0.08)  # 이보다 빠른 track 만 움직이는 장애물로 (멈춘 물체 속도 노이즈 ~0.06, 느린 사람 0.1)
-        # controller=hybrid: 평소 pure pursuit, 장애물이 가까우면 DWA
-        self.declare_parameter('hybrid.trigger_distance', 1.0)  # 로봇에서 이 거리 안 + 앞쪽 경로 가까이에 track 이 있으면 DWA (m)
-        self.declare_parameter('hybrid.moving_distance', 1.5)   # (box_trigger=false 일 때) 움직이는 track 이 이 거리 안이면 DWA (m)
-        self.declare_parameter('hybrid.path_width', 0.4)        # track 가장자리가 앞쪽 경로에서 이 거리 안이면 '경로 위' (m)
-        self.declare_parameter('hybrid.path_ahead', 1.5)        # 앞쪽 경로를 이 길이만큼 본다 (m)
+        # hybrid: 평소 pure pursuit, 장애물이 가까우면 DWA
         self.declare_parameter('hybrid.release_time', 2.0)      # 장애물이 이 시간 동안 안 보이면 pure pursuit 로 (s)
         self.declare_parameter('hybrid.rejoin_offset', 0.25)    # 경로에서 이 거리 안으로 돌아왔을 때만 pure pursuit 로 (m)
-        # 전환 조건: true = 로봇 앞(+뒤 조금) 사각형 안에 지도에 없는 스캔 점이 있으면 (box_*) /
-        # false = 앞쪽 경로 가까이에 track 이 있으면 (trigger_distance, path_*). 움직이는 track 이 moving_distance 안이면 둘 다 전환
-        self.declare_parameter('hybrid.box_trigger', True)
+        # 전환 조건: 로봇 앞(+뒤 조금) 사각형 안에 지도에 없는 스캔 점이 있거나 (box_*),
+        # 움직이는 track 이 moving_predict 초 안에 사각형에 들어올 것 같으면 DWA
         self.declare_parameter('hybrid.box_front', 1.0)         # 차체 앞 끝(x=0.069)에서 앞으로 (m)
         self.declare_parameter('hybrid.box_back', 0.2)          # 차체 뒤 끝(x=-0.197)에서 뒤로 (m)
         self.declare_parameter('hybrid.box_half_width', 0.25)   # 좌우 반폭 (m): 차체 반폭 0.153 + 여유
         self.declare_parameter('hybrid.box_min_points', 3)      # 사각형 안 점이 이만큼 이상이어야 (AMCL 오차로 벽 점 몇 개가 새는 것 무시)
         self.declare_parameter('hybrid.box_min_scans', 2)       # 이만큼 연속 스캔에서 보여야 전환 (깜빡임 방지)
-        # 움직이는 track (box_trigger 일 때): 지금 ~ 이 시간 뒤까지 속도로 예측한 위치가 사각형과 겹치면 전환 (s).
+        # 움직이는 track: 지금 ~ 이 시간 뒤까지 속도로 예측한 위치가 사각형과 겹치면 전환 (s).
         # 로봇도 지금 속도로 직진한다고 보고 사각형을 같이 옮긴다. 0 이면 지금 위치만 (= 정적인 물체와 같음)
         self.declare_parameter('hybrid.moving_predict', 2.0)
         self.box_streak = 0      # 사각형 안에 점이 있던 연속 스캔 수
@@ -404,17 +377,14 @@ class BridgeNode(Node):
         self.slam_scan_pub = self.create_publisher(LaserScan, 'scan_slam', qos_profile_sensor_data)
 
         self.plan_client = self.create_client(GetPlan, 'astar/get_plan')
-        self.follow_client = ActionClient(self, FollowPath, 'follow_path')
-        self.nav_client = ActionClient(self, NavigateToPose, 'navigate_to_pose')
 
         # 현재 목표. generation은 취소된 목표의 늦은 콜백을 무시하기 위한 번호
         self.goal = None
-        self.goal_handle = None
         self.generation = 0
         self.last_battery_sent = 0.0
         self.battery_history = []  # (시각, 전압)
         self.stop_count = 0
-        self.follower = None  # 내장 추종기 상태 (controller=builtin)
+        self.follower = None  # 추종기 상태 (pp / dwa, hybrid 전환)
         self.last_goal_id = None
 
         self.server = ServerConnection(p('server_url'), self.get_logger())
@@ -433,7 +403,7 @@ class BridgeNode(Node):
         self.params_dirty = False
         self.add_on_set_parameters_callback(self.on_set_params)
         self.create_timer(0.2, self.flush_params)
-        self.get_logger().info(f'브리지 시작 (planner={self.planner_mode}, controller={self.controller})')
+        self.get_logger().info('브리지 시작 (A* + hybrid: pure pursuit / 장애물 근처 DWA)')
 
     # ---------------------------------------------------------- 서버 메시지 처리
     def process_inbox(self):
@@ -489,7 +459,7 @@ class BridgeNode(Node):
         self.get_logger().info(f'금지 구역 {len(zones)}개 → A* 플래너')
         # 이동 중이면 새 구역으로 경로를 다시 계산한다 (예전에는 출발 때 계산한 경로를 그대로 따라가 구역을 뚫고 지나감).
         # 플래너가 구역을 먼저 받도록 0.3초 뒤에 (control_step 에서)
-        if self.goal is not None and self.planner_mode == 'astar':
+        if self.goal is not None:
             self.zone_replan_at = time.monotonic() + 0.3
 
     # ---------------------------------------------------------- 로봇 상태 → 서버
@@ -637,10 +607,6 @@ class BridgeNode(Node):
             pts = pts[:-1:3] + [pts[-1]]  # 전송량 줄이기
         self.server.send({'type': 'path', 'points': pts})
 
-    def on_nav2_plan(self, msg):
-        if self.planner_mode == 'nav2' and self.goal:
-            self.send_path(msg.poses)
-
     def report(self, status, message=''):
         """현재 목표의 결과를 서버에 알리고 목표를 비운다."""
         if self.goal is None:
@@ -650,7 +616,6 @@ class BridgeNode(Node):
                           'status': status, 'message': message})
         if status != 'navigating':
             self.goal = None
-            self.goal_handle = None
             self.send_path([])
 
     # ---------------------------------------------------------- 이동
@@ -672,22 +637,16 @@ class BridgeNode(Node):
         self.goal = {'id': goal_id, 'x': x, 'y': y, 'yaw': yaw, 'retries': 0}
         self.last_goal_id = goal_id
         self.get_logger().info(f'목표 {goal_id}: ({x:.2f}, {y:.2f}, {math.degrees(yaw):.0f}°)')
-        if self.planner_mode == 'nav2':
-            self.send_navigate_to_pose()
-        else:
-            self.request_plan()
+        self.request_plan()
 
     def cancel_goal(self, report=True):
         self.generation += 1
-        if self.goal_handle is not None:
-            self.goal_handle.cancel_goal_async()
         if self.follower is not None:
             self.follower = None
             self.stop_count = 5
         if report:
             self.report('canceled')
         self.goal = None
-        self.goal_handle = None
 
     def make_pose(self, x, y, yaw):
         ps = PoseStamped()
@@ -699,7 +658,7 @@ class BridgeNode(Node):
          ps.pose.orientation.z, ps.pose.orientation.w) = quaternion_from_yaw(yaw)
         return ps
 
-    # astar 모드 ---------------------------------------------------
+    # 경로 계획 (A*) ------------------------------------------------
     def request_plan(self):
         gen = self.generation
         pose = self.current_pose()
@@ -731,114 +690,30 @@ class BridgeNode(Node):
                 self.report('failed', f'경로를 찾을 수 없습니다{f": {why}" if why and t >= asked - 1.0 else "."}')
             timer = self.create_timer(0.3, report_fail)
             return
-        if self.controller in ('builtin', 'dwa', 'hybrid', 'mppi'):
-            start = self.current_pose()
-            if start is None:
-                self.report('failed', '로봇 위치를 알 수 없습니다. 초기 위치를 지정하세요.')
-                return
-            self.send_path(plan.poses)
-            self.stop_count = 0  # 이전 목표의 정지 명령이 새 주행에 섞이지 않게
-            now = time.monotonic()
-            points = [(ps.pose.position.x, ps.pose.position.y) for ps in plan.poses]
-            self.follower = {
-                'gen': gen,
-                'blocked_since': None,
-                'mark_pos': start[:2],
-                'mark_time': now,
-            }
-            # pp / dwa 는 같은 경로 점 목록을 쓰므로 진행 index 를 서로 넘겨줄 수 있다 (hybrid 전환)
-            follow_kw = dict(goal_tolerance=self.get_parameter('dwa_follow.goal_tolerance').value,
-                             lookahead=self.get_parameter('dwa_follow.lookahead').value)
-            if self.controller in ('dwa', 'hybrid'):
-                self.follower['dwa'] = DWAFollower(points, self.goal['yaw'], self.dwa_cfg, **follow_kw)
-            elif self.controller == 'mppi':
-                # 지역 계획기 자리('dwa' 키)를 같이 쓴다: 막힘/회복/웹 궤적 표시가 DWA 와 같은 경로로 처리됨
-                self.follower['dwa'] = MPPIFollower(points, self.goal['yaw'], self.dwa_cfg, self.mppi_cfg, **follow_kw)
-            if 'dwa' in self.follower:
-                self.follower['dwa'].target_clear = self.get_parameter('dwa_follow.target_clear').value
-                self.follower['dwa'].target_max = self.get_parameter('dwa_follow.target_max').value
-            if self.controller in ('builtin', 'hybrid'):
-                self.follower['pp'] = PurePursuit(points, self.goal['yaw'], max_v=self.max_speed,
-                                                  max_w=self.max_turn_speed, max_acc=self.max_accel,
-                                                  max_acc_w=self.max_turn_accel)
-            self.follower['use_dwa'] = self.controller in ('dwa', 'mppi')
-            self.follower['clear_since'] = None
-            return
-        if not self.follow_client.server_is_ready():
-            self.report('failed', 'Nav2 controller_server가 준비되지 않았습니다.')
+        start = self.current_pose()
+        if start is None:
+            self.report('failed', '로봇 위치를 알 수 없습니다. 초기 위치를 지정하세요.')
             return
         self.send_path(plan.poses)
-        goal = FollowPath.Goal()
-        goal.path = self.path_in_frame(plan, self.follow_frame)
-        if goal.path is None:
-            self.report('failed', f'{self.global_frame} -> {self.follow_frame} 변환을 알 수 없습니다.')
-            return
-        self.follow_client.send_goal_async(goal).add_done_callback(
-            lambda f: self.on_goal_accepted(f, gen))
-
-    def path_in_frame(self, plan, frame):
-        """경로를 frame 좌표로 변환 (2D). 같은 frame이면 그대로."""
-        if not frame or frame == plan.header.frame_id:
-            return plan
-        try:
-            t = self.tf_buffer.lookup_transform(frame, plan.header.frame_id, Time()).transform
-        except TransformException:
-            return None
-        tyaw = yaw_from_quaternion(t.rotation)
-        c, s = math.cos(tyaw), math.sin(tyaw)
-        out = Path()
-        out.header.frame_id = frame
-        out.header.stamp = self.get_clock().now().to_msg()
-        for p in plan.poses:
-            x, y = p.pose.position.x, p.pose.position.y
-            ps = self.make_pose(t.translation.x + c * x - s * y, t.translation.y + s * x + c * y,
-                                yaw_from_quaternion(p.pose.orientation) + tyaw)
-            ps.header.frame_id = frame
-            out.poses.append(ps)
-        return out
-
-    # nav2 모드 ----------------------------------------------------
-    def send_navigate_to_pose(self):
-        gen = self.generation
-        if not self.nav_client.server_is_ready():
-            self.report('failed', 'Nav2 bt_navigator가 준비되지 않았습니다.')
-            return
-        goal = NavigateToPose.Goal()
-        goal.pose = self.make_pose(self.goal['x'], self.goal['y'], self.goal['yaw'])
-        self.nav_client.send_goal_async(goal).add_done_callback(
-            lambda f: self.on_goal_accepted(f, gen))
-
-    # 공통 ---------------------------------------------------------
-    def on_goal_accepted(self, future, gen):
-        handle = future.result()
-        if gen != self.generation:
-            if handle.accepted:
-                handle.cancel_goal_async()
-            return
-        if not handle.accepted:
-            self.report('failed', 'Nav2가 목표를 거부했습니다.')
-            return
-        self.goal_handle = handle
-        handle.get_result_async().add_done_callback(lambda f: self.on_result(f, gen))
-
-    def on_result(self, future, gen):
-        if gen != self.generation or self.goal is None:
-            return
-        status = future.result().status
-        reason = '이동 중 막혔거나 목표에 도달하지 못했습니다.'
-        if status == GoalStatus.STATUS_SUCCEEDED:
-            # controller_server는 TF 변환에 실패해도 "Reached the goal"을 돌려주는 경우가 있어 직접 확인
-            error = self.goal_error()
-            if error is not None and error <= self.arrive_tolerance:
-                self.report('succeeded')
-                return
-            reason = ('Nav2는 도착이라고 했지만 로봇 위치를 확인할 수 없습니다.' if error is None else
-                      f'Nav2는 도착이라고 했지만 목표와 {error:.2f} m 떨어져 있습니다.')
-            self.get_logger().warn(reason)
-        if status == GoalStatus.STATUS_CANCELED:
-            self.report('canceled')
-        else:
-            self.fail_or_retry(reason)
+        self.stop_count = 0  # 이전 목표의 정지 명령이 새 주행에 섞이지 않게
+        points = [(ps.pose.position.x, ps.pose.position.y) for ps in plan.poses]
+        # pp / dwa 는 같은 경로 점 목록을 쓰므로 진행 index 를 서로 넘겨줄 수 있다 (hybrid 전환)
+        dwa = DWAFollower(points, self.goal['yaw'], self.dwa_cfg,
+                          goal_tolerance=self.get_parameter('dwa_follow.goal_tolerance').value,
+                          lookahead=self.get_parameter('dwa_follow.lookahead').value)
+        dwa.target_clear = self.get_parameter('dwa_follow.target_clear').value
+        dwa.target_max = self.get_parameter('dwa_follow.target_max').value
+        self.follower = {
+            'gen': gen,
+            'blocked_since': None,
+            'mark_pos': start[:2],
+            'mark_time': time.monotonic(),
+            'dwa': dwa,
+            'pp': PurePursuit(points, self.goal['yaw'], max_v=self.max_speed, max_w=self.max_turn_speed,
+                              max_acc=self.max_accel, max_acc_w=self.max_turn_accel),
+            'use_dwa': False,
+            'clear_since': None,
+        }
 
     def fail_or_retry(self, reason):
         """재시도 횟수가 남았으면 현재 위치에서 다시 계획, 아니면 실패 보고."""
@@ -846,16 +721,12 @@ class BridgeNode(Node):
             self.goal['retries'] += 1
             self.get_logger().warn(f'{reason} 재시도 {self.goal["retries"]}/{self.max_retries}')
             self.generation += 1
-            self.goal_handle = None
             self.follower = None
-            if self.planner_mode == 'nav2':
-                self.send_navigate_to_pose()
-            else:
-                self.request_plan()
+            self.request_plan()
         else:
             self.report('failed', reason)
 
-    # 내장 추종기 (controller=builtin) ------------------------------
+    # 카메라 / 파라미터 ---------------------------------------------
     def on_cargo(self, msg):
         label = msg.data.strip()
         if self.cargo_raw is None or self.cargo_raw[0] != label:
@@ -896,7 +767,7 @@ class BridgeNode(Node):
                   'max_turn_accel': 'max_turn_accel', 'stop_distance': 'stop_distance',
                   'blocked_timeout': 'blocked_timeout', 'progress_timeout': 'progress_timeout',
                   'tf_timeout': 'tf_timeout', 'rotate_timeout': 'rotate_timeout', 'stall_timeout': 'stall_timeout',
-                  'backoff_distance': 'backoff_distance', 'arrive_tolerance': 'arrive_tolerance',
+                  'backoff_distance': 'backoff_distance',
                   'max_retries': 'max_retries', 'bump_tilt_deg': 'bump_tilt'}
 
     def tunable_params(self):
@@ -904,23 +775,18 @@ class BridgeNode(Node):
         names = list(self.LIVE_ATTRS)
         names += [f'dwa.{k}' for k, v in vars(self.dwa_cfg).items()
                   if k != 'control_period' and not isinstance(v, tuple)]
-        names += [f'mppi.{k}' for k in vars(self.mppi_cfg) if k != 'seed']
         names += ['dwa_follow.lookahead', 'dwa_follow.goal_tolerance', 'dwa_follow.moving_speed',
                   'dwa_follow.target_clear', 'dwa_follow.target_max']
-        names += [f'hybrid.{k}' for k in ('box_trigger', 'box_front', 'box_back', 'box_half_width', 'box_min_points',
-                                          'box_min_scans', 'moving_predict', 'trigger_distance', 'moving_distance', 'path_width',
-                                          'path_ahead', 'release_time', 'rejoin_offset')]
+        names += [f'hybrid.{k}' for k in ('box_front', 'box_back', 'box_half_width', 'box_min_points', 'box_min_scans',
+                                          'moving_predict', 'release_time', 'rejoin_offset')]
         return names
 
     def on_set_params(self, params):
         """파라미터가 바뀌기 직전에 불림: 실행 중에 못 바꾸는 것은 거절하고, 나머지는 지금 주행에도 바로 반영."""
         for prm in params:
             n = prm.name
-            if not (n in self.param_start or (n.startswith('dwa.') and n != 'dwa.control_period')
-                    or n.startswith('mppi.')):
+            if not (n in self.param_start or (n.startswith('dwa.') and n != 'dwa.control_period')):
                 return SetParametersResult(successful=False, reason=f'{n} 은(는) 실행 중에 못 바꿉니다 (재시작 필요)')
-            if n == 'mppi.samples' and prm.value < 1:
-                return SetParametersResult(successful=False, reason=f'{n} 은(는) 1 이상이어야 합니다')
             if n in ('dwa.v_samples', 'dwa.w_samples') and prm.value < 2:
                 return SetParametersResult(successful=False, reason=f'{n} 은(는) 2 이상이어야 합니다')
         f = self.follower or {}
@@ -932,9 +798,6 @@ class BridgeNode(Node):
                 # DWAFollower 들이 같은 DWAConfig 객체를 쓰므로 주행 중인 DWA 에도 바로 적용
                 k = n[4:]
                 setattr(self.dwa_cfg, k, tuple(float(x) for x in v) if isinstance(getattr(self.dwa_cfg, k), tuple) else v)
-            elif n.startswith('mppi.'):
-                # MPPIController 들이 같은 MPPIConfig 객체를 쓰므로 주행 중에도 바로 적용
-                setattr(self.mppi_cfg, n[5:], v)
             elif n in ('dwa_follow.lookahead', 'dwa_follow.goal_tolerance', 'dwa_follow.target_clear',
                        'dwa_follow.target_max') and 'dwa' in f:
                 setattr(f['dwa'], n.split('.')[1], v)
@@ -1143,7 +1006,7 @@ class BridgeNode(Node):
     def control_step(self):
         if self.zone_replan_at is not None and time.monotonic() >= self.zone_replan_at:
             self.zone_replan_at = None
-            if self.goal is not None and self.planner_mode == 'astar':
+            if self.goal is not None:
                 self.get_logger().info('금지 구역이 바뀌어 지금 위치에서 경로를 다시 계산합니다')
                 self.generation += 1      # 지금 따르던 경로/계획 응답은 버림
                 self.stop_following()
@@ -1178,8 +1041,7 @@ class BridgeNode(Node):
         x, y, yaw, _ = pose
         if self.tilt_rel < math.radians(2):
             f['level_pose'] = (x, y, yaw)   # 부딪힌 자리는 기울기 시작 전 위치/방향으로 계산 (밀리면서 돌아가므로)
-        if 'pp' in f and 'dwa' in f:
-            self.hybrid_switch(f, x, y, now)
+        self.hybrid_switch(f, x, y, now)
         if f['use_dwa']:
             v, w, state = self.dwa_compute(f['dwa'])
         else:
@@ -1271,7 +1133,7 @@ class BridgeNode(Node):
     # DWA 만 쓰면 실물에서 벽 옆/좁은 곳에서 '안전한 궤적 없음', '진행 없음' 이 잦았다 → 지도에 있는 벽은
     # A* 경로 + pure pursuit 로 충분하므로, 지도에 없는 물체(추적 track: 상자, 사람)가 경로 가까이 올 때만 DWA
     def update_box(self, pts):
-        """스캔마다: 로봇 앞(+뒤 조금) 사각형 안의 지도에 없는 점 수 → 연속 스캔 수 (hybrid.box_trigger)."""
+        """스캔마다: 로봇 앞(+뒤 조금) 사각형 안의 지도에 없는 점 수 → 연속 스캔 수."""
         pose = self.xyyaw('odom', self.base_frame)
         if pose is None or not len(pts):
             self.box_streak, self.box_count, self.box_near = 0, 0, math.inf
@@ -1300,7 +1162,7 @@ class BridgeNode(Node):
         """hybrid 전환 조건을 웹에 (0.2초마다, hybrid 일 때만, map 좌표):
         사각형 네 꼭짓점 + 안의 점(실제로 센 점) / 밖의 지도에 없는 점, 움직이는 물체 전환 반경, 지금 상태(이유, 복귀 대기)."""
         now = time.monotonic()
-        if self.controller != 'hybrid' or now - self.last_box_sent < 0.2:
+        if now - self.last_box_sent < 0.2:
             return
         pose = self.xyyaw(self.global_frame, self.base_frame)
         m_o = self.xyyaw(self.global_frame, 'odom')
@@ -1312,7 +1174,7 @@ class BridgeNode(Node):
         bx0, bx1, hw = x0 - p('box_back'), x1 + p('box_front'), p('box_half_width')
         r3 = lambda a: [[round(float(u), 3), round(float(v), 3)] for u, v in a]
         corners = transform_points([[bx0, -hw], [bx1, -hw], [bx1, hw], [bx0, hw]], *pose)
-        info = self.hybrid_info if self.follower and 'pp' in self.follower and 'dwa' in self.follower else {}
+        info = self.hybrid_info if self.follower else {}
         # 움직이는 track 의 예측 선 (지금 → moving_predict 초 뒤, map) 과 사각형에 들어오는 시각
         movers = []
         odom_pose = self.xyyaw('odom', self.base_frame)
@@ -1322,14 +1184,13 @@ class BridgeNode(Node):
                 continue
             a, b = transform_points([t.x[:2], [t.x[0] + t.x[2] * horizon, t.x[1] + t.x[3] * horizon]], *m_o)
             movers.append({'from': r3([a])[0], 'to': r3([b])[0], 'r': round(float(t.radius), 3),
-                           'enter': self.moving_into_box(t, odom_pose) if p('box_trigger') else None})
+                           'enter': self.moving_into_box(t, odom_pose)})
         self.server.send({
             'type': 'hybrid_box', 'corners': r3(corners),
             'points': r3(transform_points(self.box_pts[:80], *m_o)) if len(self.box_pts) else [],
             'others': r3(transform_points(self.unmapped_near[:150], *m_o)) if len(self.unmapped_near) else [],
-            'count': self.box_count, 'min_points': p('box_min_points'), 'enabled': bool(p('box_trigger')),
-            'active': bool(p('box_trigger')) and self.box_streak >= p('box_min_scans'),
-            'moving_distance': None if p('box_trigger') else p('moving_distance'),
+            'count': self.box_count, 'min_points': p('box_min_points'),
+            'active': self.box_streak >= p('box_min_scans'),
             'movers': movers, 'moving_predict': horizon,
             'driving': bool(info), 'dwa': bool(info.get('use_dwa')), 'why': info.get('why'),
             'clear_for': info.get('clear_for'), 'release_time': p('release_time'),
@@ -1360,40 +1221,24 @@ class BridgeNode(Node):
         return float(ts[int(np.argmax(hit))]) if hit.any() else None
 
     def hybrid_obstacle(self, f, x, y):
-        """DWA 로 피해야 할 장애물이 있으면 설명 글자, 없으면 None. x, y: 로봇 (map)."""
-        box = self.get_parameter('hybrid.box_trigger').value
-        if box and self.box_streak >= self.get_parameter('hybrid.box_min_scans').value:
+        """DWA 로 피해야 할 장애물이 있으면 설명 글자, 없으면 None.
+        사각형 안에 지도에 없는 점 (정적이든 동적이든), 또는 사각형에 곧 들어올 움직이는 track.
+        멀어지거나 나란히 가는 사람은 무시하고, 옆/뒤에서 다가오는 사람은 미리 잡는다."""
+        if self.box_streak >= self.get_parameter('hybrid.box_min_scans').value:
             return f'앞쪽 장애물 {self.box_near:.2f} m (점 {self.box_count}개)'
         if not self.tracks:
             return None
-        m_o = self.xyyaw(self.global_frame, 'odom')
-        if m_o is None:
-            return None
-        pp = f['pp']
-        idx = f['dwa'].progress if f['use_dwa'] else pp.index
-        pts = np.asarray(pp.points[idx:], dtype=float)
-        if len(pts) > 1:
-            s = np.concatenate([[0.0], np.cumsum(np.hypot(*np.diff(pts, axis=0).T))])
-            pts = pts[s <= self.get_parameter('hybrid.path_ahead').value]
-        trigger = self.get_parameter('hybrid.trigger_distance').value
-        moving_d = self.get_parameter('hybrid.moving_distance').value
-        width = self.get_parameter('hybrid.path_width').value
-        moving_v = self.get_parameter('dwa_follow.moving_speed').value
         pose = self.xyyaw('odom', self.base_frame)
+        if pose is None:
+            return None
+        moving_v = self.get_parameter('dwa_follow.moving_speed').value
         for t in self.tracks:
-            (ox, oy), = transform_points([t.x[:2]], *m_o)
-            d = math.hypot(ox - x, oy - y) - t.radius
-            moving = math.hypot(t.x[2], t.x[3]) >= moving_v
-            if moving and box:
-                # 사각형에 지금 있거나 곧 들어올 움직이는 물체 (옆/뒤에서 다가오는 사람은 미리, 멀어지거나 나란히 가는 사람은 무시)
-                when = self.moving_into_box(t, pose)
-                if when is not None:
-                    return f'움직이는 장애물 {when:.1f}초 뒤 사각형 ({d:.2f} m)'
-            elif moving and d < moving_d:
-                return f'움직이는 장애물 {d:.2f} m'
-            if not box and d < trigger and len(pts) and \
-                    float(np.min(np.hypot(pts[:, 0] - ox, pts[:, 1] - oy))) - t.radius < width:
-                return f'경로 위 장애물 {d:.2f} m'
+            if math.hypot(t.x[2], t.x[3]) < moving_v:
+                continue
+            when = self.moving_into_box(t, pose)
+            if when is not None:
+                d = math.hypot(t.x[0] - pose[0], t.x[1] - pose[1]) - t.radius
+                return f'움직이는 장애물 {when:.1f}초 뒤 사각형 ({d:.2f} m)'
         return None
 
     def hybrid_switch(self, f, x, y, now):
@@ -1544,8 +1389,7 @@ class BridgeNode(Node):
         if traj is not None and m_o is not None:
             pts = [[round(float(px), 3), round(float(py), 3)] for px, py in transform_points(np.asarray(traj)[:, :2], *m_o)]
         v, w, state = result
-        self.server.send({'type': 'dwa', 'traj': pts, 'v': round(float(v), 3), 'w': round(float(w), 3), 'state': state,
-                          'name': 'MPPI' if isinstance(follower, MPPIFollower) else 'DWA'})
+        self.server.send({'type': 'dwa', 'traj': pts, 'v': round(float(v), 3), 'w': round(float(w), 3), 'state': state})
 
     # DWA 막힘 대처 (단순 fallback) --------------------------------
     # ① DWA 가 막히면 blocked_timeout(5초) 동안 기다림 (움직이는 장애물이 지나가길)
@@ -1726,13 +1570,6 @@ class BridgeNode(Node):
         elif self.mode == 'map':
             self.get_logger().warn(f'스캔 매칭 결과가 좋지 않아 AMCL 위치를 그대로 씁니다 ({r})')
         self.fail_or_retry(msg['reason'])
-
-    def goal_error(self):
-        """현재 위치와 목표 사이 거리(m). 위치를 모르면 None."""
-        pose = self.current_pose()
-        if pose is None or self.goal is None:
-            return None
-        return math.hypot(pose[0] - self.goal['x'], pose[1] - self.goal['y'])
 
     # ---------------------------------------------------------- 기타
     def publish_initial_pose(self, x, y, yaw, precise=False):

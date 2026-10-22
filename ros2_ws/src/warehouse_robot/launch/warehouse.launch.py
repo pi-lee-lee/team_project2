@@ -50,7 +50,6 @@ def launch_nodes(context):
             package='warehouse_robot', executable='bridge', name='warehouse_bridge', namespace=namespace,
             output='screen', remappings=remaps,
             parameters=[params, {'use_sim_time': use_sim_time, 'server_url': server_url,
-                                 'planner': arg('planner'), 'controller': arg('controller'),
                                  'map_name': arg('map_name'), 'mode': arg('mode'),
                                  'sim_scan.enabled': arg('scan_noise') == 'true'}]),
     ]
@@ -72,8 +71,6 @@ def generate_launch_description():
                               description='ROS 네임스페이스 (로봇 여러 대일 때 예: tb3_1). 비우면 지금처럼 / 아래'),
         DeclareLaunchArgument('server_url', default_value='',
                               description='비우면 ws://localhost:8000/ws/robot/<robot_name>/'),
-        DeclareLaunchArgument('planner', default_value='astar', description='astar | nav2'),
-        DeclareLaunchArgument('controller', default_value='hybrid', description='hybrid | mppi | dwa | builtin | nav2'),
         DeclareLaunchArgument('map_name', default_value='default'),
         DeclareLaunchArgument('mode', default_value='map', description='map (기존 맵 + AMCL) | slam (맵 만들기)'),
         DeclareLaunchArgument('scan_noise', default_value='false',
