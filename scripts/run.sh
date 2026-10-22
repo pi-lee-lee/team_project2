@@ -17,8 +17,9 @@
 #   --nav2         Nav2 주행 노드(planner/controller_server, bt_navigator)도 실행. slam/map 모두 가능
 #                  (slam: SLAM 이 맵과 위치를 내므로 AMCL/map_server 없이 주행 노드만)
 #   --planner P    astar(기본, 직접 구현한 A*) | nav2 (Nav2 가 계획+주행, NavigateToPose)
-#   --controller C dwa(기본, A* 경로를 DWA 로 추종, 추적한 움직이는 장애물의 미래 위치를 피함. tb3_nav 에서 이식)
-#                  | builtin (내장 pure pursuit, 앞쪽 장애물이면 정지 후 대기) | nav2 (A* 경로를 Nav2 controller_server 가 추종)
+#   --controller C hybrid(기본, 평소 pure pursuit, 경로 앞에 지도에 없는 장애물이 가까우면 DWA 로 피함)
+#                  | dwa (항상 DWA, 추적한 움직이는 장애물의 미래 위치를 피함. tb3_nav 에서 이식)
+#                  | builtin (항상 pure pursuit, 앞쪽 장애물이면 정지 후 대기) | nav2 (A* 경로를 Nav2 controller_server 가 추종)
 #                  planner/controller 를 nav2 로 주면 --nav2 는 자동으로 켜짐
 #   --scan-noise   (sim) LiDAR 를 실물 LDS-02 처럼: 빔 개수 238~244 변동, 거리 흔들림, 먼 곳 값 빠짐 (scan_noise.py)
 #                  실물과 비슷한 강당은 --world lecture_hall_real (책상 앞판 없음, 의자 무작위 배치)
@@ -38,7 +39,7 @@ LOGS="$HOME_DIR/logs"
 PI_HOST="test@192.168.0.181"
 
 ROBOT=""; MODE=""; MAP=""; NAME=""; ENGINE=slam_toolbox; WORLD=turtlebot3_world; GUI=""; NAV2=""
-PLANNER=astar; CONTROLLER=dwa; AMCL=default; SCAN_NOISE=false
+PLANNER=astar; CONTROLLER=hybrid; AMCL=default; SCAN_NOISE=false
 while [ $# -gt 0 ]; do
   case "$1" in
     --robot) ROBOT="$2"; shift ;;
@@ -61,7 +62,7 @@ done
 [[ "$ROBOT" =~ ^(real|sim)$ ]] || { echo "--robot real|sim 을 지정하세요"; exit 1; }
 [[ "$MODE" =~ ^(slam|map)$ ]] || { echo "--mode slam|map 을 지정하세요"; exit 1; }
 [[ "$PLANNER" =~ ^(astar|nav2)$ ]] || { echo "--planner astar|nav2"; exit 1; }
-[[ "$CONTROLLER" =~ ^(builtin|nav2|dwa)$ ]] || { echo "--controller builtin|nav2|dwa"; exit 1; }
+[[ "$CONTROLLER" =~ ^(hybrid|builtin|nav2|dwa)$ ]] || { echo "--controller hybrid|dwa|builtin|nav2"; exit 1; }
 if [ "$PLANNER" = nav2 ] || [ "$CONTROLLER" = nav2 ]; then NAV2=1; fi
 case "$AMCL" in
   default) AMCL_FILE="$HOME_DIR/config/amcl_waffle_pi.yaml" ;;

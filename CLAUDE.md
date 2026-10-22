@@ -17,7 +17,7 @@ TurtleBot3 Waffle Pi warehouse robot: click a point/locations on a web map → t
 ```bash
 # Everything (background, logs in logs/). Records mode in logs/run_mode.env
 scripts/run.sh --robot real|sim --mode slam|map [--map FILE] [--name DBNAME] [--slam slam_toolbox|cartographer] \
-               [--world W] [--gui] [--nav2] [--planner astar|nav2] [--controller dwa|builtin|nav2]
+               [--world W] [--gui] [--nav2] [--planner astar|nav2] [--controller hybrid|dwa|builtin|nav2]
 scripts/stop_ros.sh            # stop ROS nodes + Gazebo (never touches Pi bringup)
 scripts/stop_ros.sh --all      # + Django server and ROS daemon
 # Always stop via stop_ros.sh — killing nodes individually leaves orphan lifecycle_manager/amcl.
@@ -63,7 +63,7 @@ browser ⇄ /ws/ui/ ⇄ Django (daphne, :8000) ⇄ /ws/robot/tb3/ ⇄ bridge_nod
 **ROS 2 package (`ros2_ws/src/warehouse_robot/`)**
 - `astar.py` / `follower.py`: pure numpy/math, no ROS imports — this is what the unit tests cover. Keep them ROS-free.
 - `astar_planner_node.py`: exposes `GridPlanner` as a `nav_msgs/GetPlan` service (`astar/get_plan`). Occupancy ≥65 and unknown are obstacles unless `allow_unknown` (set true in SLAM mode).
-- `bridge_node.py`: WebSocket client to the server (`websocket-client` in a thread, inbox queue drained by a timer), goal execution, and safety (front ±25° obstacle stop, TF staleness stop, progress/off-path replan, IMU tip detection). Planner/controller are selectable: `astar`+`dwa` (default; DWA avoids tracked moving obstacles, front-stop rule off), `astar`+`builtin` (pure pursuit) or Nav2 (`NavigateToPose` / `controller_server`). Even with Nav2 it fails a goal if final position error > 0.3 m. Map save/reset are done by the bridge running `scripts/save_map.sh` / `scripts/reset_robot.sh`.
+- `bridge_node.py`: WebSocket client to the server (`websocket-client` in a thread, inbox queue drained by a timer), goal execution, and safety (front ±25° obstacle stop, TF staleness stop, progress/off-path replan, IMU tip detection). Planner/controller are selectable: `astar`+`hybrid` (default: pure pursuit, switches to DWA while a tracked non-map obstacle is near the path ahead, back after it clears; `hybrid.*` params), `astar`+`dwa` (always DWA, front-stop rule off), `astar`+`builtin` (always pure pursuit) or Nav2 (`NavigateToPose` / `controller_server`). Even with Nav2 it fails a goal if final position error > 0.3 m. Map save/reset are done by the bridge running `scripts/save_map.sh` / `scripts/reset_robot.sh`.
 - Parameters: `config/params.yaml`; launch args (map_name, mode, use_sim_time, allow_unknown, planner, controller, server_url) come from `scripts/start_bridge.sh`.
 
 **Scripts / environment**

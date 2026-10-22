@@ -371,3 +371,13 @@ cd ../ros2_ws && source /opt/ros/humble/setup.bash && colcon build --symlink-ins
 - 예전처럼 쓰려면 `scripts/run.sh ... --controller builtin`
 - DWA 는 앞쪽 ±25° 정지 규칙을 쓰지 않음 (스캔 점 + 추적한 움직이는 장애물로 직접 피함). 기울어짐/TF 끊김 정지는 그대로
 - **실물 미시험**: DWA 시험 기록은 sim 강당뿐. 실물(LDS-02 빔 개수 변동, NaN) + 좁은 미로 맵(`maze_map`)에서 여기로 이동/배송 확인 필요. 이상하면 `--controller builtin`
+
+### DWA 단독 → hybrid (pure pursuit + 장애물 가까울 때만 DWA), 속도 낮춤 (2026-10-22)
+- 실물 `realmap_1` 에서 DWA 단독: 홈(-0.08, -0.04)으로 가다 '진행이 없습니다 → 뒤로 15cm 물러난 뒤 재계획' 반복, 취소. 사용자 판단 '너무 안 됨', 속도도 빠름
+- 새 기본 `controller: hybrid`: 평소 pure pursuit (앞쪽 정지 규칙 그대로). 추적 track(지도 빈 칸의 물체: 상자, 사람)이
+  로봇에서 1.0 m 안 + 앞쪽 경로 1.5 m 에서 0.4 m 안이면, 또는 움직이는 track 이 1.5 m 안이면 DWA 로 전환.
+  2초 동안 그런 track 이 없고 경로에서 0.25 m 안으로 돌아오면 pure pursuit 로 복귀 (경로 진행 index 를 서로 넘겨줌). 파라미터 `hybrid.*`
+- 지도에 있는 벽만 있는 곳은 항상 pure pursuit. track 은 5번 연속 보여야 확정이라 처음 보인 뒤 약 1초 뒤 전환
+- 속도: pure pursuit `max_speed` 0.15 → 0.1 m/s, `max_turn_speed` 1.0 → 0.6 rad/s, DWA `max_w` 1.0 → 0.6 (`max_v` 는 0.1 그대로)
+- 같이 커밋: 정규화된 DWA 비용항(`dwa.py`, `w_path` 0.75 / `w_goal` 0.86), 움직이는 물체 앞 제동 궤적 검사, 옆 차선 비키기
+- 확인: 단위 테스트 49개 통과, 전환 판단을 가짜 track 으로 확인. **실물 주행 미확인**

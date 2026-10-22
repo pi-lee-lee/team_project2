@@ -3,7 +3,7 @@
 #   사용: scripts/start_nav2.sh <map.yaml> [--with-navigation]   기존 맵: map_server + AMCL (+ 주행 노드)
 #         scripts/start_nav2.sh --navigation-only                 SLAM 과 같이: 주행 노드만 (맵/위치는 SLAM 이 냄)
 #
-# 기본(controller=dwa, builtin 도 같음)은 브리지가 직접 주행하므로 위치 추정만 띄운다.
+# 기본(controller=hybrid, builtin/dwa 도 같음)은 브리지가 직접 주행하므로 위치 추정만 띄운다.
 # 주행 노드(planner_server, controller_server, bt_navigator 등)는 브리지를
 # planner:=nav2 또는 controller:=nav2 로 쓸 때 필요하다.
 #   주의: 실물 로봇 환경에서 controller_server 안의 TF 수신이 멈춰 로봇 위치를 잘못 아는 문제가 있었다.

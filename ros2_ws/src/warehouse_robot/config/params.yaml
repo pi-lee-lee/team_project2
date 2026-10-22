@@ -30,9 +30,9 @@ warehouse_bridge:
     pose_rate: 5.0
     max_retries: 2
     arrive_tolerance: 0.3     # Nav2가 성공이라고 해도 목표와 이 거리 이상이면 실패로 처리
-    controller: dwa           # dwa(기본): 브리지의 DWA / builtin: 브리지의 pure pursuit로 직접 주행 / nav2: Nav2 controller_server 사용
-    max_speed: 0.15           # m/s
-    max_turn_speed: 1.0       # rad/s
+    controller: hybrid        # hybrid(기본): 평소 pure pursuit, 경로 앞 장애물이 가까우면 DWA / dwa: 항상 DWA / builtin: 항상 pure pursuit / nav2: Nav2 controller_server
+    max_speed: 0.1            # m/s (pure pursuit). 실물에서 0.15 가 빠르다고 해서 낮춤 (2026-10-22)
+    max_turn_speed: 0.6       # rad/s (pure pursuit 회전, 제자리 회전). 예전 1.0
     footprint_extra: [-0.277, -0.197, -0.04, 0.04]   # 차체에 붙인 물건 사각형 (x_min, x_max, y_min, y_max) x N. 뒤쪽 가운데 8x8cm. 제자리 회전/후진 여유, 웹 로봇 모양
     stop_distance: 0.35       # 앞쪽 ±25° 안에 이 거리 이내 물체가 있으면 정지 후 대기 (m)
     blocked_timeout: 5.0      # 이 시간 넘게 막히면 장애물을 피하는 경로로 재계획, 재시도도 다 쓰면 실패 (s)
@@ -62,9 +62,9 @@ warehouse_bridge:
       max_speed: 1.5
     # controller: dwa 일 때 (tb3_nav local_planner 이식). 실수는 소수점을 붙일 것
     dwa:
-      max_v: 0.15             # 내장 추종기와 같게 (하드웨어 한계 0.26)
+      max_v: 0.1             # 내장 추종기와 같게 (하드웨어 한계 0.26)
       min_v: -0.08            # 느린 후진 (다가오는 장애물에서 물러나기)
-      max_w: 1.0              # 내장 추종기와 같게 (하드웨어 한계 1.82)
+      max_w: 0.6              # 내장 추종기와 같게 (하드웨어 한계 1.82)
       max_acc_v: 0.3          # sim 실측 1.0~1.2 m/s² (tools/step_test.py). 실물 미측정이라 보수적으로
       max_acc_w: 1.5          # sim 실측 7~12 rad/s². 보수적으로
       v_samples: 9
@@ -83,9 +83,17 @@ warehouse_bridge:
       w_path: 0.75
       w_goal: 0.86
       w_obstacle: 1.2
-      w_speed: 0.3
+      w_speed: 0.2
       w_collision: 2.0        # 1.0~6.0 사이에서 결과 차이 없음 (tools/dwa_tune.py), 덜 극단적인 값
     dwa_follow:
       lookahead: 0.5          # 경로 위 이 거리 앞 점을 DWA 목표로
       goal_tolerance: 0.1     # 이 안에 들면 제자리에서 도착 방향 맞춤
       moving_speed: 0.08      # 이보다 빠른 track 만 움직이는 장애물로 예측/웹 표시 (멈춘 물체 속도 노이즈 중앙값 0.06, 느린 사람 0.1)
+    # controller: hybrid 일 때 pure pursuit ↔ DWA 전환 (track = 지도에 없는 물체: 상자, 사람)
+    hybrid:
+      trigger_distance: 1.0   # 이 거리 안 + 앞쪽 경로 가까이에 track 이 있으면 DWA (m)
+      moving_distance: 1.5    # 움직이는 track 은 경로와 상관없이 이 거리 안이면 DWA (m)
+      path_width: 0.4         # track 가장자리가 앞쪽 경로에서 이 거리 안이면 '경로 위' (m)
+      path_ahead: 1.5         # 앞쪽 경로를 이 길이만큼 봄 (m)
+      release_time: 2.0       # 장애물이 이 시간 동안 안 보이면 pure pursuit 로 (s)
+      rejoin_offset: 0.25     # 경로에서 이 거리 안으로 돌아왔을 때만 pure pursuit 로 (m)

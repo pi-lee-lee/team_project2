@@ -5,7 +5,8 @@
 
 이동 방식
   planner=astar : astar_planner 노드로 경로 계획 후
-      controller=dwa     : 이 노드의 DWA 로 추종, 움직이는 장애물의 미래 위치를 피함 (기본)
+      controller=hybrid  : 평소 pure pursuit, 경로 앞에 지도에 없는 장애물(추적 track)이 가까우면 DWA 로 바꿔 피함 (기본)
+      controller=dwa     : 이 노드의 DWA 로 추종, 움직이는 장애물의 미래 위치를 피함
       controller=builtin : 이 노드의 pure pursuit 추종기로 cmd_vel 직접 발행
       controller=nav2    : Nav2 controller_server(FollowPath)로 추종
   planner=nav2  : Nav2 NavigateToPose (Nav2 기본 플래너 사용, 비교/예비용)
@@ -191,9 +192,9 @@ class BridgeNode(Node):
         # FollowPath에 넘길 경로 좌표계. odom이면 controller_server가 map->odom TF 없이 주행한다
         self.declare_parameter('follow_frame', 'odom')
         # 경로 추종기 (controller=builtin)
-        self.declare_parameter('controller', 'dwa')  # dwa | builtin | nav2
-        self.declare_parameter('max_speed', 0.15)          # m/s
-        self.declare_parameter('max_turn_speed', 1.0)      # rad/s
+        self.declare_parameter('controller', 'hybrid')  # hybrid | dwa | builtin | nav2
+        self.declare_parameter('max_speed', 0.1)           # m/s
+        self.declare_parameter('max_turn_speed', 0.6)      # rad/s
         self.declare_parameter('stop_distance', 0.35)      # 앞쪽 이 거리 안에 물체가 있으면 정지 (m)
         self.declare_parameter('blocked_timeout', 10.0)    # 이 시간 넘게 막히면 재계획/실패 (s)
         self.declare_parameter('progress_timeout', 15.0)   # 이 시간 동안 5cm도 못 가면 실패 (s)
@@ -331,6 +332,13 @@ class BridgeNode(Node):
         self.declare_parameter('dwa_follow.lookahead', 0.5)
         self.declare_parameter('dwa_follow.goal_tolerance', 0.1)
         self.declare_parameter('dwa_follow.moving_speed', 0.08)  # 이보다 빠른 track 만 움직이는 장애물로 (멈춘 물체 속도 노이즈 ~0.06, 느린 사람 0.1)
+        # controller=hybrid: 평소 pure pursuit, 장애물이 가까우면 DWA
+        self.declare_parameter('hybrid.trigger_distance', 1.0)  # 로봇에서 이 거리 안 + 앞쪽 경로 가까이에 track 이 있으면 DWA (m)
+        self.declare_parameter('hybrid.moving_distance', 1.5)   # 움직이는 track 은 경로와 상관없이 이 거리 안이면 DWA (m)
+        self.declare_parameter('hybrid.path_width', 0.4)        # track 가장자리가 앞쪽 경로에서 이 거리 안이면 '경로 위' (m)
+        self.declare_parameter('hybrid.path_ahead', 1.5)        # 앞쪽 경로를 이 길이만큼 본다 (m)
+        self.declare_parameter('hybrid.release_time', 2.0)      # 장애물이 이 시간 동안 안 보이면 pure pursuit 로 (s)
+        self.declare_parameter('hybrid.rejoin_offset', 0.25)    # 경로에서 이 거리 안으로 돌아왔을 때만 pure pursuit 로 (m)
         self.odom_vw = (0.0, 0.0)
         self.create_subscription(Odometry, 'odom', self.on_odom, qos_profile_sensor_data)
         # A* 가 기억 중인 장애물 (맵에 없는 LiDAR 장애물, 부딪힌 자리) → 웹 지도 표시
@@ -681,7 +689,7 @@ class BridgeNode(Node):
                 self.report('failed', f'경로를 찾을 수 없습니다{f": {why}" if why and t >= asked - 1.0 else "."}')
             timer = self.create_timer(0.3, report_fail)
             return
-        if self.controller in ('builtin', 'dwa'):
+        if self.controller in ('builtin', 'dwa', 'hybrid'):
             start = self.current_pose()
             if start is None:
                 self.report('failed', '로봇 위치를 알 수 없습니다. 초기 위치를 지정하세요.')
@@ -696,14 +704,17 @@ class BridgeNode(Node):
                 'mark_pos': start[:2],
                 'mark_time': now,
             }
-            if self.controller == 'dwa':
+            # pp / dwa 는 같은 경로 점 목록을 쓰므로 진행 index 를 서로 넘겨줄 수 있다 (hybrid 전환)
+            if self.controller in ('dwa', 'hybrid'):
                 self.follower['dwa'] = DWAFollower(
                     points, self.goal['yaw'], self.dwa_cfg,
                     goal_tolerance=self.get_parameter('dwa_follow.goal_tolerance').value,
                     lookahead=self.get_parameter('dwa_follow.lookahead').value)
-            else:
+            if self.controller in ('builtin', 'hybrid'):
                 self.follower['pp'] = PurePursuit(points, self.goal['yaw'], max_v=self.max_speed,
                                                   max_w=self.max_turn_speed)
+            self.follower['use_dwa'] = self.controller == 'dwa'
+            self.follower['clear_since'] = None
             return
         if not self.follow_client.server_is_ready():
             self.report('failed', 'Nav2 controller_server가 준비되지 않았습니다.')
@@ -1035,7 +1046,9 @@ class BridgeNode(Node):
         x, y, yaw, _ = pose
         if self.tilt_rel < math.radians(2):
             f['level_pose'] = (x, y, yaw)   # 부딪힌 자리는 기울기 시작 전 위치/방향으로 계산 (밀리면서 돌아가므로)
-        if 'dwa' in f:
+        if 'pp' in f and 'dwa' in f:
+            self.hybrid_switch(f, x, y, now)
+        if f['use_dwa']:
             v, w, state = self.dwa_compute(f['dwa'])
         else:
             v, w, state = f['pp'].compute(x, y, yaw)
@@ -1067,7 +1080,7 @@ class BridgeNode(Node):
             f.pop('drive_since', None)
             self.cmd_vel_pub.publish(Twist())
             return
-        if v > 0.0 and 'dwa' not in f:   # DWA 는 장애물(움직이는 것 포함)을 스스로 피하므로 앞쪽 정지 규칙을 쓰지 않음
+        if v > 0.0 and not f['use_dwa']:   # DWA 는 장애물(움직이는 것 포함)을 스스로 피하므로 앞쪽 정지 규칙을 쓰지 않음
             clearance = self.front_clearance()
             if clearance < self.stop_distance and self.tilt_rel > math.radians(3):
                 # 장애물 모서리에 걸쳐 조금 기운 상태: LiDAR 가 아래를 보고 바닥/상자 윗면을 장애물로 본다.
@@ -1109,7 +1122,7 @@ class BridgeNode(Node):
         if math.hypot(x - f['mark_pos'][0], y - f['mark_pos'][1]) > 0.05 or state == 'rotating':
             f['mark_pos'], f['mark_time'] = (x, y), now
         elif now - f['mark_time'] > self.progress_timeout:
-            if 'dwa' in f:
+            if f['use_dwa']:
                 self.start_recovery(f, now, '진행이 없습니다.')
                 return
             self.stop_following()
@@ -1120,6 +1133,59 @@ class BridgeNode(Node):
         cmd.linear.x = v
         cmd.angular.z = w
         self.cmd_vel_pub.publish(cmd)
+
+    # hybrid: 평소 pure pursuit, 장애물이 가까우면 DWA ---------------
+    # DWA 만 쓰면 실물에서 벽 옆/좁은 곳에서 '안전한 궤적 없음', '진행 없음' 이 잦았다 → 지도에 있는 벽은
+    # A* 경로 + pure pursuit 로 충분하므로, 지도에 없는 물체(추적 track: 상자, 사람)가 경로 가까이 올 때만 DWA
+    def hybrid_obstacle(self, f, x, y):
+        """DWA 로 피해야 할 track 이 있으면 설명 글자, 없으면 None. x, y: 로봇 (map)."""
+        if not self.tracks:
+            return None
+        m_o = self.xyyaw(self.global_frame, 'odom')
+        if m_o is None:
+            return None
+        pp = f['pp']
+        idx = f['dwa'].progress if f['use_dwa'] else pp.index
+        pts = np.asarray(pp.points[idx:], dtype=float)
+        if len(pts) > 1:
+            s = np.concatenate([[0.0], np.cumsum(np.hypot(*np.diff(pts, axis=0).T))])
+            pts = pts[s <= self.get_parameter('hybrid.path_ahead').value]
+        trigger = self.get_parameter('hybrid.trigger_distance').value
+        moving_d = self.get_parameter('hybrid.moving_distance').value
+        width = self.get_parameter('hybrid.path_width').value
+        moving_v = self.get_parameter('dwa_follow.moving_speed').value
+        for t in self.tracks:
+            (ox, oy), = transform_points([t.x[:2]], *m_o)
+            d = math.hypot(ox - x, oy - y) - t.radius
+            if math.hypot(t.x[2], t.x[3]) >= moving_v and d < moving_d:
+                return f'움직이는 장애물 {d:.2f} m'
+            if d < trigger and len(pts) and \
+                    float(np.min(np.hypot(pts[:, 0] - ox, pts[:, 1] - oy))) - t.radius < width:
+                return f'경로 위 장애물 {d:.2f} m'
+        return None
+
+    def hybrid_switch(self, f, x, y, now):
+        why = self.hybrid_obstacle(f, x, y)
+        pp, dwa = f['pp'], f['dwa']
+        if not f['use_dwa']:
+            if why and not pp.at_goal:
+                dwa.progress, dwa.turning, dwa.sidestep, dwa.last_cmd = pp.index, False, None, None
+                f['use_dwa'], f['clear_since'] = True, None
+                self.get_logger().info(f'{why} → DWA 로 피함')
+            return
+        if why or dwa.arrived:
+            f['clear_since'] = None
+            return
+        f['clear_since'] = f['clear_since'] or now
+        if now - f['clear_since'] < self.get_parameter('hybrid.release_time').value:
+            return
+        # 경로 가까이 돌아왔을 때만 (멀면 pure pursuit 가 off_path 로 실패하므로 DWA 가 경로로 데려올 때까지)
+        rest = np.asarray(pp.points[dwa.progress:dwa.progress + 60], dtype=float)
+        offset = float(np.min(np.hypot(rest[:, 0] - x, rest[:, 1] - y)))
+        if offset < self.get_parameter('hybrid.rejoin_offset').value:
+            pp.index = dwa.progress
+            f['use_dwa'] = False
+            self.get_logger().info(f'장애물 지나감 (경로에서 {offset:.2f} m) → pure pursuit')
 
     # 움직이는 장애물 추적 + DWA -----------------------------------
     def on_odom(self, msg):
