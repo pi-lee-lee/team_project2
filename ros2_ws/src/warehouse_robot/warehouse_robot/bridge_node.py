@@ -26,6 +26,8 @@ import numpy as np
 import rclpy
 import websocket
 from action_msgs.msg import GoalStatus
+from rcl_interfaces.msg import Parameter as ParamMsg, ParameterType, ParameterValue
+from rcl_interfaces.srv import GetParameters, SetParameters
 from geometry_msgs.msg import PointStamped, PoseArray, PoseStamped, PoseWithCovarianceStamped, Twist
 from nav2_msgs.action import FollowPath, NavigateToPose
 from nav_msgs.msg import OccupancyGrid, Odometry, Path
@@ -279,6 +281,18 @@ class BridgeNode(Node):
         self.cargo_resend = False   # 서버에 다시 연결되면 지금 라벨을 다시 알림
         self.create_subscription(String, 'cargo/detected', self.on_cargo, 10)
         self.create_timer(0.2, self.flush_cargo)
+        # YOLO 부품 검출기 (yolo/yolo_training/infer_ros_switch.py): 웹 버튼으로 enabled(추론+검출 영상 발행)를 켜고 끄고,
+        # 클래스별 개수 글자(/yolo/counts, 약 1초마다)를 웹에 띄운다. 검출기 노드가 없으면 '없음'으로 표시
+        self.declare_parameter('yolo_node', '/component_detector_switch')
+        self.declare_parameter('yolo_counts_topic', '/yolo/counts')
+        yn = self.get_parameter('yolo_node').value.rstrip('/')
+        self.yolo_get = self.create_client(GetParameters, f'{yn}/get_parameters')
+        self.yolo_set = self.create_client(SetParameters, f'{yn}/set_parameters')
+        self.yolo_enabled = None     # None = 모름 (검출기 없음)
+        self.yolo_counts = ('', None)   # (글자, 받은 시각)
+        self.yolo_pending = False
+        self.create_subscription(String, self.get_parameter('yolo_counts_topic').value, self.on_yolo_counts, 10)
+        self.create_timer(1.0, self.poll_yolo)
 
         # 움직이는 장애물 추적 (tb3_nav 의 obstacle_tracker 를 브리지 안으로): 스캔 → odom 점 → 지도 벽 근처 제외
         # → 덩어리 → 칼만필터로 위치/속도. DWA 가 미래 위치를 피하는 데 쓰고, 웹 지도에 표시한다
@@ -395,6 +409,8 @@ class BridgeNode(Node):
                     self.on_teleop(float(msg.get('v', 0.0)), float(msg.get('w', 0.0)))
                 elif kind == 'zones':
                     self.on_zones(msg.get('zones') or [])
+                elif kind == 'yolo_set':
+                    self.set_yolo(msg)
                 elif kind == 'initial_pose':
                     self.publish_initial_pose(float(msg['x']), float(msg['y']), float(msg['yaw']),
                                               bool(msg.get('precise')))
@@ -773,6 +789,70 @@ class BridgeNode(Node):
         label = msg.data.strip()
         if self.cargo_raw is None or self.cargo_raw[0] != label:
             self.cargo_raw = (label, time.monotonic())
+
+    # YOLO 검출기 ------------------------------------------------
+    def on_yolo_counts(self, msg):
+        self.yolo_counts = (msg.data.strip(), time.monotonic())
+        self.send_yolo()
+
+    def poll_yolo(self):
+        """1초마다 검출기의 enabled 를 읽어 (노드가 있는지도 같이) 서버에 알린다."""
+        if not self.yolo_get.service_is_ready():
+            self.yolo_enabled = None
+            self.send_yolo()
+            return
+        if self.yolo_pending:
+            return
+        self.yolo_pending = True
+        fut = self.yolo_get.call_async(GetParameters.Request(names=['enabled']))
+
+        def done(f):
+            self.yolo_pending = False
+            r = f.result()
+            if r is not None and r.values and r.values[0].type == ParameterType.PARAMETER_BOOL:
+                self.yolo_enabled = r.values[0].bool_value
+            self.send_yolo()
+        fut.add_done_callback(done)
+
+    def set_yolo(self, msg):
+        """웹 버튼: {'enabled': bool} 또는 {'capture': True} (검출 장면 한 장 저장)."""
+        if not self.yolo_set.service_is_ready():
+            self.get_logger().warn('YOLO 검출기 노드가 없습니다 (scripts/start_yolo.sh 로 실행)')
+            self.yolo_enabled = None
+            self.send_yolo()
+            return
+        params = []
+        if 'enabled' in msg:
+            params.append(ParamMsg(name='enabled', value=ParameterValue(
+                type=ParameterType.PARAMETER_BOOL, bool_value=bool(msg['enabled']))))
+        if msg.get('capture'):
+            params.append(ParamMsg(name='capture_once', value=ParameterValue(
+                type=ParameterType.PARAMETER_BOOL, bool_value=True)))
+        if not params:
+            return
+        fut = self.yolo_set.call_async(SetParameters.Request(parameters=params))
+
+        def done(f):
+            r = f.result()
+            ok = r is not None and all(x.successful for x in r.results)
+            if ok and 'enabled' in msg:
+                self.yolo_enabled = bool(msg['enabled'])
+                if not self.yolo_enabled:
+                    self.yolo_counts = ('', None)   # 끄면 이전 개수는 지움
+            self.get_logger().info(f'YOLO 설정 {[p.name for p in params]} → {"성공" if ok else "실패"}')
+            self.send_yolo()
+        fut.add_done_callback(done)
+
+    def send_yolo(self):
+        text, at = self.yolo_counts
+        age = None if at is None else round(time.monotonic() - at, 1)
+        state = (self.yolo_enabled, text if age is not None and age < 3.0 else '')
+        if state == getattr(self, 'yolo_sent', None) and age is not None and age < 3.0 and \
+                time.monotonic() - getattr(self, 'yolo_sent_at', 0.0) < 0.5:
+            return
+        self.yolo_sent, self.yolo_sent_at = state, time.monotonic()
+        self.server.send({'type': 'yolo', 'available': self.yolo_enabled is not None, 'enabled': self.yolo_enabled,
+                          'counts': state[1], 'age': age})
 
     def flush_cargo(self):
         if self.cargo_raw is None:

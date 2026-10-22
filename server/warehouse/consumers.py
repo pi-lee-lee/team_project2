@@ -102,6 +102,10 @@ class RobotConsumer(AsyncJsonWebsocketConsumer):
             live['cargo'] = str(msg.get('label') or '')
             await self.broadcast({'type': 'cargo', 'robot': self.robot_name, 'label': live['cargo']})
             await self.run(services.handle_cargo, self.robot_name, live['cargo'])
+        elif kind == 'yolo':
+            # YOLO 부품 검출기 상태 (available, enabled, counts 글자) - 화면 표시용, DB 에 저장하지 않음
+            live['yolo'] = {k: msg.get(k) for k in ('available', 'enabled', 'counts', 'age')}
+            await self.broadcast({'type': 'yolo', 'robot': self.robot_name, **live['yolo']})
         elif kind == 'scan':
             # 실시간 LiDAR (지도 좌표 점, 초당 4번) - 화면 표시용, DB 에 저장하지 않음
             await self.broadcast({'type': 'scan', 'robot': self.robot_name, 'origin': msg.get('origin'),
@@ -133,6 +137,7 @@ class UIConsumer(AsyncJsonWebsocketConsumer):
         snap['pose'] = live.get('pose')
         snap['cargo'] = live.get('cargo')   # None = 인식 노드 없음
         snap['memory'] = live.get('memory')
+        snap['yolo'] = live.get('yolo')     # None = 브리지 없음
         snap['obstacles'] = live.get('obstacles', [])
         snap['path'] = live.get('path', [])
         snap['health'] = live.get('health', {'bridge': False})
@@ -207,6 +212,19 @@ class UIConsumer(AsyncJsonWebsocketConsumer):
             if self.teleop_robot:
                 await self.channel_layer.group_send(robot_group(self.teleop_robot), {'type': 'send.msg', 'msg': {
                     'type': 'teleop', 'v': float(msg.get('v', 0.0)), 'w': float(msg.get('w', 0.0))}})
+            return
+        if action == 'yolo_set':
+            # 웹 YOLO 버튼: 검출기 enabled 켜기/끄기, 장면 캡처. DB 에 쓰지 않고 브리지로 바로 보낸다
+            target = robot or services.DEFAULT_ROBOT
+            if not LIVE.get(target, {}).get('health', {}).get('bridge'):
+                await self.send_json({'type': 'error', 'message': '브리지가 연결되어 있지 않습니다.'})
+                return
+            out = {'type': 'yolo_set'}
+            if 'enabled' in msg:
+                out['enabled'] = bool(msg['enabled'])
+            if msg.get('capture'):
+                out['capture'] = True
+            await self.channel_layer.group_send(robot_group(target), {'type': 'send.msg', 'msg': out})
             return
         if action in ('plan_order', 'travel_model'):
             # 계산 결과는 요청한 화면에만 돌려준다 (DB 를 바꾸지 않음)

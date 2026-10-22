@@ -37,6 +37,7 @@ function connect() {
     clearPose();
     S.health = { bridge: false };
     renderHealth();
+    renderYolo();
     setTimeout(connect, 2000);
   };
   ws.onmessage = (ev) => handle(JSON.parse(ev.data));
@@ -67,6 +68,8 @@ function handle(msg) {
       setMap(msg.map);
       S.cargo = msg.cargo;
       renderCargo();
+      S.yolo = msg.yolo;
+      renderYolo();
       S.memory = msg.memory;
       S.obstacles = msg.obstacles || [];
       S.obstaclesAt = Date.now();
@@ -85,6 +88,10 @@ function handle(msg) {
     case 'cargo':
       S.cargo = msg.label;
       renderCargo();
+      break;
+    case 'yolo':
+      S.yolo = msg;
+      renderYolo();
       break;
     case 'zones':
       S.zones = msg.zones || [];
@@ -136,6 +143,7 @@ function handle(msg) {
     case 'health':
       S.health = msg;
       renderHealth();
+      renderYolo();
       break;
     case 'runner':
       if (msg.state === 'started') {
@@ -868,6 +876,37 @@ function renderCargo() {
     : `카메라 인식: ${S.cargo || '비어 있음'}`;
   el.className = 'cargo-status' + (S.cargo ? ' loaded' : '');
 }
+// YOLO 검출기: 상태 배지, 켜기/끄기 버튼, /yolo/counts 글자 ("DHT11: 0 / led_red: 1 / ...")
+function renderYolo() {
+  const y = S.yolo;
+  const bridge = S.health && S.health.bridge;
+  const badge = $('#yolo-state');
+  let label = '브리지 없음';
+  let cls = 'badge off';
+  if (bridge && y && !y.available) label = '검출기 없음';
+  else if (bridge && y && y.enabled) { label = y.counts ? '검출 중' : '켜짐 · 영상 대기'; cls = 'badge on'; }
+  else if (bridge && y && y.enabled === false) label = '꺼짐';
+  badge.textContent = label;
+  badge.className = cls;
+  const on = !!(bridge && y && y.available);
+  $('#btn-yolo-on').disabled = !on || y.enabled === true;
+  $('#btn-yolo-off').disabled = !on || y.enabled === false;
+  $('#btn-yolo-capture').disabled = !on || !y.enabled;
+  const counts = (y && y.enabled && y.counts) || '';
+  const items = counts.split('/').map((s) => s.trim().split(':')).filter((p) => p.length === 2)
+    .map(([name, n]) => [name.trim(), parseInt(n, 10) || 0]);
+  const found = items.filter(([, n]) => n > 0);
+  const total = found.reduce((a, [, n]) => a + n, 0);
+  $('#yolo-summary').textContent = !on ? (bridge && y ? '검출기 노드 없음 (브리지와 같이 실행됨: logs/bridge.log 확인)' : '')
+    : !y.enabled ? '검출 꺼짐'
+    : !counts ? '카메라 영상을 기다리는 중'
+    : total ? `검출 ${total}개 · ${found.map(([name, n]) => `${name} ${n}`).join(', ')}` : '검출 없음 (0개)';
+  $('#yolo-counts').textContent = counts;
+}
+$('#btn-yolo-on').addEventListener('click', () => send('yolo_set', { enabled: true }));
+$('#btn-yolo-off').addEventListener('click', () => send('yolo_set', { enabled: false }));
+$('#btn-yolo-capture').addEventListener('click', () => { send('yolo_set', { capture: true }); toast('다음 검출 장면을 저장합니다 (~/camera_dataset/captures)'); });
+
 const STEP_LABEL = {
   pending: '대기', moving: '이동 중', arrived: '도착(적재 대기)', done: '완료', failed: '실패', skipped: '건너뜀',
 };

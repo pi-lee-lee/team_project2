@@ -1,0 +1,33 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "YOLO: /yolo/image_raw 발행",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/python_project/yolo_ros.py",
+      "python": "/usr/bin/python3",
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "YOLO_DOMAIN_ID": "44"
+      },
+      "subProcess": false,
+      "justMyCode": true
+    },
+    {
+      "name": "YOLO: 미리보기 창 열기",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/python_project/yolo_preview.py",
+      "python": "/usr/bin/python3",
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "YOLO_DOMAIN_ID": "44"
+      },
+      "subProcess": false,
+      "justMyCode": true
+    }
+  ]
+}

@@ -72,6 +72,17 @@
       <p id="cargo-status" class="cargo-status" title="카메라 물건(LED) 인식 결과 (cargo/detected)"></p>
     </section>
 
+    <section class="card" id="yolo-card">
+      <div class="card-head"><h2>카메라 검출 (YOLO)</h2><span id="yolo-state" class="badge">-</span></div>
+      <div class="btn-row three">
+        <button id="btn-yolo-on" title="검출기 enabled=true: 추론과 검출 영상(/yolo/image_raw), 개수(/yolo/counts) 발행 시작">▶ 검출 켜기</button>
+        <button id="btn-yolo-off" title="검출기 enabled=false: 추론과 발행 중지 (로봇 카메라 발행은 그대로)">■ 검출 끄기</button>
+        <button id="btn-yolo-capture" class="ghost" title="다음 검출 장면을 PNG 한 장으로 저장 (~/camera_dataset/captures)">📷 장면 캡처</button>
+      </div>
+      <p id="yolo-summary" class="yolo-summary"></p>
+      <p id="yolo-counts" class="yolo-counts muted small" title="/yolo/counts 원문 (현재 프레임의 클래스별 개수)"></p>
+    </section>
+
     <section class="card">
       <div class="card-head"><h2>LED 요청</h2><a href="/robot" target="_blank" class="muted small">로봇 화면 ↗</a></div>
       <p class="muted small">필요한 LED 를 고른 뒤 지도에서 받을 자리를 클릭하세요. 로봇이 LED 를 싣고 옵니다. 한 번에 한 건만 받습니다.</p>

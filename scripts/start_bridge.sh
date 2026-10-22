@@ -10,6 +10,7 @@ else
   MAP_NAME="${1:-maze_map}"
   ALLOW_UNKNOWN=false
 fi
+# YOLO 부품 검출기도 같이 실행 (scripts/start_yolo.sh, enabled=false 로 시작). 끄려면 WAREHOUSE_YOLO=0
 # 경로 계획/추종 방식 (run.sh 의 --planner/--controller, 기본: 직접 구현한 A* + 내장 추종기)
 PLANNER="${WAREHOUSE_PLANNER:-astar}"
 CONTROLLER="${WAREHOUSE_CONTROLLER:-builtin}"
@@ -17,4 +18,5 @@ echo "[start_bridge] 모드 $WAREHOUSE_MODE, 맵 이름 $MAP_NAME, planner=$PLAN
 exec ros2 launch warehouse_robot warehouse.launch.py map_name:="$MAP_NAME" \
   mode:="$WAREHOUSE_MODE" use_sim_time:="$WAREHOUSE_SIM_TIME" allow_unknown:="$ALLOW_UNKNOWN" \
   planner:="$PLANNER" controller:="$CONTROLLER" scan_noise:="${WAREHOUSE_SCAN_NOISE:-false}" \
-  server_url:="${2:-ws://localhost:8000/ws/robot/tb3/}"
+  server_url:="${2:-ws://localhost:8000/ws/robot/tb3/}" \
+  yolo:="$( [ "${WAREHOUSE_YOLO:-1}" = 1 ] && echo "$(cd "$(dirname "$0")" && pwd)/start_yolo.sh" )"

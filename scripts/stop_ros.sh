@@ -33,6 +33,7 @@ PATTERNS=(
   '^(/usr/bin/)?python3 /opt/ros/humble/lib/gazebo_ros/'
   '^/opt/ros/humble/lib/robot_state_publisher/robot_state_publisher'
   '^/opt/ros/humble/lib/nav2_map_server/map_saver_cli'
+  '^\S*python\S* -u \S*/yolo/yolo_training/infer_ros'   # scripts/start_yolo.sh (YOLO 검출기)
 )
 if [ "$STOP_SERVER" = 1 ]; then
   PATTERNS+=('^/bin/bash (\S*/)?scripts/start_server\.sh( |$)' '^(\S*/)?\.venv/bin/python manage\.py runserver')

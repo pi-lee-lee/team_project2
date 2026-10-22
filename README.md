@@ -218,6 +218,17 @@ SIGINT → SIGTERM → SIGKILL 순서로 보내고 남은 프로세스가 없는
   - 앞뒤 막힘 확인, 부드러운 가속/감속이 웹 수동 조작과 같이 적용됨. 자동 이동 중에 키보드로 움직이면 자동 이동은 "수동 조작(키보드)으로 중단"
 - 실물 도메인(44)은 같은 공유기의 어느 PC 에서 띄운 노드든 로봇에 닿음 (다른 PC 의 teleop_keyboard 가 /cmd_vel 을 내던 일 있었음)
 
+### 카메라 부품 검출 (YOLO)
+
+- `yolo/` = [team_project2](https://github.com/obloodobladeo-spec/team_project2) 를 합친 것 (YOLO11n 부품 검출기, 가중치, Colab 학습 노트북). 자세한 설명은 `yolo/README.md`
+- 검출기(`/component_detector_switch`)는 **브리지와 같이 자동 실행**됩니다 (`start_bridge.sh` → `scripts/start_yolo.sh`, 출력은 `logs/bridge.log` 의 `[yolo-3]`). 빼려면 `WAREHOUSE_YOLO=0`
+- 입력 영상 `/csi/image_raw`: Pi 에서 `bash yolo/camera.sh /dev/video0` (카메라 장치는 `v4l2-ctl --list-devices` 로 확인)
+- `enabled` (추론 + 검출 영상 `/yolo/image_raw` + 개수 `/yolo/counts` 발행) **기본값 false**. 웹 **"카메라 검출 (YOLO)"** 카드:
+  - **▶ 검출 켜기 / ■ 검출 끄기** = `enabled` true / false (브리지가 검출기 파라미터 서비스로 바꿈)
+  - **📷 장면 캡처** = `capture_once` (다음 검출 장면을 `~/camera_dataset/captures/` 에 PNG 로)
+  - 상태 배지 (검출기 없음 / 꺼짐 / 켜짐 · 영상 대기 / 검출 중), 개수 요약 (예: `검출 4개 · led_red 2, usb 2`), `/yolo/counts` 원문 글자
+- 검출 대상: DHT11, bluetooth, led_green, led_red, led_yellow, usb (rgb 는 제외). 아직 LED 배달(`cargo/detected`)과는 연결하지 않았습니다
+
 ### LED 배달 (서빙 로봇처럼)
 
 1. **받는 사람** (관제 화면, 휴대폰 가능): "LED 요청" 카드에서 LED(A/B/C)를 고르고 → 지도에서 받을 자리를 클릭

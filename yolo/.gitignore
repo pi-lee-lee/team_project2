@@ -1,0 +1,45 @@
+# Python and virtual environments
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+.env.*
+!.env.example
+.pytest_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+
+# ROS / training outputs
+build/
+install/
+log/
+logs/
+runs/
+evaluation/
+.config/
+*.log
+*.cache
+*.bak
+*.tmp
+
+# New captures / extracted datasets
+camera_dataset/
+dataset/
+components_dataset/
+components7_finetune/
+
+# Keep only the selected project weights and training archives
+*.pt
+!yolo_training/best_components7.pt
+!yolo_training/best_components7_finetuned.pt
+*.zip
+!colab/components_dataset.zip
+!colab/components7_finetune_bundle.zip
+
+# Editor / OS files
+.vscode/*
+!.vscode/launch.json
+.idea/
+.DS_Store
+*~

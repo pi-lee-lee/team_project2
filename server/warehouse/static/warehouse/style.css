@@ -415,6 +415,10 @@ button[hidden] { display: none; }
 .cargo-status { margin: 6px 0 0; font-size: 12px; color: var(--muted, #64748b); }
 .cargo-status.loaded { color: #15803d; font-weight: 700; }
 
+/* YOLO 검출 */
+.yolo-summary { margin: 8px 0 2px; font-size: 14px; font-weight: 700; }
+.yolo-counts { margin: 0; word-break: break-word; }
+
 /* 수동 조작 */
 .teleop { display: flex; gap: 14px; align-items: flex-start; flex-wrap: wrap; }
 .teleop-pad { display: grid; grid-template-columns: repeat(3, 52px); grid-template-rows: repeat(3, 52px); gap: 6px; }

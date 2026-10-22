@@ -6,7 +6,8 @@ import os
 
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument
+from launch.actions import DeclareLaunchArgument, ExecuteProcess
+from launch.conditions import LaunchConfigurationNotEquals
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 
@@ -21,6 +22,7 @@ def generate_launch_description():
     allow_unknown = LaunchConfiguration('allow_unknown')
     controller = LaunchConfiguration('controller')
     scan_noise = LaunchConfiguration('scan_noise')
+    yolo = LaunchConfiguration('yolo')
 
     return LaunchDescription([
         DeclareLaunchArgument('use_sim_time', default_value='false'),
@@ -31,6 +33,8 @@ def generate_launch_description():
         DeclareLaunchArgument('mode', default_value='map', description='map (기존 맵 + AMCL) | slam (맵 만들기)'),
         DeclareLaunchArgument('scan_noise', default_value='false',
                               description='시뮬레이션 LiDAR 를 실물 LDS-02 처럼 (빔 개수 변동, 흔들림, 값 빠짐)'),
+        DeclareLaunchArgument('yolo', default_value='',
+                              description='YOLO 검출기 실행 스크립트 (scripts/start_yolo.sh 경로, start_bridge.sh 가 넘김). 비우면 실행 안 함'),
         DeclareLaunchArgument('allow_unknown', default_value='false',
                               description='A*가 미탐색 칸을 지나갈 수 있는지 (SLAM 모드에서 true)'),
         Node(
@@ -43,4 +47,7 @@ def generate_launch_description():
                                  'planner': planner, 'controller': controller,
                                  'map_name': map_name, 'mode': mode,
                                  'sim_scan.enabled': scan_noise}]),
+        # YOLO 부품 검출기: 브리지와 같이 뜬다. enabled(추론+검출 영상) 는 false 로 시작, 웹 "검출 켜기" 버튼이 true 로
+        ExecuteProcess(cmd=[yolo], name='yolo', output='screen',
+                       condition=LaunchConfigurationNotEquals('yolo', '')),
     ])
