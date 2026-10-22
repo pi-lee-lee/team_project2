@@ -365,6 +365,7 @@ class BridgeNode(Node):
         self.box_streak = 0      # 사각형 안에 점이 있던 연속 스캔 수
         self.box_count = 0       # 마지막 스캔에서 사각형 안 점 수
         self.box_near = math.inf # 그중 차체에서 가장 가까운 거리 (m, 로그용)
+        self.last_box_sent = 0.0
         self.odom_vw = (0.0, 0.0)
         self.create_subscription(Odometry, 'odom', self.on_odom, qos_profile_sensor_data)
         # A* 가 기억 중인 장애물 (맵에 없는 LiDAR 장애물, 부딪힌 자리) → 웹 지도 표시
@@ -1268,6 +1269,7 @@ class BridgeNode(Node):
         pose = self.xyyaw('odom', self.base_frame)
         if pose is None or not len(pts):
             self.box_streak, self.box_count, self.box_near = 0, 0, math.inf
+            self.send_box()
             return
         x, y, yaw = pose
         c, s = math.cos(yaw), math.sin(yaw)
@@ -1283,6 +1285,25 @@ class BridgeNode(Node):
             self.box_near = float(np.min(np.hypot(gx, np.maximum(np.abs(ly[inside]) - 0.153, 0.0))))
         else:
             self.box_streak, self.box_near = 0, math.inf
+        self.send_box()
+
+    def send_box(self):
+        """hybrid 전환 사각형(map 좌표 네 꼭짓점) + 안의 점 수 + 전환 여부를 웹에 (0.2초마다). hybrid 일 때만."""
+        now = time.monotonic()
+        if self.controller != 'hybrid' or now - self.last_box_sent < 0.2:
+            return
+        pose = self.xyyaw(self.global_frame, self.base_frame)
+        if pose is None:
+            return
+        self.last_box_sent = now
+        p = lambda n: self.get_parameter(f'hybrid.{n}').value
+        x0, x1, _ = self.dwa_cfg.footprint if self.dwa_cfg.footprint else (-0.197, 0.069, 0.153)
+        bx0, bx1, hw = x0 - p('box_back'), x1 + p('box_front'), p('box_half_width')
+        corners = transform_points([[bx0, -hw], [bx1, -hw], [bx1, hw], [bx0, hw]], *pose)
+        self.server.send({'type': 'hybrid_box', 'corners': [[round(float(a), 3), round(float(b), 3)] for a, b in corners],
+                          'count': self.box_count, 'enabled': bool(p('box_trigger')),
+                          'active': bool(p('box_trigger')) and self.box_streak >= p('box_min_scans'),
+                          'dwa': bool(self.follower and self.follower.get('use_dwa'))})
 
     def hybrid_obstacle(self, f, x, y):
         """DWA 로 피해야 할 장애물이 있으면 설명 글자, 없으면 None. x, y: 로봇 (map)."""

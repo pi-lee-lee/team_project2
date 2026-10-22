@@ -136,6 +136,11 @@ function handle(msg) {
       S.obstaclesAt = Date.now();
       draw();
       break;
+    case 'hybrid_box':
+      S.hbox = msg;
+      S.hboxAt = Date.now();
+      draw();
+      break;
     case 'dwa':
       S.dwa = msg;
       S.dwaAt = Date.now();
@@ -271,6 +276,7 @@ function clearPose() {
   S.path = [];
   S.obstacles = [];
   S.dwa = null;
+  S.hbox = null;
   draw();
   if (had) renderPanel();
 }
@@ -769,6 +775,32 @@ function draw() {
       i ? ctx.lineTo(cx, cy) : ctx.moveTo(cx, cy);
     });
     ctx.stroke();
+  }
+
+  // hybrid 전환 사각형 (로봇 앞 box_front, 뒤 box_back, 좌우 box_half_width): 점선. 안에 지도에 없는 점이 있으면 주황,
+  // 전환 조건(점 수 + 연속 스캔)을 넘으면 빨강 + 반투명 채움. 1.5초 넘게 안 오면 숨김
+  if (S.hbox && S.hbox.corners && S.hbox.corners.length === 4 && Date.now() - (S.hboxAt || 0) < 1500) {
+    const col = !S.hbox.enabled ? '#94a3b8' : S.hbox.active ? '#dc2626' : S.hbox.count > 0 ? '#f59e0b' : '#0ea5e9';
+    ctx.save();
+    ctx.setLineDash([6, 4]);
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = col;
+    ctx.beginPath();
+    S.hbox.corners.forEach(([x, y], i) => {
+      const [cx, cy] = worldToCanvas(x, y);
+      i ? ctx.lineTo(cx, cy) : ctx.moveTo(cx, cy);
+    });
+    ctx.closePath();
+    if (S.hbox.active) { ctx.fillStyle = 'rgba(220, 38, 38, 0.12)'; ctx.fill(); }
+    ctx.stroke();
+    ctx.setLineDash([]);
+    if (S.hbox.count > 0) {
+      const [fx, fy] = worldToCanvas(...S.hbox.corners[2]);
+      ctx.font = '11px system-ui, sans-serif';
+      ctx.fillStyle = col;
+      ctx.fillText(`장애물 점 ${S.hbox.count}${S.hbox.active ? ' → DWA' : ''}`, fx + 4, fy - 4);
+    }
+    ctx.restore();
   }
 
   // DWA/MPPI 가 고른 궤적 (predict_time 동안 굴려 본 best): 보라 굵은 선 + 끝점, 옆에 명령 속도/상태. 1초 넘게 안 오면 숨김
