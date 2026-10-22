@@ -183,7 +183,8 @@ def stop_all():
 
 
 def auto_localize():
-    """맵 전체에서 스캔과 가장 잘 맞는 위치를 찾아 초기 위치로 지정 (AMCL 모드)."""
+    """맵 전체에서 스캔과 가장 잘 맞는 위치를 찾아 초기 위치로 지정 (AMCL 모드).
+    로봇이 제자리에서 돌고, 모호하면 조금 이동하며 스캔을 모은다 (tools/localize.py --global, 1~3분)."""
     cmd = ['bash', '-c', f'source "{SCRIPTS}/env.sh" && python3 -W ignore "{HOME}/tools/localize.py" --global']
 
     def parse(output, ok):
@@ -192,7 +193,7 @@ def auto_localize():
         if not m:
             return _last_lines(output)
         return (m.group(0) + (' / ' + warn[0] if warn else ''))[:300]
-    _start('위치 자동 찾기', cmd, timeout=120, parse=parse)
+    _start('위치 자동 찾기', cmd, timeout=300, parse=parse)
 
 
 def explore(max_minutes=30):

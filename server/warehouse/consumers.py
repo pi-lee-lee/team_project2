@@ -174,6 +174,10 @@ class UIConsumer(AsyncJsonWebsocketConsumer):
             elif action == 'auto_localize':
                 if LIVE.get(services.DEFAULT_ROBOT, {}).get('mode') != 'map':
                     raise runner.RunnerError('위치 자동 찾기는 "저장된 맵으로 위치 추정(AMCL)" 모드에서 쓸 수 있습니다.')
+                # 로봇이 제자리에서 돌고 조금 움직이므로, 작업 중이면 하지 않는다
+                robot = await database_sync_to_async(services.get_robot)()
+                if robot.state not in ('IDLE', 'ERROR'):
+                    raise runner.RunnerError('작업 중에는 위치 자동 찾기를 할 수 없습니다. 작업을 끝내거나 취소하세요.')
                 await database_sync_to_async(runner.auto_localize)()
         except runner.RunnerError as e:
             await self.send_json({'type': 'error', 'message': str(e)})

@@ -325,7 +325,9 @@ $('#btn-explore').addEventListener('click', () => {
 });
 $('#btn-explore-stop').addEventListener('click', () => send('explore_stop'));
 $('#btn-auto-localize').addEventListener('click', () => {
-  if (confirm('맵 전체에서 로봇 위치를 찾아 초기 위치로 지정할까요? (10~30초)')) send('auto_localize');
+  if (confirm('맵 전체에서 로봇 위치를 찾아 초기 위치로 지정할까요? (1~3분)\n'
+              + '로봇이 제자리에서 한 바퀴 돌고, 위치가 애매하면 트인 쪽으로 최대 0.8m 씩 2번까지 움직입니다.\n'
+              + '주변 0.3m 안에 물체가 있으면 돌지 않고, 앞이 0.35m 안으로 막히면 멈춥니다.')) send('auto_localize');
 });
 
 function setWsStatus(on) {
