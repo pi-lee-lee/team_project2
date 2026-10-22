@@ -385,6 +385,7 @@ dpkg -l ros-humble-tf2 ros-humble-tf2-ros | grep ^ii   # 0.25.24 확인
 | `python3 tools/plan_map.py ~/maps/<맵>.yaml [--check X1 Y1 X2 Y2]...` | A* 가 쓰는 계획용 가공(줄무늬 메움 + 다리 점 부풀림)을 미리 보기 → `<맵>_plan_preview.png`. `--check` 로 홈 ↔ LED 위치 같은 두 점 사이 경로가 가공 전/후 있는지 확인 |
 | `python3 tools/scan_check.py [초]` | (실물) 로봇을 세워 두고 LiDAR 거리대별 응답률/흔들림 측정 → `laser_max_range` 를 3.5m 보다 늘려도 되는지 추천 |
 | `python3 tools/explore.py` | (SLAM) 프론티어 자동 탐색. 웹 "자동 탐색" 과 같음. 가던 방향 유지, 가는 도중 목표가 보이면 바로 다음 목표, 막힌 작은 미탐색 구멍(1 m² 미만) 무시. `--turn-weight 0 --no-early-switch --pocket-min 0` 이면 예전 방식 |
+| `python3 tools/latency_test.py` | 명령 → 실제 속도 지연 측정: cmd_vel 계단 명령에 대한 odom/IMU 반응을 순수 지연 L + 1차 지연 τ 로 맞춰 출발/정지, 직진/회전별 중앙값 출력 (MPPI 지연 보상용). **로봇이 움직임** (앞뒤 약 0.26 m 왕복, 좌우 회전), LiDAR 로 앞/뒤 여유 확인. 기록은 `logs/latency_*.csv`, `--analyze <csv>` 로 다시 계산 |
 | `python3 tools/cargo_sim.py <라벨>` | 카메라 없이 LED 인식 결과 흉내 (`''` = 비어 있음) |
 | `python3 tools/collect_travel.py [--count 30]` | 빈 곳으로 무작위 이동을 반복해 이동 시간 학습 기록 모으기 |
 | `python3 tools/ui_goto.py x y [yaw]` / `--home` | 웹과 같은 방식으로 이동(또는 홈 복귀) 명령을 보내고 진행 출력 (시간 초과 시 비상정지) |
