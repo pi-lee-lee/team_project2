@@ -777,11 +777,30 @@ function draw() {
     ctx.stroke();
   }
 
-  // hybrid 전환 사각형 (로봇 앞 box_front, 뒤 box_back, 좌우 box_half_width): 점선. 안에 지도에 없는 점이 있으면 주황,
-  // 전환 조건(점 수 + 연속 스캔)을 넘으면 빨강 + 반투명 채움. 1.5초 넘게 안 오면 숨김
+  // hybrid → DWA 전환 조건 (브리지가 실제로 쓰는 값 그대로). 1.5초 넘게 안 오면 숨김
+  //  ① 움직이는 물체 반경 (moving_distance, 로봇 중심 기준 보라 점선 원): 이 안에 움직이는 track 이 들어오면 전환
+  //  ② 사각형 (box_*): 점선. 안에 지도에 없는 점 → 주황, 전환 조건(점 수 + 연속 스캔) 넘음 → 빨강 + 채움
+  //     실제로 센 점 = 빨간 점, 사각형 밖의 지도에 없는 점(2m 안) = 회색 점. 지도 벽에서 0.15m 안의 점은 벽으로 보고 안 셈
+  //  ③ 글자: 지금 PP/DWA, 전환 이유, DWA → PP 복귀 조건 (장애물 없음 release_time 초 + 경로에서 rejoin_offset 안)
   if (S.hbox && S.hbox.corners && S.hbox.corners.length === 4 && Date.now() - (S.hboxAt || 0) < 1500) {
     const col = !S.hbox.enabled ? '#94a3b8' : S.hbox.active ? '#dc2626' : S.hbox.count > 0 ? '#f59e0b' : '#0ea5e9';
     ctx.save();
+    if (S.pose && S.hbox.moving_distance) {
+      const [rx, ry] = worldToCanvas(S.pose.x, S.pose.y);
+      ctx.setLineDash([3, 5]);
+      ctx.lineWidth = 1;
+      ctx.strokeStyle = '#a855f7';
+      ctx.beginPath();
+      ctx.arc(rx, ry, S.hbox.moving_distance * pxPerM, 0, 2 * Math.PI);
+      ctx.stroke();
+    }
+    for (const [list, c, r] of [[S.hbox.others || [], '#9ca3af', 1.5], [S.hbox.points || [], '#dc2626', 2.5]]) {
+      ctx.fillStyle = c;
+      for (const [x, y] of list) {
+        const [px, py] = worldToCanvas(x, y);
+        ctx.beginPath(); ctx.arc(px, py, r, 0, 2 * Math.PI); ctx.fill();
+      }
+    }
     ctx.setLineDash([6, 4]);
     ctx.lineWidth = 2;
     ctx.strokeStyle = col;
@@ -794,12 +813,20 @@ function draw() {
     if (S.hbox.active) { ctx.fillStyle = 'rgba(220, 38, 38, 0.12)'; ctx.fill(); }
     ctx.stroke();
     ctx.setLineDash([]);
-    if (S.hbox.count > 0) {
-      const [fx, fy] = worldToCanvas(...S.hbox.corners[2]);
-      ctx.font = '11px system-ui, sans-serif';
-      ctx.fillStyle = col;
-      ctx.fillText(`장애물 점 ${S.hbox.count}${S.hbox.active ? ' → DWA' : ''}`, fx + 4, fy - 4);
+    const [fx, fy] = worldToCanvas(...S.hbox.corners[2]);
+    ctx.font = '11px system-ui, sans-serif';
+    ctx.fillStyle = col;
+    const lines = [`사각형 점 ${S.hbox.count}/${S.hbox.min_points}${S.hbox.enabled ? '' : ' (꺼짐)'}`];
+    if (S.hbox.driving) {
+      if (!S.hbox.dwa) lines.push('PP 주행');
+      else if (S.hbox.why) lines.push(`DWA: ${S.hbox.why}`);
+      else {
+        const c = S.hbox.clear_for == null ? 0 : S.hbox.clear_for;
+        const off = S.hbox.offset == null ? '-' : (+S.hbox.offset).toFixed(2);
+        lines.push(`DWA → PP 대기: 장애물 없음 ${c.toFixed(1)}/${S.hbox.release_time}s, 경로 ${off}/${S.hbox.rejoin_offset}m`);
+      }
     }
+    lines.forEach((t, i) => ctx.fillText(t, fx + 4, fy - 4 + i * 13));
     ctx.restore();
   }
 

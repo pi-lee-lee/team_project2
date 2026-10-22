@@ -366,6 +366,9 @@ class BridgeNode(Node):
         self.box_count = 0       # 마지막 스캔에서 사각형 안 점 수
         self.box_near = math.inf # 그중 차체에서 가장 가까운 거리 (m, 로그용)
         self.last_box_sent = 0.0
+        self.box_pts = np.empty((0, 2))      # 사각형 안의 지도에 없는 점 (odom) - 웹 표시
+        self.unmapped_near = np.empty((0, 2))  # 사각형 밖, 로봇 2m 안의 지도에 없는 점 (odom) - 웹 표시
+        self.hybrid_info = {}                # 지금 전환 상태 (hybrid_switch 가 채움) - 웹 표시
         self.odom_vw = (0.0, 0.0)
         self.create_subscription(Odometry, 'odom', self.on_odom, qos_profile_sensor_data)
         # A* 가 기억 중인 장애물 (맵에 없는 LiDAR 장애물, 부딪힌 자리) → 웹 지도 표시
@@ -1269,6 +1272,7 @@ class BridgeNode(Node):
         pose = self.xyyaw('odom', self.base_frame)
         if pose is None or not len(pts):
             self.box_streak, self.box_count, self.box_near = 0, 0, math.inf
+            self.box_pts = self.unmapped_near = np.empty((0, 2))
             self.send_box()
             return
         x, y, yaw = pose
@@ -1279,6 +1283,8 @@ class BridgeNode(Node):
         p = lambda n: self.get_parameter(f'hybrid.{n}').value
         inside = (lx >= x0 - p('box_back')) & (lx <= x1 + p('box_front')) & (np.abs(ly) <= p('box_half_width'))
         self.box_count = int(np.count_nonzero(inside))
+        self.box_pts = pts[inside]
+        self.unmapped_near = pts[~inside & (np.hypot(lx, ly) < 2.0)]
         if self.box_count >= p('box_min_points'):
             self.box_streak += 1
             gx = np.maximum(np.maximum(x0 - lx[inside], lx[inside] - x1), 0.0)
@@ -1288,22 +1294,32 @@ class BridgeNode(Node):
         self.send_box()
 
     def send_box(self):
-        """hybrid 전환 사각형(map 좌표 네 꼭짓점) + 안의 점 수 + 전환 여부를 웹에 (0.2초마다). hybrid 일 때만."""
+        """hybrid 전환 조건을 웹에 (0.2초마다, hybrid 일 때만, map 좌표):
+        사각형 네 꼭짓점 + 안의 점(실제로 센 점) / 밖의 지도에 없는 점, 움직이는 물체 전환 반경, 지금 상태(이유, 복귀 대기)."""
         now = time.monotonic()
         if self.controller != 'hybrid' or now - self.last_box_sent < 0.2:
             return
         pose = self.xyyaw(self.global_frame, self.base_frame)
-        if pose is None:
+        m_o = self.xyyaw(self.global_frame, 'odom')
+        if pose is None or m_o is None:
             return
         self.last_box_sent = now
         p = lambda n: self.get_parameter(f'hybrid.{n}').value
         x0, x1, _ = self.dwa_cfg.footprint if self.dwa_cfg.footprint else (-0.197, 0.069, 0.153)
         bx0, bx1, hw = x0 - p('box_back'), x1 + p('box_front'), p('box_half_width')
+        r3 = lambda a: [[round(float(u), 3), round(float(v), 3)] for u, v in a]
         corners = transform_points([[bx0, -hw], [bx1, -hw], [bx1, hw], [bx0, hw]], *pose)
-        self.server.send({'type': 'hybrid_box', 'corners': [[round(float(a), 3), round(float(b), 3)] for a, b in corners],
-                          'count': self.box_count, 'enabled': bool(p('box_trigger')),
-                          'active': bool(p('box_trigger')) and self.box_streak >= p('box_min_scans'),
-                          'dwa': bool(self.follower and self.follower.get('use_dwa'))})
+        info = self.hybrid_info if self.follower and 'pp' in self.follower and 'dwa' in self.follower else {}
+        self.server.send({
+            'type': 'hybrid_box', 'corners': r3(corners),
+            'points': r3(transform_points(self.box_pts[:80], *m_o)) if len(self.box_pts) else [],
+            'others': r3(transform_points(self.unmapped_near[:150], *m_o)) if len(self.unmapped_near) else [],
+            'count': self.box_count, 'min_points': p('box_min_points'), 'enabled': bool(p('box_trigger')),
+            'active': bool(p('box_trigger')) and self.box_streak >= p('box_min_scans'),
+            'moving_distance': p('moving_distance'),
+            'driving': bool(info), 'dwa': bool(info.get('use_dwa')), 'why': info.get('why'),
+            'clear_for': info.get('clear_for'), 'release_time': p('release_time'),
+            'offset': info.get('offset'), 'rejoin_offset': p('rejoin_offset')})
 
     def hybrid_obstacle(self, f, x, y):
         """DWA 로 피해야 할 장애물이 있으면 설명 글자, 없으면 None. x, y: 로봇 (map)."""
@@ -1338,25 +1354,30 @@ class BridgeNode(Node):
     def hybrid_switch(self, f, x, y, now):
         why = self.hybrid_obstacle(f, x, y)
         pp, dwa = f['pp'], f['dwa']
+        self.hybrid_info = {'use_dwa': f['use_dwa'], 'why': why}   # 웹 표시용 (send_box)
         if not f['use_dwa']:
             if why and not pp.at_goal:
                 dwa.progress, dwa.turning, dwa.sidestep, dwa.last_cmd = pp.index, False, None, None
                 f['use_dwa'], f['clear_since'] = True, None
+                self.hybrid_info['use_dwa'] = True
                 self.get_logger().info(f'{why} → DWA 로 피함')
-            return
-        if why or dwa.arrived:
-            f['clear_since'] = None
-            return
-        f['clear_since'] = f['clear_since'] or now
-        if now - f['clear_since'] < self.get_parameter('hybrid.release_time').value:
             return
         # 경로 가까이 돌아왔을 때만 (멀면 pure pursuit 가 off_path 로 실패하므로 DWA 가 경로로 데려올 때까지)
         rest = np.asarray(pp.points[dwa.progress:dwa.progress + 60], dtype=float)
         offset = float(np.min(np.hypot(rest[:, 0] - x, rest[:, 1] - y)))
+        self.hybrid_info['offset'] = round(offset, 3)
+        if why or dwa.arrived:
+            f['clear_since'] = None
+            return
+        f['clear_since'] = f['clear_since'] or now
+        self.hybrid_info['clear_for'] = round(now - f['clear_since'], 1)
+        if now - f['clear_since'] < self.get_parameter('hybrid.release_time').value:
+            return
         if offset < self.get_parameter('hybrid.rejoin_offset').value:
             pp.index = dwa.progress
             pp.set_speed(*self.odom_vw)   # DWA 로 달리던 속도에서 이어서 (0 으로 뚝 떨어지지 않게)
             f['use_dwa'] = False
+            self.hybrid_info = {'use_dwa': False, 'why': None}
             self.get_logger().info(f'장애물 지나감 (경로에서 {offset:.2f} m) → pure pursuit')
 
     # 움직이는 장애물 추적 + DWA -----------------------------------

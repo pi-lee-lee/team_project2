@@ -435,4 +435,7 @@ cd ../ros2_ws && source /opt/ros/humble/setup.bash && colcon build --symlink-ins
 - 웹 표시 (같은 날): 브리지가 `hybrid_box`(사각형 map 꼭짓점, 안의 점 수, 전환 여부)를 0.2초마다 보내고 서버는 저장 없이 중계,
   웹은 로봇 둘레 점선 사각형 — 하늘색: 비어 있음 / 주황: 지도에 없는 점 있음 / 빨강 + 채움: 전환 조건 넘음('장애물 점 N → DWA'). 위치(AMCL)가 잡혀야 보임
 - 사용자 params.yaml 변경 같이 반영: `dwa.max_acc_w` 1.5 → 4.0, `hybrid.box_front` 1.0 → 0.5 (sim 비교는 1.0 기준이었음)
+- 웹 표시 확장: `hybrid_box` 에 실제로 센 점(사각형 안 지도에 없는 점, 빨간 점) / 사각형 밖 2m 안의 지도에 없는 점(회색 점),
+  움직이는 물체 전환 반경(moving_distance 1.5m, 보라 점선 원), 지금 상태 글자('PP 주행' / 'DWA: 앞쪽 장애물 0.42 m (점 5개)' /
+  'DWA → PP 대기: 장애물 없음 1.2/2.0s, 경로 0.31/0.25m') 추가. 지도 벽에서 0.15m 안의 점은 벽으로 보고 세지 않음(static_match_dist)
 
