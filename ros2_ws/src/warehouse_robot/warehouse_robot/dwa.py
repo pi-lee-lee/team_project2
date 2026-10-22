@@ -5,7 +5,16 @@
 2) 그 안에서 (v, w) 를 격자로 샘플링 -> 각각 predict_time 동안 굴려본 궤적(rollout)
 3) 정적 점(현재 위치) / 동적 장애물(속도로 미래 위치 예측)과의 여유거리 계산
    -> 첫 충돌 지점 전에 멈출 수 없는 궤적 제거 (admissible velocity: v^2/2a <= 충돌까지 거리)
-4) 비용 = 방향 + 경로이탈 + 목표거리 + 장애물근접 + 느림  -> 최소 비용 (v, w) 선택
+   -> 움직이는 물체가 있으면 추가로: 이번 주기만 그 (v, w) 로 가고 최대 감속으로 서는 궤적을 물체 예측 위치와
+      직접 비교 (v^2/2a 는 '멈추면 안전' 을 가정하지만 움직이는 물체는 로봇이 멈춰도 다가온다)
+   -> 여유(움직이는 물체엔 dynamic_margin 포함)를 끝까지 지키는 궤적이 있으면 그중에서만 고른다 (비용이 아니라 제약)
+4) 비용 = 방향 + 경로이탈 + 목표거리 + 진행도 + 장애물근접 + 느림 + 여유침범 -> 최소 비용 (v, w) 선택
+   거리 항은 무차원으로 맞춘다 (가중치끼리 비교할 수 있게):
+     path     = 경로이탈 / path_scale                       (path_scale 만큼 벗어나면 1)
+     goal     = 목표거리 / 한 번 굴려 갈 수 있는 거리(max_v * predict_time)
+     progress = 1 - 경로를 따라 전진한 길이 / (max_v * predict_time)   (최대 속도로 따라가면 0, 멈추면 1, 후진 최대 2)
+   경로이탈/목표거리만으로는 '경로 옆에 가만히 있기' 와 '경로를 따라 가기' 의 차이가 작다.
+   안전은 비용이 아니라 3) 의 제약으로 지킨다. 선택한 궤적의 항별 기여도는 last_terms (튜닝/로그용).
 """
 import math
 from dataclasses import dataclass
@@ -65,17 +74,25 @@ class DWAConfig:
     dynamic_margin: float = 0.15      # 움직이는 장애물에는 여유를 더 둔다 (방향을 바꿀 수 있으므로)
     dynamic_growth: float = 0.05      # 예측 불확실성: 예측 시간 1초당 반경 증가 [m/s]
     obstacle_influence: float = 0.5   # 이 거리 안쪽부터 장애물 비용이 붙음
+    path_scale: float = 0.5           # 경로이탈 정규화 기준 [m] (비키는 차선 0.6m 와 비슷한 크기)
     w_heading: float = 0.4
-    w_path: float = 1.0
-    w_goal: float = 1.0
+    # w_path / w_goal 은 정규화된 항의 계수. 예전(미터 단위) params.yaml 값 1.5 / 2.3 과 같은 효과
+    # (params.yaml 의 max_v 0.15, predict_time 2.5 기준): 1.5 * path_scale 0.5 = 0.75, 2.3 * 0.15 * 2.5 = 0.86
+    # params.yaml 에 예전 값(1.5 / 2.3)이 남아 있으면 경로/목표 쪽 힘이 2~2.7배가 된다
+    w_path: float = 0.75
+    w_goal: float = 0.86
+    # 경로를 따라 전진한 정도. dwa_tune 시나리오 + 검증 시나리오에서 0~1.0 은 시간 차이가 없고 최소 여유만 줄어서
+    # (0.098 -> 0.076) 기본은 끔. 실물에서 '경로 옆에 서 있기' 가 보이면 0.3 정도부터
+    w_progress: float = 0.0
     w_obstacle: float = 0.6
     w_speed: float = 0.3
-    w_collision: float = 5.0          # 나중에 부딪힐 궤적의 벌점 (빨리 부딪힐수록 큼)
+    w_collision: float = 2.0          # 나중에 부딪힐 궤적의 벌점 (빨리 부딪힐수록 큼)
 
 
 class DWAController:
     def __init__(self, cfg=None):
         self.cfg = cfg or DWAConfig()
+        self.last_terms = {}   # 직전에 고른 궤적의 비용항별 기여도 (가중치 곱한 값). 튜닝/로그용
 
     def _sample(self, v0, w0):
         c = self.cfg
@@ -105,6 +122,19 @@ class DWAController:
             y = y + vs * np.sin(yaw) * c.sim_dt
             traj[:, k, 0], traj[:, k, 1], traj[:, k, 2] = x, y, yaw
         return traj
+
+    def _braking_rollout(self, state, vs, ws):
+        """(v, w) 를 한 제어 주기 낸 뒤 최대 감속으로 멈추는 궤적 (K, T, 3). 멈춘 뒤엔 그 자리."""
+        c = self.cfg
+        steps = int(round(c.predict_time / c.sim_dt))
+        t = (np.arange(steps) + 1) * c.sim_dt
+        brake = np.clip(t - c.control_period, 0.0, None)                       # 감속 시작 후 시간
+        sv = np.clip(np.abs(vs)[:, None] - c.max_acc_v * brake[None], 0.0, None) * np.sign(vs)[:, None]
+        sw = np.clip(np.abs(ws)[:, None] - c.max_acc_w * brake[None], 0.0, None) * np.sign(ws)[:, None]
+        yaw = state.yaw + np.cumsum(sw * c.sim_dt, axis=1)
+        x = state.x + np.cumsum(sv * np.cos(yaw) * c.sim_dt, axis=1)
+        y = state.y + np.cumsum(sv * np.sin(yaw) * c.sim_dt, axis=1)
+        return np.stack([x, y, yaw], axis=2)
 
     def _static_clearance(self, traj, static_points):
         """정적 점까지 여유거리 (K, T). hard/soft 가 같으므로 한 번만 계산한다 (이식하면서 추가:
@@ -232,6 +262,18 @@ class DWAController:
         first_hit = np.where(hit.any(axis=1), hit.argmax(axis=1), clear_t.shape[1])
         dist_to_hit = np.abs(vs) * first_hit * c.sim_dt
         can_stop = vs ** 2 / (2.0 * c.max_acc_v) <= dist_to_hit
+        if len(dynamic_obstacles):
+            # v^2/2a 검사는 '멈추면 안전' 이라고 보지만 움직이는 물체는 로봇이 멈춰도 계속 다가온다.
+            # → 이번 주기만 그 (v, w) 로 가고 최대 감속으로 서는 궤적을 물체 예측 위치와 직접 비교해서 추가로 거른다.
+            #   지금 바로 감속해도(달리던 로봇은 그 자리에 못 선다) 가까워지는 상황이면, 그보다 나빠지지 않을 때만.
+            # (이게 없으면 진행 쪽 계수를 키웠을 때 막 움직이기 시작한 물체 앞으로 끼어들어 겹쳤다: dwa_tune cross_3.5s)
+            risky = np.flatnonzero(can_stop & (clear < c.safety_margin) & (vs != 0.0))
+            if len(risky):
+                bt = self._braking_rollout(state, vs[risky], ws[risky])
+                b_dyn = self._clearance(bt, np.full(bt.shape[:2], np.inf), dynamic_obstacles, soft=False).min(axis=1)
+                ref = self._braking_rollout(state, np.array([state.v]), np.array([state.w]))
+                ref_dyn = self._clearance(ref, np.full(ref.shape[:2], np.inf), dynamic_obstacles, soft=False).min()
+                can_stop[risky] = b_dyn >= min(c.safety_margin, ref_dyn - 0.005)
         now_clear = clear_t[:, 0] >= 0.0
         valid = (clear >= c.safety_margin) | (can_stop & now_clear & (vs != 0.0)) \
             | ((vs == 0.0) & now_clear)
@@ -256,12 +298,21 @@ class DWAController:
         bearing = np.arctan2(to_goal[:, 1], to_goal[:, 0])
         heading_err = np.abs(np.arctan2(np.sin(bearing - end[:, 2]),
                                         np.cos(bearing - end[:, 2]))) / np.pi
-        goal_dist = np.linalg.norm(to_goal, axis=1)
+        reach = max(c.max_v * c.predict_time, 1e-6)     # 한 번 굴려 갈 수 있는 최대 거리
+        goal_dist = np.linalg.norm(to_goal, axis=1) / reach
         if len(local_path):
-            path_dist = np.linalg.norm(
-                end[:, None, :2] - local_path[None, :, :], axis=2).min(axis=1)
+            d = np.linalg.norm(end[:, None, :2] - local_path[None, :, :], axis=2)   # (K, P)
+            path_dist = d.min(axis=1) / c.path_scale
         else:
             path_dist = np.zeros(len(vs))
+        if len(local_path) >= 2:
+            # 끝점과 로봇을 경로의 가장 가까운 점에 투영해서 호 길이 차이 = 경로를 따라 전진한 길이
+            arc = np.concatenate([[0.0], np.cumsum(np.hypot(*np.diff(local_path, axis=0).T))])
+            i_robot = np.argmin(np.hypot(local_path[:, 0] - state.x, local_path[:, 1] - state.y))
+            advance = arc[d.argmin(axis=1)] - arc[i_robot]
+        else:   # 경로가 없으면 목표까지 거리가 줄어든 만큼
+            advance = np.hypot(goal[0] - state.x, goal[1] - state.y) - goal_dist * reach
+        progress = 1.0 - np.clip(advance / reach, -1.0, 1.0)
         soft_clear = soft_t.min(axis=1)
         obstacle = np.clip((c.obstacle_influence - soft_clear) / c.obstacle_influence, 0.0, 1.0)
         slowness = (c.max_v - vs) / max(c.max_v, 1e-6)   # 후진은 1 보다 커져서 자연히 덜 선택됨
@@ -273,14 +324,29 @@ class DWAController:
         depth = np.clip(c.safety_margin - soft_clear, 0.0, None) / c.robot_radius
         collision = np.where(first_soft < T, 1.0 - first_soft / T, 0.0) + depth
 
-        cost = (c.w_heading * heading_err + c.w_path * path_dist + c.w_goal * goal_dist
-                + c.w_obstacle * obstacle + c.w_speed * slowness + c.w_collision * collision)
+        terms = {
+            'heading': c.w_heading * heading_err,
+            'path': c.w_path * path_dist,
+            'goal': c.w_goal * goal_dist,
+            'progress': c.w_progress * progress,
+            'obstacle': c.w_obstacle * obstacle,
+            'speed': c.w_speed * slowness,
+            'collision': c.w_collision * collision,
+        }
+        cost = sum(terms.values())
         cost[~valid] = np.inf
+        # 여유(soft: 움직이는 물체엔 dynamic_margin 포함)를 끝까지 지키는 궤적이 있으면 그중에서만 고른다.
+        # 비용(w_collision)으로만 막으면 경로/목표 계수를 키웠을 때 천천히 가로지르는 물체 앞으로 끼어들어,
+        # 뒤따라온 물체와 6mm 까지 가까워졌다 (원래 계수는 기다렸음). 없을 때만 비용으로 '덜 위험한' 쪽을 고름
+        safe = valid & (collision <= 0.0)
+        if np.any(safe):
+            cost[~safe] = np.inf
         if c.reverse_only_when_needed:
             fwd = np.where(valid & (vs >= 0.0) & (collision <= 0.0), cost, np.inf)
             if np.isfinite(fwd).any():
                 cost = fwd
         best = int(np.argmin(cost))
+        self.last_terms = {k: float(v[best]) for k, v in terms.items()}
         return ControlResult(float(vs[best]), float(ws[best]), True, traj[best])
 
 
@@ -361,10 +427,21 @@ class DWAFollower:
         return speed if gap_f >= gap_b else -speed
 
     def sidestep_target(self, x, y, moving, pts, path_dir, look=1.5, offset=0.6):
-        """정면으로 마주 오는 움직이는 물체가 있으면 옆으로 offset 만큼 비켜선 지점, 없으면 None.
+        """정면으로 마주 오는 움직이는 물체가 있으면 경로를 옆으로 옮길 벡터 (odom, 2), 없으면 None.
         DWA 는 몇 초 앞만 보므로 '옆으로 크게 비키기' 를 스스로 못 찾는다 (마주 오는 물체 앞에서 뒤로만 물러나다 부딪힘).
         경로를 가로지르는 물체는 제외한다 (그 진행 방향의 옆으로 비키면 물체가 지나가는 줄을 건너게 되어 sim 에서 부딪혔음)
-        → 물체가 경로 방향과 거의 반대로(120° 넘게) 움직일 때만."""
+        → 물체가 경로 방향과 거의 반대로(120° 넘게) 움직일 때만.
+        옆 지점 하나로 비키면 그 자리에 서서 물체가 다 지나갈 때까지 기다렸다 (dwa_tune headon 30초, 그중 ~10초 정지)
+        → 경로 전체를 옆으로 옮긴 '옆 차선' 을 따라 계속 가고, 물체가 로봇 뒤로 지나가면 원래 경로로 돌아온다."""
+        n_path = np.array([-path_dir[1], path_dir[0]])
+        if self.sidestep is not None:
+            # 이미 비키는 중: 물체가 로봇 옆을 다 지나갈 때까지 (경로 방향으로 뒤쪽) 옆 차선 유지
+            ahead = [(ox - x) * path_dir[0] + (oy - y) * path_dir[1] > -(r + 0.3)
+                     for ox, oy, vx, vy, r in moving
+                     if np.hypot(ox - x, oy - y) < look + offset and (vx * path_dir[0] + vy * path_dir[1]) < 0.0]
+            if any(ahead):
+                return self.sidestep
+            self.sidestep = None
         threat = None
         for ox, oy, vx, vy, r in moving:
             rel = np.array([ox - x, oy - y])
@@ -377,19 +454,17 @@ class DWAFollower:
             lateral = abs(rel[0] * u[1] - rel[1] * u[0])   # 물체 진행선과 로봇 사이 거리
             head_on = u @ path_dir < -0.5
             if head_on and closing > 0.0 and lateral < 0.153 + r + 0.15:
-                threat = (u, r)
+                threat = (rel, r)
                 break
         if threat is None:
-            self.sidestep = None
             return None
-        if self.sidestep is None:
-            u, _ = threat
-            n = np.array([-u[1], u[0]])
-            cands = [np.array([x, y]) + s * offset * n for s in (1.0, -1.0)]
-            # 정적 장애물(벽)에서 더 먼 쪽으로
-            def room(p):
-                return np.min(np.hypot(pts[:, 0] - p[0], pts[:, 1] - p[1])) if len(pts) else np.inf
-            self.sidestep = max(cands, key=room)
+        rel, _ = threat
+        # 물체가 경로 중심선의 어느 쪽에 있는지 보고 반대쪽 우선, 같으면 벽에서 먼 쪽
+        def room(p):
+            return np.min(np.hypot(pts[:, 0] - p[0], pts[:, 1] - p[1])) if len(pts) else np.inf
+        cands = [s * offset * n_path for s in (1.0, -1.0)]
+        here = np.array([x, y])
+        self.sidestep = max(cands, key=lambda sh: (min(room(here + sh), 1.0), -np.sign(rel @ n_path) * np.sign(sh @ n_path)))
         return self.sidestep
 
     def compute(self, pose, v0, w0, map_to_odom, static_points, dynamic_obstacles, moving_speed=0.05):
@@ -424,7 +499,7 @@ class DWAFollower:
         path_dir = ahead / np.hypot(*ahead) if np.hypot(*ahead) > 1e-6 else np.array([np.cos(yaw), np.sin(yaw)])
         side = self.sidestep_target(x, y, moving, pts, path_dir) if self.sidestep_enabled else None
         if side is not None:
-            local_path, local_goal = np.array([side]), side
+            local_path, local_goal = local_path + side, local_goal + side
         else:
             err = math.atan2(local_goal[1] - y, local_goal[0] - x) - yaw
             err = math.atan2(math.sin(err), math.cos(err))

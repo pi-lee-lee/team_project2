@@ -80,8 +80,8 @@ warehouse_bridge:
       dynamic_growth: 0.03    # 예측 1초당 반경 증가
       obstacle_influence: 0.5
       w_heading: 0.3
-      w_path: 1.5
-      w_goal: 2.3
+      w_path: 0.75
+      w_goal: 0.86
       w_obstacle: 1.2
       w_speed: 0.3
       w_collision: 2.0        # 1.0~6.0 사이에서 결과 차이 없음 (tools/dwa_tune.py), 덜 극단적인 값
