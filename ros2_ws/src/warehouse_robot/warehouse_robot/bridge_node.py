@@ -5,7 +5,8 @@
 
 이동 방식
   planner=astar : astar_planner 노드로 경로 계획 후
-      controller=hybrid  : 평소 pure pursuit, 경로 앞에 지도에 없는 장애물(추적 track)이 가까우면 DWA 로 바꿔 피함 (기본)
+      controller=mppi    : 이 노드의 MPPI 로 추종 (기본). DWA 와 입력/안전 검사가 같고 궤적만 시점마다 다른 (v, w) 순서
+      controller=hybrid  : 평소 pure pursuit, 경로 앞에 지도에 없는 장애물(추적 track)이 가까우면 DWA 로 바꿔 피함
       controller=dwa     : 이 노드의 DWA 로 추종, 움직이는 장애물의 미래 위치를 피함
       controller=builtin : 이 노드의 pure pursuit 추종기로 cmd_vel 직접 발행
       controller=nav2    : Nav2 controller_server(FollowPath)로 추종
@@ -49,6 +50,7 @@ from .cmd_mux import CmdMux
 from .astar_planner_node import quaternion_from_yaw, yaw_from_quaternion
 from .dwa import DWAConfig, DWAFollower, transform_points
 from .follower import PurePursuit
+from .mppi import MPPIConfig, MPPIFollower
 from .scan_noise import ScanNoiseConfig, degrade
 from .tracker import MultiObjectTracker, detect_clusters
 
@@ -193,7 +195,7 @@ class BridgeNode(Node):
         # FollowPath에 넘길 경로 좌표계. odom이면 controller_server가 map->odom TF 없이 주행한다
         self.declare_parameter('follow_frame', 'odom')
         # 경로 추종기 (controller=builtin)
-        self.declare_parameter('controller', 'hybrid')  # hybrid | dwa | builtin | nav2
+        self.declare_parameter('controller', 'mppi')  # mppi | hybrid | dwa | builtin | nav2
         self.declare_parameter('max_speed', 0.1)           # m/s
         self.declare_parameter('max_turn_speed', 0.6)      # rad/s
         self.declare_parameter('max_accel', 0.3)           # m/s², pure pursuit 출발 가속/정지 감속
@@ -335,6 +337,9 @@ class BridgeNode(Node):
         # DWA 충돌 검사(dwa.footprint 직사각형)에는 아직 안 들어감
         ex = [float(v) for v in self.declare_parameter('footprint_extra', [-0.277, -0.197, -0.04, 0.04]).value]
         self.footprint_extra = [tuple(ex[i:i + 4]) for i in range(0, len(ex) - 3, 4)]
+        # MPPI (controller=mppi). 속도/가속/외곽/여유/predict_time 은 위 dwa.* 를 같이 쓰고, 샘플링/비용 계수만 mppi.*
+        self.mppi_cfg = MPPIConfig(**{k: type(v)(self.declare_parameter(f'mppi.{k}', v).value)
+                                      for k, v in vars(MPPIConfig()).items() if k != 'seed'})
         self.declare_parameter('dwa_follow.lookahead', 0.5)
         self.declare_parameter('dwa_follow.goal_tolerance', 0.1)
         self.declare_parameter('dwa_follow.moving_speed', 0.08)  # 이보다 빠른 track 만 움직이는 장애물로 (멈춘 물체 속도 노이즈 ~0.06, 느린 사람 0.1)
@@ -704,7 +709,7 @@ class BridgeNode(Node):
                 self.report('failed', f'경로를 찾을 수 없습니다{f": {why}" if why and t >= asked - 1.0 else "."}')
             timer = self.create_timer(0.3, report_fail)
             return
-        if self.controller in ('builtin', 'dwa', 'hybrid'):
+        if self.controller in ('builtin', 'dwa', 'hybrid', 'mppi'):
             start = self.current_pose()
             if start is None:
                 self.report('failed', '로봇 위치를 알 수 없습니다. 초기 위치를 지정하세요.')
@@ -720,16 +725,18 @@ class BridgeNode(Node):
                 'mark_time': now,
             }
             # pp / dwa 는 같은 경로 점 목록을 쓰므로 진행 index 를 서로 넘겨줄 수 있다 (hybrid 전환)
+            follow_kw = dict(goal_tolerance=self.get_parameter('dwa_follow.goal_tolerance').value,
+                             lookahead=self.get_parameter('dwa_follow.lookahead').value)
             if self.controller in ('dwa', 'hybrid'):
-                self.follower['dwa'] = DWAFollower(
-                    points, self.goal['yaw'], self.dwa_cfg,
-                    goal_tolerance=self.get_parameter('dwa_follow.goal_tolerance').value,
-                    lookahead=self.get_parameter('dwa_follow.lookahead').value)
+                self.follower['dwa'] = DWAFollower(points, self.goal['yaw'], self.dwa_cfg, **follow_kw)
+            elif self.controller == 'mppi':
+                # 지역 계획기 자리('dwa' 키)를 같이 쓴다: 막힘/회복/웹 궤적 표시가 DWA 와 같은 경로로 처리됨
+                self.follower['dwa'] = MPPIFollower(points, self.goal['yaw'], self.dwa_cfg, self.mppi_cfg, **follow_kw)
             if self.controller in ('builtin', 'hybrid'):
                 self.follower['pp'] = PurePursuit(points, self.goal['yaw'], max_v=self.max_speed,
                                                   max_w=self.max_turn_speed, max_acc=self.max_accel,
                                                   max_acc_w=self.max_turn_accel)
-            self.follower['use_dwa'] = self.controller == 'dwa'
+            self.follower['use_dwa'] = self.controller in ('dwa', 'mppi')
             self.follower['clear_since'] = None
             return
         if not self.follow_client.server_is_ready():
@@ -872,6 +879,7 @@ class BridgeNode(Node):
         names = list(self.LIVE_ATTRS)
         names += [f'dwa.{k}' for k, v in vars(self.dwa_cfg).items()
                   if k != 'control_period' and not isinstance(v, tuple)]
+        names += [f'mppi.{k}' for k in vars(self.mppi_cfg) if k != 'seed']
         names += ['dwa_follow.lookahead', 'dwa_follow.goal_tolerance', 'dwa_follow.moving_speed']
         names += [f'hybrid.{k}' for k in ('trigger_distance', 'moving_distance', 'path_width', 'path_ahead',
                                           'release_time', 'rejoin_offset')]
@@ -881,8 +889,11 @@ class BridgeNode(Node):
         """파라미터가 바뀌기 직전에 불림: 실행 중에 못 바꾸는 것은 거절하고, 나머지는 지금 주행에도 바로 반영."""
         for prm in params:
             n = prm.name
-            if not (n in self.param_start or (n.startswith('dwa.') and n != 'dwa.control_period')):
+            if not (n in self.param_start or (n.startswith('dwa.') and n != 'dwa.control_period')
+                    or n.startswith('mppi.')):
                 return SetParametersResult(successful=False, reason=f'{n} 은(는) 실행 중에 못 바꿉니다 (재시작 필요)')
+            if n == 'mppi.samples' and prm.value < 1:
+                return SetParametersResult(successful=False, reason=f'{n} 은(는) 1 이상이어야 합니다')
             if n in ('dwa.v_samples', 'dwa.w_samples') and prm.value < 2:
                 return SetParametersResult(successful=False, reason=f'{n} 은(는) 2 이상이어야 합니다')
         f = self.follower or {}
@@ -894,6 +905,9 @@ class BridgeNode(Node):
                 # DWAFollower 들이 같은 DWAConfig 객체를 쓰므로 주행 중인 DWA 에도 바로 적용
                 k = n[4:]
                 setattr(self.dwa_cfg, k, tuple(float(x) for x in v) if isinstance(getattr(self.dwa_cfg, k), tuple) else v)
+            elif n.startswith('mppi.'):
+                # MPPIController 들이 같은 MPPIConfig 객체를 쓰므로 주행 중에도 바로 적용
+                setattr(self.mppi_cfg, n[5:], v)
             elif n in ('dwa_follow.lookahead', 'dwa_follow.goal_tolerance') and 'dwa' in f:
                 setattr(f['dwa'], n.split('.')[1], v)
             self.get_logger().info(f'파라미터 변경: {n} = {v}')
@@ -1393,7 +1407,8 @@ class BridgeNode(Node):
         if traj is not None and m_o is not None:
             pts = [[round(float(px), 3), round(float(py), 3)] for px, py in transform_points(np.asarray(traj)[:, :2], *m_o)]
         v, w, state = result
-        self.server.send({'type': 'dwa', 'traj': pts, 'v': round(float(v), 3), 'w': round(float(w), 3), 'state': state})
+        self.server.send({'type': 'dwa', 'traj': pts, 'v': round(float(v), 3), 'w': round(float(w), 3), 'state': state,
+                          'name': 'MPPI' if isinstance(follower, MPPIFollower) else 'DWA'})
 
     # DWA 막힘 대처 (단순 fallback) --------------------------------
     # ① DWA 가 막히면 blocked_timeout(5초) 동안 기다림 (움직이는 장애물이 지나가길)

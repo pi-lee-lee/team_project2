@@ -388,3 +388,17 @@ cd ../ros2_ws && source /opt/ros/humble/setup.bash && colcon build --symlink-ins
 - 벽 점이 직선에 85% 미만으로 맞으면 회전 없이 `clean_map.py` 정리 (새 7단계: 1칸 외곽선)
 - 돌린 맵은 yaml `# rotation_deg`, 웹 "맵 저장" 이 SLAM 중 등록한 위치/금지 구역을 같은 각도로 돌려 복사
 - 서버 맵 `map.yaml`(직선 비율 96%, 0.05° → 안 돌림), `maze_map.yaml`(97%, 2.40° 보정)으로 확인. 웹 저장 → 위치 복사 흐름은 실물 미시험
+
+### 기본 경로 추종기를 MPPI 로 (2026-10-22)
+- 새 `mppi.py` (ROS 없음): `DWAController` 를 상속해 입력(정적 스캔 점, 추적 장애물 `[x, y, vx, vy, r]`), 차체 직사각형 여유, 움직이는 물체 예측을 그대로 씀.
+  후보 궤적만 다름: 직전 해(한 칸 민 것) + 가우시안 잡음 500개 + 정지 + 원호 36개 → 시점마다 다른 (v, w) 순서를 굴려 비용 → exp(-J/λ) 가중 평균.
+  평균 궤적이 안전하지 않으면(좌/우 우회가 섞여 정면으로 가는 경우) 안전한 샘플 중 최소 비용, 없으면 막힘. 움직이는 물체 앞에서는 '멈추면 안전' 으로 보지 않음 (감속 궤적 검사)
+- `controller: mppi` 기본 (`run.sh` / `start_bridge.sh` / launch / `params.yaml`). 속도/가속/외곽/여유/predict_time 은 `dwa.*` 를 같이 쓰고 `mppi.*` 는 샘플링/비용 계수. 주행 중 변경 가능(웹 '주행 파라미터' 카드에 MPPI 묶음). 웹 보라 궤적 글자가 'MPPI ...'
+- 막힘/회복/진행 없음 처리, 출발 전 돌아서기, 도착 방향 맞추기는 DWA 와 같은 경로 (브리지의 `f['dwa']` 자리에 `MPPIFollower`)
+- 비교 (`tools/planner_compare.py`, 운동학 sim + LiDAR 광선 + A* 장애물 기억 + 브리지 재시도 흉내, 9개 시나리오, params.yaml 값 max_v 0.13 / predict_time 3.5 / A* 반경 0.20):
+  MPPI 만 8/9 (지금 기본으로 쓰는 방식), DWA 만 6/9 (마주 오는/가로지르는 사람 충돌, predict_time 3.5 에서 목표 앞 기어감), hybrid PP↔DWA 7/9.
+  재계획을 1초마다 하면 MPPI 8/9 (상자 70초대 → 45초), hybrid PP↔MPPI + 1초 재계획 9/9 (가장 빠름) — 아직 브리지에 1초 재계획은 없음
+- **한계 (sim 확인)**: 경로를 정면으로 막은 상자는 MPPI 도 혼자 못 돌아감 (0.13 m/s x 2.5~5초 = 앞 0.3~0.65 m 만 봄, 가중치/잡음/예측시간 바꿔도 같음).
+  15초 진행 없음 → 뒤로 15cm → LiDAR 장애물을 넣은 A* 재계획으로 돌아감. 주기당 계산 35~57 ms (PC)
+- 같이 커밋: 사용자가 바꿔 둔 `params.yaml` 값 (A* `robot_radius` 0.20, `dwa.max_v` 0.13, `predict_time` 3.5, `w_obstacle` 1.8, `lookahead` 0.3) — 비교 sim 이 이 값으로 돌았음
+- 확인: 단위 테스트 57개 통과 (`test_mppi.py` 3개 추가), 브리지가 다른 도메인에서 `controller=mppi` 로 뜨고 `mppi.*` 변경/거절 동작. **Gazebo/실물 주행 미확인**

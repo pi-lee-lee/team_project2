@@ -73,7 +73,7 @@ def generate_launch_description():
         DeclareLaunchArgument('server_url', default_value='',
                               description='비우면 ws://localhost:8000/ws/robot/<robot_name>/'),
         DeclareLaunchArgument('planner', default_value='astar', description='astar | nav2'),
-        DeclareLaunchArgument('controller', default_value='hybrid', description='hybrid | dwa | builtin | nav2'),
+        DeclareLaunchArgument('controller', default_value='mppi', description='mppi | hybrid | dwa | builtin | nav2'),
         DeclareLaunchArgument('map_name', default_value='default'),
         DeclareLaunchArgument('mode', default_value='map', description='map (기존 맵 + AMCL) | slam (맵 만들기)'),
         DeclareLaunchArgument('scan_noise', default_value='false',

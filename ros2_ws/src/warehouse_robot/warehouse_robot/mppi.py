@@ -50,8 +50,7 @@ class MPPIController(DWAController):
         super().__init__(cfg)
         self.mcfg = mcfg or MPPIConfig()
         self.rng = np.random.default_rng(self.mcfg.seed)
-        self.T = int(round(self.cfg.predict_time / self.cfg.sim_dt))
-        self.U = np.zeros((self.T, 2))   # 직전 해 (v, w) 순서
+        self.U = np.zeros((0, 2))        # 직전 해 (v, w) 순서 (T, 2)
 
     def reset(self):
         self.U[:] = 0.0
@@ -76,7 +75,9 @@ class MPPIController(DWAController):
     def _candidates(self, state):
         """잡음 샘플 + 직전 해 그대로 + 정지 + DWA 같은 일정 원호 몇 개 (벽 옆/뒤돌기에서 잡음만으로 못 찾는 해)."""
         c, m = self.cfg, self.mcfg
-        T = self.T
+        T = max(int(round(c.predict_time / c.sim_dt)), 1)
+        if len(self.U) != T:                              # 처음이거나 predict_time 이 실행 중에 바뀜
+            self.U = np.zeros((T, 2))
         U = np.vstack([self.U[1:], self.U[-1:]])          # 한 칸 밀기 (warm start)
         n = max(m.samples, 1)
         V = U[None, :, 0] + self.rng.normal(0.0, m.noise_v, (n, T))

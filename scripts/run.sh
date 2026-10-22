@@ -17,7 +17,8 @@
 #   --nav2         Nav2 주행 노드(planner/controller_server, bt_navigator)도 실행. slam/map 모두 가능
 #                  (slam: SLAM 이 맵과 위치를 내므로 AMCL/map_server 없이 주행 노드만)
 #   --planner P    astar(기본, 직접 구현한 A*) | nav2 (Nav2 가 계획+주행, NavigateToPose)
-#   --controller C hybrid(기본, 평소 pure pursuit, 경로 앞에 지도에 없는 장애물이 가까우면 DWA 로 피함)
+#   --controller C mppi(기본, 항상 MPPI: 정적 LiDAR 점 + 추적한 움직이는 장애물의 미래 위치를 피하며 경로 추종)
+#                  | hybrid (평소 pure pursuit, 경로 앞에 지도에 없는 장애물이 가까우면 DWA 로 피함)
 #                  | dwa (항상 DWA, 추적한 움직이는 장애물의 미래 위치를 피함. tb3_nav 에서 이식)
 #                  | builtin (항상 pure pursuit, 앞쪽 장애물이면 정지 후 대기) | nav2 (A* 경로를 Nav2 controller_server 가 추종)
 #                  planner/controller 를 nav2 로 주면 --nav2 는 자동으로 켜짐
@@ -39,7 +40,7 @@ LOGS="$HOME_DIR/logs"
 PI_HOST="test@192.168.0.181"
 
 ROBOT=""; MODE=""; MAP=""; NAME=""; ENGINE=slam_toolbox; WORLD=turtlebot3_world; GUI=""; NAV2=""
-PLANNER=astar; CONTROLLER=hybrid; AMCL=default; SCAN_NOISE=false
+PLANNER=astar; CONTROLLER=mppi; AMCL=default; SCAN_NOISE=false
 while [ $# -gt 0 ]; do
   case "$1" in
     --robot) ROBOT="$2"; shift ;;
@@ -62,7 +63,7 @@ done
 [[ "$ROBOT" =~ ^(real|sim)$ ]] || { echo "--robot real|sim 을 지정하세요"; exit 1; }
 [[ "$MODE" =~ ^(slam|map)$ ]] || { echo "--mode slam|map 을 지정하세요"; exit 1; }
 [[ "$PLANNER" =~ ^(astar|nav2)$ ]] || { echo "--planner astar|nav2"; exit 1; }
-[[ "$CONTROLLER" =~ ^(hybrid|builtin|nav2|dwa)$ ]] || { echo "--controller hybrid|dwa|builtin|nav2"; exit 1; }
+[[ "$CONTROLLER" =~ ^(mppi|hybrid|builtin|nav2|dwa)$ ]] || { echo "--controller mppi|hybrid|dwa|builtin|nav2"; exit 1; }
 if [ "$PLANNER" = nav2 ] || [ "$CONTROLLER" = nav2 ]; then NAV2=1; fi
 case "$AMCL" in
   default) AMCL_FILE="$HOME_DIR/config/amcl_waffle_pi.yaml" ;;

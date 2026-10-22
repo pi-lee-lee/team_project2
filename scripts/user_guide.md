@@ -137,7 +137,7 @@ scripts/run.sh --robot real|sim --mode slam|map [옵션]
 | `--gui` | (sim) Gazebo 화면 표시 |
 | `--amcl A` | (map) 위치 추정 설정: `default`(작은 방) / `hall`(강당·교실, `config/amcl_hall.yaml`) / yaml 경로 |
 | `--scan-noise` | (sim) LiDAR 를 실물 LDS-02 처럼 (빔 개수 238~244 변동, 거리 흔들림, 먼 곳 값 빠짐) |
-| `--controller C` | `hybrid`(기본, pure pursuit + 장애물 가까우면 DWA) / `dwa`(항상 DWA) / `builtin`(항상 pure pursuit) / `nav2` |
+| `--controller C` | `mppi`(기본, 항상 MPPI) / `hybrid`(pure pursuit + 장애물 가까우면 DWA) / `dwa`(항상 DWA) / `builtin`(항상 pure pursuit) / `nav2` |
 | `--planner P` | `astar`(기본) / `nav2` |
 | `--nav2` | Nav2 주행 노드도 실행 (planner/controller 를 nav2 로 주면 자동) |
 

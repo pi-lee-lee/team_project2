@@ -30,7 +30,7 @@ warehouse_bridge:
     pose_rate: 5.0
     max_retries: 2
     arrive_tolerance: 0.3     # Nav2가 성공이라고 해도 목표와 이 거리 이상이면 실패로 처리
-    controller: hybrid        # hybrid(기본): 평소 pure pursuit, 경로 앞 장애물이 가까우면 DWA / dwa: 항상 DWA / builtin: 항상 pure pursuit / nav2: Nav2 controller_server
+    controller: mppi          # mppi(기본): 항상 MPPI / hybrid: 평소 pure pursuit, 경로 앞 장애물이 가까우면 DWA / dwa: 항상 DWA / builtin: 항상 pure pursuit / nav2: Nav2 controller_server
     max_speed: 0.26           # m/s (pure pursuit). Waffle Pi 하드웨어 한계 (2026-10-22: 0.1 이 느리다고 해서 올림, 실물 미시험)
     max_turn_speed: 1.82      # rad/s (pure pursuit 회전, 제자리 회전). 하드웨어 한계 (예전 1.0 → 0.6 → 1.82)
     max_accel: 0.3            # m/s² (pure pursuit). 출발은 이 가속으로 점점 빨라지고, 목표 앞은 이 감속으로 멈춤 (0.26 m/s 까지 0.9초, 정지 거리 약 11cm)
@@ -87,6 +87,20 @@ warehouse_bridge:
       w_obstacle: 1.8
       w_speed: 0.2
       w_collision: 2.0        # 1.0~6.0 사이에서 결과 차이 없음 (tools/dwa_tune.py), 덜 극단적인 값
+    # controller: mppi 일 때 (mppi.py). 속도/가속/외곽(footprint)/여유(safety/dynamic margin)/predict_time/obstacle_influence/path_scale 은
+    # 위 dwa.* 를 같이 쓰고, 여기는 샘플링과 비용 계수만. tools/planner_compare.py 9개 시나리오에서 이 값으로 비교함 (2026-10-22)
+    mppi:
+      samples: 500            # 잡음 샘플 수. PC 에서 주기당 35~57 ms (0.1초 주기 안)
+      noise_v: 0.04           # 선속도 잡음 표준편차 (m/s)
+      noise_w: 0.6            # 각속도 잡음 표준편차 (rad/s)
+      temperature: 0.05       # λ: 작을수록 비용 최소 샘플 쪽으로 몰림
+      w_path: 1.0             # 경로에서 떨어진 거리 (시점별 평균, path_scale 로 나눔)
+      w_progress: 1.0         # 경로를 따라 전진한 정도
+      w_goal: 0.5             # 끝점 ~ lookahead 목표점
+      w_heading: 0.2
+      w_obstacle: 1.0         # obstacle_influence 안쪽 근접 비용 (제곱)
+      w_collision: 50.0       # safety_margin 침범 벌점
+      w_smooth: 0.02          # 각속도 변화
     dwa_follow:
       lookahead: 0.3          # 경로 위 이 거리 앞 점을 DWA 목표로
       goal_tolerance: 0.1     # 이 안에 들면 제자리에서 도착 방향 맞춤
