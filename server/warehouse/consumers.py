@@ -141,6 +141,10 @@ class RobotConsumer(AsyncJsonWebsocketConsumer):
             # 추적 중인 움직이는 장애물 (map 좌표, 위치+속도) - 화면 표시용, DB 에 저장하지 않음
             live['obstacles'] = msg.get('obstacles', [])
             await self.broadcast({'type': 'obstacles', 'robot': self.robot_name, 'obstacles': live['obstacles']})
+        elif kind == 'dwa':
+            # DWA 가 고른 궤적 (map 좌표) + 명령 속도/상태 (초당 5번) - 화면 표시용, 저장/스냅샷 안 함
+            await self.broadcast({'type': 'dwa', 'robot': self.robot_name, 'traj': msg.get('traj', []),
+                                  'v': msg.get('v'), 'w': msg.get('w'), 'state': msg.get('state')})
         elif kind == 'memory':
             # A* 가 기억 중인 장애물: remembered = 맵에 없는 LiDAR 장애물 칸, bumps = 부딪힌 자리
             live['memory'] = {'remembered': msg.get('remembered', []), 'bumps': msg.get('bumps', [])}

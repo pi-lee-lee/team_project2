@@ -471,6 +471,7 @@ class DWAFollower:
         """pose: odom 프레임 (x, y, yaw), map_to_odom: map 점을 odom 으로 옮기는 (x, y, yaw).
         static_points: odom 스캔 점, dynamic_obstacles: odom [x, y, vx, vy, r]. 반환 (v, w, state)."""
         x, y, yaw = pose
+        self.last_trajectory = None   # 이번 주기에 DWA 로 고른 궤적만 남김 (제자리 회전/빠져나오기는 None)
         path = transform_points(self.path_map, *map_to_odom)
         goal_yaw = self.goal_yaw + map_to_odom[2]
         if self.arrived or np.hypot(path[-1, 0] - x, path[-1, 1] - y) < self.goal_tolerance:

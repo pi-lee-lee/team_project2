@@ -133,6 +133,11 @@ function handle(msg) {
       S.obstaclesAt = Date.now();
       draw();
       break;
+    case 'dwa':
+      S.dwa = msg;
+      S.dwaAt = Date.now();
+      draw();
+      break;
     case 'memory':
       S.memory = msg;
       draw();
@@ -254,6 +259,7 @@ function clearPose() {
   S.pose = null;
   S.path = [];
   S.obstacles = [];
+  S.dwa = null;
   draw();
   if (had) renderPanel();
 }
@@ -752,6 +758,32 @@ function draw() {
       i ? ctx.lineTo(cx, cy) : ctx.moveTo(cx, cy);
     });
     ctx.stroke();
+  }
+
+  // DWA 가 고른 궤적 (predict_time 동안 굴려 본 best): 보라 굵은 선 + 끝점, 옆에 명령 속도/상태. 1초 넘게 안 오면 숨김
+  if (S.dwa && Date.now() - (S.dwaAt || 0) < 1000) {
+    const t = S.dwa.traj || [];
+    let lx, ly;
+    if (t.length > 1) {
+      ctx.strokeStyle = '#9333ea';
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      t.forEach(([x, y], i) => {
+        const [cx, cy] = worldToCanvas(x, y);
+        i ? ctx.lineTo(cx, cy) : ctx.moveTo(cx, cy);
+      });
+      ctx.stroke();
+      [lx, ly] = worldToCanvas(...t[t.length - 1]);
+      ctx.beginPath(); ctx.arc(lx, ly, 4, 0, 2 * Math.PI); ctx.fillStyle = '#9333ea'; ctx.fill();
+    } else if (S.pose) {
+      [lx, ly] = worldToCanvas(S.pose.x, S.pose.y);
+    }
+    if (lx !== undefined) {
+      const name = { driving: '주행', blocked: '막힘', rotating: '회전', done: '도착' }[S.dwa.state] || S.dwa.state;
+      ctx.font = '11px system-ui, sans-serif';
+      ctx.fillStyle = '#7e22ce';
+      ctx.fillText(`DWA ${name} v=${(+S.dwa.v).toFixed(2)} w=${(+S.dwa.w).toFixed(2)}`, lx + 8, ly - 8);
+    }
   }
 
   // 위치

@@ -315,6 +315,7 @@ class BridgeNode(Node):
         self.scan_odom = np.empty((0, 2))  # 최근 스캔 점 (odom) - DWA 정적 장애물
         self.map_dist = None               # 지도 벽까지 거리 (벽 근처 점 = 정적) (dist, msg)
         self.last_obstacles_sent = 0.0
+        self.last_dwa_sent = 0.0
         # DWA (controller=dwa). 기본값은 tb3_nav 값에서 속도/외곽(직사각형)/여유를 이 프로젝트에 맞춤 (params.yaml 과 같음)
         defaults = DWAConfig(max_v=0.15, max_w=1.0, max_acc_v=0.3, max_acc_w=1.5, robot_radius=0.17, footprint=(-0.197, 0.069, 0.153), allow_escape=True,
                              safety_margin=0.08, dynamic_margin=0.15, dynamic_growth=0.03, predict_time=2.5,
@@ -1286,7 +1287,22 @@ class BridgeNode(Node):
         result = follower.compute(pose, *self.odom_vw, map_to_odom, self.scan_odom, dyn,
                                   moving_speed=self.get_parameter('dwa_follow.moving_speed').value)
         follower.last_cmd = (now, result)
+        self.send_dwa(follower, result)
         return result
+
+    def send_dwa(self, follower, result):
+        """DWA 가 고른 궤적(best)을 웹에 (map 좌표, 0.2초마다). 제자리 회전/막힘이면 빈 궤적."""
+        now = time.monotonic()
+        if now - self.last_dwa_sent < 0.2:
+            return
+        self.last_dwa_sent = now
+        traj = follower.last_trajectory
+        m_o = self.xyyaw(self.global_frame, 'odom')
+        pts = []
+        if traj is not None and m_o is not None:
+            pts = [[round(float(px), 3), round(float(py), 3)] for px, py in transform_points(np.asarray(traj)[:, :2], *m_o)]
+        v, w, state = result
+        self.server.send({'type': 'dwa', 'traj': pts, 'v': round(float(v), 3), 'w': round(float(w), 3), 'state': state})
 
     # DWA 막힘 대처 (단순 fallback) --------------------------------
     # ① DWA 가 막히면 blocked_timeout(5초) 동안 기다림 (움직이는 장애물이 지나가길)
