@@ -328,6 +328,7 @@ class BridgeNode(Node):
         # 웹에서 그린 금지 구역 → A* 플래너 (JSON 목록). 플래너가 나중에 떠도 받도록 transient local
         self.zones_pub = self.create_publisher(String, 'astar/zones', map_qos)
         self.zones_json = None
+        self.zone_replan_at = None   # 금지 구역이 바뀌어 경로를 다시 계산할 시각
         # A* 가 경로를 못 찾은 이유 (금지 구역 때문 등). 서비스 응답과 따로 오므로 받은 시각과 같이 둔다
         self.plan_fail = (0.0, '')
         self.create_subscription(String, 'astar/fail_reason',
@@ -409,6 +410,10 @@ class BridgeNode(Node):
         self.zones_json = data
         self.zones_pub.publish(String(data=data))
         self.get_logger().info(f'금지 구역 {len(zones)}개 → A* 플래너')
+        # 이동 중이면 새 구역으로 경로를 다시 계산한다 (예전에는 출발 때 계산한 경로를 그대로 따라가 구역을 뚫고 지나감).
+        # 플래너가 구역을 먼저 받도록 0.3초 뒤에 (control_step 에서)
+        if self.goal is not None and self.planner_mode == 'astar':
+            self.zone_replan_at = time.monotonic() + 0.3
 
     # ---------------------------------------------------------- 로봇 상태 → 서버
     def on_map(self, msg):
@@ -895,6 +900,14 @@ class BridgeNode(Node):
         self.cmd_vel_pub.publish(Twist())
 
     def control_step(self):
+        if self.zone_replan_at is not None and time.monotonic() >= self.zone_replan_at:
+            self.zone_replan_at = None
+            if self.goal is not None and self.planner_mode == 'astar':
+                self.get_logger().info('금지 구역이 바뀌어 지금 위치에서 경로를 다시 계산합니다')
+                self.generation += 1      # 지금 따르던 경로/계획 응답은 버림
+                self.stop_following()
+                self.request_plan()
+                return
         f = self.follower
         if f is None:
             return
