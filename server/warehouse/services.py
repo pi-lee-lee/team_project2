@@ -47,6 +47,25 @@ def get_robot(name=None):
     return robot
 
 
+ROBOT_NAME_RE = re.compile(r'^[A-Za-z0-9_-]{1,50}$')   # 로봇 이름 = 브리지 접속 주소 /ws/robot/<이름>/ (예: tb3, tb3_1)
+
+
+def robot_list():
+    """웹 로봇 선택 목록: DB 에 있는 로봇 전부 (한 번이라도 브리지가 접속한 이름) + 브리지 연결 여부."""
+    return [{'name': r.name, 'state': r.state, 'message': r.message,
+             'bridge': bool(LIVE.get(r.name, {}).get('health', {}).get('bridge'))}
+            for r in Robot.objects.order_by('name')]
+
+
+def known_robot(name):
+    """웹이 고른 로봇 이름이 DB 에 있으면 그 이름, 없으면 기본 로봇 (지난번에 고른 로봇이 지금은 없을 때 빈 로봇을 만들지 않게)."""
+    return name if name and Robot.objects.filter(name=name).exists() else DEFAULT_ROBOT
+
+
+def moving_robots():
+    return list(Robot.objects.filter(state=Robot.STATE_MOVING).values_list('name', flat=True))
+
+
 def active_map():
     return Map.objects.filter(is_active=True).first()
 
@@ -116,7 +135,8 @@ def push_zones(out, m=None):
     m = m or active_map()
     zones = zones_of(m)
     out.to_ui({'type': 'zones', 'zones': zones})
-    out.to_robot(get_robot(), {'type': 'zones', 'zones': zones})
+    for robot in Robot.objects.all():   # 같은 맵을 쓰는 로봇 모두의 A* 플래너에
+        out.to_robot(robot, {'type': 'zones', 'zones': zones})
 
 
 def snapshot(robot_name=None):

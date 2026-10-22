@@ -16,7 +16,16 @@ const S = {
   view: { scale: 1, ox: 0, oy: 0 },  // scale = 맵 한 칸의 캔버스 픽셀 수, (ox, oy) = 돌린 좌표 (0, 0) 의 캔버스 위치
   rot: Math.PI / 2,   // 화면 회전 (rad, 반시계): 맵의 x 축이 화면 위쪽, y 축이 왼쪽 (로봇 정면 = x 가 위로 보이게, ROS 관례)
   drag: null,
+  robotName: initialRobotName(),   // 이 화면에서 조작하는 로봇 (브리지 이름, 예: tb3, tb3_1)
+  robots: [],         // 웹 로봇 선택 목록 [{name, state, message, bridge}]
 };
+
+// 주소의 ?robot=, 없으면 지난번에 고른 로봇, 없으면 서버 기본(tb3)
+function initialRobotName() {
+  const q = new URLSearchParams(location.search).get('robot');
+  if (q) return q;
+  try { return localStorage.getItem('robotName') || ''; } catch (e) { return ''; }
+}
 
 const $ = (sel) => document.querySelector(sel);
 const canvas = $('#map');
@@ -25,7 +34,8 @@ const ctx = canvas.getContext('2d');
 // ------------------------------------------------------------------ WebSocket
 function connect() {
   const proto = location.protocol === 'https:' ? 'wss' : 'ws';
-  const ws = new WebSocket(`${proto}://${location.host}/ws/ui/`);
+  const q = S.robotName ? `?robot=${encodeURIComponent(S.robotName)}` : '';
+  const ws = new WebSocket(`${proto}://${location.host}/ws/ui/${q}`);
   S.ws = ws;
   ws.onopen = () => {
     setWsStatus(true);
@@ -55,6 +65,10 @@ function handle(msg) {
   switch (msg.type) {
     case 'snapshot':
       S.robot = msg.robot;
+      S.robotName = msg.robot.name;
+      S.robots = msg.robots || [];
+      renderRobotSelect();
+      S.scan = null;
       S.task = msg.task;
       S.locations = msg.locations;
       S.zones = msg.zones || [];
@@ -80,7 +94,15 @@ function handle(msg) {
     case 'state':
       S.robot = msg.robot;
       S.task = msg.task;
+      updateRobotEntry(msg.robot);
       renderPanel();
+      break;
+    case 'robot_summary':   // 선택하지 않은 로봇의 상태 변화 (목록 표시만)
+      updateRobotEntry(msg.robot);
+      break;
+    case 'robots':
+      S.robots = msg.robots || [];
+      renderRobotSelect();
       break;
     case 'map':
       setMap(msg.map);
@@ -194,6 +216,39 @@ function handle(msg) {
 }
 
 // 로봇이 사라지면(브리지 종료, Pi 꺼짐, 위치 TF 끊김) 화면에서 로봇과 경로를 지운다
+// ------------------------------------------------------------------ 로봇 선택 (여러 대)
+const ROBOT_STATE_KO = { OFFLINE: '연결 안 됨', IDLE: '대기', MOVING: '이동 중', WAITING_LOAD: '적재 대기',
+                         WAITING_UNLOAD: '수령 대기', ERROR: '오류' };
+function updateRobotEntry(robot) {
+  const r = S.robots.find((x) => x.name === robot.name);
+  if (r) Object.assign(r, { state: robot.state, message: robot.message });
+  else S.robots.push({ name: robot.name, state: robot.state, message: robot.message, bridge: false });
+  renderRobotSelect();
+}
+// 로봇이 두 대 이상일 때만 위쪽 막대에 선택 칸을 보여 준다 (한 대면 지금과 같은 화면)
+function renderRobotSelect() {
+  const sel = $('#robot-select');
+  const names = S.robots.map((r) => r.name);
+  if (S.robotName && !names.includes(S.robotName)) names.push(S.robotName);
+  sel.hidden = names.length < 2;
+  sel.replaceChildren(...names.sort().map((name) => {
+    const r = S.robots.find((x) => x.name === name);
+    const opt = document.createElement('option');
+    opt.value = name;
+    opt.textContent = r ? `${name} · ${ROBOT_STATE_KO[r.state] || r.state}` : name;
+    return opt;
+  }));
+  sel.value = S.robotName;
+}
+$('#robot-select').addEventListener('change', (e) => {
+  S.robotName = e.target.value;
+  try { localStorage.setItem('robotName', S.robotName); } catch (err) { /* 저장 못 해도 동작 */ }
+  // 이전 로봇의 위치/경로는 바로 지우고, 서버가 새 로봇의 전체 상태(snapshot)를 다시 보낸다
+  clearPose();
+  S.scan = null;
+  send('select_robot', { robot_name: S.robotName });
+});
+
 function clearPose() {
   const had = !!S.pose;
   S.pose = null;
@@ -1270,7 +1325,9 @@ function addLog(entry) {
   const li = document.createElement('li');
   const t = document.createElement('time');
   t.textContent = new Date(entry.created_at).toLocaleTimeString('ko-KR', { hour12: false });
-  li.append(t, entry.message);
+  // 로봇이 여러 대면 어느 로봇의 기록인지 앞에 붙인다
+  const who = S.robots.length > 1 && entry.robot_name ? `[${entry.robot_name}] ` : '';
+  li.append(t, who + entry.message);
   const ul = $('#logs');
   ul.prepend(li);
   while (ul.children.length > 100) ul.lastChild.remove();

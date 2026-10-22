@@ -27,7 +27,8 @@ class Detector(Node):
     def __init__(self):
         super().__init__('component_detector_switch')
         self.declare_parameter('weights',str(ROOT/'best_components7_finetuned.pt'))
-        self.declare_parameter('input_topic','/csi/image_raw')
+        # 상대 이름: 네임스페이스 없이 띄우면 /csi/image_raw, -r __ns:=/tb3_1 이면 /tb3_1/csi/image_raw (로봇 여러 대)
+        self.declare_parameter('input_topic','csi/image_raw')
         self.declare_parameter('confidence',0.35)
         self.declare_parameter('imgsz',320)
         self.declare_parameter('person_only',False)
@@ -47,8 +48,8 @@ class Detector(Node):
         self.qos=qos
         self.sub=None
         self.sync_input()
-        self.pub=self.create_publisher(Image,'/yolo/image_raw',qos)
-        self.pub_counts=self.create_publisher(String,'/yolo/counts',10)
+        self.pub=self.create_publisher(Image,'yolo/image_raw',qos)
+        self.pub_counts=self.create_publisher(String,'yolo/counts',10)
         self.timer=self.create_timer(0.05,self.detect)
         self.last_received=self.get_clock().now()
         self.input_warning=self.create_timer(5.0,self.check_input)

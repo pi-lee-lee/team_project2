@@ -251,8 +251,12 @@ class BridgeNode(Node):
         # 0.5초 넘게 밀리고 '위치 TF 끊김' 으로 멈췄다 (바깥 노드에서 잰 TF 는 정상이었음)
         # use_global_arguments=False: launch 의 '__node:=warehouse_bridge' 가 이 노드에도 적용되어
         # 노드 목록에 /warehouse_bridge 가 두 개로 보였음 (브리지가 둘 떠 있는 것처럼)
-        self.tf_node = rclpy.create_node('warehouse_bridge_tf', use_global_arguments=False, parameter_overrides=[
-            rclpy.parameter.Parameter('use_sim_time', value=self.get_parameter('use_sim_time').value)])
+        # 로봇 여러 대(네임스페이스 있음)면 TF 도 그 로봇 것(/<ns>/tf)만 받는다. 이 노드는 launch 인자를 안 받으므로 직접 넘김
+        ns = self.get_namespace()
+        tf_args = [] if ns == '/' else ['--ros-args', '-r', '/tf:=tf', '-r', '/tf_static:=tf_static']
+        self.tf_node = rclpy.create_node('warehouse_bridge_tf', namespace=ns, use_global_arguments=False, cli_args=tf_args,
+                                         parameter_overrides=[rclpy.parameter.Parameter(
+                                             'use_sim_time', value=self.get_parameter('use_sim_time').value)])
         self.tf_listener = TransformListener(self.tf_buffer, self.tf_node, spin_thread=True)
 
         map_qos = QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL,
@@ -283,8 +287,9 @@ class BridgeNode(Node):
         self.create_timer(0.2, self.flush_cargo)
         # YOLO 부품 검출기 (yolo/yolo_training/infer_ros_switch.py): 웹 버튼으로 enabled(추론+검출 영상 발행)를 켜고 끄고,
         # 클래스별 개수 글자(/yolo/counts, 약 1초마다)를 웹에 띄운다. 검출기 노드가 없으면 '없음'으로 표시
-        self.declare_parameter('yolo_node', '/component_detector_switch')
-        self.declare_parameter('yolo_counts_topic', '/yolo/counts')
+        # 상대 이름: 네임스페이스 없이 띄우면 /component_detector_switch, /yolo/counts (로봇 여러 대면 /<ns>/...)
+        self.declare_parameter('yolo_node', 'component_detector_switch')
+        self.declare_parameter('yolo_counts_topic', 'yolo/counts')
         yn = self.get_parameter('yolo_node').value.rstrip('/')
         self.yolo_get = self.create_client(GetParameters, f'{yn}/get_parameters')
         self.yolo_set = self.create_client(SetParameters, f'{yn}/set_parameters')

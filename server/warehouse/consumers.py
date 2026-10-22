@@ -1,10 +1,12 @@
-import time
 """WebSocket 엔드포인트.
 
-/ws/robot/<name>/ : ROS 2 브리지 노드가 접속
-/ws/ui/           : 웹 브라우저가 접속
+/ws/robot/<name>/ : ROS 2 브리지 노드가 접속 (name = 로봇 이름, 예: tb3, tb3_1, tb3_2)
+/ws/ui/[?robot=<name>] : 웹 브라우저가 접속. 연결마다 '선택한 로봇' 이 있어, 그 로봇의 위치/경로/상태만 받고
+                         요청(이동, 정지 등)도 그 로봇으로 간다 (요청에 robot_name 을 주면 그 로봇). 기본 tb3
 """
 import logging
+import time
+from urllib.parse import parse_qs
 
 from channels.db import database_sync_to_async
 from channels.generic.websocket import AsyncJsonWebsocketConsumer
@@ -23,6 +25,20 @@ def robot_group(name):
     return f'robot_{name}'
 
 
+def robot_of(msg):
+    """메시지가 어느 로봇 것인지 (pose 등은 'robot': 이름, state/snapshot 은 'robot': {name, ...}). 없으면 None."""
+    r = msg.get('robot')
+    if isinstance(r, dict):
+        return r.get('name')
+    return r if isinstance(r, str) else None
+
+
+async def broadcast_robots(channel_layer):
+    """웹 로봇 선택 목록 갱신 (브리지 접속/끊김 때)."""
+    robots = await database_sync_to_async(services.robot_list)()
+    await channel_layer.group_send(UI_GROUP, {'type': 'send.msg', 'msg': {'type': 'robots', 'robots': robots}})
+
+
 async def dispatch(channel_layer, out):
     for robot_name, msg in out.robot:
         await channel_layer.group_send(robot_group(robot_name), {'type': 'send.msg', 'msg': msg})
@@ -32,18 +48,28 @@ async def dispatch(channel_layer, out):
 
 class RobotConsumer(AsyncJsonWebsocketConsumer):
     async def connect(self):
-        self.robot_name = self.scope['url_route']['kwargs']['name']
+        name = self.scope['url_route']['kwargs']['name']
+        if not services.ROBOT_NAME_RE.match(name):
+            logger.warning('robot name rejected: %r', name)
+            self.robot_name = None
+            await self.close()
+            return
+        self.robot_name = name
         await self.channel_layer.group_add(robot_group(self.robot_name), self.channel_name)
         await self.accept()
         logger.info('robot %s connected', self.robot_name)
+        await broadcast_robots(self.channel_layer)
 
     async def disconnect(self, code):
+        if self.robot_name is None:
+            return
         await self.channel_layer.group_discard(robot_group(self.robot_name), self.channel_name)
         LIVE.pop(self.robot_name, None)
         await self.broadcast({'type': 'pose', 'robot': self.robot_name, 'lost': True})
         await self.broadcast({'type': 'path', 'robot': self.robot_name, 'points': []})
         await self.broadcast({'type': 'health', 'robot': self.robot_name, 'bridge': False})
         await self.run(services.robot_disconnected, self.robot_name)
+        await broadcast_robots(self.channel_layer)
 
     async def broadcast(self, msg):
         await self.channel_layer.group_send(UI_GROUP, {'type': 'send.msg', 'msg': msg})
@@ -131,9 +157,18 @@ class RobotConsumer(AsyncJsonWebsocketConsumer):
 
 class UIConsumer(AsyncJsonWebsocketConsumer):
     async def connect(self):
+        query = parse_qs(self.scope.get('query_string', b'').decode())
+        name = (query.get('robot') or [''])[0]
+        self.robot_name = name if services.ROBOT_NAME_RE.match(name) else services.DEFAULT_ROBOT
         await self.channel_layer.group_add(UI_GROUP, self.channel_name)
         await self.accept()
-        snap = await database_sync_to_async(services.snapshot)()
+        await self.send_snapshot()
+
+    async def send_snapshot(self):
+        """선택한 로봇의 전체 상태 (처음 접속, 로봇을 바꿨을 때)."""
+        self.robot_name = await database_sync_to_async(services.known_robot)(self.robot_name)
+        snap = await database_sync_to_async(services.snapshot)(self.robot_name)
+        snap['robots'] = await database_sync_to_async(services.robot_list)()
         live = LIVE.get(snap['robot']['name'], {})
         snap['pose'] = live.get('pose')
         snap['cargo'] = live.get('cargo')   # None = 인식 노드 없음
@@ -157,10 +192,9 @@ class UIConsumer(AsyncJsonWebsocketConsumer):
                                       'mode': runner.current_mode(), 'busy': runner.busy(), 'elapsed': runner.busy_elapsed()})
                 return
             if action in ('runner_start', 'runner_stop'):
-                # 노드를 다시 띄우기 전에 주행 중이면 멈춘다
-                robot = await database_sync_to_async(services.get_robot)()
-                if robot.state == 'MOVING':
-                    await dispatch(self.channel_layer, await database_sync_to_async(services.estop)(None))
+                # 노드를 다시 띄우기 전에 주행 중인 로봇은 모두 멈춘다
+                for name in await database_sync_to_async(services.moving_robots)():
+                    await dispatch(self.channel_layer, await database_sync_to_async(services.estop)(name))
             if action == 'runner_start':
                 await database_sync_to_async(runner.start_mode)(
                     str(msg.get('robot')), str(msg.get('mode')), msg.get('map') or None, msg.get('world') or None,
@@ -168,20 +202,20 @@ class UIConsumer(AsyncJsonWebsocketConsumer):
             elif action == 'runner_stop':
                 await database_sync_to_async(runner.stop_all)()
             elif action == 'explore_start':
-                if LIVE.get(services.DEFAULT_ROBOT, {}).get('mode') != 'slam':
+                if LIVE.get(self.robot_name, {}).get('mode') != 'slam':
                     raise runner.RunnerError('자동 탐색은 "맵 만들기 (SLAM)" 모드에서 쓸 수 있습니다.')
                 await database_sync_to_async(runner.explore)()
             elif action == 'explore_stop':
                 await database_sync_to_async(runner.cancel)(runner.EXPLORE_JOB)
                 # 탐색이 보낸 이동도 멈춘다
-                robot = await database_sync_to_async(services.get_robot)()
+                robot = await database_sync_to_async(services.get_robot)(self.robot_name)
                 if robot.state == 'MOVING':
-                    await dispatch(self.channel_layer, await database_sync_to_async(services.cancel_task)(None))
+                    await dispatch(self.channel_layer, await database_sync_to_async(services.cancel_task)(robot.name))
             elif action == 'auto_localize':
-                if LIVE.get(services.DEFAULT_ROBOT, {}).get('mode') != 'map':
+                if LIVE.get(self.robot_name, {}).get('mode') != 'map':
                     raise runner.RunnerError('위치 자동 찾기는 "저장된 맵으로 위치 추정(AMCL)" 모드에서 쓸 수 있습니다.')
                 # 로봇이 제자리에서 돌고 조금 움직이므로, 작업 중이면 하지 않는다
-                robot = await database_sync_to_async(services.get_robot)()
+                robot = await database_sync_to_async(services.get_robot)(self.robot_name)
                 if robot.state not in ('IDLE', 'ERROR'):
                     raise runner.RunnerError('작업 중에는 위치 자동 찾기를 할 수 없습니다. 작업을 끝내거나 취소하세요.')
                 await database_sync_to_async(runner.auto_localize)()
@@ -189,11 +223,31 @@ class UIConsumer(AsyncJsonWebsocketConsumer):
             await self.send_json({'type': 'error', 'message': str(e)})
 
     async def send_msg(self, event):
-        await self.send_json(event['msg'])
+        msg = event['msg']
+        name = robot_of(msg)
+        if name and name != self.robot_name:
+            # 선택하지 않은 로봇의 위치/경로 등은 보내지 않는다. 상태 변화만 목록 표시용으로 줄여서
+            if msg.get('type') == 'state':
+                await self.send_json({'type': 'robot_summary', 'robot': msg['robot']})
+            return
+        await self.send_json(msg)
 
     async def receive_json(self, msg, **kwargs):
         action = msg.get('action')
-        robot = msg.get('robot')
+        if action == 'select_robot':
+            name = str(msg.get('robot_name', ''))
+            if not services.ROBOT_NAME_RE.match(name):
+                await self.send_json({'type': 'error', 'message': f'잘못된 로봇 이름: {name}'})
+                return
+            self.robot_name = name
+            self.teleop_checked_until = 0.0   # 수동 조작 허용 여부를 새 로봇으로 다시 확인
+            await self.send_snapshot()
+            return
+        # 요청 대상 로봇: robot_name 을 주면 그 로봇, 아니면 이 화면에서 선택한 로봇 ('robot' 은 실행 모드의 real/sim)
+        robot = str(msg.get('robot_name') or self.robot_name)
+        if not services.ROBOT_NAME_RE.match(robot):
+            await self.send_json({'type': 'error', 'message': f'잘못된 로봇 이름: {robot}'})
+            return
         if action in ('runner_start', 'runner_stop', 'auto_localize', 'list_maps', 'explore_start', 'explore_stop'):
             await self.handle_runner(action, msg)
             return
@@ -216,7 +270,7 @@ class UIConsumer(AsyncJsonWebsocketConsumer):
             return
         if action == 'yolo_set':
             # 웹 YOLO 버튼: 검출기 enabled 켜기/끄기, 장면 캡처. DB 에 쓰지 않고 브리지로 바로 보낸다
-            target = robot or services.DEFAULT_ROBOT
+            target = robot
             if not LIVE.get(target, {}).get('health', {}).get('bridge'):
                 await self.send_json({'type': 'error', 'message': '브리지가 연결되어 있지 않습니다.'})
                 return
@@ -241,13 +295,13 @@ class UIConsumer(AsyncJsonWebsocketConsumer):
             return
         if action == 'set_home_here':
             # 로봇의 현재 위치는 DB가 아니라 메모리(LIVE)에 있으므로 여기서 꺼내 넘긴다
-            pose = LIVE.get(robot or services.DEFAULT_ROBOT, {}).get('pose')
+            pose = LIVE.get(robot, {}).get('pose')
             if pose is None:
                 await self.send_json({'type': 'error', 'message': '로봇 위치를 모릅니다. 초기 위치를 먼저 지정하세요.'})
                 return
             msg = {'action': 'set_home', 'x': pose['x'], 'y': pose['y'], 'yaw': pose['yaw']}
             action = 'set_home'
-        if action == 'set_initial_pose' and LIVE.get(robot or services.DEFAULT_ROBOT, {}).get('mode') == 'slam':
+        if action == 'set_initial_pose' and LIVE.get(robot, {}).get('mode') == 'slam':
             await self.send_json({'type': 'error', 'message': 'SLAM 모드에서는 초기 위치 지정이 필요 없습니다 (SLAM이 위치를 잡습니다).'})
             return
         handlers = {

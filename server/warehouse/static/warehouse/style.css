@@ -54,7 +54,10 @@ h2 { font-size: 13px; margin: 0; font-weight: 700; color: #374151; letter-spacin
   font-size: 15px;
 }
 .sub { margin: 1px 0 0; font-size: 11px; color: #94a3b8; }
-.top-status { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+.top-status { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; align-items: center; }
+.robot-select { background: #1e293b; color: #f8fafc; border: 1px solid #475569; border-radius: 999px;
+  padding: 3px 10px; font-size: 13px; font-weight: 700; }
+.robot-select[hidden] { display: none; }
 .topbar .badge.off { background: #334155; color: #cbd5e1; }
 
 /* ---------------------------------------------------------------- 레이아웃 */

@@ -229,6 +229,23 @@ SIGINT → SIGTERM → SIGKILL 순서로 보내고 남은 프로세스가 없는
   - 상태 배지 (검출기 없음 / 정지 / 실행 중 · 영상 대기 / 실행 중), 버튼 위 클래스별 개수 칸, 개수 요약 (예: `검출 4개 · led_red 2, usb 2`), `/yolo/counts` 원문 글자
 - 검출 대상: DHT11, bluetooth, led_green, led_red, led_yellow, usb (rgb 는 제외). 아직 LED 배달(`cargo/detected`)과는 연결하지 않았습니다
 
+### 로봇 여러 대 (코드만 추가, 실물 2대로는 아직 시험 안 함)
+
+- 로봇마다 **이름**(서버 접속 `/ws/robot/<이름>/`)과 **ROS 네임스페이스**를 다르게 해서 브리지를 띄웁니다:
+  `WAREHOUSE_ROBOT_NAME=tb3_1 WAREHOUSE_NAMESPACE=tb3_1 scripts/start_bridge.sh <맵이름>`
+  - 노드/토픽/서비스가 `/tb3_1/` 아래로 (`cmd_vel`, `scan`, `odom`, `astar/...`, YOLO `component_detector_switch`, `csi/image_raw` → `yolo/counts`)
+  - TF 는 `/tb3_1/tf`, `/tb3_1/tf_static` 로 나눔 (프레임 이름은 map/odom/base_footprint 그대로)
+  - `params.yaml` 은 launch 가 `/tb3_1/<노드>` 키로 바꾼 사본을 만들어 씀. 이름·네임스페이스를 안 주면 지금처럼 `tb3`, `/`
+- 웹: 로봇이 두 대 이상 등록되면 위쪽 막대에 **로봇 선택** 칸이 생깁니다 (이름 · 상태). 고른 로봇의 위치/경로/상태만 보이고
+  이동·정지·위치 지정·YOLO 등 모든 요청이 그 로봇으로 갑니다. 화면마다 따로 고를 수 있고 마지막 선택을 기억합니다.
+  주소로도 고를 수 있음: `/?robot=tb3_2`, 로봇에 단 화면은 `/robot?robot=tb3_2`. 기록에는 `[로봇이름]` 이 붙습니다
+- 아직 안 된 것 (실제로 2대를 돌리려면 필요):
+  - Pi bringup / 카메라를 로봇마다 그 네임스페이스로 띄우기 (`robot.launch.py`, `yolo/camera.sh`)
+  - 위치 추정(AMCL)·SLAM 을 로봇마다 네임스페이스로 (`start_nav2.sh`, `start_slam.sh` 는 지금 한 대용). 맵(map_server)은 같이 써도 됨
+  - `run.sh` 는 시작할 때 전부 끄므로 두 번째 로봇의 브리지는 위처럼 `start_bridge.sh` 로 따로 띄워야 함. 웹 '실행 모드',
+    자동 탐색, 위치 자동 찾기, `tools/*.py` 는 한 대(기본 `tb3`) 기준
+  - 로봇끼리 충돌 회피는 없음 (서로를 LiDAR 장애물로만 봄)
+
 ### LED 배달 (서빙 로봇처럼)
 
 1. **받는 사람** (관제 화면, 휴대폰 가능): "LED 요청" 카드에서 LED(A/B/C)를 고르고 → 지도에서 받을 자리를 클릭

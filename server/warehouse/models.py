@@ -205,4 +205,5 @@ class EventLog(models.Model):
         ordering = ['-created_at']
 
     def to_dict(self):
-        return {'message': self.message, 'created_at': self.created_at.isoformat()}
+        return {'message': self.message, 'created_at': self.created_at.isoformat(),
+                'robot_name': self.robot.name if self.robot_id else None}

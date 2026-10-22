@@ -14,7 +14,9 @@ const cargoColor = (label) => CARGO_COLORS[(label || '').toLowerCase()] || '#94a
 
 function connect() {
   const proto = location.protocol === 'https:' ? 'wss' : 'ws';
-  const ws = new WebSocket(`${proto}://${location.host}/ws/ui/`);
+  // 로봇에 달린 화면: /robot?robot=tb3_1 처럼 그 로봇 이름을 주소에 (없으면 서버 기본 tb3)
+  const name = new URLSearchParams(location.search).get('robot');
+  const ws = new WebSocket(`${proto}://${location.host}/ws/ui/${name ? `?robot=${encodeURIComponent(name)}` : ''}`);
   S.ws = ws;
   ws.onopen = () => { $('#conn').textContent = '연결됨'; $('#conn').className = 'conn on'; };
   ws.onclose = () => {
