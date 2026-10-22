@@ -290,7 +290,7 @@ class BridgeNode(Node):
         self.yolo_set = self.create_client(SetParameters, f'{yn}/set_parameters')
         self.yolo_enabled = None     # None = 모름 (검출기 없음)
         self.yolo_counts = ('', None)   # (글자, 받은 시각)
-        self.yolo_pending = False
+        self.yolo_pending = None     # 답을 기다리는 enabled 조회 (future, 보낸 시각)
         self.create_subscription(String, self.get_parameter('yolo_counts_topic').value, self.on_yolo_counts, 10)
         self.create_timer(1.0, self.poll_yolo)
 
@@ -807,13 +807,19 @@ class BridgeNode(Node):
             self.yolo_enabled = None
             self.send_yolo()
             return
-        if self.yolo_pending:
-            return
-        self.yolo_pending = True
+        if self.yolo_pending is not None:
+            fut, sent = self.yolo_pending
+            if time.monotonic() - sent < 3.0:
+                return
+            # 답이 안 온 요청(통신 끊김, 검출기 바쁨)은 버리고 다시 묻는다. 안 그러면 영영 다시 묻지 않음
+            self.yolo_get.remove_pending_request(fut)
         fut = self.yolo_get.call_async(GetParameters.Request(names=['enabled']))
+        self.yolo_pending = (fut, time.monotonic())
 
         def done(f):
-            self.yolo_pending = False
+            if self.yolo_pending is None or self.yolo_pending[0] is not f:
+                return   # 이미 버린 요청의 늦은 답
+            self.yolo_pending = None
             r = f.result()
             if r is not None and r.values and r.values[0].type == ParameterType.PARAMETER_BOOL:
                 self.yolo_enabled = r.values[0].bool_value
