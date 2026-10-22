@@ -142,7 +142,7 @@ class UIConsumer(AsyncJsonWebsocketConsumer):
         snap['path'] = live.get('path', [])
         snap['health'] = live.get('health', {'bridge': False})
         snap['runner'] = {'maps': runner.list_maps(), 'worlds': runner.list_worlds(),
-                          'mode': runner.current_mode(), 'busy': runner.busy()}
+                          'mode': runner.current_mode(), 'busy': runner.busy(), 'elapsed': runner.busy_elapsed()}
         await self.send_json(snap)
 
     async def disconnect(self, code):
@@ -153,7 +153,7 @@ class UIConsumer(AsyncJsonWebsocketConsumer):
         try:
             if action == 'list_maps':
                 await self.send_json({'type': 'runner_info', 'maps': runner.list_maps(), 'worlds': runner.list_worlds(),
-                                      'mode': runner.current_mode(), 'busy': runner.busy()})
+                                      'mode': runner.current_mode(), 'busy': runner.busy(), 'elapsed': runner.busy_elapsed()})
                 return
             if action in ('runner_start', 'runner_stop'):
                 # 노드를 다시 띄우기 전에 주행 중이면 멈춘다

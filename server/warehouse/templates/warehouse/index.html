@@ -228,6 +228,22 @@
 </main>
 
 <div id="toast" hidden></div>
+<!-- 실행 모드 전환 대기 화면 (맵 만들기 / 맵 사용 / 전체 정지): 지도와 카드는 필요 없으므로 화면 전체를 덮는다 -->
+<div id="run-overlay" class="run-overlay" hidden>
+  <div class="run-box">
+    <div class="run-head"><div id="run-spinner" class="spinner big"></div><div>
+      <h2 id="run-title"></h2>
+      <div class="run-time"><span id="run-elapsed">0.0</span>초<span id="run-prev" class="muted small"></span></div>
+    </div></div>
+    <ol id="run-steps" class="run-steps"></ol>
+    <p id="run-line" class="run-line muted small"></p>
+    <p id="run-result" class="run-result" hidden></p>
+    <div class="run-actions">
+      <button id="run-hide" class="ghost" title="대기 화면만 닫음 (실행은 계속, 실행 모드 카드에서 확인)">화면 숨기기</button>
+      <button id="run-close" class="primary" hidden>닫기</button>
+    </div>
+  </div>
+</div>
 <script src="{% static 'warehouse/app.js' %}?v={{ static_version }}"></script>
 </body>
 </html>

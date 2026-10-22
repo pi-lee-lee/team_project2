@@ -10,6 +10,7 @@ import re
 import signal
 import subprocess
 import threading
+import time
 
 from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
@@ -38,6 +39,7 @@ WORLD_LABELS = {
 _lock = threading.Lock()
 _running = None  # 실행 중인 작업 이름
 _proc = None     # 실행 중인 프로세스 (중지용)
+_started_at = None  # 실행 중인 작업 시작 시각 (monotonic)
 EXPLORE_JOB = '자동 탐색'
 
 
@@ -98,6 +100,11 @@ def busy():
     return _running
 
 
+def busy_elapsed():
+    """진행 중인 job 이 시작된 뒤 지난 초 (없으면 None). 페이지를 새로 열어도 대기 화면 시간이 이어지게"""
+    return round(time.monotonic() - _started_at, 1) if _running and _started_at else None
+
+
 def _broadcast(msg):
     async_to_sync(get_channel_layer().group_send)('ui', {'type': 'send.msg', 'msg': msg})
 
@@ -109,6 +116,8 @@ def _start(job, cmd, timeout, parse=None):
         if _running:
             raise RunnerError(f'"{_running}" 이(가) 아직 진행 중입니다.')
         _running = job
+    global _started_at
+    _started_at = time.monotonic()
     _broadcast({'type': 'runner', 'job': job, 'state': 'started'})
 
     def run():
@@ -117,12 +126,36 @@ def _start(job, cmd, timeout, parse=None):
         ok, message = False, ''
         try:
             _proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
-                                     cwd=HOME, start_new_session=True)
-            try:
-                output, _ = _proc.communicate(timeout=timeout)
-            except subprocess.TimeoutExpired:
-                os.killpg(_proc.pid, signal.SIGINT)
-                output, _ = _proc.communicate()
+                                     cwd=HOME, start_new_session=True, bufsize=1)
+            proc = _proc
+            timed_out = []
+
+            def kill():
+                timed_out.append(1)
+                try:
+                    os.killpg(proc.pid, signal.SIGINT)
+                except ProcessLookupError:
+                    pass
+            timer = threading.Timer(timeout, kill)
+            timer.start()
+            # 출력을 한 줄씩 읽어 웹 대기 화면에 진행 상황으로 보낸다 (run.sh 의 "1) 웹 서버", "2) Gazebo ..." = 단계)
+            lines, last_sent = [], 0.0
+            for line in proc.stdout:
+                line = line.rstrip()
+                lines.append(line)
+                text = line.strip()
+                if not text or 'WARN' in text or 'warn' in text:
+                    continue
+                step = bool(re.match(r'^(\d\)|==)', text))
+                now = time.monotonic()
+                if step or now - last_sent > 0.5:
+                    last_sent = now
+                    _broadcast({'type': 'runner', 'job': job, 'state': 'progress', 'line': text[:200], 'step': step,
+                                'elapsed': round(now - _started_at, 1)})
+            proc.wait()
+            timer.cancel()
+            output = '\n'.join(lines)
+            if timed_out:
                 output += f'\n{timeout}초 안에 끝나지 않아 중지했습니다.'
             output = output.strip()
             ok = _proc.returncode == 0
@@ -136,7 +169,7 @@ def _start(job, cmd, timeout, parse=None):
                 _running = None
                 _proc = None
         _broadcast({'type': 'runner', 'job': job, 'state': 'done', 'ok': ok, 'message': message,
-                    'mode': current_mode()})
+                    'mode': current_mode(), 'elapsed': round(time.monotonic() - _started_at, 1)})
         from . import services  # 순환 import 방지
         services.log_runner(job, ok, message)
     threading.Thread(target=run, daemon=True).start()

@@ -149,13 +149,19 @@ function handle(msg) {
       renderYolo();
       break;
     case 'runner':
+      if (msg.state === 'progress') {
+        runProgress(msg);
+        break;
+      }
       if (msg.state === 'started') {
         S.runnerBusy = msg.job;
-        toast(`${msg.job} 시작...`);
+        if (runOverlayJob(msg.job)) runOpen(msg.job, 0);
+        else toast(`${msg.job} 시작...`);
       } else {
         S.runnerBusy = null;
         if (msg.mode) S.runnerMode = msg.mode;
-        toast(`${msg.job} ${msg.ok ? '완료' : '실패'}: ${msg.message}`);
+        if (S.run && S.run.job === msg.job) runDone(msg);
+        else toast(`${msg.job} ${msg.ok ? '완료' : '실패'}: ${msg.message}`);
       }
       renderRunner();
       break;
@@ -233,9 +239,117 @@ function renderHealth() {
 // ------------------------------------------------------------------ 실행 모드
 const ROBOT_LABEL = { sim: '시뮬레이션', real: '실물' };
 
+// ---------------------------------------------------------- 실행 모드 전환 대기 화면
+// 맵 만들기 / 맵 사용 / 전체 정지: 수십 초 동안 지도·카드는 쓸 일이 없으므로 화면 전체를 덮고 단계와 걸린 시간을 보여 준다.
+// 자동 탐색, 위치 자동 찾기는 지도를 보며 기다려야 하므로 덮지 않는다
+function runOverlayJob(job) {
+  return job && job !== '자동 탐색' && job !== '위치 자동 찾기';
+}
+function runKey(job) {   // 지난번 걸린 시간 (브라우저에만 저장): 월드 이름 등은 빼고 종류별로
+  return 'runTime:' + job.replace(/\s*\(.*?\)/, '');
+}
+function runOpen(job, elapsed) {
+  clearInterval(S.runTimer);
+  S.run = { job, t0: performance.now() - elapsed * 1000, steps: [], hidden: false };
+  let prev = null;
+  try { prev = localStorage.getItem(runKey(job)); } catch (e) { /* 저장소 없음 */ }
+  $('#run-title').textContent = `${job} 준비 중`;
+  $('#run-prev').textContent = prev ? `지난번 ${prev}초` : '';
+  $('#run-steps').innerHTML = '';
+  $('#run-line').textContent = elapsed ? '진행 중인 작업에 다시 연결했습니다' : '';
+  $('#run-result').hidden = true;
+  $('#run-spinner').className = 'spinner big';
+  $('#run-hide').hidden = false;
+  $('#run-close').hidden = true;
+  $('#run-overlay').hidden = false;
+  S.runTimer = setInterval(runTick, 100);
+  runTick();
+}
+function runTick() {
+  if (!S.run) return;
+  const t = (performance.now() - S.run.t0) / 1000;
+  $('#run-elapsed').textContent = t.toFixed(1);
+  const cur = $('#run-steps li.cur .t');
+  const last = S.run.steps[S.run.steps.length - 1];
+  if (cur && last) cur.textContent = `${(t - last.at).toFixed(1)}초`;
+}
+function runProgress(msg) {
+  if (!S.run || S.run.job !== msg.job) {
+    if (!runOverlayJob(msg.job)) return;
+    runOpen(msg.job, msg.elapsed || 0);   // 다른 화면에서 시작한 작업
+  }
+  if (S.run.hidden) return;
+  $('#run-line').textContent = msg.line;
+  if (!msg.step || msg.line.startsWith('== 완료')) return;
+  if (msg.line.startsWith('==')) {   // run.sh 첫 줄: 로봇 / 모드 / 도메인 요약
+    $('#run-line').textContent = msg.line.replace(/^==\s*/, '');
+    return;
+  }
+  const t = (performance.now() - S.run.t0) / 1000;
+  const ol = $('#run-steps');
+  const prev = ol.querySelector('li.cur');
+  const last = S.run.steps[S.run.steps.length - 1];
+  if (prev) {
+    prev.classList.remove('cur');
+    prev.querySelector('.run-ico').textContent = '✓';
+    prev.querySelector('.t').textContent = `${(t - last.at).toFixed(1)}초`;
+  }
+  S.run.steps.push({ text: msg.line, at: t });
+  const li = document.createElement('li');
+  li.className = 'cur';
+  const ico = document.createElement('span');
+  ico.className = 'run-ico';
+  ico.textContent = '…';
+  const tt = document.createElement('span');
+  tt.className = 't';
+  li.append(ico, msg.line.replace(/^\d\)\s*/, ''), tt);
+  ol.appendChild(li);
+}
+function runDone(msg) {
+  clearInterval(S.runTimer);
+  const t = msg.elapsed != null ? msg.elapsed : (performance.now() - S.run.t0) / 1000;
+  $('#run-elapsed').textContent = t.toFixed(1);
+  const cur = $('#run-steps li.cur');
+  if (cur) {
+    cur.classList.remove('cur');
+    cur.querySelector('.run-ico').textContent = msg.ok ? '✓' : '✕';
+    const last = S.run.steps[S.run.steps.length - 1];
+    if (last) cur.querySelector('.t').textContent = `${(t - last.at).toFixed(1)}초`;
+  }
+  if (msg.ok) {
+    try { localStorage.setItem(runKey(msg.job), t.toFixed(0)); } catch (e) { /* 저장소 없음 */ }
+  }
+  $('#run-title').textContent = `${msg.job} ${msg.ok ? '완료' : '실패'}`;
+  $('#run-spinner').className = 'spinner big ' + (msg.ok ? 'done' : 'fail');
+  const res = $('#run-result');
+  res.textContent = `${msg.ok ? '✓' : '✕'} ${t.toFixed(1)}초 · ${msg.message || ''}`;
+  res.className = 'run-result' + (msg.ok ? '' : ' fail');
+  res.hidden = false;
+  $('#run-line').textContent = '';
+  $('#run-hide').hidden = true;
+  $('#run-close').hidden = false;
+  const job = S.run.job;
+  S.run.finished = true;
+  if (S.run.hidden) toast(`${job} ${msg.ok ? '완료' : '실패'} (${t.toFixed(1)}초): ${msg.message}`);
+  if (msg.ok) setTimeout(() => { if (S.run && S.run.finished && S.run.job === job) runClose(); }, 3000);
+}
+function runClose() {
+  clearInterval(S.runTimer);
+  S.run = null;
+  $('#run-overlay').hidden = true;
+}
+$('#run-close').addEventListener('click', runClose);
+$('#run-hide').addEventListener('click', () => {
+  // 실행은 계속, 화면만 닫음. 끝나면 알림으로
+  S.run.hidden = true;
+  $('#run-overlay').hidden = true;
+});
+
 function setRunner(info) {
   S.runnerMode = info.mode || {};
   S.runnerBusy = info.busy || null;
+  // 페이지를 새로 열었는데 전환 중이면 대기 화면을 이어서 (시작부터 지난 시간 포함)
+  if (info.busy && runOverlayJob(info.busy) && !S.run) runOpen(info.busy, info.elapsed || 0);
   const sel = $('#runner-map');
   const keep = sel.value;
   sel.innerHTML = '';
