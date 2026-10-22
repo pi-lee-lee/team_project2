@@ -5,7 +5,8 @@
 
 이동 방식
   planner=astar : astar_planner 노드로 경로 계획 후
-      controller=builtin : 이 노드의 pure pursuit 추종기로 cmd_vel 직접 발행 (기본)
+      controller=dwa     : 이 노드의 DWA 로 추종, 움직이는 장애물의 미래 위치를 피함 (기본)
+      controller=builtin : 이 노드의 pure pursuit 추종기로 cmd_vel 직접 발행
       controller=nav2    : Nav2 controller_server(FollowPath)로 추종
   planner=nav2  : Nav2 NavigateToPose (Nav2 기본 플래너 사용, 비교/예비용)
 
@@ -190,7 +191,7 @@ class BridgeNode(Node):
         # FollowPath에 넘길 경로 좌표계. odom이면 controller_server가 map->odom TF 없이 주행한다
         self.declare_parameter('follow_frame', 'odom')
         # 경로 추종기 (controller=builtin)
-        self.declare_parameter('controller', 'builtin')  # builtin | nav2 | dwa
+        self.declare_parameter('controller', 'dwa')  # dwa | builtin | nav2
         self.declare_parameter('max_speed', 0.15)          # m/s
         self.declare_parameter('max_turn_speed', 1.0)      # rad/s
         self.declare_parameter('stop_distance', 0.35)      # 앞쪽 이 거리 안에 물체가 있으면 정지 (m)

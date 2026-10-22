@@ -365,3 +365,9 @@ cd ../ros2_ws && source /opt/ros/humble/setup.bash && colcon build --symlink-ins
 - 실물 확인: 초기화 후 오도메트리 0, SLAM 지도 속 로봇 방향 0.3°
 - 웹 지도 표시: 고정 90° 회전으로 x 축이 화면 위쪽, y 축이 왼쪽 (좌표는 그대로, 보기만). 첫 번째 시도(SLAM 마다 각도 저장)는 되돌림
 
+
+### 기본 경로 추종기를 DWA 로 (2026-10-22)
+- `run.sh` / `start_bridge.sh` / launch / `params.yaml` / 브리지 기본값 `controller` 를 `builtin`(pure pursuit) → `dwa` 로. 웹 실행 모드로 시작해도 DWA (runner 는 `--controller` 를 넘기지 않음)
+- 예전처럼 쓰려면 `scripts/run.sh ... --controller builtin`
+- DWA 는 앞쪽 ±25° 정지 규칙을 쓰지 않음 (스캔 점 + 추적한 움직이는 장애물로 직접 피함). 기울어짐/TF 끊김 정지는 그대로
+- **실물 미시험**: DWA 시험 기록은 sim 강당뿐. 실물(LDS-02 빔 개수 변동, NaN) + 좁은 미로 맵(`maze_map`)에서 여기로 이동/배송 확인 필요. 이상하면 `--controller builtin`

@@ -108,8 +108,8 @@ scripts/run.sh --robot sim --mode map --map ~/maps/<이름>_clean.yaml   # 저�
 
 | 옵션 | 의미 |
 |---|---|
-| (기본) `--planner astar --controller builtin` | 직접 구현한 A* + pure pursuit |
-| `--controller dwa` | A* 경로를 DWA 로 추종, 추적한 움직이는 장애물의 미래 위치를 피함 |
+| (기본) `--planner astar --controller dwa` | 직접 구현한 A* + DWA (추적한 움직이는 장애물의 미래 위치를 피함) |
+| `--controller builtin` | A* 경로를 pure pursuit 로 추종 (앞쪽 ±25° 장애물이면 정지 후 대기). 예전 기본값 |
 | `--controller nav2` / `--planner nav2` | Nav2 controller_server / NavigateToPose 사용 (`--nav2` 자동). **tf2 ≥ 0.25.24 필요** |
 | `--nav2` | Nav2 주행 노드만 추가로 띄움 |
 | `--slam cartographer` | SLAM 엔진 변경 (기본 slam_toolbox) |

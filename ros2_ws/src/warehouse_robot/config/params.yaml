@@ -30,7 +30,7 @@ warehouse_bridge:
     pose_rate: 5.0
     max_retries: 2
     arrive_tolerance: 0.3     # Nav2가 성공이라고 해도 목표와 이 거리 이상이면 실패로 처리
-    controller: builtin       # builtin: 브리지의 pure pursuit로 직접 주행 / nav2: Nav2 controller_server 사용
+    controller: dwa           # dwa(기본): 브리지의 DWA / builtin: 브리지의 pure pursuit로 직접 주행 / nav2: Nav2 controller_server 사용
     max_speed: 0.15           # m/s
     max_turn_speed: 1.0       # rad/s
     footprint_extra: [-0.277, -0.197, -0.04, 0.04]   # 차체에 붙인 물건 사각형 (x_min, x_max, y_min, y_max) x N. 뒤쪽 가운데 8x8cm. 제자리 회전/후진 여유, 웹 로봇 모양

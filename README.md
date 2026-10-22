@@ -136,7 +136,7 @@ scripts/stop_ros.sh --all
 | `--gui` | Gazebo 화면 표시 |
 | `--nav2` | Nav2 주행 노드도 실행 (SLAM 모드에서도 가능, 이때는 AMCL 없이 주행 노드만) |
 | `--planner nav2` / `--controller nav2` | Nav2 로 경로 계획+주행 / A* 경로를 Nav2 controller 로 추종 (`--nav2` 자동). tf2 0.25.24 이상 필요 (8번 참고) |
-| `--controller dwa` | A* 경로를 DWA 로 추종 (추적한 움직이는 장애물의 미래 위치를 피함) |
+| `--controller dwa` (기본) / `builtin` | A* 경로를 DWA 로 추종 (추적한 움직이는 장애물의 미래 위치를 피함) / pure pursuit 로 추종 (앞쪽 장애물이면 정지 후 대기) |
 | `--amcl default` / `hall` / 파일 | (map) 위치 추정 설정. `hall` = `config/amcl_hall.yaml`: 책상/의자가 흩어진 강당·교실용 (지도에 없는 빔에 너그럽게). 웹 실행 모드의 "강당/교실용 위치 추정" 체크와 같음 |
 | `--scan-noise` | (sim) LiDAR 를 실물 LDS-02 처럼: 빔 개수 238~244 변동, 거리 흔들림, 먼 곳 값 빠짐(NaN). 웹 "LiDAR 를 실물처럼" 체크와 같음 |
 | `--world lecture_hall_real` | (sim) 실제 학원과 비슷한 강당: 책상 앞판 없음(다리만 보임), 좌우 끝 열이 벽에 붙음, 좌석 줄 사이 빈 틈 0.25m(로봇 폭 0.31m 보다 좁아 세로 복도와 맨 앞/뒤 가로 복도로만 다님), 의자 무작위 배치 |
@@ -305,7 +305,7 @@ SIGINT → SIGTERM → SIGKILL 순서로 보내고 남은 프로세스가 없는
 |---|---|---|
 | `astar_planner.robot_radius` | 0.25 | Waffle Pi 반경(뒤쪽 모서리까지). 이 안쪽은 통과 불가 |
 | `astar_planner.inflation_radius` | 0.55 | 이 거리까지 벽에서 멀어지도록 비용 부여 |
-| `warehouse_bridge.controller` | builtin | builtin: 내장 추종기 / nav2: Nav2 controller_server |
+| `warehouse_bridge.controller` | dwa | dwa: 내장 DWA / builtin: 내장 pure pursuit / nav2: Nav2 controller_server |
 | `warehouse_bridge.max_speed` | 0.15 | 최고 속도 (m/s) |
 | `warehouse_bridge.stop_distance` | 0.35 | 앞쪽 ±25° 안에 이 거리 이내 물체가 있으면 정지 후 대기 |
 | `astar_planner.scan_obstacles` / `scan_memory` | true / 20.0 | AMCL 모드: LiDAR 로 본, 맵에 없는 장애물을 이 시간(초) 기억해 피함 (SLAM 모드는 SLAM 맵이 대신함) |
