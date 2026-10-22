@@ -113,6 +113,15 @@ warehouse_bridge:
       moving_speed: 0.08      # 이보다 빠른 track 만 움직이는 장애물로 예측/웹 표시 (멈춘 물체 속도 노이즈 중앙값 0.06, 느린 사람 0.1)
     # controller: hybrid 일 때 pure pursuit ↔ DWA 전환 (track = 지도에 없는 물체: 상자, 사람)
     hybrid:
+      # 전환 조건: true = 로봇 앞(+뒤 조금) 사각형 안에 지도에 없는 LiDAR 점이 box_min_points 개 이상, box_min_scans 번 연속이면 DWA
+      #           false = 지도에 없는 물체(track)가 trigger_distance 안 + 앞쪽 경로 path_width 안이면 DWA (예전 방식)
+      # 움직이는 track 이 moving_distance 안이면 둘 다 DWA. 사각형은 track(지름 0.8m 이하, 5번 연속 확정)을 거치지 않아 큰 물체도 바로 잡음
+      box_trigger: true
+      box_front: 1.0          # 차체 앞 끝에서 앞으로 (m)
+      box_back: 0.2           # 차체 뒤 끝에서 뒤로 (m). 뒤 부착물/후진/제자리 회전 여유
+      box_half_width: 0.25    # 좌우 반폭 (m): 차체 반폭 0.153 + 여유 0.1. 0.33 은 경로 옆을 지나는 물체에도 DWA 로 바뀌어 느려짐 (sim 17/21 → 18/21)
+      box_min_points: 3       # AMCL 오차로 벽 점 몇 개가 '지도에 없는 점' 으로 새는 것 무시
+      box_min_scans: 2        # 깜빡임 방지 (스캔 약 9 Hz → 약 0.2초)
       trigger_distance: 1.0   # 이 거리 안 + 앞쪽 경로 가까이에 track 이 있으면 DWA (m)
       moving_distance: 1.5    # 움직이는 track 은 경로와 상관없이 이 거리 안이면 DWA (m)
       path_width: 0.25        # track 가장자리가 앞쪽 경로에서 이 거리 안이면 '경로 위' (m). 차체 반폭 + 여유 정도:

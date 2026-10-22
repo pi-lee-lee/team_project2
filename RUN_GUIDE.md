@@ -108,7 +108,7 @@ scripts/run.sh --robot sim --mode map --map ~/maps/<이름>_clean.yaml   # 저�
 
 | 옵션 | 의미 |
 |---|---|
-| (기본) `--planner astar --controller hybrid` | 직접 구현한 A* + 평소 pure pursuit, 경로 앞 1m 안에 지도에 없는 장애물(상자, 사람)이 오면 DWA 로 피하고 지나가면 pure pursuit 로 복귀 |
+| (기본) `--planner astar --controller hybrid` | 직접 구현한 A* + 평소 pure pursuit, 로봇 앞 1m (좌우 ±0.25m, 뒤 0.2m) 안에 지도에 없는 장애물(상자, 사람)이 보이면 DWA 로 피하고 지나가면 pure pursuit 로 복귀 |
 | `--controller mppi` | 항상 MPPI (경로를 정면으로 막은 상자는 혼자 못 돌아가 15초 뒤 재계획) |
 | `--controller dwa` | 항상 DWA (추적한 움직이는 장애물의 미래 위치를 피함) |
 | `--controller builtin` | 항상 pure pursuit (앞쪽 ±25° 장애물이면 정지 후 대기) |

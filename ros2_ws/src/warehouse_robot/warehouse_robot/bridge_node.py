@@ -354,6 +354,17 @@ class BridgeNode(Node):
         self.declare_parameter('hybrid.path_ahead', 1.5)        # 앞쪽 경로를 이 길이만큼 본다 (m)
         self.declare_parameter('hybrid.release_time', 2.0)      # 장애물이 이 시간 동안 안 보이면 pure pursuit 로 (s)
         self.declare_parameter('hybrid.rejoin_offset', 0.25)    # 경로에서 이 거리 안으로 돌아왔을 때만 pure pursuit 로 (m)
+        # 전환 조건: true = 로봇 앞(+뒤 조금) 사각형 안에 지도에 없는 스캔 점이 있으면 (box_*) /
+        # false = 앞쪽 경로 가까이에 track 이 있으면 (trigger_distance, path_*). 움직이는 track 이 moving_distance 안이면 둘 다 전환
+        self.declare_parameter('hybrid.box_trigger', True)
+        self.declare_parameter('hybrid.box_front', 1.0)         # 차체 앞 끝(x=0.069)에서 앞으로 (m)
+        self.declare_parameter('hybrid.box_back', 0.2)          # 차체 뒤 끝(x=-0.197)에서 뒤로 (m)
+        self.declare_parameter('hybrid.box_half_width', 0.25)   # 좌우 반폭 (m): 차체 반폭 0.153 + 여유
+        self.declare_parameter('hybrid.box_min_points', 3)      # 사각형 안 점이 이만큼 이상이어야 (AMCL 오차로 벽 점 몇 개가 새는 것 무시)
+        self.declare_parameter('hybrid.box_min_scans', 2)       # 이만큼 연속 스캔에서 보여야 전환 (깜빡임 방지)
+        self.box_streak = 0      # 사각형 안에 점이 있던 연속 스캔 수
+        self.box_count = 0       # 마지막 스캔에서 사각형 안 점 수
+        self.box_near = math.inf # 그중 차체에서 가장 가까운 거리 (m, 로그용)
         self.odom_vw = (0.0, 0.0)
         self.create_subscription(Odometry, 'odom', self.on_odom, qos_profile_sensor_data)
         # A* 가 기억 중인 장애물 (맵에 없는 LiDAR 장애물, 부딪힌 자리) → 웹 지도 표시
@@ -889,8 +900,9 @@ class BridgeNode(Node):
         names += [f'mppi.{k}' for k in vars(self.mppi_cfg) if k != 'seed']
         names += ['dwa_follow.lookahead', 'dwa_follow.goal_tolerance', 'dwa_follow.moving_speed',
                   'dwa_follow.target_clear', 'dwa_follow.target_max']
-        names += [f'hybrid.{k}' for k in ('trigger_distance', 'moving_distance', 'path_width', 'path_ahead',
-                                          'release_time', 'rejoin_offset')]
+        names += [f'hybrid.{k}' for k in ('box_trigger', 'box_front', 'box_back', 'box_half_width', 'box_min_points',
+                                          'box_min_scans', 'trigger_distance', 'moving_distance', 'path_width',
+                                          'path_ahead', 'release_time', 'rejoin_offset')]
         return names
 
     def on_set_params(self, params):
@@ -1251,8 +1263,32 @@ class BridgeNode(Node):
     # hybrid: 평소 pure pursuit, 장애물이 가까우면 DWA ---------------
     # DWA 만 쓰면 실물에서 벽 옆/좁은 곳에서 '안전한 궤적 없음', '진행 없음' 이 잦았다 → 지도에 있는 벽은
     # A* 경로 + pure pursuit 로 충분하므로, 지도에 없는 물체(추적 track: 상자, 사람)가 경로 가까이 올 때만 DWA
+    def update_box(self, pts):
+        """스캔마다: 로봇 앞(+뒤 조금) 사각형 안의 지도에 없는 점 수 → 연속 스캔 수 (hybrid.box_trigger)."""
+        pose = self.xyyaw('odom', self.base_frame)
+        if pose is None or not len(pts):
+            self.box_streak, self.box_count, self.box_near = 0, 0, math.inf
+            return
+        x, y, yaw = pose
+        c, s = math.cos(yaw), math.sin(yaw)
+        lx = c * (pts[:, 0] - x) + s * (pts[:, 1] - y)
+        ly = -s * (pts[:, 0] - x) + c * (pts[:, 1] - y)
+        x0, x1, _ = self.dwa_cfg.footprint if self.dwa_cfg.footprint else (-0.197, 0.069, 0.153)
+        p = lambda n: self.get_parameter(f'hybrid.{n}').value
+        inside = (lx >= x0 - p('box_back')) & (lx <= x1 + p('box_front')) & (np.abs(ly) <= p('box_half_width'))
+        self.box_count = int(np.count_nonzero(inside))
+        if self.box_count >= p('box_min_points'):
+            self.box_streak += 1
+            gx = np.maximum(np.maximum(x0 - lx[inside], lx[inside] - x1), 0.0)
+            self.box_near = float(np.min(np.hypot(gx, np.maximum(np.abs(ly[inside]) - 0.153, 0.0))))
+        else:
+            self.box_streak, self.box_near = 0, math.inf
+
     def hybrid_obstacle(self, f, x, y):
-        """DWA 로 피해야 할 track 이 있으면 설명 글자, 없으면 None. x, y: 로봇 (map)."""
+        """DWA 로 피해야 할 장애물이 있으면 설명 글자, 없으면 None. x, y: 로봇 (map)."""
+        box = self.get_parameter('hybrid.box_trigger').value
+        if box and self.box_streak >= self.get_parameter('hybrid.box_min_scans').value:
+            return f'앞쪽 장애물 {self.box_near:.2f} m (점 {self.box_count}개)'
         if not self.tracks:
             return None
         m_o = self.xyyaw(self.global_frame, 'odom')
@@ -1273,7 +1309,7 @@ class BridgeNode(Node):
             d = math.hypot(ox - x, oy - y) - t.radius
             if math.hypot(t.x[2], t.x[3]) >= moving_v and d < moving_d:
                 return f'움직이는 장애물 {d:.2f} m'
-            if d < trigger and len(pts) and \
+            if not box and d < trigger and len(pts) and \
                     float(np.min(np.hypot(pts[:, 0] - ox, pts[:, 1] - oy))) - t.radius < width:
                 return f'경로 위 장애물 {d:.2f} m'
         return None
@@ -1326,7 +1362,8 @@ class BridgeNode(Node):
         ok = np.isfinite(r) & (r >= scan.range_min) & (r <= min(scan.range_max, c['max_range']))
         pts = transform_points(np.column_stack([r[ok] * np.cos(a[ok]), r[ok] * np.sin(a[ok])]), *sensor)
         self.scan_odom = pts
-        self.scan_unmapped = pts[:0]   # 지도에 없는 물체의 스캔 점 (odom) - DWA 목표점을 장애물 너머로 옮길 때
+        # 지도에 없는 물체의 스캔 점 (odom): DWA 목표점을 장애물 너머로 옮길 때, hybrid 앞 사각형 전환. 지도와 못 맞추면 비움
+        self.scan_unmapped = pts[:0]
         if not self.tracking:
             return
         # 지도 벽 근처 점은 정적이므로 추적하지 않는다 (판별에만 map 을 쓰므로 AMCL 이 몇 cm 틀려도 속도에는 영향 없음).
@@ -1348,7 +1385,8 @@ class BridgeNode(Node):
                 free = (cell >= 0) & (cell < 65)
                 keep[inside] = free & (dist[row[inside], col[inside]] > c['static_match_dist'])
                 pts = pts[keep]
-        self.scan_unmapped = pts
+                self.scan_unmapped = pts
+        self.update_box(self.scan_unmapped)
         dets = detect_clusters(pts, c['cluster_gap'], c['min_points'], c['max_diameter'], c['min_radius'],
                                sensor[:2])
         self.tracks = self.tracker.update(dets, Time.from_msg(scan.header.stamp).nanoseconds * 1e-9)

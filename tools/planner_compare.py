@@ -50,6 +50,10 @@ EXTRA = (-0.277, -0.197, 0.04)   # 뒤에 붙인 물건 (x_min, x_max, 반폭)
 
 STRATEGIES = {
     'A': dict(local='dwa', hybrid=True, replan=False, desc='hybrid PP↔DWA (params.yaml 그대로 = 기본)'),
+    'A_path': dict(local='dwa', hybrid=True, replan=False, hybrid_cfg=dict(box_trigger=False),
+                   desc='A, 전환 = 경로 가까이 track'),
+    'A_box': dict(local='dwa', hybrid=True, replan=False, hybrid_cfg=dict(box_trigger=True, box_front=1.0, box_back=0.2,
+                  box_half_width=0.33, box_min_points=3, box_min_scans=2), desc='전환 = 로봇 앞 사각형 반폭 0.33'),
     # 2026-10-22 비용 함수 다시 정의하기 전 기본값 (비교용)
     'A_old': dict(local='dwa', hybrid=True, replan=False, target_clear=0.0, astar=dict(robot_radius=0.20),
                   dwa=dict(w_path=0.75, obstacle_influence=0.5, w_obstacle=1.8, min_v=-0.05),
@@ -371,6 +375,7 @@ class Run:
         self.replans = 0
         self.switches = 0
         self.odo = 0.0
+        self.box_streak = 0
 
     def say(self, t, msg):
         self.log.append(f'{t:6.1f}s {msg}')
@@ -429,8 +434,21 @@ class Run:
         f['clear_since'] = None
         return f
 
+    def update_box(self, pts, x, y, yaw):
+        """브리지 update_box 와 같음: 스캔마다 로봇 앞(+뒤 조금) 사각형 안의 지도에 없는 점 → 연속 스캔 수."""
+        h = {**self.b['hybrid'], **self.st.get('hybrid_cfg', {})}
+        um = self.wd.unmapped(pts)
+        c, s = math.cos(yaw), math.sin(yaw)
+        lx = c * (um[:, 0] - x) + s * (um[:, 1] - y)
+        ly = -s * (um[:, 0] - x) + c * (um[:, 1] - y)
+        inside = (lx >= BODY[0] - h['box_back']) & (lx <= BODY[1] + h['box_front']) & (np.abs(ly) <= h['box_half_width'])
+        self.box_streak = self.box_streak + 1 if np.count_nonzero(inside) >= h['box_min_points'] else 0
+
     def hybrid_trigger(self, f, x, y, pts, t):
         h = {**self.b['hybrid'], **self.st.get('hybrid_cfg', {})}
+        box = h.get('box_trigger', False)
+        if box and self.box_streak >= h['box_min_scans']:
+            return True
         idx = f['local'].progress if f['use_local'] else f['pp'].index
         ahead = f['path'][idx:]
         if len(ahead) > 1:
@@ -441,7 +459,7 @@ class Run:
             if math.hypot(vx, vy) >= self.b['dwa_follow']['moving_speed'] and d < h['moving_distance']:
                 return True
         um = self.wd.unmapped(pts)
-        if len(um) and len(ahead):
+        if not box and len(um) and len(ahead):
             near = um[np.hypot(um[:, 0] - x, um[:, 1] - y) < h['trigger_distance']]
             if len(near):
                 dp = np.hypot(near[:, None, 0] - ahead[None, :, 0], near[:, None, 1] - ahead[None, :, 1]).min()
@@ -483,6 +501,7 @@ class Run:
             if t - last_scan >= 0.2 - 1e-9:
                 pts, rng, ang = wd.scan(x, y, yaw, t)
                 self.remember(pts, t)
+                self.update_box(pts, x, y, yaw)
                 last_scan = t
             dyn = wd.mover_state(t)
             outcome = None
