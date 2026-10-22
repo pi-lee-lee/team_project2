@@ -82,6 +82,7 @@
         <button id="btn-yolo-off" title="검출기 enabled=false: 추론과 발행 중지 (로봇 카메라 발행은 그대로)">■ 검출 끄기</button>
         <button id="btn-yolo-capture" class="ghost" title="다음 검출 장면을 PNG 한 장으로 저장 (~/camera_dataset/captures)">📷 장면 캡처</button>
       </div>
+      <img id="yolo-image" class="yolo-image" alt="검출 결과 영상" title="/yolo/image_raw (브리지가 줄여서 보냄, 초당 최대 5장)" hidden>
       <p id="yolo-summary" class="yolo-summary"></p>
       <p id="yolo-counts" class="yolo-counts muted small" title="/yolo/counts 원문 (현재 프레임의 클래스별 개수)"></p>
       <p id="yolo-timing" class="yolo-timing muted small"></p>

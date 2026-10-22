@@ -89,6 +89,9 @@ function handle(msg) {
       S.cargo = msg.label;
       renderCargo();
       break;
+    case 'yolo_image':
+      showYoloImage(msg);
+      break;
     case 'yolo':
       // 개수 글자가 새로 온 시각 (bridge 의 age 가 작으면 새 결과)
       msg.countsAt = msg.counts && msg.age !== null && msg.age < 0.3 ? Date.now()
@@ -1044,6 +1047,16 @@ function renderYolo() {
     : !y.enabled ? '검출 꺼짐'
     : '카메라 영상을 기다리는 중';
   $('#yolo-counts').textContent = counts;
+}
+// 버튼 아래 검출 결과 영상 (/yolo/image_raw). 3초 동안 새 장면이 없으면(검출 끔, 영상 끊김) 숨김
+let yoloImageTimer = null;
+function showYoloImage(msg) {
+  const img = $('#yolo-image');
+  if (!msg.jpg) return;
+  img.src = 'data:image/jpeg;base64,' + msg.jpg;
+  img.hidden = false;
+  clearTimeout(yoloImageTimer);
+  yoloImageTimer = setTimeout(() => { img.hidden = true; img.removeAttribute('src'); }, 3000);
 }
 // 버튼 위 클래스별 개수 칸. 개수가 안 올 때도 마지막으로 본 클래스 칸은 '-' 로 남겨 자리가 흔들리지 않게
 function renderYoloClasses(items) {

@@ -107,6 +107,10 @@ class RobotConsumer(AsyncJsonWebsocketConsumer):
             # YOLO 부품 검출기 상태 (available, enabled, counts 글자) - 화면 표시용, DB 에 저장하지 않음
             live['yolo'] = {k: msg.get(k) for k in ('available', 'enabled', 'counts', 'age')}
             await self.broadcast({'type': 'yolo', 'robot': self.robot_name, **live['yolo']})
+        elif kind == 'yolo_image':
+            # 검출 결과 영상 한 장 (JPEG base64, 초당 최대 5장) - 화면 표시용, 저장하지 않음
+            await self.broadcast({'type': 'yolo_image', 'robot': self.robot_name, 'jpg': msg.get('jpg', ''),
+                                  'w': msg.get('w'), 'h': msg.get('h')})
         elif kind == 'scan':
             # 실시간 LiDAR (지도 좌표 점, 초당 4번) - 화면 표시용, DB 에 저장하지 않음
             await self.broadcast({'type': 'scan', 'robot': self.robot_name, 'origin': msg.get('origin'),
