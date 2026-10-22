@@ -19,9 +19,11 @@ PLANNER="${WAREHOUSE_PLANNER:-astar}"
 CONTROLLER="${WAREHOUSE_CONTROLLER:-dwa}"
 ROBOT_NAME="${WAREHOUSE_ROBOT_NAME:-tb3}"
 echo "[start_bridge] 로봇 $ROBOT_NAME, 네임스페이스 ${WAREHOUSE_NAMESPACE:-(없음)}, 모드 $WAREHOUSE_MODE, 맵 이름 $MAP_NAME, planner=$PLANNER, controller=$CONTROLLER, 시뮬레이션 시간 $WAREHOUSE_SIM_TIME, LiDAR 노이즈 ${WAREHOUSE_SCAN_NOISE:-false}, 도메인 $ROS_DOMAIN_ID"
+# ros2 launch 는 값이 빈 인자(namespace:=)를 받지 않으므로 값이 있을 때만 넘긴다 (없으면 launch 기본값 '')
+EXTRA=()
+[ -n "$WAREHOUSE_NAMESPACE" ] && EXTRA+=(namespace:="$WAREHOUSE_NAMESPACE")
+[ "${WAREHOUSE_YOLO:-1}" = 1 ] && EXTRA+=(yolo:="$(cd "$(dirname "$0")" && pwd)/start_yolo.sh")
 exec ros2 launch warehouse_robot warehouse.launch.py map_name:="$MAP_NAME" \
   mode:="$WAREHOUSE_MODE" use_sim_time:="$WAREHOUSE_SIM_TIME" allow_unknown:="$ALLOW_UNKNOWN" \
   planner:="$PLANNER" controller:="$CONTROLLER" scan_noise:="${WAREHOUSE_SCAN_NOISE:-false}" \
-  robot_name:="$ROBOT_NAME" namespace:="${WAREHOUSE_NAMESPACE:-}" \
-  server_url:="${2:-ws://localhost:8000/ws/robot/$ROBOT_NAME/}" \
-  yolo:="$( [ "${WAREHOUSE_YOLO:-1}" = 1 ] && echo "$(cd "$(dirname "$0")" && pwd)/start_yolo.sh" )"
+  robot_name:="$ROBOT_NAME" server_url:="${2:-ws://localhost:8000/ws/robot/$ROBOT_NAME/}" "${EXTRA[@]}"
