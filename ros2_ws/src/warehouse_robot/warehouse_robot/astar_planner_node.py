@@ -59,7 +59,7 @@ class AStarPlannerNode(Node):
         # 맵에 없는 장애물 기억: LiDAR 로 본 점 중 맵의 벽에서 떨어진 것만, 이 시간 동안 장애물로 취급
         self.declare_parameter('scan_obstacles', True)
         self.declare_parameter('scan_memory', 20.0)      # s
-        self.declare_parameter('scan_max_range', 2.0)    # m, 이보다 먼 점은 무시
+        self.declare_parameter('scan_max_range', 5.0)    # m, 이보다 먼 점은 무시
         self.declare_parameter('scan_wall_margin', 0.15)  # m, 맵 벽에서 이 거리 안의 점은 벽으로 보고 무시
         # 같은 5cm 칸에서 이 시간 넘게 계속 보여야 기억한다. 지나가는 사람/물체(한 칸에 1~2초)는 기억하지 않음
         # (움직이는 원기둥이 지나간 궤적 전체가 727칸의 가짜 벽이 되어 통로가 막혔었음)

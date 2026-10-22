@@ -11,8 +11,15 @@ echo "[start_slam] $ENGINE, 시뮬레이션 시간 $WAREHOUSE_SIM_TIME, 도메�
 case "$ENGINE" in
   slam_toolbox)
     # config/slam_toolbox.yaml: 수평일 때 스캔(/scan_slam, 브리지가 발행, inf 빔 → 빈 공간)만 사용
+    # 시뮬레이션 LiDAR 는 3.5 m 까지 (inf → 3.45 로 바뀜) → max_laser_range 를 그보다 작은 3.4 로 (5.0 이면 3.45 를 벽으로 찍음)
+    PARAMS="$WAREHOUSE_HOME/config/slam_toolbox.yaml"
+    if [ "$WAREHOUSE_ROBOT" = sim ]; then
+      sed 's/^\(\s*max_laser_range:\s*\)[0-9.]*/\13.4/' "$PARAMS" > "$WAREHOUSE_HOME/logs/slam_toolbox_run.yaml"
+      PARAMS="$WAREHOUSE_HOME/logs/slam_toolbox_run.yaml"
+    fi
+    grep -E '^\s*max_laser_range' "$PARAMS" | sed 's/#.*//; s/^\s*/[start_slam] /'
     exec ros2 launch slam_toolbox online_async_launch.py use_sim_time:="$WAREHOUSE_SIM_TIME" \
-      slam_params_file:="$WAREHOUSE_HOME/config/slam_toolbox.yaml"
+      slam_params_file:="$PARAMS"
     ;;
   cartographer)
     exec ros2 launch turtlebot3_cartographer cartographer.launch.py \

@@ -73,7 +73,8 @@ class RobotConsumer(AsyncJsonWebsocketConsumer):
             live['mode'] = msg.get('mode', live.get('mode', 'map'))
             health = {'scan_ok': msg.get('scan_ok'), 'odom_ok': msg.get('odom_ok'),
                       'localized': msg.get('localized'), 'bridge': True, 'mode': live['mode'],
-                      'tipped': bool(msg.get('tipped')), 'tilt_deg': msg.get('tilt_deg')}
+                      'tipped': bool(msg.get('tipped')), 'tilt_deg': msg.get('tilt_deg'),
+                      'footprint': msg.get('footprint')}
             live['health'] = health
             await self.broadcast({'type': 'health', 'robot': self.robot_name, **health})
             # 로봇(Pi)이 응답할 때/안 할 때가 바뀔 때만 DB 상태를 바꾼다

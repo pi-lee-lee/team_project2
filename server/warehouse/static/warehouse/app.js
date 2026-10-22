@@ -718,17 +718,35 @@ function draw() {
     drawArrow(cx, cy, current.yaw, Math.max(8, 0.25 * pxPerM), '#ea580c', true);
   }
 
-  // 로봇 (Waffle Pi 반경 약 0.22m)
+  // 로봇: 실제 외곽 사각형 (차체 + 뒤에 붙인 물건, 브리지 health 의 footprint). 없으면 예전처럼 원
   if (S.pose) {
     const [cx, cy] = worldToCanvas(S.pose.x, S.pose.y);
     const r = Math.max(6, 0.22 * pxPerM);
     ctx.fillStyle = 'rgba(220, 38, 38, 0.25)';
     ctx.strokeStyle = '#dc2626';
     ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.arc(cx, cy, r, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
+    const rects = (S.health && S.health.footprint) || null;
+    if (rects && rects.length && 0.3 * pxPerM >= 8) {
+      const a = S.pose.yaw + S.rot;
+      const ca = Math.cos(a);
+      const sa = Math.sin(a);
+      for (const [x0, x1, y0, y1] of rects) {   // 로봇 기준 (앞 x, 왼 y) → 화면 (y 는 아래가 +)
+        ctx.beginPath();
+        [[x0, y0], [x1, y0], [x1, y1], [x0, y1]].forEach(([px, py], i) => {
+          const sx = cx + (px * ca - py * sa) * pxPerM;
+          const sy = cy - (px * sa + py * ca) * pxPerM;
+          if (i) ctx.lineTo(sx, sy); else ctx.moveTo(sx, sy);
+        });
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+      }
+    } else {   // 너무 작게 보일 때 / 정보 없을 때
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+    }
     ctx.beginPath();
     ctx.moveTo(cx, cy);
     ctx.lineTo(cx + Math.cos(S.pose.yaw + S.rot) * r * 1.6, cy - Math.sin(S.pose.yaw + S.rot) * r * 1.6);

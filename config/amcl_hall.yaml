@@ -22,7 +22,7 @@ amcl:
     global_frame_id: "map"
     lambda_short: 0.1
     laser_likelihood_max_dist: 1.5
-    laser_max_range: 3.5     # tools/scan_check.py 로 실물 측정 후 늘릴 수 있음
+    laser_max_range: 5.0     # tools/scan_check.py 로 실물 측정 후 늘릴 수 있음
     laser_min_range: 0.12
     laser_model_type: "likelihood_field"
     max_beams: 180

@@ -298,7 +298,7 @@ class BridgeNode(Node):
         # → 덩어리 → 칼만필터로 위치/속도. DWA 가 미래 위치를 피하는 데 쓰고, 웹 지도에 표시한다
         tp = lambda n, d: self.declare_parameter(f'tracking.{n}', d).value  # noqa: E731
         self.tracking = tp('enabled', True)
-        self.track_cfg = dict(max_range=tp('max_range', 3.0), static_match_dist=tp('static_match_dist', 0.15),
+        self.track_cfg = dict(max_range=tp('max_range', 5.0), static_match_dist=tp('static_match_dist', 0.15),
                               cluster_gap=tp('cluster_gap', 0.15), min_points=tp('min_points', 3),
                               max_diameter=tp('max_diameter', 0.8), min_radius=tp('min_radius', 0.05))
         self.tracker = MultiObjectTracker(gate=tp('gate', 0.5), min_hits=tp('min_hits', 3),
@@ -317,6 +317,11 @@ class BridgeNode(Node):
                 if isinstance(v, tuple) else type(v)(self.declare_parameter(f'dwa.{k}', v).value))
             for k, v in vars(defaults).items()})
         self.dwa_cfg.control_period = 0.1    # DWA 계산 주기 (dwa_compute)
+        # 차체에 붙인 물건 (base_footprint 기준 사각형 x_min, x_max, y_min, y_max 를 4개씩 이어 붙인 목록).
+        # 기본: 뒤쪽 가운데 8cm x 8cm (차체 뒤 끝 x=-0.197 에서 8cm 더 나옴). 제자리 회전/후진 여유와 웹 로봇 모양에 반영.
+        # DWA 충돌 검사(dwa.footprint 직사각형)에는 아직 안 들어감
+        ex = [float(v) for v in self.declare_parameter('footprint_extra', [-0.277, -0.197, -0.04, 0.04]).value]
+        self.footprint_extra = [tuple(ex[i:i + 4]) for i in range(0, len(ex) - 3, 4)]
         self.declare_parameter('dwa_follow.lookahead', 0.5)
         self.declare_parameter('dwa_follow.goal_tolerance', 0.1)
         self.declare_parameter('dwa_follow.moving_speed', 0.08)  # 이보다 빠른 track 만 움직이는 장애물로 (멈춘 물체 속도 노이즈 ~0.06, 느린 사람 0.1)
@@ -554,6 +559,7 @@ class BridgeNode(Node):
             'localized': odom_ok and map_age is not None and map_age < 2.0,
             'tipped': self.tipped,
             'tilt_deg': round(math.degrees(self.tilt)),
+            'footprint': [[round(v, 3) for v in r] for r in self.body_rects()],   # 웹 로봇 모양
         })
 
     def on_battery(self, msg):
@@ -1242,9 +1248,21 @@ class BridgeNode(Node):
         pts = self.scan_odom
         if not len(pts):
             return True
-        x0, x1, hw = self.dwa_cfg.footprint if self.dwa_cfg.footprint else (-0.197, 0.069, 0.153)
-        radius = math.hypot(max(-x0, x1), hw) + 0.05
+        radius = self.body_radius() + 0.05
         return float(np.min(np.hypot(pts[:, 0] - odom[0], pts[:, 1] - odom[1]))) > radius
+
+    def body_rects(self):
+        """차체 + 붙인 물건 사각형 목록 (x_min, x_max, y_min, y_max), base_footprint 기준."""
+        x0, x1, hw = self.dwa_cfg.footprint if self.dwa_cfg.footprint else (-0.197, 0.069, 0.153)
+        return [(x0, x1, -hw, hw)] + self.footprint_extra
+
+    def body_radius(self):
+        """회전 중심(base_footprint)에서 가장 먼 차체 끝까지 거리 = 제자리에서 돌 때 쓸고 지나가는 반경."""
+        return max(math.hypot(x, y) for a, b, c, d in self.body_rects() for x in (a, b) for y in (c, d))
+
+    def rear_extent(self):
+        """차체(붙인 물건 포함) 뒤 끝 x (음수)."""
+        return min(r[0] for r in self.body_rects())
 
     def recovery_step(self, f, now):
         r = f['recovery']
@@ -1302,9 +1320,10 @@ class BridgeNode(Node):
     def backoff_step(self, f, now):
         """부딪힌 뒤 천천히 빠져나온다 (보통 뒤로). 다 물러나면 부딪힌 자리를 플래너에 알리고 재계획."""
         b = f['backoff']
-        # LiDAR 는 로봇 뒤 끝에서 0.13 m 앞에 있으므로 뒤쪽 0.3 m 안에 물체가 있으면 더 물러나지 않음 (앞으로 나올 때는 0.25 m)
+        # LiDAR 는 차체 뒤 끝에서 0.13 m 앞에 있으므로 뒤쪽 0.3 m 안에 물체가 있으면 더 물러나지 않음 (앞으로 나올 때는 0.25 m).
+        # 뒤에 붙인 물건이 더 나온 만큼 늘림 (기본 8cm → 0.38 m)
         if b['speed'] < 0:
-            blocked = self.front_clearance(math.radians(30), center=math.pi) < 0.3
+            blocked = self.front_clearance(math.radians(30), center=math.pi) < 0.3 + max(0.0, -0.197 - self.rear_extent())
         else:
             blocked = self.front_clearance(math.radians(30)) < 0.25
         cur, start = self.odom_xy(), b['odom']
