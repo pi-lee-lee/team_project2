@@ -28,7 +28,7 @@ import numpy as np
 import rclpy
 import websocket
 from action_msgs.msg import GoalStatus
-from rcl_interfaces.msg import Parameter as ParamMsg, ParameterType, ParameterValue
+from rcl_interfaces.msg import Parameter as ParamMsg, ParameterType, ParameterValue, SetParametersResult
 from rcl_interfaces.srv import GetParameters, SetParameters
 from geometry_msgs.msg import PointStamped, PoseArray, PoseStamped, PoseWithCovarianceStamped, Twist
 from nav2_msgs.action import FollowPath, NavigateToPose
@@ -36,6 +36,7 @@ from nav_msgs.msg import OccupancyGrid, Odometry, Path
 from nav_msgs.srv import GetPlan
 from rclpy.action import ActionClient
 from rclpy.node import Node
+from rclpy.parameter import Parameter
 from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy, qos_profile_sensor_data
 from rclpy.time import Time
 from sensor_msgs.msg import BatteryState, Imu, LaserScan
@@ -399,6 +400,12 @@ class BridgeNode(Node):
         self.create_timer(0.05, self.control_step)
         self.create_timer(1.0, self.send_health)
         self.create_timer(0.1, self.flush_map)
+        # 실행 중 파라미터 변경 (ros2 param set, 웹 '주행 파라미터' 카드). 메모리에서만 바뀌고 재시작하면 params.yaml 값.
+        # 시작 값을 기억해 웹에서 바뀐 것을 표시/되돌림. declare 가 모두 끝난 뒤에 등록 (declare 도 콜백을 부름)
+        self.param_start = {n: self.get_parameter(n).value for n in self.tunable_params()}
+        self.params_dirty = False
+        self.add_on_set_parameters_callback(self.on_set_params)
+        self.create_timer(0.2, self.flush_params)
         self.get_logger().info(f'브리지 시작 (planner={self.planner_mode}, controller={self.controller})')
 
     # ---------------------------------------------------------- 서버 메시지 처리
@@ -415,6 +422,7 @@ class BridgeNode(Node):
                     self.server.send({'type': 'hello', 'mode': self.mode, 'session': self.session,
                                       'active_goal_id': self.goal['id'] if self.goal else None})
                     self.send_map()
+                    self.params_dirty = True
                 elif kind == 'goto':
                     self.start_goal(msg['goal_id'], float(msg['x']), float(msg['y']), float(msg['yaw']))
                 elif kind == 'cancel':
@@ -433,6 +441,8 @@ class BridgeNode(Node):
                     self.on_teleop(float(msg.get('v', 0.0)), float(msg.get('w', 0.0)))
                 elif kind == 'zones':
                     self.on_zones(msg.get('zones') or [])
+                elif kind == 'param_set':
+                    self.set_param_from_web(str(msg.get('name', '')), msg.get('value'))
                 elif kind == 'yolo_set':
                     self.set_yolo(msg)
                 elif kind == 'initial_pose':
@@ -848,6 +858,80 @@ class BridgeNode(Node):
                 self.yolo_enabled = r.values[0].bool_value
             self.send_yolo()
         fut.add_done_callback(done)
+
+    # 실행 중에 바꾸면 바로 쓰이는 파라미터 → 브리지 속성 (나머지 tunable 은 쓸 때마다 get_parameter 로 읽음)
+    LIVE_ATTRS = {'max_speed': 'max_speed', 'max_turn_speed': 'max_turn_speed', 'max_accel': 'max_accel',
+                  'max_turn_accel': 'max_turn_accel', 'stop_distance': 'stop_distance',
+                  'blocked_timeout': 'blocked_timeout', 'progress_timeout': 'progress_timeout',
+                  'tf_timeout': 'tf_timeout', 'rotate_timeout': 'rotate_timeout', 'stall_timeout': 'stall_timeout',
+                  'backoff_distance': 'backoff_distance', 'arrive_tolerance': 'arrive_tolerance',
+                  'max_retries': 'max_retries', 'bump_tilt_deg': 'bump_tilt'}
+
+    def tunable_params(self):
+        """실행 중에 바꿀 수 있는 파라미터 이름 (웹 카드 순서). dwa.* 중 목록 값(footprint 등)은 ros2 param set 으로만."""
+        names = list(self.LIVE_ATTRS)
+        names += [f'dwa.{k}' for k, v in vars(self.dwa_cfg).items()
+                  if k != 'control_period' and not isinstance(v, tuple)]
+        names += ['dwa_follow.lookahead', 'dwa_follow.goal_tolerance', 'dwa_follow.moving_speed']
+        names += [f'hybrid.{k}' for k in ('trigger_distance', 'moving_distance', 'path_width', 'path_ahead',
+                                          'release_time', 'rejoin_offset')]
+        return names
+
+    def on_set_params(self, params):
+        """파라미터가 바뀌기 직전에 불림: 실행 중에 못 바꾸는 것은 거절하고, 나머지는 지금 주행에도 바로 반영."""
+        for prm in params:
+            n = prm.name
+            if not (n in self.param_start or (n.startswith('dwa.') and n != 'dwa.control_period')):
+                return SetParametersResult(successful=False, reason=f'{n} 은(는) 실행 중에 못 바꿉니다 (재시작 필요)')
+            if n in ('dwa.v_samples', 'dwa.w_samples') and prm.value < 2:
+                return SetParametersResult(successful=False, reason=f'{n} 은(는) 2 이상이어야 합니다')
+        f = self.follower or {}
+        for prm in params:
+            n, v = prm.name, prm.value
+            if n in self.LIVE_ATTRS:
+                setattr(self, self.LIVE_ATTRS[n], math.radians(v) if n == 'bump_tilt_deg' else v)
+            elif n.startswith('dwa.'):
+                # DWAFollower 들이 같은 DWAConfig 객체를 쓰므로 주행 중인 DWA 에도 바로 적용
+                k = n[4:]
+                setattr(self.dwa_cfg, k, tuple(float(x) for x in v) if isinstance(getattr(self.dwa_cfg, k), tuple) else v)
+            elif n in ('dwa_follow.lookahead', 'dwa_follow.goal_tolerance') and 'dwa' in f:
+                setattr(f['dwa'], n.split('.')[1], v)
+            self.get_logger().info(f'파라미터 변경: {n} = {v}')
+        if 'pp' in f:
+            pp = f['pp']
+            pp.max_v, pp.max_w, pp.max_acc, pp.max_acc_w = (self.max_speed, self.max_turn_speed,
+                                                            self.max_accel, self.max_turn_accel)
+        self.params_dirty = True
+        return SetParametersResult(successful=True)
+
+    def set_param_from_web(self, name, value):
+        """웹에서 온 값: 선언된 타입으로 맞춰서 (JSON 은 2.0 을 2 로 보냄) set_parameters → 결과를 웹에 알림."""
+        try:
+            cur = self.get_parameter(name)
+            t = cur.type_
+            if t == Parameter.Type.DOUBLE:
+                value = float(value)
+            elif t == Parameter.Type.INTEGER:
+                value = int(value)
+            elif t == Parameter.Type.BOOL:
+                value = bool(value)
+            else:
+                raise ValueError('숫자/참거짓 파라미터만 웹에서 바꿀 수 있습니다')
+            if isinstance(value, float) and not math.isfinite(value):
+                raise ValueError('숫자가 아닙니다')
+            r = self.set_parameters([Parameter(name, value=value)])[0]
+            ok, reason = r.successful, r.reason
+        except Exception as e:  # 선언 안 된 이름, 숫자 아님 등
+            ok, reason = False, str(e) or type(e).__name__
+        self.server.send({'type': 'param_result', 'name': name, 'ok': ok, 'reason': reason})
+
+    def flush_params(self):
+        """바뀐 파라미터 목록을 서버(웹 카드)로. ros2 param set 으로 바꾼 것도 여기로 들어옴."""
+        if not self.params_dirty:
+            return
+        self.params_dirty = False
+        self.server.send({'type': 'params', 'items': [
+            {'name': n, 'value': self.get_parameter(n).value, 'start': s} for n, s in self.param_start.items()]})
 
     def set_yolo(self, msg):
         """웹 버튼: {'enabled': bool} 또는 {'capture': True} (검출 장면 한 장 저장)."""

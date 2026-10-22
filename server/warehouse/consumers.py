@@ -133,6 +133,13 @@ class RobotConsumer(AsyncJsonWebsocketConsumer):
             # YOLO 부품 검출기 상태 (available, enabled, counts 글자) - 화면 표시용, DB 에 저장하지 않음
             live['yolo'] = {k: msg.get(k) for k in ('available', 'enabled', 'counts', 'age')}
             await self.broadcast({'type': 'yolo', 'robot': self.robot_name, **live['yolo']})
+        elif kind == 'params':
+            # 실행 중에 바꿀 수 있는 브리지 파라미터 (이름, 지금 값, 시작 값) - 웹 '주행 파라미터' 카드, DB 에 저장하지 않음
+            live['params'] = msg.get('items', [])
+            await self.broadcast({'type': 'params', 'robot': self.robot_name, 'items': live['params']})
+        elif kind == 'param_result':
+            await self.broadcast({'type': 'param_result', 'robot': self.robot_name, 'name': msg.get('name'),
+                                  'ok': bool(msg.get('ok')), 'reason': msg.get('reason', '')})
         elif kind == 'scan':
             # 실시간 LiDAR (지도 좌표 점, 초당 4번) - 화면 표시용, DB 에 저장하지 않음
             await self.broadcast({'type': 'scan', 'robot': self.robot_name, 'origin': msg.get('origin'),
@@ -178,6 +185,7 @@ class UIConsumer(AsyncJsonWebsocketConsumer):
         snap['cargo'] = live.get('cargo')   # None = 인식 노드 없음
         snap['memory'] = live.get('memory')
         snap['yolo'] = live.get('yolo')     # None = 브리지 없음
+        snap['params'] = live.get('params')  # None = 브리지 없음
         snap['obstacles'] = live.get('obstacles', [])
         snap['path'] = live.get('path', [])
         snap['health'] = live.get('health', {'bridge': False})
@@ -284,6 +292,14 @@ class UIConsumer(AsyncJsonWebsocketConsumer):
             if msg.get('capture'):
                 out['capture'] = True
             await self.channel_layer.group_send(robot_group(target), {'type': 'send.msg', 'msg': out})
+            return
+        if action == 'param_set':
+            # 웹 '주행 파라미터' 카드: 브리지가 ROS 파라미터로 바꾸고 결과(param_result)와 새 목록(params)을 보낸다
+            if not LIVE.get(robot, {}).get('health', {}).get('bridge'):
+                await self.send_json({'type': 'error', 'message': '브리지가 연결되어 있지 않습니다.'})
+                return
+            await self.channel_layer.group_send(robot_group(robot), {'type': 'send.msg', 'msg': {
+                'type': 'param_set', 'name': str(msg.get('name', '')), 'value': msg.get('value')}})
             return
         if action in ('plan_order', 'travel_model'):
             # 계산 결과는 요청한 화면에만 돌려준다 (DB 를 바꾸지 않음)

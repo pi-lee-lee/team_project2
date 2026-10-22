@@ -48,6 +48,7 @@ function connect() {
     S.health = { bridge: false };
     renderHealth();
     renderYolo();
+    renderParams();
     setTimeout(connect, 2000);
   };
   ws.onmessage = (ev) => handle(JSON.parse(ev.data));
@@ -84,6 +85,8 @@ function handle(msg) {
       renderCargo();
       S.yolo = msg.yolo;
       renderYolo();
+      S.params = msg.params;
+      renderParams();
       S.memory = msg.memory;
       S.obstacles = msg.obstacles || [];
       S.obstaclesAt = Date.now();
@@ -174,6 +177,14 @@ function handle(msg) {
       S.health = msg;
       renderHealth();
       renderYolo();
+      renderParams();
+      break;
+    case 'params':
+      S.params = msg.items;
+      renderParams();
+      break;
+    case 'param_result':
+      paramResult(msg);
       break;
     case 'runner':
       if (msg.state === 'progress') {
@@ -1100,6 +1111,103 @@ function renderCargo() {
     : `카메라 인식: ${S.cargo || '비어 있음'}`;
   el.className = 'cargo-status' + (S.cargo ? ' loaded' : '');
 }
+// 주행 파라미터: 브리지가 보낸 목록(params: 이름, 지금 값, 시작 값)을 묶음별 입력칸으로.
+// 값을 바꾸면 param_set → 브리지가 ROS 파라미터로 바꾸고 결과(param_result)와 새 목록을 보낸다
+const PARAM_GROUPS = [['dwa_follow.', 'DWA 경로 따라가기'], ['dwa.', 'DWA'], ['hybrid.', 'hybrid 전환'], ['', '속도 / 안전 (pure pursuit 등)']];
+const paramGroup = (name) => PARAM_GROUPS.find(([p]) => name.startsWith(p));
+S.paramRows = new Map();      // 이름 → {row, input, item}
+S.paramPending = new Set();   // 이 화면에서 보내고 답을 기다리는 이름
+function renderParams() {
+  const box = $('#params-list');
+  const items = S.health && S.health.bridge ? S.params : null;
+  if (!items || !items.length) {
+    box.innerHTML = '<p class="muted small">브리지가 연결되어 있지 않습니다.</p>';
+    S.paramRows.clear();
+    return;
+  }
+  const names = items.map((it) => it.name).join(',');
+  if (box.dataset.names !== names) {   // 목록이 바뀌었을 때만 새로 만든다 (입력 중인 칸 보호)
+    box.dataset.names = names;
+    box.innerHTML = '';
+    S.paramRows.clear();
+    for (const [prefix, title] of PARAM_GROUPS) {
+      const group = items.filter((it) => paramGroup(it.name)[0] === prefix);
+      if (!group.length) continue;
+      const h = document.createElement('div');
+      h.className = 'params-group';
+      h.textContent = title;
+      box.appendChild(h);
+      for (const it of group) box.appendChild(paramRow(it, prefix));
+    }
+  }
+  for (const it of items) {
+    const r = S.paramRows.get(it.name);
+    if (!r) continue;
+    r.item = it;
+    if (document.activeElement !== r.input) {
+      if (r.input.type === 'checkbox') r.input.checked = !!it.value;
+      else r.input.value = String(it.value);
+    }
+    const changed = it.value !== it.start;
+    r.row.classList.toggle('changed', changed);
+    r.reset.hidden = !changed;
+    r.reset.title = `시작 값 ${it.start} 으로 되돌림`;
+  }
+}
+function paramRow(it, prefix) {
+  const row = document.createElement('div');
+  row.className = 'param-row';
+  const label = document.createElement('label');
+  label.textContent = it.name.slice(prefix.length);
+  label.title = it.name;
+  const input = document.createElement('input');
+  if (typeof it.value === 'boolean') {
+    input.type = 'checkbox';
+  } else {
+    input.type = 'number';
+    input.step = 'any';
+  }
+  const reset = document.createElement('button');
+  reset.className = 'ghost small';
+  reset.textContent = '↺';
+  const r = { row, input, reset, item: it };
+  const submit = (value) => {
+    if (value === r.item.value) return;
+    S.paramPending.add(it.name);
+    send('param_set', { name: it.name, value });
+  };
+  input.addEventListener('change', () => {
+    if (input.type === 'checkbox') return submit(input.checked);
+    const v = Number(input.value);
+    if (input.value.trim() === '' || !Number.isFinite(v)) {
+      input.value = String(r.item.value);
+      return toast(`${it.name}: 숫자를 넣으세요.`);
+    }
+    submit(v);
+  });
+  input.addEventListener('keydown', (e) => { if (e.key === 'Enter') input.blur(); });
+  reset.addEventListener('click', () => submit(r.item.start));
+  row.append(label, input, reset);
+  S.paramRows.set(it.name, r);
+  return row;
+}
+function paramResult(msg) {
+  if (!S.paramPending.delete(msg.name)) return;   // 다른 화면이 바꾼 것
+  const r = S.paramRows.get(msg.name);
+  if (!msg.ok) {
+    toast(`${msg.name} 변경 실패: ${msg.reason || '알 수 없는 이유'}`);
+    if (r) {
+      if (r.input.type === 'checkbox') r.input.checked = !!r.item.value;
+      else r.input.value = String(r.item.value);
+    }
+    return;
+  }
+  if (r) {
+    r.row.classList.add('saved');
+    setTimeout(() => r.row.classList.remove('saved'), 1000);
+  }
+}
+
 let YOLO_NAMES = [];   // 마지막으로 본 /yolo/counts 클래스 이름 (칸 순서)
 // YOLO 검출기: 상태 배지, 켜기/끄기 버튼, /yolo/counts 글자 ("DHT11: 0 / led_red: 1 / ...")
 function renderYolo() {
