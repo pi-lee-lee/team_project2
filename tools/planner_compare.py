@@ -1,0 +1,505 @@
+"""지역 계획기 + 재계획 방식 비교 시뮬레이션 (ROS 없음, A* / DWA / MPPI / pure pursuit 모듈만 사용).
+
+    python3 tools/planner_compare.py                 # 전체 (방식 x 시나리오)
+    python3 tools/planner_compare.py --only F --scen box_center -v
+
+브리지(bridge_node.py)의 주행 로직을 단순화해 흉내 낸다:
+  - A* 는 지도(벽) + LiDAR 로 2.5초 넘게 같은 칸에 보인 '지도에 없는 점'(scan_persist, 20초 기억)으로 계획.
+    그걸로 경로가 없으면 지도만으로 계획 (astar_planner_node 와 같음)
+  - 진행 없음 15초 / 막힘 5초 → (지역 계획기면) 뒤로 15cm → 재계획, 재시도 2번 넘으면 실패
+  - pure pursuit 는 앞쪽 ±25° 0.35m 정지 규칙
+LiDAR 는 360개 빔(최대 3.5m, 0.2초마다)을 벽/상자/사람에 직접 쏴서 만든다. 상자는 지도에 없다 (출발 때 A* 가 모름).
+움직이는 사람은 추적 결과 대신 정답 위치/속도를 준다 (dwa_tune 과 같음).
+
+방식:
+  A  hybrid: pure pursuit, 경로 앞 장애물이 가까우면 DWA (지금 기본값)
+  B  hybrid: pure pursuit ↔ MPPI
+  C  DWA 만
+  D  MPPI 만
+  E  DWA + 1초마다 전역 재계획
+  F  MPPI + 1초마다 전역 재계획
+  G  hybrid(pure pursuit ↔ MPPI) + 1초마다 전역 재계획
+1초 재계획: A*(LiDAR 장애물 포함)가 성공했고, 지금 경로의 남은 부분이 새 장애물에 막혔거나 새 경로가 15% 넘게 짧을 때만 바꿈
+(안 그러면 비슷한 두 경로 사이를 왔다 갔다 함). LiDAR 장애물로는 길이 없어서 지도만으로 나온 경로는 받지 않는다.
+"""
+import argparse
+import math
+import os
+import sys
+import time
+from concurrent.futures import ProcessPoolExecutor
+
+import numpy as np
+import yaml
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.join(HERE, '..', 'ros2_ws', 'src', 'warehouse_robot'))
+from scipy.spatial import cKDTree  # noqa: E402
+from warehouse_robot.astar import GridPlanner, PlanningError, obstacle_distance  # noqa: E402
+from warehouse_robot.dwa import DWAConfig, DWAFollower  # noqa: E402
+from warehouse_robot.follower import PurePursuit  # noqa: E402
+from warehouse_robot.mppi import MPPIConfig, MPPIFollower  # noqa: E402
+
+PARAMS = os.path.join(HERE, '..', 'ros2_ws', 'src', 'warehouse_robot', 'config', 'params.yaml')
+DT = 0.1
+RES = 0.05          # 지도 / A* 해상도
+TRUTH = 0.02        # LiDAR 를 쏘는 실제 세계 해상도
+LIDAR_X = -0.064
+BODY = (-0.197, 0.069, 0.153)
+EXTRA = (-0.277, -0.197, 0.04)   # 뒤에 붙인 물건 (x_min, x_max, 반폭)
+
+STRATEGIES = {
+    'A': dict(local='dwa', hybrid=True, replan=False, desc='hybrid PP↔DWA (지금 기본)'),
+    'B': dict(local='mppi', hybrid=True, replan=False, desc='hybrid PP↔MPPI'),
+    'C': dict(local='dwa', hybrid=False, replan=False, desc='DWA 만'),
+    'D': dict(local='mppi', hybrid=False, replan=False, desc='MPPI 만'),
+    'E': dict(local='dwa', hybrid=False, replan=True, desc='DWA + 1초 재계획'),
+    'F': dict(local='mppi', hybrid=False, replan=True, desc='MPPI + 1초 재계획'),
+    'G': dict(local='mppi', hybrid=True, replan=True, desc='hybrid PP↔MPPI + 1초 재계획'),
+}
+
+
+def load_params():
+    p = yaml.safe_load(open(PARAMS))
+    a = p['astar_planner']['ros__parameters']
+    b = p['warehouse_bridge']['ros__parameters']
+    dwa = {k: tuple(v) if isinstance(v, list) else v for k, v in b['dwa'].items()}
+    dwa['control_period'] = 0.1
+    return a, b, dwa
+
+
+# ------------------------------------------------------------------ 세계
+def rect(x0, x1, y0, y1):
+    return (min(x0, x1), max(x0, x1), min(y0, y1), max(y0, y1))
+
+
+def room_walls(x0, x1, y0, y1, t=0.1):
+    """(x0..x1, y0..y1) 안쪽이 빈 방의 네 벽."""
+    return [rect(x0 - t, x1 + t, y0 - t, y0), rect(x0 - t, x1 + t, y1, y1 + t),
+            rect(x0 - t, x0, y0, y1), rect(x1, x1 + t, y0, y1)]
+
+
+def scenarios():
+    S = {}
+    # 1. 폭 1.3m 통로 가운데 상자 0.3m (옆 틈 0.5m 씩)
+    S['box_center'] = dict(walls=room_walls(-0.6, 4.6, -0.65, 0.65), boxes=[rect(1.85, 2.15, -0.15, 0.15)],
+                           start=(0.0, 0.0, 0.0), goal=(4.0, 0.0))
+    # 2. 폭 1.2m, 상자가 위로 치우침 (위 틈 0.35m 는 못 지나감, 아래 0.55m)
+    S['box_offset'] = dict(walls=room_walls(-0.6, 4.6, -0.6, 0.6), boxes=[rect(1.85, 2.15, -0.05, 0.25)],
+                           start=(0.0, 0.0, 0.0), goal=(4.0, 0.0))
+    # 3. 넓은 방 가운데 큰 상자 0.6 x 0.8
+    S['room_bigbox'] = dict(walls=room_walls(-0.6, 4.6, -1.5, 1.5), boxes=[rect(1.7, 2.3, -0.4, 0.4)],
+                            start=(0.0, 0.0, 0.0), goal=(4.0, 0.0))
+    # 4. ㄱ자 통로(폭 1.3m), 꺾인 직후 상자
+    walls = [rect(-0.7, 3.75, -0.75, -0.65), rect(-0.7, 2.35, 0.65, 0.75), rect(-0.7, -0.6, -0.65, 0.65),
+             rect(3.65, 3.75, -0.65, 4.1), rect(2.25, 2.35, 0.65, 4.1), rect(2.25, 3.75, 4.0, 4.1)]
+    S['corner_box'] = dict(walls=walls, boxes=[rect(2.85, 3.15, 1.65, 1.95)], start=(0.0, 0.0, 0.0), goal=(3.0, 3.5))
+    # 5. 두 갈래 길. 위(폭 1.0m) 가 A* 첫 경로인데 상자로 완전히 막힘 → 아래(0.9m)로 돌아가야 함
+    walls = room_walls(-1.0, 5.0, -1.4, 1.5) + [rect(0.5, 3.5, -0.5, 0.5)]
+    S['blocked_route'] = dict(walls=walls, boxes=[rect(1.8, 2.2, 0.5, 1.5)], start=(-0.5, 0.0, 0.0), goal=(4.5, 0.0))
+    # 6. 폭 1.6m 통로, 사람이 x=2.0 에서 통로를 가로질러 왔다 갔다 (0.2 m/s, 끝에서 8초 쉼).
+    #    쉬지 않고 왔다 갔다 하면 통로 전체를 5.5초마다 쓸어서 0.13 m/s 로는 안전하게 지나갈 틈이 아예 없음
+    S['person_cross'] = dict(walls=room_walls(-0.6, 4.6, -0.8, 0.8), boxes=[], start=(0.0, 0.0, 0.0), goal=(4.0, 0.0),
+                             movers=[dict(kind='pingpong', p0=(2.0, 0.55), p1=(2.0, -0.55), speed=0.2, r=0.2,
+                                          pause=8.0)])
+    # 7. 폭 1.6m 통로, 사람이 경로를 따라 마주 옴 (0.15 m/s)
+    S['person_headon'] = dict(walls=room_walls(-0.6, 4.6, -0.8, 0.8), boxes=[], start=(0.0, 0.0, 0.0), goal=(4.0, 0.0),
+                              movers=[dict(kind='line', p0=(4.3, 0.0), v=(-0.15, 0.0), r=0.2, until=40.0)])
+    # 8. 사람이 걸어와 경로 한가운데 서 버림 (멈춘 뒤엔 상자와 같음)
+    S['person_stops'] = dict(walls=room_walls(-0.6, 4.6, -0.8, 0.8), boxes=[], start=(0.0, 0.0, 0.0), goal=(4.0, 0.0),
+                             movers=[dict(kind='line', p0=(2.2, 0.75), v=(0.0, -0.15), r=0.2, until=5.0)])
+    # 9. 장애물 없는 S자 좁은 통로 (폭 1.0m) — 평소 경로 추종 / 벽 여유
+    walls = [rect(-0.6, 2.5, -0.6, -0.5), rect(-0.6, 1.5, 0.5, 0.6), rect(-0.7, -0.6, -0.6, 0.6),
+             rect(2.5, 2.6, -0.6, 3.1), rect(1.5, 1.6, 0.5, 2.0), rect(-0.5, 1.6, 2.0, 2.1),
+             rect(-0.6, 2.6, 3.0, 3.1), rect(-0.7, -0.6, 2.0, 3.1)]
+    S['s_corridor'] = dict(walls=walls, boxes=[], start=(0.0, 0.0, 0.0), goal=(0.0, 2.55))
+    return S
+
+
+class World:
+    def __init__(self, sc):
+        self.sc = sc
+        rects = sc['walls'] + sc['boxes']
+        xs = [r[0] for r in rects] + [r[1] for r in rects]
+        ys = [r[2] for r in rects] + [r[3] for r in rects]
+        self.ox, self.oy = min(xs) - 0.2, min(ys) - 0.2
+        self.w = int(math.ceil((max(xs) + 0.2 - self.ox) / RES))
+        self.h = int(math.ceil((max(ys) + 0.2 - self.oy) / RES))
+        self.map = self._raster(sc['walls'], RES, self.w, self.h)          # A* / 지도 (상자 없음)
+        tw, th = int(self.w * RES / TRUTH), int(self.h * RES / TRUTH)
+        self.truth = self._raster(rects, TRUTH, tw, th)
+        self.map_dist = obstacle_distance(self.map, RES, 0.5)
+        occ = np.argwhere(self.truth)
+        self.occ_pts = np.column_stack([self.ox + (occ[:, 1] + 0.5) * TRUTH, self.oy + (occ[:, 0] + 0.5) * TRUTH])
+        self.occ_tree = cKDTree(self.occ_pts)
+        self.movers = sc.get('movers', [])
+        ang = np.radians(np.arange(360))
+        self.ray_dir = np.column_stack([np.cos(ang), np.sin(ang)])
+        self.ray_s = np.arange(0.02, 3.5, TRUTH / 1.5)
+
+    def _raster(self, rects, res, w, h):
+        g = np.zeros((h, w), dtype=bool)
+        for x0, x1, y0, y1 in rects:
+            c0, c1 = int(math.floor((x0 - self.ox) / res)), int(math.ceil((x1 - self.ox) / res))
+            r0, r1 = int(math.floor((y0 - self.oy) / res)), int(math.ceil((y1 - self.oy) / res))
+            g[max(r0, 0):max(r1, 0), max(c0, 0):max(c1, 0)] = True
+        return g
+
+    def mover_state(self, t):
+        """[[x, y, vx, vy, r], ...] (정답)."""
+        out = []
+        for m in self.movers:
+            if m['kind'] == 'line':
+                k = min(t, m['until'])
+                moving = t < m['until']
+                out.append([m['p0'][0] + m['v'][0] * k, m['p0'][1] + m['v'][1] * k,
+                            m['v'][0] * moving, m['v'][1] * moving, m['r']])
+            else:
+                p0, p1 = np.array(m['p0']), np.array(m['p1'])
+                L = np.hypot(*(p1 - p0))
+                u = (p1 - p0) / L
+                go, rest = L / m['speed'], m.get('pause', 0.0)
+                k = t % (2 * (go + rest))
+                if k < go:                          # p0 → p1
+                    pos, vel = p0 + u * m['speed'] * k, u * m['speed']
+                elif k < go + rest:                 # p1 에서 쉼
+                    pos, vel = p1, u * 0.0
+                elif k < 2 * go + rest:             # p1 → p0
+                    pos, vel = p1 - u * m['speed'] * (k - go - rest), -u * m['speed']
+                else:                               # p0 에서 쉼
+                    pos, vel = p0, u * 0.0
+                out.append([pos[0], pos[1], vel[0], vel[1], m['r']])
+        return np.array(out, dtype=float).reshape(-1, 5)
+
+    def scan(self, x, y, yaw, t):
+        """LiDAR 점 (map 좌표, (N, 2)) 와 빔별 거리 / 각도 (로봇 기준)."""
+        lx, ly = x + LIDAR_X * math.cos(yaw), y + LIDAR_X * math.sin(yaw)
+        c, s = math.cos(yaw), math.sin(yaw)
+        d = self.ray_dir @ np.array([[c, s], [-s, c]])      # 빔 방향 (map)
+        px = lx + d[:, 0:1] * self.ray_s[None]
+        py = ly + d[:, 1:2] * self.ray_s[None]
+        col = np.floor((px - self.ox) / TRUTH).astype(int)
+        row = np.floor((py - self.oy) / TRUTH).astype(int)
+        th, tw = self.truth.shape
+        ok = (row >= 0) & (row < th) & (col >= 0) & (col < tw)
+        hit = np.zeros_like(ok)
+        hit[ok] = self.truth[row[ok], col[ok]]
+        first = np.where(hit.any(axis=1), hit.argmax(axis=1), -1)
+        rng = np.where(first >= 0, self.ray_s[np.maximum(first, 0)], np.inf)
+        for mx, my, _, _, r in self.mover_state(t):
+            ox_, oy_ = mx - lx, my - ly
+            b = d[:, 0] * ox_ + d[:, 1] * oy_
+            disc = b ** 2 - (ox_ ** 2 + oy_ ** 2 - r ** 2)
+            tt = b - np.sqrt(np.maximum(disc, 0.0))
+            rng = np.where((disc > 0) & (tt > 0) & (tt < rng), tt, rng)
+        fin = np.isfinite(rng)
+        pts = np.column_stack([lx + d[fin, 0] * rng[fin], ly + d[fin, 1] * rng[fin]])
+        return pts, rng, np.radians(np.arange(360))
+
+    def unmapped(self, pts):
+        """지도 벽에서 0.15m 넘게 떨어진 점 (= 지도에 없는 물체)."""
+        col = np.floor((pts[:, 0] - self.ox) / RES).astype(int)
+        row = np.floor((pts[:, 1] - self.oy) / RES).astype(int)
+        ok = (row >= 0) & (row < self.h) & (col >= 0) & (col < self.w)
+        keep = np.zeros(len(pts), dtype=bool)
+        keep[ok] = self.map_dist[row[ok], col[ok]] > 0.15
+        return pts[keep]
+
+    def body_gap(self, x, y, yaw, t):
+        """차체(+뒤 부착물) 외곽과 실제 장애물 사이 최소 거리 [m] (음수 = 닿음)."""
+        pts = []
+        for x0, x1, hw in (BODY, EXTRA):
+            for px in np.arange(x0, x1 + 1e-9, 0.02):
+                pts += [(px, hw), (px, -hw)]
+            for py in np.arange(-hw, hw + 1e-9, 0.02):
+                pts += [(x0, py), (x1, py)]
+        p = np.array(pts)
+        c, s = math.cos(yaw), math.sin(yaw)
+        wp = np.column_stack([x + c * p[:, 0] - s * p[:, 1], y + s * p[:, 0] + c * p[:, 1]])
+        g = float(self.occ_tree.query(wp)[0].min()) - TRUTH / 2
+        # 외곽점이 벽 안으로 완전히 들어가도 잡히게: 로봇 중심 칸이 벽이면 음수
+        for mx, my, _, _, r in self.mover_state(t):
+            g = min(g, float(np.hypot(wp[:, 0] - mx, wp[:, 1] - my).min()) - r)
+        return g
+
+
+# ------------------------------------------------------------------ 주행 (브리지 흉내)
+class Run:
+    def __init__(self, world, strat, params, verbose=False):
+        self.wd, self.st, self.verbose = world, strat, verbose
+        self.a, self.b, dwa = params
+        self.cfg = DWAConfig(**dwa)
+        self.mcfg = MPPIConfig()
+        self.memory = {}          # 칸 → (처음 본 시각, 마지막 본 시각)
+        self.log = []
+        self.replans = 0
+        self.switches = 0
+
+    def say(self, t, msg):
+        self.log.append(f'{t:6.1f}s {msg}')
+        if self.verbose:
+            print(self.log[-1])
+
+    def remember(self, pts, t):
+        """scan_persist 2.5초 / scan_memory 20초 흉내."""
+        um = self.wd.unmapped(pts)
+        cells = set(map(tuple, np.floor((um - [self.wd.ox, self.wd.oy]) / RES).astype(int)[:, ::-1]))
+        for cell in cells:
+            first, last = self.memory.get(cell, (t, t))
+            if t - last > 0.6:
+                first = t
+            self.memory[cell] = (first, t)
+        for cell in [k for k, (f, l) in self.memory.items() if t - l > 20.0]:
+            del self.memory[cell]
+
+    def planner(self, t, with_scan=True):
+        grid = np.where(self.wd.map, 100, 0).astype(np.int16)
+        if with_scan:
+            for (r, c), (f, l) in self.memory.items():
+                if l - f >= 2.5 and 0 <= r < self.wd.h and 0 <= c < self.wd.w:
+                    grid[r, c] = 100
+        return GridPlanner(grid.ravel().tolist(), self.wd.w, self.wd.h, RES, self.wd.ox, self.wd.oy,
+                           robot_radius=self.a['robot_radius'], inflation_radius=self.a['inflation_radius'],
+                           cost_weight=self.a['cost_weight'])
+
+    def plan(self, x, y, t, allow_fallback=True):
+        """(경로, LiDAR 장애물 반영 여부) 또는 (None, None)."""
+        goal = self.wd.sc['goal']
+        try:
+            return self.planner(t).plan((x, y), goal), True
+        except PlanningError:
+            if not allow_fallback:
+                return None, None
+        try:
+            return self.planner(t, with_scan=False).plan((x, y), goal), False
+        except PlanningError:
+            return None, None
+
+    def make_follower(self, path, keep=None):
+        f = {'path': np.asarray(path, dtype=float)}
+        kw = dict(goal_tolerance=self.b['dwa_follow']['goal_tolerance'], lookahead=self.b['dwa_follow']['lookahead'])
+        if self.st['local'] == 'mppi':
+            ctrl = keep['local'].dwa if keep and 'local' in keep else None
+            f['local'] = MPPIFollower(path, 0.0, self.cfg, self.mcfg, controller=ctrl, **kw)
+        else:
+            f['local'] = DWAFollower(path, 0.0, self.cfg, **kw)
+        if self.st['hybrid']:
+            f['pp'] = PurePursuit(path, 0.0, max_v=self.b['max_speed'], max_w=self.b['max_turn_speed'],
+                                  max_acc=self.b['max_accel'], max_acc_w=self.b['max_turn_accel'])
+        f['use_local'] = not self.st['hybrid']
+        f['clear_since'] = None
+        return f
+
+    def hybrid_trigger(self, f, x, y, pts, t):
+        h = self.b['hybrid']
+        idx = f['local'].progress if f['use_local'] else f['pp'].index
+        ahead = f['path'][idx:]
+        if len(ahead) > 1:
+            s = np.concatenate([[0.0], np.cumsum(np.hypot(*np.diff(ahead, axis=0).T))])
+            ahead = ahead[s <= h['path_ahead']]
+        for mx, my, vx, vy, r in self.wd.mover_state(t):
+            d = math.hypot(mx - x, my - y) - r
+            if math.hypot(vx, vy) >= self.b['dwa_follow']['moving_speed'] and d < h['moving_distance']:
+                return True
+        um = self.wd.unmapped(pts)
+        if len(um) and len(ahead):
+            near = um[np.hypot(um[:, 0] - x, um[:, 1] - y) < h['trigger_distance']]
+            if len(near):
+                dp = np.hypot(near[:, None, 0] - ahead[None, :, 0], near[:, None, 1] - ahead[None, :, 1]).min()
+                if dp < h['path_width']:
+                    return True
+        return False
+
+    def path_blocked(self, f, planner):
+        """지금 경로의 남은 부분(3m)이 새 플래너 기준 통과 불가 칸을 지나는지."""
+        idx = f['local'].progress if f['use_local'] else f['pp'].index
+        rest = f['path'][idx:]
+        s = np.concatenate([[0.0], np.cumsum(np.hypot(*np.diff(rest, axis=0).T))]) if len(rest) > 1 else [0.0]
+        for (px, py), si in zip(rest, s):
+            if si > 3.0:
+                break
+            if si > 0.3 and not planner.is_free(px, py):
+                return True
+        return False
+
+    def run(self, limit=150.0):
+        wd = self.wd
+        x, y, yaw = wd.sc['start']
+        v = w = 0.0
+        t = 0.0
+        pts, rng, ang = wd.scan(x, y, yaw, t)
+        self.remember(pts, t)
+        path, _ = self.plan(x, y, t)
+        if path is None:
+            return self.result('A* 실패', t, math.inf, x, y)
+        f = self.make_follower(path)
+        retries = 0
+        mark = (x, y, t)
+        blocked_since = None
+        backing = None
+        min_gap = math.inf
+        next_replan = 1.0
+        last_scan = 0.0
+        while t < limit:
+            if t - last_scan >= 0.2 - 1e-9:
+                pts, rng, ang = wd.scan(x, y, yaw, t)
+                self.remember(pts, t)
+                last_scan = t
+            dyn = wd.mover_state(t)
+            outcome = None
+            if backing is not None:
+                # 뒤로 15cm (start_recovery) 후 재계획
+                v, w = -0.05, 0.0
+                if math.hypot(x - backing[0], y - backing[1]) > 0.15 or t - backing[2] > 5.0:
+                    backing = None
+                    outcome = 'replan'
+            else:
+                if self.st['replan'] and t >= next_replan:
+                    next_replan = t + 1.0
+                    newp, scan_ok = self.plan(x, y, t, allow_fallback=False)
+                    if newp is not None and len(newp) > 1:
+                        idx = f['local'].progress if f['use_local'] else f['pp'].index
+                        rest = f['path'][idx:]
+                        rest_len = float(np.hypot(*np.diff(rest, axis=0).T).sum()) if len(rest) > 1 else 0.0
+                        new_len = float(np.hypot(*np.diff(np.asarray(newp), axis=0).T).sum())
+                        if self.path_blocked(f, self.planner(t)) or new_len < 0.85 * rest_len:
+                            self.replans += 1
+                            self.say(t, f'재계획 (남은 {rest_len:.2f} m → 새 {new_len:.2f} m)')
+                            use_local = f['use_local']
+                            f = self.make_follower(newp, keep=f)
+                            if self.st['hybrid'] and use_local:
+                                f['use_local'] = True
+                if self.st['hybrid']:
+                    trig = self.hybrid_trigger(f, x, y, pts, t)
+                    if not f['use_local']:
+                        if trig and not f['pp'].at_goal:
+                            f['local'].progress = f['pp'].index
+                            f['local'].turning = False
+                            f['use_local'] = True
+                            f['clear_since'] = None
+                            self.switches += 1
+                            self.say(t, '→ 지역 계획기')
+                    elif trig or f['local'].arrived:
+                        f['clear_since'] = None
+                    else:
+                        f['clear_since'] = f['clear_since'] or t
+                        if t - f['clear_since'] >= self.b['hybrid']['release_time']:
+                            rest = f['path'][f['local'].progress:f['local'].progress + 60]
+                            if np.hypot(rest[:, 0] - x, rest[:, 1] - y).min() < self.b['hybrid']['rejoin_offset']:
+                                f['pp'].index = f['local'].progress
+                                f['pp'].set_speed(v, w)
+                                f['use_local'] = False
+                                self.say(t, '→ pure pursuit')
+                if f['use_local']:
+                    v, w, state = f['local'].compute((x, y, yaw), v, w, (0.0, 0.0, 0.0), pts, dyn,
+                                                     moving_speed=self.b['dwa_follow']['moving_speed'])
+                else:
+                    v, w, state = f['pp'].compute(x, y, yaw, now=t)
+                if state == 'done':
+                    return self.result('도착', t, min_gap, x, y)
+                if state == 'off_path':
+                    outcome = 'fail_or_retry'
+                    self.say(t, '경로 이탈')
+                elif state == 'blocked':
+                    v = w = 0.0
+                    blocked_since = blocked_since if blocked_since is not None else t
+                    mark = (x, y, t)   # 기다리는 동안은 진행 없음으로 치지 않음 (브리지와 같음)
+                    if t - blocked_since > self.b['blocked_timeout']:
+                        outcome = 'recovery'
+                        self.say(t, '막힘 5초')
+                else:
+                    blocked_since = None
+                    if v > 0 and not f['use_local']:
+                        front = np.abs(np.arctan2(np.sin(ang), np.cos(ang))) <= math.radians(25)
+                        if np.min(rng[front]) < self.b['stop_distance']:
+                            v = w = 0.0
+                            f['pp'].set_speed(0.0, 0.0)
+                            blocked_since = t if blocked_since is None else blocked_since
+                            mark = (x, y, t)
+                            if t - (f.get('pp_block') or t) > self.b['blocked_timeout']:
+                                outcome = 'fail_or_retry'
+                                self.say(t, '앞 막힘 5초 (pure pursuit)')
+                            f['pp_block'] = f.get('pp_block') or t
+                        else:
+                            f['pp_block'] = None
+                if outcome is None:
+                    if math.hypot(x - mark[0], y - mark[1]) > 0.05 or state == 'rotating':
+                        mark = (x, y, t)
+                    elif t - mark[2] > self.b['progress_timeout']:
+                        outcome = 'recovery' if f['use_local'] else 'fail_or_retry'
+                        self.say(t, '진행 없음 15초')
+            if outcome == 'recovery':
+                # 뒤가 비었으면 15cm 물러난 뒤 재계획
+                back = np.abs(np.arctan2(np.sin(ang - math.pi), np.cos(ang - math.pi))) <= math.radians(30)
+                if np.min(rng[back]) > 0.35:
+                    backing = (x, y, t)
+                    blocked_since = None
+                    v = w = 0.0
+                else:
+                    outcome = 'replan'
+            if outcome in ('replan', 'fail_or_retry'):
+                retries += 1
+                if retries > self.b['max_retries']:
+                    return self.result('실패', t, min_gap, x, y)
+                newp, scan_ok = self.plan(x, y, t)
+                if newp is None:
+                    return self.result('실패 (A*)', t, min_gap, x, y)
+                self.replans += 1
+                self.say(t, f'재시도 {retries}: 재계획 ({"LiDAR 장애물 포함" if scan_ok else "지도만"})')
+                f = self.make_follower(newp, keep=f)
+                v = w = 0.0
+                mark = (x, y, t)
+                blocked_since = None
+            yaw += w * DT
+            x += v * math.cos(yaw) * DT
+            y += v * math.sin(yaw) * DT
+            t += DT
+            min_gap = min(min_gap, wd.body_gap(x, y, yaw, t))
+        return self.result('시간 초과', t, min_gap, x, y)
+
+    def result(self, outcome, t, gap, x, y):
+        return dict(outcome=outcome, time=round(t, 1), gap=round(gap, 3), pos=(round(x, 2), round(y, 2)),
+                    replans=self.replans, switches=self.switches, log=self.log)
+
+
+def job(args):
+    key, name, verbose = args
+    sc = scenarios()[name]
+    t0 = time.time()
+    r = Run(World(sc), STRATEGIES[key], load_params(), verbose).run()
+    r['cpu'] = round(time.time() - t0, 1)
+    return key, name, r
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument('--only', default=''.join(STRATEGIES))
+    ap.add_argument('--scen', default='')
+    ap.add_argument('-v', action='store_true')
+    ap.add_argument('--workers', type=int, default=10)
+    args = ap.parse_args()
+    names = args.scen.split(',') if args.scen else list(scenarios())
+    jobs = [(k, n, args.v) for k in args.only for n in names]
+    with ProcessPoolExecutor(args.workers) as ex:
+        res = list(ex.map(job, jobs))
+    table = {}
+    for k, n, r in res:
+        table.setdefault(k, {})[n] = r
+    print('방식 | ' + ' | '.join(names))
+    for k in args.only:
+        row = []
+        for n in names:
+            r = table[k][n]
+            mark = '✓' if r['outcome'] == '도착' else '✗'
+            hit = ' 충돌' if r['gap'] < 0 else ''
+            row.append(f"{mark}{r['time']:.0f}s g{r['gap']:.2f}{hit} rp{r['replans']}")
+        ok = sum(table[k][n]['outcome'] == '도착' and table[k][n]['gap'] >= 0 for n in names)
+        print(f"{k} {STRATEGIES[k]['desc']:28s} [{ok}/{len(names)}] | " + ' | '.join(row))
+    if args.v or len(jobs) <= 3:
+        for k, n, r in res:
+            print(k, n, r['outcome'], r['pos'], r['cpu'], 's cpu')
+            print('\n'.join(r['log'][-15:]))
+
+
+if __name__ == '__main__':
+    main()
