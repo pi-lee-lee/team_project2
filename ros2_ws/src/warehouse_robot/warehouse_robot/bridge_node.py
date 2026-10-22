@@ -195,6 +195,8 @@ class BridgeNode(Node):
         self.declare_parameter('controller', 'hybrid')  # hybrid | dwa | builtin | nav2
         self.declare_parameter('max_speed', 0.1)           # m/s
         self.declare_parameter('max_turn_speed', 0.6)      # rad/s
+        self.declare_parameter('max_accel', 0.3)           # m/s², pure pursuit 출발 가속/정지 감속
+        self.declare_parameter('max_turn_accel', 1.5)      # rad/s², pure pursuit 제자리 회전
         self.declare_parameter('stop_distance', 0.35)      # 앞쪽 이 거리 안에 물체가 있으면 정지 (m)
         self.declare_parameter('blocked_timeout', 10.0)    # 이 시간 넘게 막히면 재계획/실패 (s)
         self.declare_parameter('progress_timeout', 15.0)   # 이 시간 동안 5cm도 못 가면 실패 (s)
@@ -230,6 +232,8 @@ class BridgeNode(Node):
         self.controller = p('controller')
         self.max_speed = p('max_speed')
         self.max_turn_speed = p('max_turn_speed')
+        self.max_accel = p('max_accel')
+        self.max_turn_accel = p('max_turn_accel')
         self.stop_distance = p('stop_distance')
         self.blocked_timeout = p('blocked_timeout')
         self.progress_timeout = p('progress_timeout')
@@ -713,7 +717,8 @@ class BridgeNode(Node):
                     lookahead=self.get_parameter('dwa_follow.lookahead').value)
             if self.controller in ('builtin', 'hybrid'):
                 self.follower['pp'] = PurePursuit(points, self.goal['yaw'], max_v=self.max_speed,
-                                                  max_w=self.max_turn_speed)
+                                                  max_w=self.max_turn_speed, max_acc=self.max_accel,
+                                                  max_acc_w=self.max_turn_accel)
             self.follower['use_dwa'] = self.controller == 'dwa'
             self.follower['clear_since'] = None
             return
@@ -1099,6 +1104,7 @@ class BridgeNode(Node):
                     return
                 f['mark_time'] = now  # 기다리는 동안은 진행 없음으로 치지 않음
                 f.pop('drive_since', None)
+                f['pp'].set_speed(0.0, 0.0)   # 다시 갈 때 0 에서 가속
                 self.cmd_vel_pub.publish(Twist())
                 return
             f['blocked_since'] = None
@@ -1185,6 +1191,7 @@ class BridgeNode(Node):
         offset = float(np.min(np.hypot(rest[:, 0] - x, rest[:, 1] - y)))
         if offset < self.get_parameter('hybrid.rejoin_offset').value:
             pp.index = dwa.progress
+            pp.set_speed(*self.odom_vw)   # DWA 로 달리던 속도에서 이어서 (0 으로 뚝 떨어지지 않게)
             f['use_dwa'] = False
             self.get_logger().info(f'장애물 지나감 (경로에서 {offset:.2f} m) → pure pursuit')
 
