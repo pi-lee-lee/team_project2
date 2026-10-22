@@ -16,6 +16,7 @@
     </div>
   </div>
   <div class="top-status">
+    <span id="top-robot" class="badge top-robot" title="로봇 상태 · 배터리 (휴대폰에서만 표시)"></span>
     <span id="run-mode" class="badge" hidden></span>
     <span id="ws-status" class="badge off">서버 연결 안 됨</span>
   </div>
@@ -36,9 +37,10 @@
       <span id="mode-hint">모드를 고르세요</span>
     </div>
     <div id="canvas-wrap">
-      <canvas id="map"></canvas>
+      <canvas id="map" class="pan"></canvas>
       <div id="no-map" hidden>아직 맵이 없습니다 — 로봇 주변 8m 격자(1칸 = 1m)를 표시합니다. SLAM 이 첫 맵을 만들면 맵 크기에 맞춰 바뀝니다.</div>
       <button id="btn-estop" class="estop" title="즉시 정지하고 진행 중인 작업을 취소">■ 비상정지</button>
+      <button id="btn-legend" class="legend-toggle" aria-expanded="false" title="지도 기호 설명">범례</button>
       <div class="legend">
         <span><i class="lgd robot"></i>로봇</span>
         <span><i class="lgd path"></i>경로</span>
@@ -129,7 +131,7 @@
               <option value="0.2">빠르게 (0.2 m/s)</option>
             </select>
           </label>
-          <label class="check"><input type="checkbox" id="teleop-keys"> 키보드 사용</label>
+          <label class="check keys-only"><input type="checkbox" id="teleop-keys"> 키보드 사용</label>
           <p id="teleop-status" class="muted small"></p>
         </div>
       </div>

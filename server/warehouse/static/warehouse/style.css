@@ -111,6 +111,9 @@ main {
 
 #canvas-wrap { position: relative; flex: 1; min-height: 300px; overflow: hidden; background: #cfd4da; }
 #map { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; }
+#map.pan { touch-action: pan-y; }   /* 보기 모드: 지도 위에서도 페이지 세로 스크롤 */
+.legend-toggle { display: none; }
+.topbar .top-robot { display: none; }
 #no-map {
   position: absolute;
   top: 12px;
@@ -395,16 +398,6 @@ button[hidden] { display: none; }
   z-index: 10;
 }
 
-/* ---------------------------------------------------------------- 좁은 화면 (휴대폰) */
-@media (max-width: 900px) {
-  main { grid-template-columns: 1fr; height: auto; padding: 10px; }
-  #canvas-wrap { height: 60vh; flex: none; }
-  aside { overflow: visible; padding-right: 0; }
-  .sub { display: none; }
-  .segmented { width: 100%; }
-  .segmented button.mode { flex: 1; padding: 0 6px; }
-  .ico { display: none; }
-}
 
 /* LED 요청 */
 .small { font-size: 12px; }
@@ -457,3 +450,53 @@ button[hidden] { display: none; }
 .teleop-pad button.diag { font-size: 15px; opacity: 0.85; }
 .teleop-pad button:active { transform: translateY(1px); filter: brightness(0.92); }
 .teleop-opts { display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: 150px; }
+
+/* ---------------------------------------------------------------- 좁은 화면 (휴대폰): 파일 끝에 두어 위 규칙보다 우선 */
+@media (max-width: 900px) {
+  main { grid-template-columns: 1fr; height: auto; padding: 10px; padding-bottom: calc(84px + env(safe-area-inset-bottom)); }
+  #canvas-wrap { height: min(62vh, 560px); min-height: 320px; flex: none; }
+  aside { overflow: visible; padding-right: 0; }
+  .sub { display: none; }
+
+  /* 위쪽 막대: 스크롤해도 보이게, 로봇 상태/배터리 표시 */
+  .topbar { position: sticky; top: 0; z-index: 20; padding: 8px 12px; padding-top: calc(8px + env(safe-area-inset-top)); }
+  .topbar h1 { font-size: 16px; white-space: nowrap; }
+  .logo { width: 28px; height: 28px; }
+  .topbar .top-robot { display: inline-flex; }
+  #run-mode { display: none; }
+
+  /* 지도 모드: 글자가 잘리지 않게 3칸씩 두 줄 */
+  .segmented { width: 100%; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; }
+  .segmented button.mode { height: 40px; padding: 0 4px; font-size: 13px; white-space: nowrap; }
+  .ico { display: inline-block; width: auto; margin-right: 3px; }
+  #mode-hint { display: block; margin-top: 6px; }
+
+  /* 비상정지: 어디까지 스크롤해도 오른쪽 아래에 떠 있음 */
+  .estop { position: fixed; top: auto; right: 14px; bottom: calc(16px + env(safe-area-inset-bottom)); z-index: 30;
+    height: 56px; padding: 0 22px; font-size: 16px; }
+  #toast { bottom: calc(86px + env(safe-area-inset-bottom)); }
+
+  /* 범례: 지도를 가리지 않게 접어 두고 버튼으로 펼침 */
+  .legend-toggle { display: block; position: absolute; left: 10px; bottom: 10px; z-index: 3; height: 32px; min-height: 0;
+    padding: 0 12px; font-size: 12px; border-radius: 999px; background: rgba(255, 255, 255, 0.95); }
+  .legend { display: none; bottom: 48px; left: 10px; right: 10px; font-size: 12px; }
+  #canvas-wrap.legend-open .legend { display: flex; }
+
+  /* 손가락으로 누르기 쉽게: 버튼/선택 44px, 체크박스 크게, 입력 글자 16px (iOS 확대 방지) */
+  button, select { min-height: 44px; }
+  button.small { min-height: 36px; }
+  select, input, textarea { font-size: 16px; }
+  .check { min-height: 40px; font-size: 14px; }
+  .check input[type="checkbox"] { width: 20px; height: 20px; }
+  .card-head > a { padding: 10px 0; }
+  details.collapsible > summary { min-height: 40px; }
+
+  /* 수동 조작 패드 크게 */
+  .teleop { justify-content: center; }
+  .teleop-pad { grid-template-columns: repeat(3, 72px); grid-template-rows: repeat(3, 64px); gap: 8px; }
+  .teleop-pad button { font-size: 24px; height: 100%; min-height: 0; }
+}
+/* 터치 화면(키보드 없음)에서는 '키보드 사용' 숨김 */
+@media (hover: none) and (pointer: coarse) {
+  .keys-only { display: none; }
+}

@@ -942,6 +942,8 @@ const HINTS = {
 
 function setMode(mode) {
   S.mode = mode;
+  // 보기 모드에서는 지도 위를 손가락으로 쓸어도 페이지가 스크롤되게 (다른 모드는 지도에서 찍기/끌기)
+  canvas.classList.toggle('pan', mode === 'view');
   document.querySelectorAll('button.mode').forEach((b) => b.classList.toggle('active', b.dataset.mode === mode));
   $('#mode-hint').textContent = mode === 'deliver' && S.deliveryLoc
     ? `${S.deliveryLoc.cargo} — ${HINTS.deliver}` : HINTS[mode];
@@ -1082,6 +1084,11 @@ function renderPanel() {
   badge.textContent = STATE_LABEL[state] || state;
   badge.className = 'badge ' + state;
   $('#robot-message').textContent = r ? r.message : '';
+  // 휴대폰: 스크롤해도 보이는 위쪽 막대에 로봇 상태와 배터리
+  const top = $('#top-robot');
+  top.textContent = (STATE_LABEL[state] || state)
+    + (r && r.battery_percentage != null && state !== 'OFFLINE' ? ` · ${Math.round(r.battery_percentage)}%` : '');
+  top.className = 'badge top-robot ' + state;
   const bat = $('#battery');
   bat.textContent = r && r.battery_voltage != null && state !== 'OFFLINE'
     ? `배터리 ${r.battery_voltage.toFixed(1)} V` + (r.battery_percentage != null ? ` (${Math.round(r.battery_percentage)}%)` : '')
@@ -1292,6 +1299,10 @@ $('#btn-set-home').addEventListener('click', () => {
 });
 $('#btn-reset').addEventListener('click', () => send('reset_error'));
 $('#btn-estop').addEventListener('click', () => send('estop'));
+$('#btn-legend').addEventListener('click', () => {
+  const open = $('#canvas-wrap').classList.toggle('legend-open');
+  $('#btn-legend').setAttribute('aria-expanded', String(open));
+});
 $('#btn-reset-robot').addEventListener('click', () => {
   if (confirm('작업을 취소하고 로봇 상태를 초기화할까요?\n(시뮬레이션이면 로봇이 출발 위치로 돌아갑니다)')) send('reset_robot');
 });
