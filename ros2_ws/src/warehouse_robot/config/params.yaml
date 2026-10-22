@@ -31,8 +31,8 @@ warehouse_bridge:
     max_retries: 2
     arrive_tolerance: 0.3     # Nav2가 성공이라고 해도 목표와 이 거리 이상이면 실패로 처리
     controller: hybrid        # hybrid(기본): 평소 pure pursuit, 경로 앞 장애물이 가까우면 DWA / dwa: 항상 DWA / builtin: 항상 pure pursuit / nav2: Nav2 controller_server
-    max_speed: 0.1            # m/s (pure pursuit). 실물에서 0.15 가 빠르다고 해서 낮춤 (2026-10-22)
-    max_turn_speed: 0.6       # rad/s (pure pursuit 회전, 제자리 회전). 예전 1.0
+    max_speed: 0.26           # m/s (pure pursuit). Waffle Pi 하드웨어 한계 (2026-10-22: 0.1 이 느리다고 해서 올림, 실물 미시험)
+    max_turn_speed: 1.82      # rad/s (pure pursuit 회전, 제자리 회전). 하드웨어 한계 (예전 1.0 → 0.6 → 1.82)
     footprint_extra: [-0.277, -0.197, -0.04, 0.04]   # 차체에 붙인 물건 사각형 (x_min, x_max, y_min, y_max) x N. 뒤쪽 가운데 8x8cm. 제자리 회전/후진 여유, 웹 로봇 모양
     stop_distance: 0.35       # 앞쪽 ±25° 안에 이 거리 이내 물체가 있으면 정지 후 대기 (m)
     blocked_timeout: 5.0      # 이 시간 넘게 막히면 장애물을 피하는 경로로 재계획, 재시도도 다 쓰면 실패 (s)
@@ -62,15 +62,15 @@ warehouse_bridge:
       max_speed: 1.5
     # controller: dwa 일 때 (tb3_nav local_planner 이식). 실수는 소수점을 붙일 것
     dwa:
-      max_v: 0.07            # 실물에서 0.1 도 빠르다고 해서 낮춤 (2026-10-22, 하드웨어 한계 0.26)
+      max_v: 0.26            # 하드웨어 한계 (2026-10-22: 0.07 이 느리다고 해서 올림. 튜닝은 0.15 에서 했음, 0.26 은 실물/sim 미시험)
       min_v: -0.05            # 느린 후진 (다가오는 장애물에서 물러나기)
-      max_w: 0.4              # 실물에서 낮춤 (2026-10-22, 하드웨어 한계 1.82). 돌아서기 회전도 이 값 이하
+      max_w: 1.82             # 하드웨어 한계 (2026-10-22 올림). 돌아서기 회전은 dwa.py rotate_speed 0.6 이하
       max_acc_v: 0.3          # sim 실측 1.0~1.2 m/s² (tools/step_test.py). 실물 미측정이라 보수적으로
       max_acc_w: 1.5          # sim 실측 7~12 rad/s². 보수적으로
       v_samples: 9
       w_samples: 21
       sim_dt: 0.1
-      predict_time: 2.0       # max_v 0.07 에서 0.14 m 앞까지. 1.0~3.0 비교(dwa_tune 16개 + 좁은 모서리 3개, 2026-10-22): 3.0 은 마주 올 때 오래 기다림, 1.0 은 여유 줄어듦, 2.0 이 여유 유지 + 계산 2.5초보다 17% 적음
+      predict_time: 2.0       # max_v 0.26 에서 0.52 m 앞까지. 1.0~3.0 비교(dwa_tune 16개 + 좁은 모서리 3개, 2026-10-22): 3.0 은 마주 올 때 오래 기다림, 1.0 은 여유 줄어듦, 2.0 이 여유 유지 + 계산 2.5초보다 17% 적음
       robot_radius: 0.17      # 정규화/탐색 범위용 (충돌은 아래 footprint 직사각형으로 봄)
       footprint: [-0.197, 0.069, 0.153]   # Waffle Pi 외곽 직사각형 (x_min, x_max, 반폭). 원으로 덮으면 앞뒤가 커서 벽 옆에서 갇힘
       allow_escape: true      # 벽에 바짝 붙어 갈 궤적이 없으면 여유가 줄지 않는 이동은 허용
