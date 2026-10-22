@@ -1,7 +1,7 @@
 astar_planner:
   ros__parameters:
     map_topic: map
-    robot_radius: 0.28        # 외곽 반경 (m): 차체 뒤 모서리 (0.197, 0.153) → 0.25, 뒤에 붙인 8x8cm (0.277, 0.04) → 0.28. 제자리 회전 때 닿지 않게
+    robot_radius: 0.20       # 외곽 반경 (m): 차체 뒤 모서리 (0.197, 0.153) → 0.25, 뒤에 붙인 8x8cm (0.277, 0.04) → 0.28. 제자리 회전 때 닿지 않게
     inflation_radius: 0.55    # 이 거리까지는 벽에서 멀어지도록 비용 부여
     cost_weight: 3.0
     occupied_threshold: 65
@@ -64,7 +64,7 @@ warehouse_bridge:
       max_speed: 1.5
     # controller: dwa 일 때 (tb3_nav local_planner 이식). 실수는 소수점을 붙일 것
     dwa:
-      max_v: 0.26            # 하드웨어 한계 (2026-10-22: 0.07 이 느리다고 해서 올림. 튜닝은 0.15 에서 했음, 0.26 은 실물/sim 미시험)
+      max_v: 0.13           # 하드웨어 한계 (2026-10-22: 0.07 이 느리다고 해서 올림. 튜닝은 0.15 에서 했음, 0.26 은 실물/sim 미시험)
       min_v: -0.05            # 느린 후진 (다가오는 장애물에서 물러나기)
       max_w: 1.82             # 하드웨어 한계 (2026-10-22 올림). 돌아서기 회전은 dwa.py rotate_speed 0.6 이하
       max_acc_v: 0.3          # sim 실측 1.0~1.2 m/s² (tools/step_test.py). 실물 미측정이라 보수적으로
@@ -72,7 +72,7 @@ warehouse_bridge:
       v_samples: 9
       w_samples: 21
       sim_dt: 0.1
-      predict_time: 2.0       # max_v 0.26 에서 0.52 m 앞까지. 1.0~3.0 비교(dwa_tune 16개 + 좁은 모서리 3개, 2026-10-22): 3.0 은 마주 올 때 오래 기다림, 1.0 은 여유 줄어듦, 2.0 이 여유 유지 + 계산 2.5초보다 17% 적음
+      predict_time: 3.5       # max_v 0.26 에서 0.52 m 앞까지. 1.0~3.0 비교(dwa_tune 16개 + 좁은 모서리 3개, 2026-10-22): 3.0 은 마주 올 때 오래 기다림, 1.0 은 여유 줄어듦, 2.0 이 여유 유지 + 계산 2.5초보다 17% 적음
       robot_radius: 0.17      # 정규화/탐색 범위용 (충돌은 아래 footprint 직사각형으로 봄)
       footprint: [-0.197, 0.069, 0.153]   # Waffle Pi 외곽 직사각형 (x_min, x_max, 반폭). 원으로 덮으면 앞뒤가 커서 벽 옆에서 갇힘
       allow_escape: true      # 벽에 바짝 붙어 갈 궤적이 없으면 여유가 줄지 않는 이동은 허용
@@ -84,11 +84,11 @@ warehouse_bridge:
       w_heading: 0.3
       w_path: 0.75
       w_goal: 0.86
-      w_obstacle: 1.2
+      w_obstacle: 1.8
       w_speed: 0.2
       w_collision: 2.0        # 1.0~6.0 사이에서 결과 차이 없음 (tools/dwa_tune.py), 덜 극단적인 값
     dwa_follow:
-      lookahead: 0.5          # 경로 위 이 거리 앞 점을 DWA 목표로
+      lookahead: 0.3          # 경로 위 이 거리 앞 점을 DWA 목표로
       goal_tolerance: 0.1     # 이 안에 들면 제자리에서 도착 방향 맞춤
       moving_speed: 0.08      # 이보다 빠른 track 만 움직이는 장애물로 예측/웹 표시 (멈춘 물체 속도 노이즈 중앙값 0.06, 느린 사람 0.1)
     # controller: hybrid 일 때 pure pursuit ↔ DWA 전환 (track = 지도에 없는 물체: 상자, 사람)
