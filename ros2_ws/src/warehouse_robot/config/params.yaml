@@ -70,7 +70,7 @@ warehouse_bridge:
       v_samples: 9
       w_samples: 21
       sim_dt: 0.1
-      predict_time: 2.5       # tools/dwa_tune.py 로 비교: 3.0 보다 빠르고 충돌 없음
+      predict_time: 2.0       # max_v 0.07 에서 0.14 m 앞까지. 1.0~3.0 비교(dwa_tune 16개 + 좁은 모서리 3개, 2026-10-22): 3.0 은 마주 올 때 오래 기다림, 1.0 은 여유 줄어듦, 2.0 이 여유 유지 + 계산 2.5초보다 17% 적음
       robot_radius: 0.17      # 정규화/탐색 범위용 (충돌은 아래 footprint 직사각형으로 봄)
       footprint: [-0.197, 0.069, 0.153]   # Waffle Pi 외곽 직사각형 (x_min, x_max, 반폭). 원으로 덮으면 앞뒤가 커서 벽 옆에서 갇힘
       allow_escape: true      # 벽에 바짝 붙어 갈 궤적이 없으면 여유가 줄지 않는 이동은 허용
