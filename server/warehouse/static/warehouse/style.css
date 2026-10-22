@@ -417,8 +417,6 @@ button[hidden] { display: none; }
 .yolo-class b { font-size: 18px; font-variant-numeric: tabular-nums; }
 .yolo-class.hit { border-color: var(--primary); background: var(--primary-soft); color: var(--text); }
 .yolo-class.hit b { color: var(--primary); }
-.yolo-image { display: block; width: 100%; height: auto; margin-top: 10px; border-radius: 8px; background: #000; }
-.yolo-image[hidden] { display: none; }
 .yolo-summary { margin: 8px 0 2px; font-size: 14px; font-weight: 700; }
 .yolo-counts { margin: 0; word-break: break-word; }
 .yolo-timing { margin: 4px 0 0; }

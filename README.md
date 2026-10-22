@@ -226,7 +226,7 @@ SIGINT → SIGTERM → SIGKILL 순서로 보내고 남은 프로세스가 없는
 - `enabled` (카메라 영상 구독 + 추론 + 검출 영상 `/yolo/image_raw` + 개수 `/yolo/counts` 발행) **기본값 false**. false 면 카메라 영상 구독도 끊어 추론하지 않음 (모델은 메모리에 남아 다시 시작이 빠름). 웹 **"카메라 검출 (YOLO)"** 카드:
   - **▶ YOLO 시작 / ■ YOLO 정지** = `enabled` true / false (브리지가 검출기 파라미터 서비스로 바꿈)
   - **📷 장면 캡처** = `capture_once` (다음 검출 장면을 `~/camera_dataset/captures/` 에 PNG 로)
-  - 상태 배지 (검출기 없음 / 정지 / 실행 중 · 영상 대기 / 실행 중), 버튼 위 클래스별 개수 칸, 버튼 아래 검출 영상 (브리지가 `/yolo/image_raw` 를 JPEG 로 줄여 보냄), 개수 요약 (예: `검출 4개 · led_red 2, usb 2`), `/yolo/counts` 원문 글자
+  - 상태 배지 (검출기 없음 / 정지 / 실행 중 · 영상 대기 / 실행 중), 버튼 위 클래스별 개수 칸, 개수 요약 (예: `검출 4개 · led_red 2, usb 2`), `/yolo/counts` 원문 글자
 - 검출 대상: DHT11, bluetooth, led_green, led_red, led_yellow, usb (rgb 는 제외). 아직 LED 배달(`cargo/detected`)과는 연결하지 않았습니다
 
 ### LED 배달 (서빙 로봇처럼)

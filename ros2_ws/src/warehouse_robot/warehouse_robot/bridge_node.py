@@ -24,10 +24,6 @@ import zlib
 
 import numpy as np
 import rclpy
-try:
-    import cv2   # 검출 영상 JPEG 변환용 (없으면 영상만 안 보냄)
-except ImportError:
-    cv2 = None
 import websocket
 from action_msgs.msg import GoalStatus
 from rcl_interfaces.msg import Parameter as ParamMsg, ParameterType, ParameterValue
@@ -40,7 +36,7 @@ from rclpy.action import ActionClient
 from rclpy.node import Node
 from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy, qos_profile_sensor_data
 from rclpy.time import Time
-from sensor_msgs.msg import BatteryState, Image, Imu, LaserScan
+from sensor_msgs.msg import BatteryState, Imu, LaserScan
 from std_msgs.msg import String
 from std_srvs.srv import Empty
 from tf2_ros import Buffer, TransformException, TransformListener
@@ -297,12 +293,6 @@ class BridgeNode(Node):
         self.yolo_pending = None     # 답을 기다리는 enabled 조회 (future, 보낸 시각)
         self.create_subscription(String, self.get_parameter('yolo_counts_topic').value, self.on_yolo_counts, 10)
         self.create_timer(1.0, self.poll_yolo)
-        # 검출 결과 영상(/yolo/image_raw)을 작은 JPEG 로 줄여 웹에 보낸다. 검출이 꺼져 있으면 구독도 안 함 (큰 원본 영상을 받지 않게)
-        self.declare_parameter('yolo_image_topic', '/yolo/image_raw')
-        self.declare_parameter('yolo_image_hz', 5.0)       # 웹으로 보내는 최대 장수 (초당)
-        self.declare_parameter('yolo_image_width', 480)    # 이보다 넓으면 줄임 (px)
-        self.yolo_image_sub = None
-        self.yolo_image_at = 0.0
 
         # 움직이는 장애물 추적 (tb3_nav 의 obstacle_tracker 를 브리지 안으로): 스캔 → odom 점 → 지도 벽 근처 제외
         # → 덩어리 → 칼만필터로 위치/속도. DWA 가 미래 위치를 피하는 데 쓰고, 웹 지도에 표시한다
@@ -865,37 +855,7 @@ class BridgeNode(Node):
             self.send_yolo()
         fut.add_done_callback(done)
 
-    def sync_yolo_image(self):
-        """검출이 꺼진 것을 확인했을 때만 영상 구독을 끊는다 (모름=None 이면 구독해 둠, 영상이 안 오면 비용 없음)."""
-        want = self.yolo_enabled is not False and cv2 is not None
-        if want and self.yolo_image_sub is None:
-            self.yolo_image_sub = self.create_subscription(
-                Image, self.get_parameter('yolo_image_topic').value, self.on_yolo_image, qos_profile_sensor_data)
-        elif not want and self.yolo_image_sub is not None:
-            self.destroy_subscription(self.yolo_image_sub)
-            self.yolo_image_sub = None
-
-    def on_yolo_image(self, msg):
-        now = time.monotonic()
-        if now - self.yolo_image_at < 1.0 / max(0.5, self.get_parameter('yolo_image_hz').value):
-            return
-        if msg.encoding not in ('bgr8', 'rgb8') or msg.height == 0 or msg.width == 0:
-            return
-        self.yolo_image_at = now
-        frame = np.frombuffer(msg.data, np.uint8).reshape(msg.height, msg.step)[:, :msg.width * 3]
-        frame = frame.reshape(msg.height, msg.width, 3)
-        if msg.encoding == 'rgb8':
-            frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
-        width = int(self.get_parameter('yolo_image_width').value)
-        if msg.width > width:
-            frame = cv2.resize(frame, (width, round(msg.height * width / msg.width)), interpolation=cv2.INTER_AREA)
-        ok, buf = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 60])
-        if ok:
-            self.server.send({'type': 'yolo_image', 'jpg': base64.b64encode(buf.tobytes()).decode('ascii'),
-                              'w': frame.shape[1], 'h': frame.shape[0]})
-
     def send_yolo(self):
-        self.sync_yolo_image()
         text, at = self.yolo_counts
         age = None if at is None else round(time.monotonic() - at, 1)
         state = (self.yolo_enabled, text if age is not None and age < 3.0 else '')
