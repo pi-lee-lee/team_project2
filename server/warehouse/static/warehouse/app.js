@@ -1013,6 +1013,7 @@ function renderCargo() {
     : `카메라 인식: ${S.cargo || '비어 있음'}`;
   el.className = 'cargo-status' + (S.cargo ? ' loaded' : '');
 }
+let YOLO_NAMES = [];   // 마지막으로 본 /yolo/counts 클래스 이름 (칸 순서)
 // YOLO 검출기: 상태 배지, 켜기/끄기 버튼, /yolo/counts 글자 ("DHT11: 0 / led_red: 1 / ...")
 function renderYolo() {
   const y = S.yolo;
@@ -1029,16 +1030,38 @@ function renderYolo() {
   $('#btn-yolo-on').disabled = !on || y.enabled === true;
   $('#btn-yolo-off').disabled = !on || y.enabled === false;
   $('#btn-yolo-capture').disabled = !on || !y.enabled;
-  const counts = (y && y.enabled && y.counts) || '';
+  // 브리지는 3초 안에 받은 개수만 보내므로, enabled 를 못 읽었어도 개수가 오면 그대로 표시
+  const counts = (bridge && y && y.counts) || '';
   const items = counts.split('/').map((s) => s.trim().split(':')).filter((p) => p.length === 2)
     .map(([name, n]) => [name.trim(), parseInt(n, 10) || 0]);
   const found = items.filter(([, n]) => n > 0);
   const total = found.reduce((a, [, n]) => a + n, 0);
-  $('#yolo-summary').textContent = !on ? (bridge && y ? '검출기 노드 없음 (브리지와 같이 실행됨: logs/bridge.log 확인)' : '')
+  if (items.length) YOLO_NAMES = items.map(([name]) => name);
+  renderYoloClasses(items);
+  $('#yolo-summary').textContent = counts
+    ? (total ? `검출 ${total}개 · ${found.map(([name, n]) => `${name} ${n}`).join(', ')}` : '검출 없음 (0개)')
+    : !on ? (bridge && y ? '검출기 노드 없음 (브리지와 같이 실행됨: logs/bridge.log 확인)' : '')
     : !y.enabled ? '검출 꺼짐'
-    : !counts ? '카메라 영상을 기다리는 중'
-    : total ? `검출 ${total}개 · ${found.map(([name, n]) => `${name} ${n}`).join(', ')}` : '검출 없음 (0개)';
+    : '카메라 영상을 기다리는 중';
   $('#yolo-counts').textContent = counts;
+}
+// 버튼 위 클래스별 개수 칸. 개수가 안 올 때도 마지막으로 본 클래스 칸은 '-' 로 남겨 자리가 흔들리지 않게
+function renderYoloClasses(items) {
+  const box = $('#yolo-classes');
+  const map = new Map(items);
+  box.hidden = !YOLO_NAMES.length;
+  box.replaceChildren(...YOLO_NAMES.map((name) => {
+    const n = map.get(name);
+    const tile = document.createElement('div');
+    tile.className = 'yolo-class' + (n > 0 ? ' hit' : '');
+    const label = document.createElement('span');
+    label.textContent = name;
+    label.title = name;
+    const num = document.createElement('b');
+    num.textContent = n === undefined ? '-' : String(n);
+    tile.append(label, num);
+    return tile;
+  }));
 }
 // 버튼을 누른 뒤 결과까지 걸린 시간 (로딩 표시). 켜기: 설정 응답 → 첫 검출 결과, 끄기: 설정 응답, 캡처: 다음 검출 결과
 const YOLO_JOB = {

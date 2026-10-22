@@ -409,6 +409,14 @@ button[hidden] { display: none; }
 .cargo-status.loaded { color: #15803d; font-weight: 700; }
 
 /* YOLO 검출 */
+.yolo-classes { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 6px; margin: 0 0 10px; }
+.yolo-classes[hidden] { display: none; }
+.yolo-class { display: flex; justify-content: space-between; align-items: baseline; gap: 6px; padding: 6px 10px;
+  border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--muted); }
+.yolo-class span { font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.yolo-class b { font-size: 18px; font-variant-numeric: tabular-nums; }
+.yolo-class.hit { border-color: var(--primary); background: var(--primary-soft); color: var(--text); }
+.yolo-class.hit b { color: var(--primary); }
 .yolo-summary { margin: 8px 0 2px; font-size: 14px; font-weight: 700; }
 .yolo-counts { margin: 0; word-break: break-word; }
 .yolo-timing { margin: 4px 0 0; }
