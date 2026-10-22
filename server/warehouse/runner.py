@@ -169,7 +169,7 @@ def start_mode(robot, mode, map_path=None, world=None, amcl='default', scan_nois
         elif robot != 'sim':
             raise RunnerError('맵을 선택하세요.')
     label = (f'{"시뮬레이션" if robot == "sim" else "실물"}{f" ({world})" if robot == "sim" and world else ""} '
-             f'{"맵 만들기(SLAM)" if mode == "slam" else "위치 추정(AMCL)"}')
+             f'{"맵 만들기(SLAM)" if mode == "slam" else "맵 사용(AMCL)"}')
 
     def parse(output, ok):
         done = [l for l in output.splitlines() if l.startswith('==') or '가장 잘 맞는' in l or '실패' in l
