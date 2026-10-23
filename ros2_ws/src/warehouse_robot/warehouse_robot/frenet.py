@@ -78,6 +78,7 @@ class FrenetConfig:
     w_speed: float = 1.0          # (목표 - 속도) / 목표
     w_clear: float = 1.0          # 정적: (clear_pref - 최소 여유) / clear_pref
     w_dynamic: float = 1.0        # 움직이는 물체: 같은 식
+    rotate_speed: float = 1.0     # 출발 전 돌아서기 각속도 (rad/s). SLAM 모드는 브리지가 0.6 으로 (빨리 돌면 스캔이 휘어 매칭이 나빠짐)
     stop_decel: float = 0.3       # 경로 끝에서 이 감속으로 멈출 수 있는 속도 이하 (m/s²)
     stop_margin: float = 0.05     # 경로 끝 이만큼 앞에서 멈추는 프로필 (m)
     reference_ds: float = 0.05    # 기준선 간격 (m). A* 격자 5 cm
@@ -474,7 +475,6 @@ class FrenetFollower:
         self.turn_dir = 0.0           # 돌아서는 방향 (+1 / -1). 돌기 시작하면 끝날 때까지 유지
         self.rotate_first = math.radians(60)   # 기준선 방향과 이보다 차이 나면 제자리에서 먼저 돎
         self.turn_done = math.radians(30)      # 이 안으로 들어오면 돌기 끝
-        self.rotate_speed = 0.6
         self.min_v = 0.03             # 이보다 느린 전진 명령은 실제 로봇이 안 움직임 (기록: 0.007 → 실제 0)
         self.last_trajectory = None
         self.last_debug = None
@@ -504,7 +504,7 @@ class FrenetFollower:
         grid = StaticGrid.around(pts, x, y, 0.6, c.grid_res)
         for k in dirs:
             rem = abs(err) if k == near else 2.0 * math.pi - abs(err)           # 이 방향으로 남은 각도
-            w = k * max(0.3, min(c.max_w, self.rotate_speed, 2.0 * rem))
+            w = k * max(0.3, min(c.max_w, c.rotate_speed, 2.0 * rem))
             if self._rotation_clear(grid, x, y, yaw, w, max(1.0, rem / abs(w))):
                 self.turn_dir = k
                 dbg.update(branch='turn_first', err=err, turn_dir=k)

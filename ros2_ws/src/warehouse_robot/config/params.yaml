@@ -122,6 +122,7 @@ warehouse_bridge:
       max_speed: 0.18
       max_accel: 0.3          # 속도 프로필 가/감속 (m/s²)
       max_w: 1.82             # 후보 각속도 한계 |v·κ| (rad/s)
+      rotate_speed: 1.0       # 출발 전 돌아서기 (rad/s). 0.6 은 실물에서 180° 도는 데 5초 넘게 걸렸음. SLAM 모드는 0.6 으로 (브리지)
       max_offset: 0.3         # 옆 오프셋 후보 ±(m). 통로 약 0.9 m
       offset_step: 0.025      # 실제 소화기 틈(양쪽 9 cm)은 5 cm 간격으로는 가운데를 못 맞춰 막혔음
       lateral_dists: [0.4, 0.6]        # 옆으로 가는(돌아오는) 거리 후보 (m)

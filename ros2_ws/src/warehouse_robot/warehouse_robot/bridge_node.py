@@ -334,6 +334,8 @@ class BridgeNode(Node):
             k: (tuple(float(x) for x in self.declare_parameter(f'frenet.{k}', [float(x) for x in v]).value)
                 if isinstance(v, tuple) else type(v)(self.declare_parameter(f'frenet.{k}', v).value))
             for k, v in vars(fdef).items()})
+        if self.mode == 'slam':   # 지도를 만드는 중에는 천천히 돈다 (빨리 돌면 스캔이 휘어 SLAM 매칭이 나빠짐)
+            self.frenet_cfg.rotate_speed = min(self.frenet_cfg.rotate_speed, 0.6)
         self.declare_parameter('dwa_follow.lookahead', 0.5)
         self.declare_parameter('dwa_follow.goal_tolerance', 0.1)
         # 앞쪽 경로가 지도에 없는 장애물에서 이 거리 안을 지나면 목표점을 그 너머 경로점으로 (m, 0 이면 끔), target_max 까지
