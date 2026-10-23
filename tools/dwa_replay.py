@@ -2,9 +2,12 @@
 """주행 기록(logs/records/*.jsonl.gz, bridge_node 가 목표마다 남김) 분석.
 
   python3 tools/dwa_replay.py                     가장 최근 기록 요약 (사건, 1초 간격 표, 느림/정지 구간 설명)
-  python3 tools/dwa_replay.py FILE                그 기록 요약
+  python3 tools/dwa_replay.py --list              세션(브리지 켠 단위) / 주행(목표) 목록과 결과
+  python3 tools/dwa_replay.py 폴더|파일            그 기록 요약 (목표 폴더, record.jsonl.gz, 예전 *.jsonl.gz)
   python3 tools/dwa_replay.py --at 23.4           23.4초에 가장 가까운 로컬 플래너(Frenet/DWA) 주기를 자세히 (왜 그 명령이 나왔나)
-  python3 tools/dwa_replay.py --at 23.4 --plot    + 그림 (logs/records/<기록>_23.4.png)
+  python3 tools/dwa_replay.py --at 23.4 --plot    + 그림 (그 목표 폴더의 plot_23.4.png)
+
+기록 위치: logs/records/<브리지 켠 시각>_<frenet|hybrid>/<시각>_<목표>/record.jsonl.gz
   python3 tools/dwa_replay.py --set frenet.safety_margin=0.05 [--set ...]   (DWA 기록이면 dwa.*)
                                                   같은 입력(스캔/위치/트래킹)으로 다시 계산해서 원래 명령과 비교
                                                   (열린 루프: 로봇이 실제로 다르게 움직였을 때의 결과는 아님)
@@ -49,11 +52,45 @@ def load(path):
     return rows
 
 
+def all_records():
+    """logs/records 아래 모든 기록 파일 (수정 시각 순)."""
+    files = glob.glob(os.path.join(HOME, 'logs', 'records', '**', '*.jsonl.gz'), recursive=True)
+    return sorted(files, key=os.path.getmtime)
+
+
 def latest():
-    files = sorted(glob.glob(os.path.join(HOME, 'logs', 'records', '*.jsonl.gz')))
+    files = all_records()
     if not files:
         sys.exit('기록이 없습니다 (logs/records/). 브리지 record.enabled 를 확인하세요.')
     return files[-1]
+
+
+def resolve(arg):
+    """목표 폴더 / 세션 폴더(그 안 최근) / 파일 → 기록 파일."""
+    if os.path.isdir(arg):
+        files = sorted(glob.glob(os.path.join(arg, '**', '*.jsonl.gz'), recursive=True), key=os.path.getmtime)
+        if not files:
+            sys.exit(f'{arg}: 기록이 없습니다')
+        return files[-1]
+    return arg
+
+
+def list_records():
+    root = os.path.join(HOME, 'logs', 'records')
+    last = None
+    for f in all_records():
+        rows = load(f)
+        start = rows[0] if rows and rows[0].get('type') == 'start' else {}
+        end = next((r for r in reversed(rows) if r.get('type') == 'end'), None)
+        rel = os.path.relpath(f, root)
+        session = rel.split(os.sep)[0] if os.sep in rel else '(폴더 없음)'
+        if session != last:
+            print(f'\n[{session}]')
+            last = session
+        g = start.get('goal', {})
+        dur = rows[-1].get('t', 0.0) if rows else 0.0
+        print(f"  {os.path.dirname(rel) or rel:<55} 목표 ({g.get('x', 0):.2f}, {g.get('y', 0):.2f})  {dur:5.1f}s  "
+              f"{end['status'] + ' ' + end.get('message', '') if end else '끝 기록 없음'}")
 
 
 def make_cfg(params, overrides=None):
@@ -425,6 +462,13 @@ def plot_frenet(rec, s, path, plt):
     print(f'그림: {path}')
 
 
+def plot_path(rec, s):
+    """그림 파일: 목표 폴더 기록이면 그 폴더의 plot_<t>.png, 예전 파일이면 옆에 <이름>_<t>.png."""
+    if os.path.basename(rec.path) == 'record.jsonl.gz':
+        return os.path.join(os.path.dirname(rec.path), f"plot_{s['t']:.1f}.png")
+    return rec.path.replace('.jsonl.gz', f"_{s['t']:.1f}.png")
+
+
 def plot(rec, s, path):
     import matplotlib
     matplotlib.use('Agg')
@@ -490,13 +534,17 @@ def parse_set(items):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument('file', nargs='?', help='기록 파일 (기본: logs/records 에서 가장 최근)')
+    ap.add_argument('file', nargs='?', help='기록 (목표 폴더, 세션 폴더, 파일. 기본: 가장 최근)')
+    ap.add_argument('--list', action='store_true', help='세션/주행 목록과 결과')
     ap.add_argument('--at', type=float, help='이 시각(s, 기록 시작부터)의 로컬 플래너 주기를 자세히')
     ap.add_argument('--plot', action='store_true', help='--at 시각의 그림 저장')
     ap.add_argument('--set', action='append', metavar='이름=값',
                     help='다시 계산할 때 바꿀 파라미터 (frenet.*, dwa.*, dwa_follow.*)')
     a = ap.parse_args()
-    rec = Record(a.file or latest())
+    if a.list:
+        list_records()
+        return
+    rec = Record(resolve(a.file) if a.file else latest())
     ov = parse_set(a.set)
     if a.at is not None:
         s = rec.step_at(a.at)
@@ -509,7 +557,7 @@ def main():
             v2, w2, st2, f2 = replay(rec, s, ov)
             print(f"\n바꾼 파라미터 {ov} 로 다시 계산: v={v2:.3f} w={w2:.2f} ({st2})")
         if a.plot:
-            plot(rec, s, rec.path.replace('.jsonl.gz', f"_{s['t']:.1f}.png"))
+            plot(rec, s, plot_path(rec, s))
         return
     if ov:
         print(f'바꾼 파라미터 {ov}: 같은 입력으로 다시 계산 (열린 루프)\n   t     기록 v / w        다시 v / w')

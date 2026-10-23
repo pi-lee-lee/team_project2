@@ -27,6 +27,8 @@
   - 운동 한계: |v·κ| <= max_w (각속도), v <= max_speed
   - 추종: 계획의 앞부분을 그대로 실행 (v = 0.1초 뒤 계획 속도, w = v·κ(0.1~0.3초 평균)). 계획이 늘 지금 위치/방향에서
     시작하므로 오차는 다음 계획이 바로잡음 (pure pursuit 로 따라가면 옆으로 비킬 때 안쪽으로 질러가 늦게 비켰음)
+  - 인지 범위: 정적 격자는 이번 후보들이 지나가는 곳 + 차체 + clear_pref 만 (뒤는 차체 뒤 끝 근처까지), 제자리 회전은
+    로봇 둘레 0.6 m. 움직이는 물체는 horizon 안에 후보 영역에 닿을 수 있는 것만, 차체 뒤 끝보다 뒤에 있는 순간은 무시
   - 출발 전 돌아서기 / 도착 후 방향 맞추기는 제자리 회전 (후보는 앞으로 가는 궤적만). 가까운 쪽이 막히면 먼 쪽으로,
     양쪽 다 막히면(구석: 실물에서 벽 13 cm 앞, 옆 9 cm) 짧게 앞/뒤로 움직여 돌 자리를 만든 뒤 돈다
 """
@@ -69,7 +71,7 @@ class FrenetConfig:
     dynamic_margin: float = 0.15  # 움직이는 물체 추가 여유 (m)
     dynamic_growth: float = 0.03  # 예측 1초당 여유 증가 (m/s)
     grid_res: float = 0.01        # 정적 거리 격자 (m). 2 cm 는 오차 때문에 소화기 옆 0.5 m 틈을 못 지나갔음
-    grid_half: float = 1.6        # 로봇 중심 ±grid_half 안의 스캔 점만 (m)
+    grid_half: float = 1.6        # 정적 격자 최대 범위: 로봇 중심 ±grid_half (실제 범위는 후보가 지나가는 곳에 맞춤, m)
     w_offset: float = 1.0         # 검사 구간 평균 |d| / max_offset
     w_change: float = 0.3         # |오프셋 - 직전 오프셋| / max_offset
     w_turn: float = 0.5           # max|d'| (옆으로 꺾는 기울기, 1 = 45°)
@@ -207,27 +209,33 @@ def frenet_to_cartesian(rx, ry, rtheta, rkappa, rdkappa, s_dot, s_ddot, d, d_pri
 
 # ------------------------------------------------------------------ 충돌 (차체 = 원 4개)
 class StaticGrid:
-    """스캔 점까지 거리 격자 (로봇 중심 ±half). 격자 밖은 장애물 없음."""
+    """스캔 점까지 거리 격자, 사각형 [x0, x1] x [y0, y1] 안의 점만. 격자 밖은 장애물 없음.
+    계산(거리 변환)은 격자 넓이에 비례 → 쓸 곳(후보가 지나가는 곳 + 차체 + 선호 여유)만 만든다."""
 
-    def __init__(self, points, cx, cy, half, res):
-        self.ox, self.oy, self.res = cx - half, cy - half, res
-        self.n = int(round(2 * half / res))
-        free = np.ones((self.n, self.n), dtype=bool)
+    def __init__(self, points, x0, y0, x1, y1, res):
+        self.ox, self.oy, self.res = x0, y0, res
+        self.nx = max(int(math.ceil((x1 - x0) / res)), 1)
+        self.ny = max(int(math.ceil((y1 - y0) / res)), 1)
+        free = np.ones((self.ny, self.nx), dtype=bool)
         pts = np.asarray(points, dtype=float).reshape(-1, 2)
         if len(pts):
             j = np.floor((pts[:, 0] - self.ox) / res).astype(int)
             i = np.floor((pts[:, 1] - self.oy) / res).astype(int)
-            ok = (i >= 0) & (i < self.n) & (j >= 0) & (j < self.n)
+            ok = (i >= 0) & (i < self.ny) & (j >= 0) & (j < self.nx)
             free[i[ok], j[ok]] = False
         self.empty = bool(free.all())
         self.dist = None if self.empty else distance_transform_edt(free) * res   # 칸 중심 사이 거리
+
+    @classmethod
+    def around(cls, points, cx, cy, half, res):
+        return cls(points, cx - half, cy - half, cx + half, cy + half, res)
 
     def lookup(self, x, y):
         if self.empty:
             return np.full(np.shape(x), np.inf)
         j = np.floor((x - self.ox) / self.res).astype(int)
         i = np.floor((y - self.oy) / self.res).astype(int)
-        inside = (i >= 0) & (i < self.n) & (j >= 0) & (j < self.n)
+        inside = (i >= 0) & (i < self.ny) & (j >= 0) & (j < self.nx)
         out = np.full(np.shape(x), np.inf)
         out[inside] = self.dist[i[inside], j[inside]]
         return out
@@ -318,7 +326,7 @@ class FrenetPlanner:
         nS, nV = len(OFF), len(vs)
         offs_c, rad = body_circles(c.footprint)
         body = body_points(c.footprint, c.footprint_extra)
-        grid = StaticGrid(static_points, x, y, c.grid_half, c.grid_res)
+        r_body = float(np.hypot(body[:, 0], body[:, 1]).max())            # 기준점에서 차체 끝까지 (부착물 포함)
 
         # ---- 모양만: 정적 장애물을 거리 0 ~ check_dist 에서 (속도와 무관)
         q = np.arange(0.0, c.check_dist + 1e-9, c.check_step)             # (nq,)
@@ -326,6 +334,13 @@ class FrenetPlanner:
         sq = np.broadcast_to(s0 + q, dq.shape)
         g = frenet_to_cartesian(*ref.at(sq), np.ones_like(dq), np.zeros_like(dq), dq, dpq, ddq)
         on_path = sq <= ref.s_end + 0.02                                  # 경로 끝 너머는 검사 안 함
+        # 인지 범위: 이번 후보들이 지나가는 곳(+ 지금 자세) + 차체 끝 + 선호 여유. 그 밖의 점은 어느 후보의 여유/비용에도
+        # 영향이 없다 (뒤쪽은 차체 뒤 끝 근처까지만). ±grid_half 를 넘지 않게
+        gx, gy = g[..., 0][on_path], g[..., 1][on_path]
+        pad = r_body + c.clear_pref + 2 * c.grid_res
+        bx0, bx1 = max(min(gx.min(), x) - pad, x - c.grid_half), min(max(gx.max(), x) + pad, x + c.grid_half)
+        by0, by1 = max(min(gy.min(), y) - pad, y - c.grid_half), min(max(gy.max(), y) + pad, y + c.grid_half)
+        grid = StaticGrid(static_points, bx0, by0, bx1, by1, c.grid_res)
         stat = np.where(on_path, FrenetPlanner._static_clear(grid, g[..., 0], g[..., 1], g[..., 2], body),
                         np.inf).min(axis=1)                               # (nS,)
         now_static = float(FrenetPlanner._static_clear(grid, np.array([x]), np.array([y]), np.array([yaw]), body)[0])
@@ -362,6 +377,11 @@ class FrenetPlanner:
         over = np.where(valid, cart[..., 4] - max(c.max_speed * 1.05, v0 + 0.01), -1.0).max(axis=2)
         kin = (np.all(np.isfinite(cart).all(axis=3) | ~valid, axis=2) & (wmax <= c.max_w) & (over <= 0.0))
         mv = np.asarray(moving, dtype=float).reshape(-1, 5)
+        if len(mv):   # horizon 안에 후보 영역(지금 자세에서 reach 안)에 닿을 수 있는 물체만
+            reach = float(np.hypot(cart[..., 0] - x, cart[..., 1] - y).max()) + r_body
+            grow = c.dynamic_margin + c.dynamic_growth * c.horizon
+            mv = mv[np.hypot(mv[:, 0] - x, mv[:, 1] - y) - mv[:, 4] - np.hypot(mv[:, 2], mv[:, 3]) * c.horizon - grow
+                    <= reach]
         dyn = np.full((nS, nV), np.inf)
         need_d = c.safety_margin
         if len(mv):
@@ -410,23 +430,26 @@ class FrenetPlanner:
     @staticmethod
     def _static_clear(grid, X, Y, TH, body):
         """자세 (X, Y, TH) 마다 차체(body_points) 에서 가장 가까운 스캔 점까지 거리."""
-        c, s = np.cos(TH), np.sin(TH)
-        out = np.full(np.shape(X), np.inf)
-        for bx, by in body:
-            out = np.minimum(out, grid.lookup(X + bx * c - by * s, Y + bx * s + by * c))
-        return out
+        c, s = np.cos(TH)[..., None], np.sin(TH)[..., None]
+        bx, by = body[:, 0], body[:, 1]                                   # 차체 점 전부 한 번에 조회 (점마다 돌면 3배 느림)
+        return grid.lookup(X[..., None] + bx * c - by * s, Y[..., None] + bx * s + by * c).min(axis=-1)
 
     def _dynamic_clear(self, mv, t, X, Y, TH, offs, rad):
-        """X, Y, TH: (..., n) 시간 샘플 t 의 자세. 움직이는 물체 등속 예측까지 거리 - 여유 반경."""
+        """X, Y, TH: (..., n) 시간 샘플 t 의 자세. 움직이는 물체 등속 예측까지 거리 - 여유 반경.
+        그 시각 물체가 차체 뒤 끝보다 완전히 뒤에 있으면 빼다: 뒤에서 오는 물체는 로봇이 서도 피할 수 없고,
+        서면 오히려 길을 막는다 (뒤 물체 때문에 앞으로 가는 후보가 다 빠지지 않게)."""
         c = self.cfg
         px = mv[:, 0, None] + mv[:, 2, None] * t[None, :]                # (M, n)
         py = mv[:, 1, None] + mv[:, 3, None] * t[None, :]
         R = mv[:, 4, None] + c.dynamic_margin + c.dynamic_growth * t[None, :]
+        cos, sin = np.cos(TH), np.sin(TH)
+        rear = c.footprint[0]
         out = np.full(np.shape(X), np.inf)
-        for o in offs:
-            cx, cy = X + o * np.cos(TH), Y + o * np.sin(TH)
-            for m in range(len(mv)):
-                out = np.minimum(out, np.hypot(cx - px[m], cy - py[m]) - R[m])
+        for m in range(len(mv)):
+            behind = (px[m] - X) * cos + (py[m] - Y) * sin + mv[m, 4] < rear    # 물체 앞 끝이 차체 뒤 끝보다 뒤
+            for o in offs:
+                d = np.hypot(X + o * cos - px[m], Y + o * sin - py[m]) - R[m]
+                out = np.minimum(out, np.where(behind, np.inf, d))
         return out - rad
 
 
@@ -456,6 +479,14 @@ class FrenetFollower:
         self.last_trajectory = None
         self.last_debug = None
 
+    @property
+    def static_blocked(self):
+        """마지막 계획이 막혔고, 정적 장애물만으로도 모든 모양이 막혔는지 (기다려도 안 풀림 → 브리지가 바로 A* 재계획)."""
+        ev = self.planner.last_eval
+        if not ev or ev.get('best') is not None:
+            return False
+        return bool(np.all(np.asarray(ev['min_static']) < ev['need_static']))
+
     def _rotation_clear(self, grid, x, y, yaw, w, horizon):
         ts = np.arange(1, int(horizon / 0.1) + 1) * 0.1
         clear = FrenetPlanner._static_clear(grid, np.full_like(ts, x), np.full_like(ts, y), yaw + w * ts,
@@ -469,7 +500,8 @@ class FrenetFollower:
         c = self.cfg
         near = math.copysign(1.0, err)
         dirs = [self.turn_dir, -self.turn_dir] if was_turning and self.turn_dir else [near, -near]
-        grid = StaticGrid(pts, x, y, c.grid_half, c.grid_res)
+        # 제자리 회전/돌 자리 만들기는 로봇 둘레만 (회전 반경 약 0.3 m + 짧은 이동 + 빈 반경 비교)
+        grid = StaticGrid.around(pts, x, y, 0.6, c.grid_res)
         for k in dirs:
             rem = abs(err) if k == near else 2.0 * math.pi - abs(err)           # 이 방향으로 남은 각도
             w = k * max(0.3, min(c.max_w, self.rotate_speed, 2.0 * rem))

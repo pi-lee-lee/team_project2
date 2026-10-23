@@ -114,3 +114,10 @@ def test_actual_speed_stays_below_max_when_shifting_on_curve():
     obstacle = [(0.71 + 0.05 * math.cos(a) - 0.0, 0.29 + 0.05 * math.sin(a)) for a in np.linspace(0, 2 * math.pi, 12)]
     f, log = drive(arc, obstacle, steps=300)
     assert max(log['v']) <= f.cfg.max_speed + 1e-6
+
+
+def test_mover_behind_does_not_stop_robot():
+    # 뒤에서 비슷한 속도로 따라오는 물체 (0.12 m/s, 0.45 m 뒤): 예측 여유가 커지며 뒤 끝에 닿는 순간이 있어도 서지 않고 앞으로
+    f, log = drive(STRAIGHT, WALLS, steps=120, moving=lambda t: np.array([[-0.45 + 0.12 * t, 0.0, 0.12, 0.0, 0.1]]))
+    assert 'blocked' not in log['state'][:60]
+    assert np.mean(log['v'][20:60]) > 0.12

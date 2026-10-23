@@ -416,10 +416,12 @@ class BridgeNode(Node):
         # 시작 값을 기억해 웹에서 바뀐 것을 표시/되돌림. declare 가 모두 끝난 뒤에 등록 (declare 도 콜백을 부름)
         self.param_start = {n: self.get_parameter(n).value for n in self.tunable_params()}
         self.params_dirty = False
-        # 주행 기록 (tools/dwa_replay.py 로 분석): 목표 하나 = logs/records/<시각>_<목표>.jsonl.gz 하나.
+        # 주행 기록 (tools/dwa_replay.py 로 분석): 브리지를 켤 때마다 세션 폴더 logs/records/<켠 시각>_<추종 방식>/,
+        # 그 안에 목표 하나 = <시각>_<목표>/record.jsonl.gz (분석 그림도 그 폴더에).
         # 0.1초마다 위치/속도/명령/hybrid 상태/트래킹/스캔 점, DWA 로 달릴 땐 그 입력과 후보별 판정·비용까지
         self.record_enabled = self.declare_parameter('record.enabled', True).value
         self.record_dir = os.path.join(os.environ.get('WAREHOUSE_HOME') or os.getcwd(), 'logs', 'records')
+        self.record_session = None   # 이번 브리지 세션 폴더 (첫 기록 때 만듦)
         self.rec = None        # 열린 기록 {'file', 't0', 'last', 'flushed', 'path'}
         self.rec_raw = None    # 이번 주기 추종기(PP/DWA)가 낸 값 (v, w, state). 비상 정지 등으로 바뀌기 전
         self.rec_local = None  # 이번 주기 로컬 플래너 ('dwa' | 'frenet', 입력/결과) (dwa_compute / frenet_compute 가 채움)
@@ -1111,6 +1113,19 @@ class BridgeNode(Node):
                 f['blocked_since'] = now
                 self.get_logger().warn(f'{"Frenet" if "frenet" in f else "DWA"}: 안전한 궤적 없음, 정지 후 대기')
                 self.record_event(f'{"Frenet" if "frenet" in f else "DWA"}: 안전한 궤적 없음, 정지 후 대기')
+            # Frenet 이 정적 장애물만으로 막힘 (A* 경로가 아직 몰랐던 물체 옆 좁은 틈으로 남): 기다려도 안 풀리므로 1초 뒤
+            # 바로 A* 재계획 (A* 는 본 장애물을 기억해서 피함). 실물: 5초 대기 + 물러나기 + 재계획에 매번 8초쯤 걸렸음.
+            # 같은 목표에서 4번까지, 그 뒤는 예전처럼 대기/물러나기
+            fr = f.get('frenet')
+            if (fr is not None and fr.static_blocked and now - f['blocked_since'] > 1.0
+                    and self.goal.get('reroutes', 0) < 4):
+                self.goal['reroutes'] = self.goal.get('reroutes', 0) + 1
+                self.get_logger().info(f'Frenet: 정적 장애물로 막힘 → A* 재계획 ({self.goal["reroutes"]}/4)')
+                self.record_event(f'Frenet: 정적 장애물로 막힘 → A* 재계획 ({self.goal["reroutes"]}/4)')
+                self.generation += 1
+                self.stop_following()
+                self.request_plan()
+                return
             if now - f['blocked_since'] > self.blocked_timeout:
                 self.start_recovery(f, now, '앞이 막혀 진행할 수 없습니다.')
                 return
@@ -1180,8 +1195,11 @@ class BridgeNode(Node):
         if not self.record_enabled:
             return
         try:
-            os.makedirs(self.record_dir, exist_ok=True)
-            path = os.path.join(self.record_dir, f'{time.strftime("%Y%m%d_%H%M%S")}_{self.goal["id"]}.jsonl.gz')
+            if self.record_session is None:
+                self.record_session = os.path.join(self.record_dir, f'{time.strftime("%Y%m%d_%H%M%S")}_{self.controller}')
+            folder = os.path.join(self.record_session, f'{time.strftime("%H%M%S")}_{self.goal["id"]}')
+            os.makedirs(folder, exist_ok=True)
+            path = os.path.join(folder, 'record.jsonl.gz')
             fh = gzip.open(path, 'wt', encoding='utf-8')
         except OSError as e:
             self.get_logger().warn(f'주행 기록 파일을 못 열었습니다: {e}')
