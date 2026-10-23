@@ -110,3 +110,7 @@ warehouse_bridge:
                               # 옆/뒤에서 다가오는 사람은 미리 잡고, 멀어지거나 나란히 가는 사람은 무시
       release_time: 2.0       # 장애물이 이 시간 동안 안 보이면 pure pursuit 로 (s)
       rejoin_offset: 0.25     # 경로에서 이 거리 안으로 돌아왔을 때만 pure pursuit 로 (m)
+    # 주행 기록: 목표 하나마다 logs/records/<시각>_<목표>.jsonl.gz (0.1초마다 위치/명령/hybrid/트래킹/스캔,
+    # DWA 구간은 후보별 판정·비용까지). 분석: python3 tools/dwa_replay.py. 1분에 수 MB
+    record:
+      enabled: true

@@ -11,6 +11,7 @@
 경로 이탈/진행 없음/장애물로 오래 막힘 → 정지 후 재계획 또는 실패.
 """
 import base64
+import gzip
 import json
 import math
 import os
@@ -75,6 +76,17 @@ NO_RETURN_MARGIN = 0.05  # m. inf 빔을 range_max - 이 값으로 바꿈 (slam_
 SCAN_SEND_INTERVAL = 0.15  # s, 웹에 실시간 LiDAR 를 보내는 최소 간격 (화면 표시용). LiDAR 5Hz 면 스캔마다 (0.25 면 한 번 건너 2.5Hz 였음)
 MAP_MIN_INTERVAL = 0.5  # s, SLAM 맵을 서버로 보내는 최소 간격 (갱신되면 바로 보내되 몰려 오면 이 간격으로)
 SLAM_BEAMS = 240  # slam_toolbox 에 넘기는 스캔의 빔 개수 (1.5° 간격 고정). 실물 LDS-02 가 238~244 개라 빈 칸이 거의 없게
+
+
+def _json_default(o):
+    """주행 기록용: numpy 값을 JSON 으로 (실수는 소수 4자리)."""
+    if isinstance(o, np.ndarray):
+        return np.round(o, 4).tolist() if o.dtype.kind == 'f' else o.tolist()
+    if isinstance(o, np.floating):
+        return round(float(o), 4)
+    if isinstance(o, (np.integer, np.bool_)):
+        return o.item()
+    raise TypeError(f'{type(o).__name__} 은(는) 기록할 수 없습니다')
 
 
 def to_slam_scan(msg):
@@ -165,9 +177,12 @@ class _AutoCmd:
 
     def __init__(self, mux):
         self.mux = mux
+        self.last = None   # (v, w, 시각) 마지막으로 낸 자동 명령 (주행 기록용)
 
     def publish(self, msg):
-        self.mux.auto(msg.linear.x, msg.angular.z, time.monotonic())
+        now = time.monotonic()
+        self.last = (msg.linear.x, msg.angular.z, now)
+        self.mux.auto(msg.linear.x, msg.angular.z, now)
 
 
 class BridgeNode(Node):
@@ -391,6 +406,13 @@ class BridgeNode(Node):
         # 시작 값을 기억해 웹에서 바뀐 것을 표시/되돌림. declare 가 모두 끝난 뒤에 등록 (declare 도 콜백을 부름)
         self.param_start = {n: self.get_parameter(n).value for n in self.tunable_params()}
         self.params_dirty = False
+        # 주행 기록 (tools/dwa_replay.py 로 분석): 목표 하나 = logs/records/<시각>_<목표>.jsonl.gz 하나.
+        # 0.1초마다 위치/속도/명령/hybrid 상태/트래킹/스캔 점, DWA 로 달릴 땐 그 입력과 후보별 판정·비용까지
+        self.record_enabled = self.declare_parameter('record.enabled', True).value
+        self.record_dir = os.path.join(os.environ.get('WAREHOUSE_HOME') or os.getcwd(), 'logs', 'records')
+        self.rec = None        # 열린 기록 {'file', 't0', 'last', 'flushed', 'path'}
+        self.rec_raw = None    # 이번 주기 추종기(PP/DWA)가 낸 값 (v, w, state). 비상 정지 등으로 바뀌기 전
+        self.rec_dwa = None    # 이번 주기 DWA 입력/결과 (dwa_compute 가 채움)
         self.add_on_set_parameters_callback(self.on_set_params)
         self.create_timer(0.2, self.flush_params)
         self.get_logger().info('브리지 시작 (A* + hybrid: pure pursuit / 장애물 근처 DWA)')
@@ -605,6 +627,7 @@ class BridgeNode(Node):
         self.server.send({'type': 'nav_status', 'goal_id': self.goal['id'],
                           'status': status, 'message': message})
         if status != 'navigating':
+            self.record_close(status, message)
             self.goal = None
             self.send_path([])
 
@@ -627,6 +650,7 @@ class BridgeNode(Node):
         self.goal = {'id': goal_id, 'x': x, 'y': y, 'yaw': yaw, 'retries': 0}
         self.last_goal_id = goal_id
         self.get_logger().info(f'목표 {goal_id}: ({x:.2f}, {y:.2f}, {math.degrees(yaw):.0f}°)')
+        self.record_open()
         self.request_plan()
 
     def cancel_goal(self, report=True):
@@ -636,6 +660,7 @@ class BridgeNode(Node):
             self.stop_count = 5
         if report:
             self.report('canceled')
+        self.record_close('canceled')
         self.goal = None
 
     def make_pose(self, x, y, yaw):
@@ -687,6 +712,7 @@ class BridgeNode(Node):
         self.send_path(plan.poses)
         self.stop_count = 0  # 이전 목표의 정지 명령이 새 주행에 섞이지 않게
         points = [(ps.pose.position.x, ps.pose.position.y) for ps in plan.poses]
+        self.record_write({'type': 'plan', 'retries': self.goal['retries'], 'start': start, 'path': points})
         # pp / dwa 는 같은 경로 점 목록을 쓰므로 진행 index 를 서로 넘겨줄 수 있다 (hybrid 전환)
         dwa = DWAFollower(points, self.goal['yaw'], self.dwa_cfg,
                           goal_tolerance=self.get_parameter('dwa_follow.goal_tolerance').value,
@@ -710,6 +736,7 @@ class BridgeNode(Node):
         if self.goal['retries'] < self.max_retries:
             self.goal['retries'] += 1
             self.get_logger().warn(f'{reason} 재시도 {self.goal["retries"]}/{self.max_retries}')
+            self.record_event(f'{reason} 재시도 {self.goal["retries"]}/{self.max_retries}')
             self.generation += 1
             self.follower = None
             self.request_plan()
@@ -793,6 +820,7 @@ class BridgeNode(Node):
                        'dwa_follow.target_max') and 'dwa' in f:
                 setattr(f['dwa'], n.split('.')[1], v)
             self.get_logger().info(f'파라미터 변경: {n} = {v}')
+            self.record_event(f'파라미터 변경: {n} = {v}', param=n, value=v)
         if 'pp' in f:
             pp = f['pp']
             pp.max_v, pp.max_w, pp.max_acc, pp.max_acc_w = (self.max_speed, self.max_turn_speed,
@@ -984,6 +1012,11 @@ class BridgeNode(Node):
         self.cmd_vel_pub.publish(Twist())
 
     def control_step(self):
+        self.rec_raw = None
+        self.drive_step()
+        self.record_step()
+
+    def drive_step(self):
         if self.zone_replan_at is not None and time.monotonic() >= self.zone_replan_at:
             self.zone_replan_at = None
             if self.goal is not None:
@@ -1026,6 +1059,7 @@ class BridgeNode(Node):
             v, w, state = self.dwa_compute(f['dwa'], obstacle_near=bool(f.get('why')))
         else:
             v, w, state = f['pp'].compute(x, y, yaw)
+        self.rec_raw = (v, w, state)
 
         if state == 'done':
             self.stop_following()
@@ -1047,6 +1081,7 @@ class BridgeNode(Node):
             if f['blocked_since'] is None:
                 f['blocked_since'] = now
                 self.get_logger().warn('DWA: 안전한 궤적 없음, 정지 후 대기')
+                self.record_event('DWA: 안전한 궤적 없음, 정지 후 대기')
             if now - f['blocked_since'] > self.blocked_timeout:
                 self.start_recovery(f, now, '앞이 막혀 진행할 수 없습니다.')
                 return
@@ -1069,6 +1104,7 @@ class BridgeNode(Node):
                 # 보통 여기까지 오지 않음 → 갑자기 튀어나온 물체, 위치 추정 오차 등
                 if not f.get('estop'):
                     self.get_logger().warn(f'비상 정지: 앞쪽 {clearance:.2f} m')
+                    self.record_event(f'비상 정지: 앞쪽 {clearance:.2f} m')
                 f['estop'] = True
                 v = 0.0
                 if not f['use_dwa']:
@@ -1107,6 +1143,92 @@ class BridgeNode(Node):
         cmd.linear.x = v
         cmd.angular.z = w
         self.cmd_vel_pub.publish(cmd)
+
+    # 주행 기록 (tools/dwa_replay.py 로 분석) ------------------------
+    def record_open(self):
+        """목표를 받으면 기록 파일을 새로 연다 (재시도/재계획은 같은 파일)."""
+        self.record_close('replaced')
+        if not self.record_enabled:
+            return
+        try:
+            os.makedirs(self.record_dir, exist_ok=True)
+            path = os.path.join(self.record_dir, f'{time.strftime("%Y%m%d_%H%M%S")}_{self.goal["id"]}.jsonl.gz')
+            fh = gzip.open(path, 'wt', encoding='utf-8')
+        except OSError as e:
+            self.get_logger().warn(f'주행 기록 파일을 못 열었습니다: {e}')
+            return
+        now = time.monotonic()
+        self.rec = {'file': fh, 't0': now, 'last': 0.0, 'flushed': now, 'path': path}
+        params = {n: self.get_parameter(n).value for n in self.tunable_params()}
+        params.update({f'dwa.{k}': v for k, v in vars(self.dwa_cfg).items()})
+        self.record_write({'type': 'start', 'wall': time.strftime('%Y-%m-%d %H:%M:%S'), 'goal': self.goal,
+                           'map': self.get_parameter('map_name').value, 'global_frame': self.global_frame,
+                           'base_frame': self.base_frame, 'footprint_extra': self.footprint_extra,
+                           'tracking': self.track_cfg, 'params': params})
+        self.get_logger().info(f'주행 기록: {path}')
+
+    def record_close(self, status, message=''):
+        r = self.rec
+        if r is None:
+            return
+        self.record_write({'type': 'end', 'status': status, 'message': message})
+        self.rec = None
+        try:
+            r['file'].close()
+        except OSError:
+            pass
+
+    def record_write(self, obj):
+        r = self.rec
+        if r is None:
+            return
+        obj['t'] = round(time.monotonic() - r['t0'], 3)
+        try:
+            r['file'].write(json.dumps(obj, default=_json_default, ensure_ascii=False, separators=(',', ':')) + '\n')
+            now = time.monotonic()
+            if now - r['flushed'] > 1.0:   # 주행 중에도 읽을 수 있게 1초마다 내보냄
+                r['file'].flush()
+                r['flushed'] = now
+        except (OSError, ValueError, TypeError) as e:
+            self.get_logger().warn(f'주행 기록 중단: {e}')
+            self.rec = None
+
+    def record_event(self, text, **extra):
+        self.record_write({'type': 'event', 'text': text, **extra})
+
+    def record_step(self):
+        """제어 주기마다 (0.1초 간격, DWA 를 새로 계산한 주기는 항상): 위치/속도/명령/hybrid 상태/트래킹/스캔.
+        raw 는 추종기(PP/DWA)가 낸 값, cmd 는 비상 정지 등을 거쳐 실제로 낸 값."""
+        r = self.rec
+        if r is None:
+            return
+        now = time.monotonic()
+        d, self.rec_dwa = self.rec_dwa, None
+        if d is None and now - r['last'] < 0.1:
+            return
+        r['last'] = now
+        f = self.follower or {}
+        mode = None
+        if f:
+            mode = ('backoff' if 'backoff' in f else 'recovery' if 'recovery' in f
+                    else 'dwa' if f.get('use_dwa') else 'pp')
+        cmd = self.cmd_vel_pub.last
+        out = {'type': 'step', 'mode': mode, 'why': f.get('why'),
+               'pose': self.xyyaw(self.global_frame, self.base_frame),
+               'odom': self.xyyaw('odom', self.base_frame), 'vw': self.odom_vw,
+               'raw': self.rec_raw, 'cmd': cmd[:2] if cmd and now - cmd[2] < 0.06 else None,
+               'estop': bool(f.get('estop')),
+               'blocked_for': round(now - f['blocked_since'], 2) if f.get('blocked_since') else None,
+               'hybrid': self.hybrid_info if f else None, 'front': self.front_clearance(),
+               'box': [self.box_count, self.box_streak, self.box_near], 'tilt': self.tilt_rel,
+               'progress': f['pp'].index if 'pp' in f else None,
+               'tracks': [[t.id, *t.x, t.radius, t.hits, t.misses] for t in self.tracks]}
+        if d is not None:
+            out['dwa'] = d          # 스캔 점은 DWA 입력 안에
+        else:
+            out['map_to_odom'] = self.xyyaw('odom', self.global_frame)
+            out['scan'], out['unmapped'] = self.scan_odom, self.scan_unmapped
+        self.record_write(out)
 
     # hybrid: 평소 pure pursuit, 장애물이 가까우면 DWA ---------------
     # DWA 만 쓰면 실물에서 벽 옆/좁은 곳에서 '안전한 궤적 없음', '진행 없음' 이 잦았다 → 지도에 있는 벽은
@@ -1236,6 +1358,7 @@ class BridgeNode(Node):
                 f['use_dwa'], f['clear_since'] = True, None
                 self.hybrid_info['use_dwa'] = True
                 self.get_logger().info(f'{why} → DWA 로 피함')
+                self.record_event(f'{why} → DWA 로 피함')
             return
         # 경로 가까이 돌아왔을 때만 (멀면 pure pursuit 가 off_path 로 실패하므로 DWA 가 경로로 데려올 때까지)
         rest = np.asarray(pp.points[dwa.progress:dwa.progress + 60], dtype=float)
@@ -1254,6 +1377,7 @@ class BridgeNode(Node):
             f['use_dwa'] = False
             self.hybrid_info = {'use_dwa': False, 'why': None}
             self.get_logger().info(f'장애물 지나감 (경로에서 {offset:.2f} m) → pure pursuit')
+            self.record_event(f'장애물 지나감 (경로에서 {offset:.2f} m) → pure pursuit')
 
     # 움직이는 장애물 추적 + DWA -----------------------------------
     def on_odom(self, msg):
@@ -1355,10 +1479,19 @@ class BridgeNode(Node):
         if pose is None or map_to_odom is None:
             return 0.0, 0.0, 'blocked'
         dyn = np.array([[t.x[0], t.x[1], t.x[2], t.x[3], t.radius] for t in self.tracks]).reshape(-1, 5)
+        moving_speed = self.get_parameter('dwa_follow.moving_speed').value
+        # 기록용: 계산 전 추종기 상태 (같은 입력으로 다시 계산하면 같은 결과가 나오게)
+        pre = {'progress': follower.progress, 'sidestep': follower.sidestep, 'turning': follower.turning,
+               'arrived': follower.arrived}
         result = follower.compute(pose, *self.odom_vw, map_to_odom, self.scan_odom, dyn,
                                   unmapped_points=self.scan_unmapped, obstacle_near=obstacle_near,
-                                  moving_speed=self.get_parameter('dwa_follow.moving_speed').value)
+                                  moving_speed=moving_speed)
         follower.last_cmd = (now, result)
+        if self.rec is not None:
+            self.rec_dwa = {'pose': pose, 'vw': self.odom_vw, 'map_to_odom': map_to_odom, 'dyn': dyn,
+                            'obstacle_near': obstacle_near, 'moving_speed': moving_speed, 'pre': pre,
+                            'scan': self.scan_odom, 'unmapped': self.scan_unmapped,
+                            'result': result, 'debug': follower.last_debug, 'eval': follower.dwa.last_eval}
         self.send_dwa(follower, result)
         return result
 
@@ -1408,6 +1541,7 @@ class BridgeNode(Node):
         f['recovery'] = rec
         self.cmd_vel_pub.publish(Twist())
         self.get_logger().warn(f'{reason} {what} 다시 계획합니다')
+        self.record_event(f'{reason} {what} 다시 계획합니다')
 
     def rotation_clear(self, odom):
         """제자리에서 돌아도 차체가 닿지 않는지: 회전 중심에서 차체 끝까지 반경(외곽 모서리) + 여유 안에 스캔 점이 없음."""
@@ -1454,6 +1588,7 @@ class BridgeNode(Node):
         """x, y, yaw: 부딪힌 때의 map 좌표 (부딪힌 자리 계산용). 물러난 거리는 odom 으로 잰다
         (기울어진 동안은 map TF 가 갱신되지 않으므로)."""
         self.get_logger().warn(f'부딪힘 감지: {reason} 뒤로 물러납니다')
+        self.record_event(f'부딪힘 감지: {reason} 뒤로 물러납니다')
         x, y, yaw = f.get('level_pose', (x, y, yaw))
         # 기울어서 감지했으면 들린 쪽이 장애물. 앞이 들렸으면 뒤로, 뒤가 들렸으면(회전하다 뒤 모서리가 올라탐) 앞으로
         # 빠져나온다. 앞으로 가다 막혀서(정지) 감지했으면 앞쪽이 장애물

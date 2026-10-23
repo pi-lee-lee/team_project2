@@ -88,6 +88,8 @@ class DWAConfig:
 class DWAController:
     def __init__(self, cfg=None):
         self.cfg = cfg or DWAConfig()
+        # 마지막 compute() 의 후보별 판정/비용 (주행 기록·분석용, tools/dwa_replay.py). 계산에는 안 씀
+        self.last_eval = None
 
     def _sample(self, v0, w0):
         c = self.cfg
@@ -279,6 +281,7 @@ class DWAController:
             start = clear_t[:, 0]
             valid = valid | ((vs != 0.0) & (clear >= np.minimum(start, c.safety_margin) - 0.005)
                              & (clear_t[:, -1] > start))
+        self.last_eval = {'v': vs, 'w': ws, 'clear': clear, 'first_hit': first_hit, 'valid': valid}
         if not np.any(valid):
             if c.allow_escape:
                 # 갈 곳이 없으면(움직이는 물체가 다가와 멈춰 있어도 부딪힐 때 등) 여유가 가장 커지는 쪽으로 천천히 피한다.
@@ -287,7 +290,9 @@ class DWAController:
                 stay_clear = clear[stay].max() if np.any(stay) else -np.inf
                 best = int(np.argmax(clear))
                 if clear[best] > stay_clear + 0.005:   # 가만히 있는 것보다 여유가 클 때만
+                    self.last_eval.update(best=best, how='escape')
                     return ControlResult(float(vs[best]), float(ws[best]), True, traj[best])
+            self.last_eval.update(best=None, how='none')
             return ControlResult(0.0, 0.0, False, None)
 
         end = traj[:, -1, :]
@@ -322,18 +327,25 @@ class DWAController:
             'collision': c.w_collision * collision,
         }
         cost = sum(terms.values())
+        total = cost.copy()
         cost[~valid] = np.inf
         # 여유(soft: 움직이는 물체엔 dynamic_margin 포함)를 끝까지 지키는 궤적이 있으면 그중에서만 고른다.
         # 비용(w_collision)으로만 막으면 경로/목표 계수를 키웠을 때 천천히 가로지르는 물체 앞으로 끼어들어,
         # 뒤따라온 물체와 6mm 까지 가까워졌다 (원래 계수는 기다렸음). 없을 때만 비용으로 '덜 위험한' 쪽을 고름
         safe = valid & (collision <= 0.0)
-        if np.any(safe):
+        safe_only = bool(np.any(safe))
+        if safe_only:
             cost[~safe] = np.inf
+        fwd_only = False
         if c.reverse_only_when_needed:
             fwd = np.where(valid & (vs >= 0.0) & (collision <= 0.0), cost, np.inf)
             if np.isfinite(fwd).any():
                 cost = fwd
+                fwd_only = True
         best = int(np.argmin(cost))
+        # 후보가 어느 단계에서 빠졌는지: valid(충돌 판정) → safe(끝까지 여유, safe_only 일 때) → 후진 제외(fwd_only 일 때)
+        self.last_eval.update(best=best, how='cost', safe=safe, safe_only=safe_only, fwd_only=fwd_only,
+                              terms=terms, total=total, path_weight=w_path)
         return ControlResult(float(vs[best]), float(ws[best]), True, traj[best])
 
 
@@ -382,6 +394,8 @@ class DWAFollower:
         # '상자 쪽으로 가기' 와 '피하기' 가 싸워 상자 앞에 멈췄다 → 장애물 너머의 점을 보면 옆으로 돌아가는 궤적이 싸짐
         self.target_clear = 0.0
         self.target_max = 2.0
+        # 마지막 compute() 가 어느 갈래로 명령을 정했는지 + 목표점 (주행 기록·분석용). 계산에는 안 씀
+        self.last_debug = None
 
     def local_target(self, path, x, y):
         window = path[self.progress:self.progress + 60]
@@ -496,11 +510,14 @@ class DWAFollower:
         끌려가지 않게), False 면 cfg.w_path 로 경로에 다시 붙인다. None 이면 늘 cfg.w_path."""
         x, y, yaw = pose
         self.last_trajectory = None   # 이번 주기에 DWA 로 고른 궤적만 남김 (제자리 회전/빠져나오기는 None)
+        self.dwa.last_eval = None
+        dbg = self.last_debug = {'branch': None}
         path = transform_points(self.path_map, *map_to_odom)
         goal_yaw = self.goal_yaw + map_to_odom[2]
         if self.arrived or np.hypot(path[-1, 0] - x, path[-1, 1] - y) < self.goal_tolerance:
             # 도착: 제자리에서 목표 방향 맞추기 (회전은 DWA 대신 단순 비례 제어)
             self.arrived = True
+            dbg['branch'] = 'arrived'
             err = np.arctan2(np.sin(goal_yaw - yaw), np.cos(goal_yaw - yaw))
             if abs(err) < self.yaw_tolerance:
                 return 0.0, 0.0, 'done'
@@ -509,6 +526,7 @@ class DWAFollower:
                 w = 0.3 * np.sign(w)
             return 0.0, w, 'rotating'
         local_path, local_goal = self.local_target(path, x, y)
+        dbg['goal_raw'] = local_goal
         # 움직이는 장애물은 예측해서 쓰고, 그 자리의 스캔 점은 정적 목록에서 뺀다 (중복 방지)
         dyn = np.asarray(dynamic_obstacles, dtype=float).reshape(-1, 5)
         moving = dyn[np.hypot(dyn[:, 2], dyn[:, 3]) > moving_speed] if len(dyn) else dyn
@@ -529,6 +547,7 @@ class DWAFollower:
                                > moving[None, :, 4] + 0.1, axis=1)]
         local_path, local_goal = self.clear_target(path, x, y, obst, local_path, local_goal)
         side = self.sidestep_target(x, y, moving, pts, path_dir) if self.sidestep_enabled else None
+        dbg['goal_cleared'] = local_goal
         if side is not None:
             local_path, local_goal = local_path + side, local_goal + side
         else:
@@ -547,15 +566,18 @@ class DWAFollower:
                 # 필요한 회전 전체에 대해 검사 (1초 앞만 보면 돌다 멈추고 물러나기를 번갈아 해서, 옆으로 선 차체가
                 # 벽과 나란히 미끄러지기만 했음)
                 if self._rotation_clear(x, y, yaw, w, pts, horizon=max(1.0, abs(err) / abs(w))):
+                    dbg.update(branch='turn_first', err=err)
                     return 0.0, w, 'rotating'
                 # 벽에 붙어 돌 공간이 없으면 앞/뒤 중 트인 쪽으로 천천히 떨어진 뒤 돈다
                 # (그냥 DWA 에 맡기면 목표가 뒤라 멈춰 있다가, 브리지 회복 동작이 벽에 붙은 채 돌아 넘어졌음)
                 v = self._escape_speed(x, y, yaw, pts)
                 if v != 0.0:
+                    dbg.update(branch='turn_escape', err=err)
                     return v, 0.0, 'driving'
                 self.turning = False
         r = self.dwa.compute(RobotState(x, y, yaw, v0, w0), local_path, local_goal, pts, moving,
                              path_weight=0.0 if obstacle_near else None)
+        dbg.update(branch='dwa', goal=local_goal, sidestep=side)
         self.last_trajectory = r.trajectory
         if not r.ok:
             return 0.0, 0.0, 'blocked'

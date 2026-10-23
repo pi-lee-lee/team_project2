@@ -169,3 +169,26 @@ def test_path_weight_pulls_back_only_when_on():
     off = DWAController(cfg).compute(s, path, goal, [], [], path_weight=0.0)
     assert on.w < 0.0 and off.w == 0.0            # 켜면 경로(오른쪽) 쪽으로 꺾고, 끄면 목표점 정면으로 직진
     assert on.trajectory[-1, 1] < off.trajectory[-1, 1]
+
+
+def test_last_eval_explains_choice():
+    # 주행 기록용 후보별 판정/비용: 고른 후보가 남은 것 중 비용 최소이고, 상자 앞에서 빠른 전진은 '끝까지 안전' 에서 빠짐
+    import numpy as np
+    from warehouse_robot.dwa import DWAConfig, DWAFollower
+    cfg = DWAConfig(max_v=0.13, footprint=(-0.197, 0.069, 0.153), safety_margin=0.08, allow_escape=True,
+                    reverse_only_when_needed=True, control_period=0.1)
+    box = np.array([[x, y] for x in np.arange(0.40, 0.71, 0.02) for y in np.arange(-0.15, 0.151, 0.02)])
+    path = [(x, 0.0) for x in np.linspace(0.0, 2.0, 41)]
+    f = DWAFollower(path, 0.0, cfg, lookahead=0.3)
+    f.target_clear = 0.233
+    v, w, state = f.compute((0.2, 0.0, 0.0), 0.05, 0.0, (0.0, 0.0, 0.0), box, [], unmapped_points=box,
+                            obstacle_near=True)
+    ev, dbg = f.dwa.last_eval, f.last_debug
+    assert dbg['branch'] == 'dwa' and dbg['goal'][0] > dbg['goal_raw'][0]   # 목표점을 상자 너머로 옮김
+    assert ev['how'] == 'cost' and ev['safe_only']
+    best = ev['best']
+    assert (ev['v'][best], ev['w'][best]) == (v, w)
+    ok = ev['safe'] & ~(ev['fwd_only'] & (ev['v'] < 0))
+    assert ev['total'][best] == ev['total'][ok].min()
+    fast = ev['v'] == ev['v'].max()
+    assert not ev['safe'][fast & (ev['w'] == 0.0)].any()
