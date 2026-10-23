@@ -15,8 +15,8 @@ def test_tracker_estimates_velocity():
                         for i in range(11)])
         tracks = tr.update(detect_clusters(arc, 0.15, 3, 0.8, 0.08), t)
     assert len(tracks) == 1
-    assert abs(tracks[0].velocity[0] - 0.3) < 0.05
-    assert abs(tracks[0].velocity[1]) < 0.05
+    assert abs(tracks[0].x[2] - 0.3) < 0.05   # 상태 [x, y, vx, vy]
+    assert abs(tracks[0].x[3]) < 0.05
 
 
 def test_cluster_center_corrected_away_from_sensor():

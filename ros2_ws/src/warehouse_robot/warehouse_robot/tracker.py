@@ -61,10 +61,6 @@ class Track:
     def position(self):
         return self.x[:2]
 
-    @property
-    def velocity(self):
-        return self.x[2:]
-
 
 class MultiObjectTracker:
     """등속(CV) 모델 칼만필터 + 최근접(greedy) 매칭."""

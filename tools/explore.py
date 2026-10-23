@@ -269,13 +269,6 @@ def frontier_left(msg, fx, fy, pocket_min=POCKET_MIN, visited=()):
     return int(np.count_nonzero((rr - r) ** 2 + (cc - c) ** 2 <= k * k))
 
 
-def pick_goal(msg, robot_xy, blacklist, heading=None, turn_weight=TURN_WEIGHT, pocket_min=POCKET_MIN,
-              exclude=(), sensor_range=SENSOR_RANGE, visited=()):
-    """다음 목표 (x, y, yaw, 보일 넓이 m², 프론티어 중심 x, y, 방향 단계) 또는 None (방향 유지 방식)."""
-    return choose_by_heading(_candidates(msg, robot_xy, blacklist, pocket_min, exclude, sensor_range, visited),
-                             robot_xy, heading, turn_weight)
-
-
 def choose_by_heading(cands, robot_xy, heading=None, turn_weight=TURN_WEIGHT):
     """방향 단계(DIRECTION_TIERS) 순서로, 그 안에 후보가 있는 첫 단계에서 점수가 가장 좋은 후보.
     반환 (x, y, yaw, 보일 넓이, 프론티어 중심 x, y, 방향 단계) 또는 None."""
