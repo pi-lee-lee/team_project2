@@ -23,7 +23,6 @@ import random
 import sys
 import time
 from concurrent.futures import ProcessPoolExecutor
-from dataclasses import asdict
 
 import numpy as np
 

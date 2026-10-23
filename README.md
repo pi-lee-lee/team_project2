@@ -135,7 +135,6 @@ scripts/stop_ros.sh --all
 | `--world` | 시뮬레이션 월드: turtlebot3_world(기본), turtlebot3_house, empty_world 등 |
 | `--gui` | Gazebo 화면 표시 |
 | `--amcl default` / `hall` / 파일 | (map) 위치 추정 설정. `hall` = `config/amcl_hall.yaml`: 책상/의자가 흩어진 강당·교실용 (지도에 없는 빔에 너그럽게). 웹 실행 모드의 "강당/교실용 위치 추정" 체크와 같음 |
-| `--scan-noise` | (sim) LiDAR 를 실물 LDS-02 처럼: 빔 개수 238~244 변동, 거리 흔들림, 먼 곳 값 빠짐(NaN). 웹 "LiDAR 를 실물처럼" 체크와 같음 |
 | `--world lecture_hall_real` | (sim) 실제 학원과 비슷한 강당: 책상 앞판 없음(다리만 보임), 좌우 끝 열이 벽에 붙음, 좌석 줄 사이 빈 틈 0.25m(로봇 폭 0.31m 보다 좁아 세로 복도와 맨 앞/뒤 가로 복도로만 다님), 의자 무작위 배치 |
 
 실행 순서: 웹 서버 → 로봇(Pi bringup 은 SSH 로 자동 실행 / Gazebo) → SLAM 또는 map_server+AMCL → A* + 브리지 → (sim+map) 초기 위치 자동 지정.

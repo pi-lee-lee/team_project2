@@ -17,7 +17,7 @@ TurtleBot3 Waffle Pi warehouse robot: click a point/locations on a web map → t
 ```bash
 # Everything (background, logs in logs/). Records mode in logs/run_mode.env
 scripts/run.sh --robot real|sim --mode slam|map [--map FILE] [--name DBNAME] [--slam slam_toolbox|cartographer] \
-               [--world W] [--gui] [--amcl default|hall|FILE] [--scan-noise]
+               [--world W] [--gui] [--amcl default|hall|FILE]
 scripts/stop_ros.sh            # stop ROS nodes + Gazebo (never touches Pi bringup)
 scripts/stop_ros.sh --all      # + Django server and ROS daemon
 # Always stop via stop_ros.sh — killing nodes individually leaves orphan lifecycle_manager/amcl.
@@ -64,7 +64,7 @@ browser ⇄ /ws/ui/ ⇄ Django (daphne, :8000) ⇄ /ws/robot/tb3/ ⇄ bridge_nod
 - `astar.py` / `follower.py` / `dwa.py`: pure numpy/math, no ROS imports — this is what the unit tests cover. Keep them ROS-free.
 - `astar_planner_node.py`: exposes `GridPlanner` as a `nav_msgs/GetPlan` service (`astar/get_plan`). Occupancy ≥65 and unknown are obstacles unless `allow_unknown` (set true in SLAM mode).
 - `bridge_node.py`: WebSocket client to the server (`websocket-client` in a thread, inbox queue drained by a timer), goal execution, and safety (front ±25° obstacle stop while on pure pursuit, TF staleness stop, progress/off-path replan, IMU tip detection). Driving is always A* + **hybrid**: pure pursuit normally; switches to DWA when ≥`hybrid.box_min_points` non-map LiDAR points (`scan_unmapped`: free map cells, >0.15 m from walls) are in a box around the robot (front `box_front`, back `box_back`, ±`box_half_width`) for `box_min_scans` scans (`update_box`), or a moving track's predicted position within `hybrid.moving_predict` s overlaps that box (`moving_into_box`); back to pure pursuit after `release_time` clear and within `rejoin_offset` of the path. DWA in hybrid has no path-return cost (`w_path` 0) and aims at the first path point beyond the obstacle (`dwa_follow.target_clear`). The box, counted points, predicted mover lines and switch state are sent as `hybrid_box` and drawn on the web map. Map save/reset are done by the bridge running `scripts/save_map.sh` / `scripts/reset_robot.sh`.
-- Parameters: `config/params.yaml`; speed/safety, `dwa.*`, `dwa_follow.*`, `hybrid.*` can be changed while running (`BridgeNode.on_set_params`, memory only — restart reverts to yaml); others are rejected as restart-only; launch args (map_name, mode, use_sim_time, allow_unknown, scan_noise, server_url) come from `scripts/start_bridge.sh`.
+- Parameters: `config/params.yaml`; speed/safety, `dwa.*`, `dwa_follow.*`, `hybrid.*` can be changed while running (`BridgeNode.on_set_params`, memory only — restart reverts to yaml); others are rejected as restart-only; launch args (map_name, mode, use_sim_time, allow_unknown, server_url) come from `scripts/start_bridge.sh`.
 
 **Scripts / environment**
 - `run.sh` orchestrates `start_server.sh` → Pi bringup over SSH or `start_sim.sh` → `start_slam.sh` or `start_nav2.sh` (map_server+AMCL; `config/amcl_waffle_pi.yaml`) → `start_bridge.sh`.

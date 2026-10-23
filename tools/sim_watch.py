@@ -11,7 +11,6 @@
 """
 import argparse
 import math
-import re
 import signal
 import time
 import xml.etree.ElementTree as ET

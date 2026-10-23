@@ -42,7 +42,6 @@ from .cmd_mux import CmdMux
 from .astar_planner_node import quaternion_from_yaw, yaw_from_quaternion
 from .dwa import DWAConfig, DWAFollower, transform_points
 from .follower import PurePursuit
-from .scan_noise import ScanNoiseConfig, degrade
 from .tracker import MultiObjectTracker, detect_clusters
 
 
@@ -196,17 +195,6 @@ class BridgeNode(Node):
         self.declare_parameter('bump_tilt_deg', 6.0)
         self.declare_parameter('stall_timeout', 2.5)       # s
         self.declare_parameter('backoff_distance', 0.15)   # m
-        # 시뮬레이션 LiDAR 를 실물 LDS-02 처럼 (빔 개수 238~244, 거리 흔들림, 먼 곳/약한 반사 값 빠짐). scan_noise.py
-        # run.sh --scan-noise 로 켬. 실물 로봇(use_sim_time false)에서는 켜도 무시
-        sn = lambda n, d: self.declare_parameter(f'sim_scan.{n}', d).value  # noqa: E731
-        self.scan_noise = None
-        if sn('enabled', False):
-            if self.get_parameter('use_sim_time').value:
-                self.scan_noise = ScanNoiseConfig(**{k: type(v)(sn(k, v)) for k, v in vars(ScanNoiseConfig()).items()})
-                self.scan_noise_rng = np.random.default_rng()
-                self.get_logger().info(f'시뮬레이션 LiDAR 를 실물처럼 바꿈: {self.scan_noise}')
-            else:
-                self.get_logger().warn('sim_scan.enabled 는 시뮬레이션에서만 씁니다 (실물이라 무시)')
         self.declare_parameter('battery_cells', 3)         # LiPo 셀 수 (TurtleBot3: 3셀 11.1V)
         self.declare_parameter('battery_empty_v', 11.0)    # 0% 로 볼 전압 (TurtleBot3 충전 경고 전압)
         self.declare_parameter('mode', 'map')              # map: 기존 맵+AMCL / slam: 맵 만들기
@@ -890,17 +878,6 @@ class BridgeNode(Node):
             self.get_logger().info(f'카메라 인식: {label or "없음"}')
 
     def on_scan(self, msg):
-        if self.scan_noise is not None:
-            r, amin, inc = degrade(msg.ranges, msg.angle_min, msg.angle_increment, msg.range_min,
-                                   self.scan_noise_rng, self.scan_noise)
-            noisy = LaserScan()
-            noisy.header = msg.header
-            noisy.angle_min, noisy.angle_increment = amin, inc
-            noisy.angle_max = amin + (len(r) - 1) * inc
-            noisy.time_increment = msg.time_increment * len(msg.ranges) / max(len(r), 1)
-            noisy.scan_time, noisy.range_min, noisy.range_max = msg.scan_time, msg.range_min, msg.range_max
-            noisy.ranges = r.astype(np.float32).tolist()
-            msg = noisy
         self.scan = msg
         self.send_scan(msg)
         # AMCL/SLAM/A* 기억에는 평소보다 기울지 않았을 때의 스캔만 넘긴다 (scan_level).

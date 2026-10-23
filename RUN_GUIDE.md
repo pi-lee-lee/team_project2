@@ -110,7 +110,6 @@ scripts/run.sh --robot sim --mode map --map ~/maps/<이름>_clean.yaml   # 저�
 |---|---|
 | `--slam cartographer` | SLAM 엔진 변경 (기본 slam_toolbox) |
 | `--amcl hall` | 강당/교실용 위치 추정 설정 (`config/amcl_hall.yaml`). 웹 실행 모드의 체크와 같음 |
-| `--scan-noise` | (sim) LiDAR 를 실물 LDS-02 처럼 (빔 개수 변동, 흔들림, 값 빠짐) |
 | `--world lecture_hall_real` | (sim) 실물형 강당: 책상 앞판 없음, 좌우 끝 열이 벽에 붙음, 좌석 줄 사이 0.25m(로봇이 못 지나감), 의자 무작위 |
 
 ### 3.6 정상 구동 확인

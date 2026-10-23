@@ -514,7 +514,6 @@ function runnerStart(mode) {
   if (!confirm(`${ROBOT_LABEL[robot]}${world ? ` (${world})` : ''} / ${what} 으로 다시 시작할까요?\n(지금 실행 중인 노드는 정지됩니다)`)) return;
   send('runner_start', {
     robot, mode, map, world, amcl: $('#runner-amcl-hall').checked ? 'hall' : 'default',
-    scan_noise: robot === 'sim' && $('#runner-scan-noise').checked,
   });
 }
 

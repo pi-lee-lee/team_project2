@@ -16,14 +16,13 @@
 | 실물 로봇, 강당/교실에서 운영 | 위 명령 + `--amcl hall` |
 | 실물 로봇으로 지도 만들기 | `scripts/run.sh --robot real --mode slam` |
 | 시뮬레이션 강당(실물형)에서 지도 만들기 | `scripts/run.sh --robot sim --mode slam --world lecture_hall_real` |
-| 시뮬레이션, 실물 같은 LiDAR | 위 명령 + `--scan-noise` |
 | 만든 지도 저장 | 웹 "맵 저장" 또는 `source scripts/env.sh && scripts/save_map.sh <이름>` |
 | ROS 노드만 끄기 (웹 서버 유지) | `scripts/stop_ros.sh` |
 | 전부 끄기 | `scripts/stop_ros.sh --all` |
 | 도움말 | `scripts/run.sh --help` |
 
 웹: **http://192.168.0.188:8000/** — 웹의 "실행 모드" 카드에서도 같은 `run.sh` / `stop_ros.sh` 를 실행할 수 있습니다
-(로봇·맵·월드 선택, "강당/교실용 위치 추정", "LiDAR 를 실물처럼" 체크).
+(로봇·맵·월드 선택, "강당/교실용 위치 추정" 체크).
 
 ---
 
@@ -71,7 +70,7 @@ scripts/run.sh --robot real --mode slam
 ### 2.5 시뮬레이션
 
 ```bash
-scripts/run.sh --robot sim --mode slam --world lecture_hall_real [--scan-noise] [--gui]
+scripts/run.sh --robot sim --mode slam --world lecture_hall_real [--gui]
 scripts/run.sh --robot sim --mode map --map ~/maps/<이름>_clean.yaml       # 월드는 맵 yaml 의 '# world:' 로 자동
 ```
 - 도메인 77 이라 실물(44)과 섞이지 않습니다. 기존 맵 모드는 출발 위치를 알아서 초기 위치를 자동 지정합니다.
@@ -136,7 +135,6 @@ scripts/run.sh --robot real|sim --mode slam|map [옵션]
 | `--world W` | (sim) `lecture_hall_real`(실물형 강당), `lecture_hall`, `maze_room`, `turtlebot3_world`(기본), `turtlebot3_house`, `empty_world` 등. map 모드에서 빼면 지도 yaml 의 `# world:` |
 | `--gui` | (sim) Gazebo 화면 표시 |
 | `--amcl A` | (map) 위치 추정 설정: `default`(작은 방) / `hall`(강당·교실, `config/amcl_hall.yaml`) / yaml 경로 |
-| `--scan-noise` | (sim) LiDAR 를 실물 LDS-02 처럼 (빔 개수 238~244 변동, 거리 흔들림, 먼 곳 값 빠짐) |
 
 실행 순서:
 1. 다른 `run.sh` 가 실행 중이면 거절 (`logs/run.lock`, 웹과 터미널 동시 실행 방지)
@@ -149,7 +147,7 @@ scripts/run.sh --robot real|sim --mode slam|map [옵션]
 8. A* 플래너 + 브리지 (`start_bridge.sh`)
 9. sim + map: `tools/localize.py` 로 초기 위치 자동 지정 / 실물 + map: 웹에서 지정
 
-`logs/run_mode.env` 항목: `WAREHOUSE_ROBOT`, `MODE`, `MAP`, `MAP_NAME`, `WORLD`, `SLAM_ENGINE`, `SPAWN_X/Y`, `AMCL`, `SCAN_NOISE` (앞에 `WAREHOUSE_`).
+`logs/run_mode.env` 항목: `WAREHOUSE_ROBOT`, `MODE`, `MAP`, `MAP_NAME`, `WORLD`, `SLAM_ENGINE`, `SPAWN_X/Y`, `AMCL` (앞에 `WAREHOUSE_`).
 
 ### `stop_ros.sh` — 정리
 `scripts/stop_ros.sh [--server] [--daemon] [--all]` — 3절 참고.
@@ -175,7 +173,7 @@ Django(HTTP + WebSocket) 를 `0.0.0.0:8000` 으로. 보통 `run.sh` 가 부름. 
 `scripts/start_nav2.sh <map.yaml>` — Nav2 의 map_server + AMCL 만 (주행은 브리지). AMCL 설정은 `run.sh --amcl` 이 정한 파일(기본 `config/amcl_waffle_pi.yaml`). 맵 파일이 없으면 바로 오류로 끝남.
 
 ### `start_bridge.sh` — A* 플래너 + 브리지
-`scripts/start_bridge.sh [맵이름] [서버 URL]` — `warehouse.launch.py` 실행. SLAM 모드는 맵 이름 `slam_live`, 미탐색 칸 통과 허용. `run_mode.env` 의 LiDAR 노이즈 설정을 따름. 주행은 항상 A* + hybrid (pure pursuit / 장애물 근처 DWA).
+`scripts/start_bridge.sh [맵이름] [서버 URL]` — `warehouse.launch.py` 실행. SLAM 모드는 맵 이름 `slam_live`, 미탐색 칸 통과 허용. 주행은 항상 A* + hybrid (pure pursuit / 장애물 근처 DWA).
 - 브리지: 웹 서버와 WebSocket 으로 연결, 목표 주행, 안전 정지, 웹에 위치·지도·실시간 LiDAR 전송
 - A* 플래너: 기존 맵 모드에서 지도를 계획용으로 가공(미탐색 줄무늬 메움, 책상/의자 다리 점 부풀림)하고 웹의 금지 구역을 피함 (`ros2_ws/src/warehouse_robot/config/params.yaml`)
 

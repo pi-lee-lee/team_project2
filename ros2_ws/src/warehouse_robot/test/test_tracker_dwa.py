@@ -98,7 +98,6 @@ def test_dwa_considers_future_obstacle_position():
 
 
 def run_follower(follower, steps=400, dt=0.1, map_to_odom=(0.0, 0.0, 0.0), static=(), dyn=None):
-    from warehouse_robot.dwa import transform_points  # noqa: F401
     x = y = yaw = v = w = 0.0
     dyn = np.array(dyn if dyn is not None else [], dtype=float).reshape(-1, 5)
     state = None

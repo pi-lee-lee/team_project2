@@ -50,8 +50,7 @@ def launch_nodes(context):
             package='warehouse_robot', executable='bridge', name='warehouse_bridge', namespace=namespace,
             output='screen', remappings=remaps,
             parameters=[params, {'use_sim_time': use_sim_time, 'server_url': server_url,
-                                 'map_name': arg('map_name'), 'mode': arg('mode'),
-                                 'sim_scan.enabled': arg('scan_noise') == 'true'}]),
+                                 'map_name': arg('map_name'), 'mode': arg('mode')}]),
     ]
     # YOLO 부품 검출기: 브리지와 같이 뜬다. enabled(추론+검출 영상) 는 false 로 시작, 웹 "YOLO 시작" 버튼이 true 로
     # 네임스페이스를 주면 검출기도 그 아래로 (/<ns>/component_detector_switch, /<ns>/csi/image_raw → /<ns>/yolo/counts)
@@ -73,8 +72,6 @@ def generate_launch_description():
                               description='비우면 ws://localhost:8000/ws/robot/<robot_name>/'),
         DeclareLaunchArgument('map_name', default_value='default'),
         DeclareLaunchArgument('mode', default_value='map', description='map (기존 맵 + AMCL) | slam (맵 만들기)'),
-        DeclareLaunchArgument('scan_noise', default_value='false',
-                              description='시뮬레이션 LiDAR 를 실물 LDS-02 처럼 (빔 개수 변동, 흔들림, 값 빠짐)'),
         DeclareLaunchArgument('yolo', default_value='',
                               description='YOLO 검출기 실행 스크립트 (scripts/start_yolo.sh 경로, start_bridge.sh 가 넘김). 비우면 실행 안 함'),
         DeclareLaunchArgument('allow_unknown', default_value='false',

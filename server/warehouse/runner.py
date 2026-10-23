@@ -180,15 +180,13 @@ def _last_lines(output, n=2):
     return ' / '.join(lines[-n:])[:300]
 
 
-def start_mode(robot, mode, map_path=None, world=None, amcl='default', scan_noise=False):
+def start_mode(robot, mode, map_path=None, world=None, amcl='default'):
     """robot: sim|real, mode: map|slam. map_path: ~/maps 기준 상대 경로 (map 모드).
     world: 시뮬레이션 월드. 비우면 SLAM 은 turtlebot3_world, 맵 모드는 맵에 기록된 월드 (run.sh).
-    amcl: default | hall (run.sh --amcl, 강당/교실용 위치 추정 설정). scan_noise: 시뮬레이션 LiDAR 를 실물처럼."""
+    amcl: default | hall (run.sh --amcl, 강당/교실용 위치 추정 설정)."""
     if robot not in ('sim', 'real') or mode not in ('map', 'slam') or amcl not in ('default', 'hall'):
         raise RunnerError('잘못된 모드입니다.')
     cmd = [os.path.join(SCRIPTS, 'run.sh'), '--robot', robot, '--mode', mode, '--amcl', amcl]
-    if robot == 'sim' and scan_noise:
-        cmd.append('--scan-noise')
     if robot == 'sim' and world:
         if world not in {w['name'] for w in list_worlds()}:
             raise RunnerError(f'월드를 찾을 수 없습니다: {world}')

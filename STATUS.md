@@ -459,4 +459,10 @@ cd ../ros2_ws && source /opt/ros/humble/setup.bash && colcon build --symlink-ins
 - 문서: CLAUDE.md / README / RUN_GUIDE / user_guide 에서 위 옵션 설명 제거, README 기본값 표(robot_radius 0.24, max_speed 0.18) 갱신
 - 남긴 것: `tools/dwa_tune.py` (DWA 계수 튜닝, hybrid 의 DWA 가 그대로 씀), Nav2 의 map_server/AMCL (`start_nav2.sh`, tf2 0.25.24 주의는 AMCL 에도 해당)
 - 확인: 단위 테스트 55개, pyflakes/vulture 깨끗, bash -n, 이 브랜치 코드로 브리지를 다른 도메인에서 기동(hybrid.* 8개만, moving_predict 실행 중 변경), planner_compare / dwa_tune 실행. **실물 미확인**
+- 2차 정리 (같은 브랜치): 시뮬레이션 LiDAR 노이즈 기능 제거 — `scan_noise.py`, `test_scan_noise.py`, 브리지 `sim_scan.*`, launch `scan_noise` 인자,
+  `run.sh --scan-noise` / run_mode.env `SCAN_NOISE`, `start_bridge.sh` 전달, 웹 실행 모드 'LiDAR 를 실물처럼' 체크(`index.html`, `app.js`, `runner.py`, `consumers.py`).
+  `dwa.py` 의 `last_terms`(쓰기만 하고 읽는 곳 없음), 안 쓰는 import 3개(`dwa_tune.py` asdict, `sim_watch.py` re, `test_tracker_dwa.py` transform_points),
+  어디서도 안 쓰는 sim 전용 도구 `tools/sim_record.py`, `tools/track_eval.py` 제거. `tools/slam_drift.py` 는 실물 SLAM 점검용으로 남김.
+  vulture 가 더 잡은 것(발행 메시지 필드 angle_max, TF 수신 유지용 tf_listener, 콜백 인자, Django admin/모델 필드, 테스트가 쓰는 tracker.velocity)은 실제로 쓰는 것이라 남김
+- 확인: 단위 테스트 52개(scan_noise 3개 빠짐), pyflakes 깨끗, bash -n, 이 브랜치 코드로 브리지 기동. **실물 미확인**
 

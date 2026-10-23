@@ -13,9 +13,8 @@
 #   --slam ENGINE  (slam) slam_toolbox(기본) | cartographer
 #   --world WORLD  (sim) turtlebot3_world(기본) | turtlebot3_house | empty_world | maze_room(worlds/, 실제 방 복제) | lecture_hall(강당)
 #                  | no_roof_small_warehouse (AWS 창고, ~/sim_ws 에 받아야 함) ...
-#   --gui          (sim) Gazebo 화면 표시
-#   --scan-noise   (sim) LiDAR 를 실물 LDS-02 처럼: 빔 개수 238~244 변동, 거리 흔들림, 먼 곳 값 빠짐 (scan_noise.py)
 #                  실물과 비슷한 강당은 --world lecture_hall_real (책상 앞판 없음, 의자 무작위 배치)
+#   --gui          (sim) Gazebo 화면 표시
 #   --amcl A       (map) 위치 추정 설정: default(기본, config/amcl_waffle_pi.yaml, 작은 방) | hall(config/amcl_hall.yaml,
 #                  책상/의자가 흩어진 강당·교실: 지도와 안 맞는 빔에 너그럽게) | yaml 파일 경로
 #
@@ -33,7 +32,7 @@ LOGS="$HOME_DIR/logs"
 PI_HOST="test@192.168.0.181"
 
 ROBOT=""; MODE=""; MAP=""; NAME=""; ENGINE=slam_toolbox; WORLD=turtlebot3_world; GUI=""
-AMCL=default; SCAN_NOISE=false
+AMCL=default
 while [ $# -gt 0 ]; do
   case "$1" in
     --robot) ROBOT="$2"; shift ;;
@@ -44,8 +43,7 @@ while [ $# -gt 0 ]; do
     --world) WORLD="$2"; WORLD_SET=1; shift ;;
     --gui) GUI=--gui ;;
     --amcl) AMCL="$2"; shift ;;
-    --scan-noise) SCAN_NOISE=true ;;
-    -h|--help) sed -n '2,28p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,27p' "$0"; exit 0 ;;
     *) echo "알 수 없는 옵션: $1 (scripts/run.sh --help)"; exit 1 ;;
   esac
   shift
@@ -115,10 +113,9 @@ WAREHOUSE_SLAM_ENGINE=$ENGINE
 WAREHOUSE_SPAWN_X=$SPAWN_X
 WAREHOUSE_SPAWN_Y=$SPAWN_Y
 WAREHOUSE_AMCL=$AMCL_FILE
-WAREHOUSE_SCAN_NOISE=$([ "$ROBOT" = sim ] && echo "$SCAN_NOISE" || echo false)
 EOF
 source "$DIR/env.sh"
-echo "== 로봇 $ROBOT / 모드 $MODE$([ "$SCAN_NOISE" = true ] && [ "$ROBOT" = sim ] && echo ' / LiDAR 노이즈 켬') / 도메인 $ROS_DOMAIN_ID"
+echo "== 로봇 $ROBOT / 모드 $MODE / 도메인 $ROS_DOMAIN_ID"
 
 start() {  # start <로그이름> <명령...>
   local log="$LOGS/$1.log"; shift

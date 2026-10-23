@@ -14,7 +14,7 @@
      goal     = 목표거리 / 한 번 굴려 갈 수 있는 거리(max_v * predict_time)
      progress = 1 - 경로를 따라 전진한 길이 / (max_v * predict_time)   (최대 속도로 따라가면 0, 멈추면 1, 후진 최대 2)
    경로이탈/목표거리만으로는 '경로 옆에 가만히 있기' 와 '경로를 따라 가기' 의 차이가 작다.
-   안전은 비용이 아니라 3) 의 제약으로 지킨다. 선택한 궤적의 항별 기여도는 last_terms (튜닝/로그용).
+   안전은 비용이 아니라 3) 의 제약으로 지킨다.
 """
 import math
 from dataclasses import dataclass
@@ -92,7 +92,6 @@ class DWAConfig:
 class DWAController:
     def __init__(self, cfg=None):
         self.cfg = cfg or DWAConfig()
-        self.last_terms = {}   # 직전에 고른 궤적의 비용항별 기여도 (가중치 곱한 값). 튜닝/로그용
 
     def _sample(self, v0, w0):
         c = self.cfg
@@ -346,7 +345,6 @@ class DWAController:
             if np.isfinite(fwd).any():
                 cost = fwd
         best = int(np.argmin(cost))
-        self.last_terms = {k: float(v[best]) for k, v in terms.items()}
         return ControlResult(float(vs[best]), float(ws[best]), True, traj[best])
 
 
