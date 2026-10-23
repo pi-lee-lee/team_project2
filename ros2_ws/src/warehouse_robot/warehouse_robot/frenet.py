@@ -357,8 +357,9 @@ class FrenetPlanner:
         valid = st <= ref.s_end + 0.02
         valid[..., 0] = True
         wmax = np.where(valid, np.abs(cart[..., 4] * cart[..., 3]), 0.0).max(axis=2)
-        # 실제 속도가 프로필(목표 이하로 가/감속)을 넘지 않는지. 이미 빠르면(지금 속도 > max_speed) 감속하는 후보는 통과
-        over = np.where(valid, cart[..., 4] - (Vb * 1.05 + 0.01), -1.0).max(axis=2)
+        # 실제 속도가 max_speed 를 넘지 않는지 (이미 빠르면 지금 속도까지는 허용 → 감속 후보 통과). 프로필과 딱 맞추면
+        # 경로와 60° 넘게 틀어진 출발에서 위 보정이 완벽하지 않아 후보가 전부 빠졌음 (실물 기록 2596, 2597)
+        over = np.where(valid, cart[..., 4] - max(c.max_speed * 1.05, v0 + 0.01), -1.0).max(axis=2)
         kin = (np.all(np.isfinite(cart).all(axis=3) | ~valid, axis=2) & (wmax <= c.max_w) & (over <= 0.0))
         mv = np.asarray(moving, dtype=float).reshape(-1, 5)
         dyn = np.full((nS, nV), np.inf)
@@ -461,6 +462,28 @@ class FrenetFollower:
                                             body_points(self.cfg.footprint, self.cfg.footprint_extra))
         return float(clear.min()) > 0.01 if len(ts) else True
 
+    def _turn(self, pts, x, y, yaw, err, was_turning, dbg):
+        """제자리 돌기 (v, w, state) 또는 None (못 돎). 가까운 쪽으로 돌면 모서리가 닿으면 먼 쪽으로 (실물: 벽 8 cm 앞에서
+        130° 오른쪽은 막히고 230° 왼쪽은 됨), 둘 다 막히면 짧게 움직여 돌 자리를 만든다. 돌기 시작한 방향을 먼저 본다
+        (먼 쪽으로 반 바퀴 넘게 돌면 '가까운 쪽' 이 바뀌어 왔다 갔다 하지 않게). 그 방향이 막히면 반대쪽도."""
+        c = self.cfg
+        near = math.copysign(1.0, err)
+        dirs = [self.turn_dir, -self.turn_dir] if was_turning and self.turn_dir else [near, -near]
+        grid = StaticGrid(pts, x, y, c.grid_half, c.grid_res)
+        for k in dirs:
+            rem = abs(err) if k == near else 2.0 * math.pi - abs(err)           # 이 방향으로 남은 각도
+            w = k * max(0.3, min(c.max_w, self.rotate_speed, 2.0 * rem))
+            if self._rotation_clear(grid, x, y, yaw, w, max(1.0, rem / abs(w))):
+                self.turn_dir = k
+                dbg.update(branch='turn_first', err=err, turn_dir=k)
+                return 0.0, w, 'rotating'
+        room = self._make_room(grid, x, y, yaw)
+        if room is not None:          # 양쪽 다 막힘: 돌 자리를 만들러 짧게 움직임 (돌기 상태는 유지)
+            self.turn_dir = 0.0
+            dbg.update(branch='make_room', err=err)
+            return room[0], room[1], 'driving'
+        return None
+
     def _make_room(self, grid, x, y, yaw):
         """제자리에서 양쪽 다 못 돌 때: 1초 동안 ±0.05 m/s 로 짧게 움직이는 후보 중, 차체가 지금보다 장애물에 가까워지지
         않으면서 회전 중심 둘레의 빈 반경(돌 수 있는지)이 가장 커지는 것 (v, w). 넓어지는 게 없으면 None."""
@@ -519,28 +542,22 @@ class FrenetFollower:
         was_turning = self.turning
         self.turning = abs(err) > (self.turn_done if self.turning else self.rotate_first) and not near_moving
         if self.turning:
-            # 가까운 쪽으로 돌면 모서리가 벽에 닿으면 먼 쪽으로 (실물: 벽 8 cm 앞에서 130° 오른쪽은 막히고 230° 왼쪽은 됨).
-            # 돌기 시작한 방향은 끝까지 유지 (먼 쪽으로 반 바퀴 넘게 돌면 '가까운 쪽' 이 바뀌어 왔다 갔다 하지 않게)
-            near = math.copysign(1.0, err)
-            dirs = [self.turn_dir] if was_turning and self.turn_dir else [near, -near]
-            grid = StaticGrid(pts, x, y, c.grid_half, c.grid_res)
-            for k in dirs:
-                rem = abs(err) if k == near else 2.0 * math.pi - abs(err)       # 이 방향으로 남은 각도
-                w = k * max(0.3, min(c.max_w, self.rotate_speed, 2.0 * rem))
-                if self._rotation_clear(grid, x, y, yaw, w, max(1.0, rem / abs(w))):
-                    self.turn_dir = k
-                    dbg.update(branch='turn_first', err=err, turn_dir=k)
-                    return 0.0, w, 'rotating'
-            room = self._make_room(grid, x, y, yaw)
-            if room is not None:      # 양쪽 다 막힘: 돌 자리를 만들러 짧게 움직임 (돌기 상태는 유지)
-                self.turn_dir = 0.0
-                dbg.update(branch='make_room', err=err)
-                return room[0], room[1], 'driving'
-            self.turning = False      # 그것도 안 되면 플래너에 맡김 (다 막히면 blocked → 브리지가 물러나기/재계획)
+            turn = self._turn(pts, x, y, yaw, err, was_turning, dbg)
+            if turn is not None:
+                return turn
+            self.turning = False      # 못 돌면 플래너에 맡김 (다 막히면 blocked → 브리지가 물러나기/재계획)
         self.turn_dir = 0.0
         traj = self.planner.plan(ref, (x, y, yaw), v0, pts, moving, hint=self.progress, prev_offset=self.offset)
         dbg.update(branch='frenet', s0=s0)
         if traj is None:
+            # 막혔는데 경로 방향과 30° 넘게 틀어져 있으면 제자리에서 돌아 본다 (60° 미만이라 돌아서기를 안 했거나 움직이는 물체가
+            # 가까워서 안 했을 때. 실물: 64~68° 틀어진 채 후보가 다 빠져 서 있었음)
+            ev = self.planner.last_eval or {}
+            if abs(math.atan(ev.get('dp0', 0.0))) > self.turn_done:   # 그 자리 경로 방향 기준 (앞이 꺾인 경로에서는 안 돎)
+                turn = self._turn(pts, x, y, yaw, err, False, dbg)
+                if turn is not None:
+                    self.turning = True
+                    return turn
             return 0.0, 0.0, 'blocked'
         self.offset = traj['offset']
         self.last_trajectory = np.column_stack([traj['x'][traj['valid']], traj['y'][traj['valid']]])
