@@ -6,8 +6,9 @@
 브리지(bridge_node.py)의 주행 로직을 단순화해 흉내 낸다:
   - A* 는 지도(벽) + LiDAR 로 2.5초 넘게 같은 칸에 보인 '지도에 없는 점'(scan_persist, 20초 기억)으로 계획.
     그걸로 경로가 없으면 지도만으로 계획 (astar_planner_node 와 같음)
-  - 평소 pure pursuit (앞쪽 ±25° 0.35m 정지 규칙). 로봇 앞 사각형(hybrid.box_*) 안에 지도에 없는 점이 있거나
-    움직이는 물체가 hybrid.moving_predict 초 안에 사각형에 들어오면 DWA, 지나가면 pure pursuit (브리지 hybrid_switch 와 같음)
+  - 평소 pure pursuit. 로봇 앞 사각형(hybrid.box_*) 안에 지도에 없는 점이 있거나, 움직이는 물체가 hybrid.moving_predict 초
+    안에 사각형에 들어오거나, 앞쪽 ±25° stop_distance 안에 무엇이든 있으면 DWA, 지나가면 pure pursuit (브리지 hybrid_switch 와 같음).
+    DWA 는 피할 장애물이 있는 동안 경로이탈 비용 0. 앞쪽 estop_distance 안이면 모드와 상관없이 전진 금지
   - 진행 없음 15초 / 막힘 5초 → (DWA 면) 뒤로 15cm → 재계획, 재시도 2번 넘으면 실패
 LiDAR 는 360개 빔(최대 3.5m, 0.2초마다)을 벽/상자/사람에 직접 쏴서 만든다. 상자는 지도에 없다 (출발 때 A* 가 모름).
 움직이는 사람은 추적 결과 대신 정답 위치/속도를 준다 (dwa_tune 과 같음).
@@ -37,16 +38,14 @@ LIDAR_X = -0.064
 BODY = (-0.197, 0.069, 0.153)
 EXTRA = (-0.277, -0.197, 0.04)   # 뒤에 붙인 물건 (x_min, x_max, 반폭)
 
-# 변형: dwa / astar / hybrid_cfg = params.yaml 값 덮어쓰기, pp_speed = pure pursuit 최고 속도
+# 변형: dwa / astar / hybrid_cfg = params.yaml 값 덮어쓰기, pp_speed = pure pursuit 최고 속도, dwa_only = 전환 없이 DWA 만
 STRATEGIES = {
-    'A': dict(desc='params.yaml 그대로 (기본)'),
+    'A': dict(desc='params.yaml 그대로 (hybrid)'),
+    'D': dict(dwa_only=True, desc='DWA 만 (같은 비용 함수, 전환 없음)'),
+    'wpath0': dict(dwa=dict(w_path=0.0), desc='장애물 없을 때도 경로이탈 비용 0'),
     'pred0': dict(hybrid_cfg=dict(moving_predict=0.0), desc='움직이는 물체도 지금 위치만 (예측 없음)'),
-    'pred1': dict(hybrid_cfg=dict(moving_predict=1.0), desc='예측 1초'),
-    'pred3': dict(hybrid_cfg=dict(moving_predict=3.0), desc='예측 3초'),
     'front1': dict(hybrid_cfg=dict(box_front=1.0), desc='box_front 1.0'),
     'accw15': dict(dwa=dict(max_acc_w=1.5), desc='dwa.max_acc_w 1.5'),
-    'old3': dict(hybrid_cfg=dict(box_front=1.0), dwa=dict(max_acc_w=1.5), pp_speed=0.26,
-                 desc='box_front 1.0 + max_acc_w 1.5 + PP 0.26'),
 }
 
 
@@ -376,7 +375,7 @@ class Run:
         f['local'].target_max = self.b['dwa_follow']['target_max']
         f['pp'] = PurePursuit(path, 0.0, max_v=self.st.get('pp_speed', self.b['max_speed']), max_w=self.b['max_turn_speed'],
                               max_acc=self.b['max_accel'], max_acc_w=self.b['max_turn_accel'])
-        f['use_local'] = False
+        f['use_local'] = bool(self.st.get('dwa_only'))
         f['clear_since'] = None
         return f
 
@@ -390,10 +389,13 @@ class Run:
         inside = (lx >= BODY[0] - h['box_back']) & (lx <= BODY[1] + h['box_front']) & (np.abs(ly) <= h['box_half_width'])
         self.box_streak = self.box_streak + 1 if np.count_nonzero(inside) >= h['box_min_points'] else 0
 
-    def hybrid_trigger(self, x, y, yaw, v, t):
-        """브리지 hybrid_obstacle 과 같음: 사각형 조건 또는 움직이는 물체가 moving_predict 초 안에 사각형과 겹침."""
+    def hybrid_trigger(self, x, y, yaw, v, t, front_range=math.inf):
+        """브리지 hybrid_obstacle 과 같음: 사각형 조건 또는 움직이는 물체가 moving_predict 초 안에 사각형과 겹침.
+        앞쪽 ±25° 에 stop_distance 안의 무엇이든(지도 벽 포함) 있어도 DWA."""
         h = self.h
         if self.box_streak >= h['box_min_scans']:
+            return True
+        if front_range < self.b['stop_distance']:
             return True
         ts = np.arange(0.0, h['moving_predict'] + 1e-9, 0.1)
         c, s = math.cos(yaw), math.sin(yaw)
@@ -441,8 +443,11 @@ class Run:
                     backing = None
                     outcome = 'replan'
             else:
-                trig = self.hybrid_trigger(x, y, yaw, v, t)
-                if not f['use_local']:
+                front_range = float(np.min(rng[np.abs(np.arctan2(np.sin(ang), np.cos(ang))) <= math.radians(25)]))
+                trig = self.hybrid_trigger(x, y, yaw, v, t, front_range)
+                if self.st.get('dwa_only'):
+                    pass   # DWA 만: 전환 없음 (trig 는 경로이탈 비용 켜고 끄기에만 씀)
+                elif not f['use_local']:
                     if trig and not f['pp'].at_goal:
                         f['local'].progress = f['pp'].index
                         f['local'].turning = False
@@ -464,7 +469,8 @@ class Run:
                 if f['use_local']:
                     v, w, state = f['local'].compute((x, y, yaw), v, w, (0.0, 0.0, 0.0), pts, dyn,
                                                      moving_speed=self.b['dwa_follow']['moving_speed'],
-                                                     unmapped_points=wd.unmapped(pts))
+                                                     unmapped_points=wd.unmapped(pts),
+                                                     obstacle_near=trig)
                 else:
                     v, w, state = f['pp'].compute(x, y, yaw, now=t)
                 if state == 'done':
@@ -481,19 +487,10 @@ class Run:
                         self.say(t, '막힘 5초')
                 else:
                     blocked_since = None
-                    if v > 0 and not f['use_local']:
-                        front = np.abs(np.arctan2(np.sin(ang), np.cos(ang))) <= math.radians(25)
-                        if np.min(rng[front]) < self.b['stop_distance']:
-                            v = w = 0.0
-                            f['pp'].set_speed(0.0, 0.0)
-                            blocked_since = t if blocked_since is None else blocked_since
-                            mark = (x, y, t)
-                            if t - (f.get('pp_block') or t) > self.b['blocked_timeout']:
-                                outcome = 'fail_or_retry'
-                                self.say(t, '앞 막힘 5초 (pure pursuit)')
-                            f['pp_block'] = f.get('pp_block') or t
-                        else:
-                            f['pp_block'] = None
+                    if v > 0 and front_range < self.b['estop_distance']:
+                        v = 0.0   # 비상 정지: 모드와 상관없이 앞으로는 안 감 (회전/후진은 허용)
+                        if not f['use_local']:
+                            f['pp'].set_speed(0.0, w)
                 if outcome is None:
                     if math.hypot(x - mark[0], y - mark[1]) > 0.05 or state == 'rotating':
                         mark = (x, y, t)

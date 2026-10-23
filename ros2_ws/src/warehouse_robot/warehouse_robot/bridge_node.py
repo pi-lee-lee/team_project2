@@ -185,7 +185,8 @@ class BridgeNode(Node):
         self.declare_parameter('max_turn_speed', 0.6)      # rad/s
         self.declare_parameter('max_accel', 0.3)           # m/s², pure pursuit 출발 가속/정지 감속
         self.declare_parameter('max_turn_accel', 1.5)      # rad/s², pure pursuit 제자리 회전
-        self.declare_parameter('stop_distance', 0.35)      # 앞쪽 이 거리 안에 물체가 있으면 정지 (m)
+        self.declare_parameter('stop_distance', 0.35)      # (pure pursuit) 앞쪽 ±25° 이 거리 안에 무엇이든 있으면 DWA 로 (m, LiDAR 기준)
+        self.declare_parameter('estop_distance', 0.2)      # 앞쪽 ±25° 이 거리 안이면 모드와 상관없이 앞으로는 안 감 (m, LiDAR 기준)
         self.declare_parameter('blocked_timeout', 10.0)    # 이 시간 넘게 막히면 재계획/실패 (s)
         self.declare_parameter('progress_timeout', 15.0)   # 이 시간 동안 5cm도 못 가면 실패 (s)
         self.declare_parameter('tf_timeout', 0.5)          # 위치 TF가 이보다 오래되면 즉시 정지 (s)
@@ -208,6 +209,7 @@ class BridgeNode(Node):
         self.max_accel = p('max_accel')
         self.max_turn_accel = p('max_turn_accel')
         self.stop_distance = p('stop_distance')
+        self.estop_distance = p('estop_distance')
         self.blocked_timeout = p('blocked_timeout')
         self.progress_timeout = p('progress_timeout')
         self.tf_timeout = p('tf_timeout')
@@ -753,6 +755,7 @@ class BridgeNode(Node):
     # 실행 중에 바꾸면 바로 쓰이는 파라미터 → 브리지 속성 (나머지 tunable 은 쓸 때마다 get_parameter 로 읽음)
     LIVE_ATTRS = {'max_speed': 'max_speed', 'max_turn_speed': 'max_turn_speed', 'max_accel': 'max_accel',
                   'max_turn_accel': 'max_turn_accel', 'stop_distance': 'stop_distance',
+                  'estop_distance': 'estop_distance',
                   'blocked_timeout': 'blocked_timeout', 'progress_timeout': 'progress_timeout',
                   'tf_timeout': 'tf_timeout', 'rotate_timeout': 'rotate_timeout', 'stall_timeout': 'stall_timeout',
                   'backoff_distance': 'backoff_distance',
@@ -1020,7 +1023,7 @@ class BridgeNode(Node):
             f['level_pose'] = (x, y, yaw)   # 부딪힌 자리는 기울기 시작 전 위치/방향으로 계산 (밀리면서 돌아가므로)
         self.hybrid_switch(f, x, y, now)
         if f['use_dwa']:
-            v, w, state = self.dwa_compute(f['dwa'])
+            v, w, state = self.dwa_compute(f['dwa'], obstacle_near=bool(f.get('why')))
         else:
             v, w, state = f['pp'].compute(x, y, yaw)
 
@@ -1051,7 +1054,9 @@ class BridgeNode(Node):
             f.pop('drive_since', None)
             self.cmd_vel_pub.publish(Twist())
             return
-        if v > 0.0 and not f['use_dwa']:   # DWA 는 장애물(움직이는 것 포함)을 스스로 피하므로 앞쪽 정지 규칙을 쓰지 않음
+        if v > 0.0:
+            # 앞쪽 stop_distance 안의 물체는 hybrid_switch 가 이미 DWA 로 넘겼다 (예전: pure pursuit 가 서서 기다림).
+            # 여기서는 비상 정지와 '걸침' 만 본다
             clearance = self.front_clearance()
             if clearance < self.stop_distance and self.tilt_rel > math.radians(3):
                 # 장애물 모서리에 걸쳐 조금 기운 상태: LiDAR 가 아래를 보고 바닥/상자 윗면을 장애물로 본다.
@@ -1059,20 +1064,17 @@ class BridgeNode(Node):
                 self.start_backoff(f, x, y, yaw, now,
                                    f'차체가 {math.degrees(self.tilt_rel):.0f}도 기운 채 앞이 막혔습니다 (장애물에 걸침).')
                 return
-            if clearance < self.stop_distance:
-                if f['blocked_since'] is None:
-                    f['blocked_since'] = now
-                    self.get_logger().warn(f'앞쪽 {clearance:.2f} m 장애물, 정지 후 대기')
-                if now - f['blocked_since'] > self.blocked_timeout:
-                    self.stop_following()
-                    self.fail_or_retry('앞이 막혀 진행할 수 없습니다.')
-                    return
-                f['mark_time'] = now  # 기다리는 동안은 진행 없음으로 치지 않음
-                f.pop('drive_since', None)
-                f['pp'].set_speed(0.0, 0.0)   # 다시 갈 때 0 에서 가속
-                self.cmd_vel_pub.publish(Twist())
-                return
-            f['blocked_since'] = None
+            if clearance < self.estop_distance:
+                # 비상 정지: 모드와 상관없이 앞으로는 안 간다 (회전/후진은 허용). DWA 는 여유 0.08 m 를 지키므로
+                # 보통 여기까지 오지 않음 → 갑자기 튀어나온 물체, 위치 추정 오차 등
+                if not f.get('estop'):
+                    self.get_logger().warn(f'비상 정지: 앞쪽 {clearance:.2f} m')
+                f['estop'] = True
+                v = 0.0
+                if not f['use_dwa']:
+                    f['pp'].set_speed(0.0, w)
+            else:
+                f['estop'] = False
         if state != 'blocked':
             f['blocked_since'] = None
 
@@ -1203,6 +1205,11 @@ class BridgeNode(Node):
         멀어지거나 나란히 가는 사람은 무시하고, 옆/뒤에서 다가오는 사람은 미리 잡는다."""
         if self.box_streak >= self.get_parameter('hybrid.box_min_scans').value:
             return f'앞쪽 장애물 {self.box_near:.2f} m (점 {self.box_count}개)'
+        # 바로 앞(±25°, stop_distance)에 무엇이든(지도 벽, 점이 적은 가는 물체 포함): 사각형이 못 잡는 것.
+        # 예전에는 pure pursuit 가 여기서 서서 기다리다 재계획했다 → DWA 가 피하거나 멈출지 정하게 한다
+        front = self.front_clearance()
+        if front < self.stop_distance:
+            return f'바로 앞 {front:.2f} m'
         if not self.tracks:
             return None
         pose = self.xyyaw('odom', self.base_frame)
@@ -1220,6 +1227,7 @@ class BridgeNode(Node):
 
     def hybrid_switch(self, f, x, y, now):
         why = self.hybrid_obstacle(f, x, y)
+        f['why'] = why                 # DWA 에 '피할 장애물 있음' 으로 넘김 (있으면 경로이탈 비용 끔)
         pp, dwa = f['pp'], f['dwa']
         self.hybrid_info = {'use_dwa': f['use_dwa'], 'why': why}   # 웹 표시용 (send_box)
         if not f['use_dwa']:
@@ -1336,7 +1344,7 @@ class BridgeNode(Node):
                         'r': round(float(t.radius), 3)})
         self.server.send({'type': 'obstacles', 'obstacles': out})
 
-    def dwa_compute(self, follower):
+    def dwa_compute(self, follower, obstacle_near=None):
         # DWA 는 0.1초마다만 계산하고 그 사이에는 같은 명령 (브리지 한 스레드에서 TF 수신 등과 같이 돌기 때문)
         now = time.monotonic()
         last = getattr(follower, 'last_cmd', None)
@@ -1348,7 +1356,7 @@ class BridgeNode(Node):
             return 0.0, 0.0, 'blocked'
         dyn = np.array([[t.x[0], t.x[1], t.x[2], t.x[3], t.radius] for t in self.tracks]).reshape(-1, 5)
         result = follower.compute(pose, *self.odom_vw, map_to_odom, self.scan_odom, dyn,
-                                  unmapped_points=self.scan_unmapped,
+                                  unmapped_points=self.scan_unmapped, obstacle_near=obstacle_near,
                                   moving_speed=self.get_parameter('dwa_follow.moving_speed').value)
         follower.last_cmd = (now, result)
         self.send_dwa(follower, result)

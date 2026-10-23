@@ -8,12 +8,11 @@
    -> 움직이는 물체가 있으면 추가로: 이번 주기만 그 (v, w) 로 가고 최대 감속으로 서는 궤적을 물체 예측 위치와
       직접 비교 (v^2/2a 는 '멈추면 안전' 을 가정하지만 움직이는 물체는 로봇이 멈춰도 다가온다)
    -> 여유(움직이는 물체엔 dynamic_margin 포함)를 끝까지 지키는 궤적이 있으면 그중에서만 고른다 (비용이 아니라 제약)
-4) 비용 = 방향 + 경로이탈 + 목표거리 + 진행도 + 장애물근접 + 느림 + 여유침범 -> 최소 비용 (v, w) 선택
+4) 비용 = 방향 + 경로이탈 + 목표거리 + 장애물근접 + 느림 + 여유침범 -> 최소 비용 (v, w) 선택
    거리 항은 무차원으로 맞춘다 (가중치끼리 비교할 수 있게):
-     path     = 경로이탈 / path_scale                       (path_scale 만큼 벗어나면 1)
-     goal     = 목표거리 / 한 번 굴려 갈 수 있는 거리(max_v * predict_time)
-     progress = 1 - 경로를 따라 전진한 길이 / (max_v * predict_time)   (최대 속도로 따라가면 0, 멈추면 1, 후진 최대 2)
-   경로이탈/목표거리만으로는 '경로 옆에 가만히 있기' 와 '경로를 따라 가기' 의 차이가 작다.
+     path = 경로이탈 / path_scale                       (path_scale 만큼 벗어나면 1)
+     goal = 목표거리 / 한 번 굴려 갈 수 있는 거리(max_v * predict_time)
+   경로이탈 계수는 호출할 때 바꿀 수 있다 (path_weight): hybrid 는 장애물을 피하는 동안 0, 다 지나가면 cfg.w_path.
    안전은 비용이 아니라 3) 의 제약으로 지킨다.
 """
 import math
@@ -81,9 +80,6 @@ class DWAConfig:
     # params.yaml 에 예전 값(1.5 / 2.3)이 남아 있으면 경로/목표 쪽 힘이 2~2.7배가 된다
     w_path: float = 0.75
     w_goal: float = 0.86
-    # 경로를 따라 전진한 정도. dwa_tune 시나리오 + 검증 시나리오에서 0~1.0 은 시간 차이가 없고 최소 여유만 줄어서
-    # (0.098 -> 0.076) 기본은 끔. 실물에서 '경로 옆에 서 있기' 가 보이면 0.3 정도부터
-    w_progress: float = 0.0
     w_obstacle: float = 0.6
     w_speed: float = 0.3
     w_collision: float = 2.0          # 나중에 부딪힐 궤적의 벌점 (빨리 부딪힐수록 큼)
@@ -222,15 +218,17 @@ class DWAController:
             clear = np.minimum(clear, d.min(axis=2))
         return clear
 
-    def compute(self, state, local_path, local_goal, static_points, dynamic_obstacles):
+    def compute(self, state, local_path, local_goal, static_points, dynamic_obstacles, path_weight=None):
         """
         state             : RobotState (odom frame)
         local_path        : (P, 2) 로봇 앞쪽 전역 경로 일부
         local_goal        : (2,) 이번 주기의 목표점 (경로 위 lookahead 점)
         static_points     : (N, 2) 정적 장애물 점 (스캔)
         dynamic_obstacles : (M, 5) [x, y, vx, vy, radius] 추적된 움직이는 장애물
+        path_weight       : 경로이탈 계수. None 이면 cfg.w_path
         """
         c = self.cfg
+        w_path = c.w_path if path_weight is None else path_weight
         static_points = np.asarray(static_points, dtype=float).reshape(-1, 2)
         dynamic_obstacles = np.asarray(dynamic_obstacles, dtype=float).reshape(-1, 5)
         local_path = np.asarray(local_path, dtype=float).reshape(-1, 2)
@@ -299,19 +297,11 @@ class DWAController:
                                         np.cos(bearing - end[:, 2]))) / np.pi
         reach = max(c.max_v * c.predict_time, 1e-6)     # 한 번 굴려 갈 수 있는 최대 거리
         goal_dist = np.linalg.norm(to_goal, axis=1) / reach
-        if len(local_path):
+        if len(local_path) and w_path > 0.0:
             d = np.linalg.norm(end[:, None, :2] - local_path[None, :, :], axis=2)   # (K, P)
             path_dist = d.min(axis=1) / c.path_scale
         else:
             path_dist = np.zeros(len(vs))
-        if len(local_path) >= 2:
-            # 끝점과 로봇을 경로의 가장 가까운 점에 투영해서 호 길이 차이 = 경로를 따라 전진한 길이
-            arc = np.concatenate([[0.0], np.cumsum(np.hypot(*np.diff(local_path, axis=0).T))])
-            i_robot = np.argmin(np.hypot(local_path[:, 0] - state.x, local_path[:, 1] - state.y))
-            advance = arc[d.argmin(axis=1)] - arc[i_robot]
-        else:   # 경로가 없으면 목표까지 거리가 줄어든 만큼
-            advance = np.hypot(goal[0] - state.x, goal[1] - state.y) - goal_dist * reach
-        progress = 1.0 - np.clip(advance / reach, -1.0, 1.0)
         soft_clear = soft_t.min(axis=1)
         obstacle = np.clip((c.obstacle_influence - soft_clear) / c.obstacle_influence, 0.0, 1.0)
         slowness = (c.max_v - vs) / max(c.max_v, 1e-6)   # 후진은 1 보다 커져서 자연히 덜 선택됨
@@ -325,9 +315,8 @@ class DWAController:
 
         terms = {
             'heading': c.w_heading * heading_err,
-            'path': c.w_path * path_dist,
+            'path': w_path * path_dist,
             'goal': c.w_goal * goal_dist,
-            'progress': c.w_progress * progress,
             'obstacle': c.w_obstacle * obstacle,
             'speed': c.w_speed * slowness,
             'collision': c.w_collision * collision,
@@ -498,11 +487,13 @@ class DWAFollower:
         return self.sidestep
 
     def compute(self, pose, v0, w0, map_to_odom, static_points, dynamic_obstacles, moving_speed=0.05,
-                unmapped_points=None):
+                unmapped_points=None, obstacle_near=None):
         """pose: odom 프레임 (x, y, yaw), map_to_odom: map 점을 odom 으로 옮기는 (x, y, yaw).
         static_points: odom 스캔 점, dynamic_obstacles: odom [x, y, vx, vy, r]. 반환 (v, w, state).
         unmapped_points: 지도에 없는 물체의 스캔 점 (odom). 목표점을 장애물 너머로 옮길 때만 씀 (벽은 빼야
-        좁은 통로/모서리에서 목표가 멀리 튀지 않음). None 이면 static_points 전체."""
+        좁은 통로/모서리에서 목표가 멀리 튀지 않음). None 이면 static_points 전체.
+        obstacle_near: hybrid 가 '지금 피할 장애물이 있다' 고 본 상태. True 면 경로이탈 비용을 끄고(장애물 쪽으로
+        끌려가지 않게), False 면 cfg.w_path 로 경로에 다시 붙인다. None 이면 늘 cfg.w_path."""
         x, y, yaw = pose
         self.last_trajectory = None   # 이번 주기에 DWA 로 고른 궤적만 남김 (제자리 회전/빠져나오기는 None)
         path = transform_points(self.path_map, *map_to_odom)
@@ -563,7 +554,8 @@ class DWAFollower:
                 if v != 0.0:
                     return v, 0.0, 'driving'
                 self.turning = False
-        r = self.dwa.compute(RobotState(x, y, yaw, v0, w0), local_path, local_goal, pts, moving)
+        r = self.dwa.compute(RobotState(x, y, yaw, v0, w0), local_path, local_goal, pts, moving,
+                             path_weight=0.0 if obstacle_near else None)
         self.last_trajectory = r.trajectory
         if not r.ok:
             return 0.0, 0.0, 'blocked'

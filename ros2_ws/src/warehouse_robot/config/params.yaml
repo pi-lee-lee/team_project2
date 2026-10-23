@@ -35,7 +35,8 @@ warehouse_bridge:
     max_accel: 0.3            # m/s² (pure pursuit). 출발은 이 가속으로 점점 빨라지고, 목표 앞은 이 감속으로 멈춤 (0.26 m/s 까지 0.9초, 정지 거리 약 11cm)
     max_turn_accel: 1.5       # rad/s² (pure pursuit 제자리 회전). DWA 의 max_acc_v / max_acc_w 와 같은 값
     footprint_extra: [-0.277, -0.197, -0.04, 0.04]   # 차체에 붙인 물건 사각형 (x_min, x_max, y_min, y_max) x N. 뒤쪽 가운데 8x8cm. 제자리 회전/후진 여유, 웹 로봇 모양
-    stop_distance: 0.35       # 앞쪽 ±25° 안에 이 거리 이내 물체가 있으면 정지 후 대기 (m)
+    stop_distance: 0.35       # (pure pursuit) 앞쪽 ±25° 이 거리(LiDAR 기준) 안에 무엇이든(지도 벽 포함) 있으면 DWA 로 전환 (예전: 서서 기다림)
+    estop_distance: 0.2       # 앞쪽 ±25° 이 거리(LiDAR 기준, 차체 앞 끝에서 약 7cm) 안이면 모드와 상관없이 앞으로는 안 감 (비상 정지)
     blocked_timeout: 5.0      # 이 시간 넘게 막히면 장애물을 피하는 경로로 재계획, 재시도도 다 쓰면 실패 (s)
     progress_timeout: 15.0    # 이 시간 동안 5cm도 못 가면 실패 (s)
     tf_timeout: 0.5           # 로봇 위치 TF가 이보다 오래되면 즉시 정지 (s)
@@ -80,8 +81,8 @@ warehouse_bridge:
       dynamic_growth: 0.03    # 예측 1초당 반경 증가
       obstacle_influence: 0.3   # 이 거리 안쪽부터 장애물 비용 (0.5 는 좁은 통로에서 항상 비용이 붙어 상자 앞에서 섰음)
       w_heading: 0.3
-      w_path: 0.0             # 경로 복귀 비용 없음: 피하는 동안 경로 쪽(장애물 쪽)으로 끌어당기지 않음. 경로로 돌아오는 건
-                              # 장애물 너머의 목표점(dwa_follow.target_clear) + 진행 비용 + pure pursuit 복귀가 맡음
+      w_path: 0.6             # 경로이탈 비용. hybrid 에서 피할 장애물이 있는 동안은 0 (장애물 쪽 경로로 끌려가지 않게),
+                              # 다 지나가면 이 값으로 경로에 다시 붙음. sim 21개: 0 → 14/21, 0.3 → 14/21, 0.6 → 15/21 (2026-10-23)
       w_goal: 0.86
       w_obstacle: 1.0
       w_speed: 0.2

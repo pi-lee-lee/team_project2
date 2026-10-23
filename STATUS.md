@@ -471,3 +471,15 @@ cd ../ros2_ws && source /opt/ros/humble/setup.bash && colcon build --symlink-ins
   app.js / robot.js 에 부르지 않는 함수 없음, 브리지 ↔ 서버 메시지 종류 일치(_connected/_relocalized 는 브리지 내부 메시지).
   문서에 지운 기능 이름이 남은 곳은 PROJECT_PLAN.md (처음 계획, 기록이라 그대로)뿐
 
+### (브랜치 hybrid-predict-box) PP 앞쪽 정지 → DWA 전환, 경로 복귀 비용은 장애물 없을 때만, progress 항 삭제 (2026-10-23)
+- pure pursuit 의 '앞쪽 ±25° 0.35m 안이면 서서 기다리다 5초 뒤 재계획' 삭제 → `hybrid_obstacle` 의 세 번째 전환 조건('바로 앞 0.xx m'):
+  지도 벽/점이 적은 가는 물체/갑자기 나타난 물체처럼 사각형이 못 잡는 것도 DWA 가 피하거나 멈출지 정함
+- 비상 정지 `estop_distance` 0.2 m (LiDAR 기준, 차체 앞 끝에서 약 7cm): 모드와 상관없이 전진 금지, 회전/후진은 허용
+- DWA 경로이탈 비용: `DWAFollower.compute(obstacle_near=)` — 전환 이유가 있는 동안 0, 없으면 `dwa.w_path` 0.6 으로 경로에 다시 붙음
+  (예전: 늘 0 이라 목표점만 따라 대각선으로 붙음). 쓰지 않던 `w_progress` 항과 계산 삭제
+- sim (`tools/planner_compare.py` 21개, 지금 params): 이전 14/21 충돌 2 → **15/21 충돌 1**. 같은 비용 함수로 DWA 만 쓰면 10/21 충돌 2 (평균 0.053 m/s, hybrid 0.077)
+  - 시험했지만 안 넣음: goal 을 목표점 거리로 정규화(14/21, 느려짐), obstacle_influence 0.45(14/21), safety_margin 0.1(13/21), PP 복귀 0.35(15/21, 여유 0.016)
+  - `dwa.max_acc_w` 4.0 → 1.5 면 **18/21** (실물에서 정한 값이라 바꾸지 않음)
+- 남은 문제: 최소 여유 0.02 m 는 뒤에 붙인 8cm 부착물(제자리 회전 때). DWA/도착 회전 검사는 차체 사각형만 봄 (차체만이면 0.048 m)
+- 확인: 단위 테스트 53개(경로이탈 켜고 끄기 1개 추가), pyflakes, 이 브랜치 코드로 브리지 기동(estop 0.2, w_path 0.6). **실물 미확인**
+

@@ -304,7 +304,8 @@ SIGINT → SIGTERM → SIGKILL 순서로 보내고 남은 프로세스가 없는
 | `astar_planner.inflation_radius` | 0.55 | 이 거리까지 벽에서 멀어지도록 비용 부여 |
 | `warehouse_bridge.hybrid.*` | | 주행은 항상 A* + hybrid: 평소 pure pursuit, 로봇 앞 사각형(`box_front`/`box_back`/`box_half_width`) 안에 지도에 없는 점이 `box_min_points` 개 이상 `box_min_scans` 번 연속이거나, 움직이는 물체가 `moving_predict` 초 안에 사각형에 들어오면 DWA. `release_time` 동안 없고 경로에서 `rejoin_offset` 안이면 pure pursuit |
 | `warehouse_bridge.max_speed` | 0.18 | pure pursuit 최고 속도 (m/s). 회전은 `max_turn_speed` 1.82 rad/s, DWA 는 `dwa.max_v` 0.13 / `dwa.max_w` 1.82 |
-| `warehouse_bridge.stop_distance` | 0.35 | 앞쪽 ±25° 안에 이 거리 이내 물체가 있으면 정지 후 대기 |
+| `warehouse_bridge.stop_distance` | 0.35 | (pure pursuit) 앞쪽 ±25° 안에 이 거리(LiDAR 기준) 이내 무엇이든 있으면 DWA 로 전환 |
+| `warehouse_bridge.estop_distance` | 0.2 | 앞쪽 ±25° 안에 이 거리 이내면 모드와 상관없이 전진 금지 (비상 정지) |
 | `astar_planner.scan_obstacles` / `scan_memory` | true / 20.0 | AMCL 모드: LiDAR 로 본, 맵에 없는 장애물을 이 시간(초) 기억해 피함 (SLAM 모드는 SLAM 맵이 대신함) |
 | `astar_planner.bump_memory` / `bump_radius` | 120.0 / 0.15 | 부딪힌 자리를 장애물로 기억하는 시간(초)과 반경(m) |
 | `astar_planner.stripe_cells` | 2 | (기존 맵 모드) 빈 칸 사이 폭 4칸 미만 미탐색 줄무늬를 빈 칸으로 (먼 곳 LiDAR 빔 사이). 0 이면 끔 |

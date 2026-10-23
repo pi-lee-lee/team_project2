@@ -155,3 +155,17 @@ def test_target_moves_beyond_obstacle_on_path():
     assert f.clear_target(path, 0.0, 0.0, box[:0], lp, goal)[1] is goal
     f.target_clear = 0.0
     assert f.clear_target(path, 0.0, 0.0, box, lp, goal)[1] is goal
+
+
+def test_path_weight_pulls_back_only_when_on():
+    # 경로(y=0)에서 0.3m 옆에 선 로봇: 경로이탈 비용을 켜면(장애물 없음) 경로 쪽으로, 끄면(피하는 중) 끌려가지 않음
+    import numpy as np
+    from warehouse_robot.dwa import DWAConfig, DWAController, RobotState
+    cfg = DWAConfig(max_v=0.13, footprint=(-0.197, 0.069, 0.153), w_path=0.6)
+    path = np.array([[x, 0.0] for x in np.linspace(0, 2, 41)])
+    goal = np.array([3.0, 0.3])          # 목표점은 로봇 정면 멀리 (목표만으로는 옆으로 끌지 않음)
+    s = RobotState(0.0, 0.3, 0.0, 0.1, 0.0)
+    on = DWAController(cfg).compute(s, path, goal, [], [])
+    off = DWAController(cfg).compute(s, path, goal, [], [], path_weight=0.0)
+    assert on.w < 0.0 and off.w == 0.0            # 켜면 경로(오른쪽) 쪽으로 꺾고, 끄면 목표점 정면으로 직진
+    assert on.trajectory[-1, 1] < off.trajectory[-1, 1]
