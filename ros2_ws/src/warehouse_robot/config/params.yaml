@@ -110,6 +110,34 @@ warehouse_bridge:
                               # 옆/뒤에서 다가오는 사람은 미리 잡고, 멀어지거나 나란히 가는 사람은 무시
       release_time: 2.0       # 장애물이 이 시간 동안 안 보이면 pure pursuit 로 (s)
       rejoin_offset: 0.25     # 경로에서 이 거리 안으로 돌아왔을 때만 pure pursuit 로 (m)
+    # 추종 방식 (재시작해야 바뀜): frenet = Frenet 로컬 플래너 하나로 (기본), hybrid = pure pursuit + 장애물 근처 DWA (예전)
+    drive:
+      controller: frenet
+    # Frenet 로컬 플래너 (frenet.py). A* 경로를 기준선으로 '옆 오프셋 x 옆 이동/유지 거리 x 속도' 후보 중 안전하고 싼 궤적.
+    # 정적 장애물은 거리(check_dist)로, 움직이는 물체는 시간(horizon)으로 검사. 실행 중에 바꿀 수 있음 (목록 값 제외)
+    frenet:
+      target_speed: 0.15      # (m/s) 후보 속도: 이 값부터 speed_step 씩 n_speed 개 더 낮춘 것
+      speed_step: 0.05
+      n_speed: 2
+      max_speed: 0.18
+      max_accel: 0.3          # 속도 프로필 가/감속 (m/s²)
+      max_w: 1.82             # 후보 각속도 한계 |v·κ| (rad/s)
+      max_offset: 0.3         # 옆 오프셋 후보 ±(m). 통로 약 0.9 m
+      offset_step: 0.025      # 실제 소화기 틈(양쪽 9 cm)은 5 cm 간격으로는 가운데를 못 맞춰 막혔음
+      lateral_dists: [0.4, 0.6]        # 옆으로 가는(돌아오는) 거리 후보 (m)
+      hold_dists: [0.0, 0.3, -1.0]     # 오프셋 유지 거리 후보 (m), 음수 = 돌아오지 않음
+      check_dist: 1.0         # 정적 장애물 검사 거리 (m): 이만큼 앞에서부터 비켜 감. 다 막히면 이만큼 앞에서 섬
+      horizon: 4.0            # 움직이는 물체 검사 시간 (s)
+      safety_margin: 0.06     # 차체와 장애물 최소 여유 (제약). 0.08 은 실제 소화기 옆 0.5 m 틈을 못 지나갔음 (기록 분석 2026-10-23)
+      clear_pref: 0.15        # 여유가 이보다 작으면 비용 (틈에서는 가운데 쪽)
+      dynamic_margin: 0.15    # 움직이는 물체 추가 여유 (m)
+      dynamic_growth: 0.03    # 예측 1초당 여유 증가
+      w_offset: 1.0           # 비용 계수: 경로에서 벗어남 / 오프셋 바뀜 / 꺾는 기울기 / 느림 / 정적 여유 / 움직이는 물체 여유
+      w_change: 0.3
+      w_turn: 0.5
+      w_speed: 1.0
+      w_clear: 1.0
+      w_dynamic: 1.0
     # 주행 기록: 목표 하나마다 logs/records/<시각>_<목표>.jsonl.gz (0.1초마다 위치/명령/hybrid/트래킹/스캔,
     # DWA 구간은 후보별 판정·비용까지). 분석: python3 tools/dwa_replay.py. 1분에 수 MB
     record:
