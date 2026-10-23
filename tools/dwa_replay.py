@@ -2,6 +2,8 @@
 """주행 기록(logs/records/*.jsonl.gz, bridge_node 가 목표마다 남김) 분석.
 
   python3 tools/dwa_replay.py                     가장 최근 기록 요약 (사건, 1초 간격 표, 느림/정지 구간 설명)
+                                                  + 중요한 순간 그림 자동 저장 (막힘 시작, 재계획/물러나기 직전, 가장 가까움,
+                                                  느린 구간 가운데. 그 목표 폴더의 plot_<t>_<이유>.png, --no-plots 로 끔)
   python3 tools/dwa_replay.py --list              세션(브리지 켠 단위) / 주행(목표) 목록과 결과
   python3 tools/dwa_replay.py 폴더|파일            그 기록 요약 (목표 폴더, record.jsonl.gz, 예전 *.jsonl.gz)
   python3 tools/dwa_replay.py --at 23.4           23.4초에 가장 가까운 로컬 플래너(Frenet/DWA) 주기를 자세히 (왜 그 명령이 나왔나)
@@ -462,11 +464,71 @@ def plot_frenet(rec, s, path, plt):
     print(f'그림: {path}')
 
 
-def plot_path(rec, s):
-    """그림 파일: 목표 폴더 기록이면 그 폴더의 plot_<t>.png, 예전 파일이면 옆에 <이름>_<t>.png."""
+def plot_path(rec, s, tag=''):
+    """그림 파일: 목표 폴더 기록이면 그 폴더의 plot_<t>[_<이유>].png, 예전 파일이면 옆에 <이름>_<t>.png."""
+    name = f"{s['t']:.1f}" + (f'_{tag}' if tag else '')
     if os.path.basename(rec.path) == 'record.jsonl.gz':
-        return os.path.join(os.path.dirname(rec.path), f"plot_{s['t']:.1f}.png")
-    return rec.path.replace('.jsonl.gz', f"_{s['t']:.1f}.png")
+        return os.path.join(os.path.dirname(rec.path), f'plot_{name}.png')
+    return rec.path.replace('.jsonl.gz', f'_{name}.png')
+
+
+def key_moments(rec, limit=10):
+    """그림으로 남길 중요한 순간 [(step, 이유)]: 막힘 시작, 재계획/물러나기/부딪힘/비상 정지 직전, 장애물과 가장 가까운 순간,
+    느린 구간 가운데. 1초 안에 겹치면 앞의 것(우선순위 높은 것)만. 로컬 플래너를 계산한 주기만 (그림에 후보가 나오게)."""
+    planned = [s for s in rec.steps if kind(s)]
+    if not planned:
+        return []
+    picks = []
+
+    def before(t):
+        cand = [s for s in planned if s['t'] <= t + 1e-6]
+        return cand[-1] if cand else None
+    prev = None
+    for s in planned:                                       # 막힘 시작
+        st = s[kind(s)]['result'][2]
+        if st == 'blocked' and prev != 'blocked':
+            picks.append((s, 'blocked'))
+        prev = st
+    for e in rec.events:                                    # 재계획/물러나기/부딪힘/비상 정지 직전
+        text = e.get('text', '')
+        if e['type'] == 'event' and any(k in text for k in ('재계획', '다시 계획', '물러', '부딪힘', '비상 정지', '나온 뒤')):
+            s = before(e['t'])
+            if s is not None:
+                picks.append((s, 'event'))
+    driving = [s for s in planned if s[kind(s)]['result'][2] == 'driving']
+    if driving:                                             # 가장 가까운 순간 (주행 중)
+        s = min(driving, key=lambda s: body_clearance(rec.cfg, rec.odom_pose(s), rec.scan_of(s)[0]))
+        picks.append((s, 'closest'))
+    seg = []
+    for s in planned + [None]:                              # 느린 구간 (제자리 회전 제외) 가운데
+        if s is not None and abs(s[kind(s)]['result'][0]) < 0.03 and s[kind(s)]['result'][2] not in ('rotating', 'blocked'):
+            seg.append(s)
+            continue
+        if seg and seg[-1]['t'] - seg[0]['t'] > 1.0:
+            picks.append((seg[len(seg) // 2], 'slow'))
+        seg = []
+    # 이유별 개수 제한 (막힘만 10장이 되지 않게), 우선순위: 사건 > 가장 가까움 > 막힘 > 느림
+    quota = {'event': 4, 'closest': 1, 'blocked': 5, 'slow': 2}
+    out = []
+    for why in quota:
+        n = 0
+        for s, w in picks:
+            if w == why and n < quota[why] and all(abs(s['t'] - o['t']) > 1.0 for o, _ in out):
+                out.append((s, w))
+                n += 1
+    return sorted(out[:limit], key=lambda p: p[0]['t'])
+
+
+def auto_plots(rec):
+    import matplotlib
+    matplotlib.use('Agg')
+    moments = key_moments(rec)
+    print('\n[그림 자동 저장]' + ('' if moments else '  없음 (로컬 플래너를 계산한 주기가 없음)'))
+    for s, why in moments:
+        try:
+            plot(rec, s, plot_path(rec, s, why))
+        except Exception as e:                              # 그림 하나 실패로 분석 전체가 멈추지 않게
+            print(f"  {s['t']:.1f}s 그림 실패: {e}")
 
 
 def plot(rec, s, path):
@@ -536,6 +598,7 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument('file', nargs='?', help='기록 (목표 폴더, 세션 폴더, 파일. 기본: 가장 최근)')
     ap.add_argument('--list', action='store_true', help='세션/주행 목록과 결과')
+    ap.add_argument('--no-plots', action='store_true', help='요약할 때 중요한 순간 그림을 저장하지 않음')
     ap.add_argument('--at', type=float, help='이 시각(s, 기록 시작부터)의 로컬 플래너 주기를 자세히')
     ap.add_argument('--plot', action='store_true', help='--at 시각의 그림 저장')
     ap.add_argument('--set', action='append', metavar='이름=값',
@@ -571,6 +634,8 @@ def main():
             print(f"  {s['t']:6.1f}  {r[0]:+.3f} / {r[1]:+.2f}   {v2:+.3f} / {w2:+.2f}  {st2}")
         return
     summary(rec)
+    if not a.no_plots:
+        auto_plots(rec)
 
 
 if __name__ == '__main__':
