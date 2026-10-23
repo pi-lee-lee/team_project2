@@ -328,7 +328,8 @@ class BridgeNode(Node):
         self.footprint_extra = [tuple(ex[i:i + 4]) for i in range(0, len(ex) - 3, 4)]
         # 추종 방식 (재시작해야 바뀜): frenet = Frenet 로컬 플래너 하나로, hybrid = pure pursuit + 장애물 근처 DWA
         self.controller = self.declare_parameter('drive.controller', 'frenet').value
-        fdef = FrenetConfig(footprint=self.dwa_cfg.footprint)
+        fdef = FrenetConfig(footprint=self.dwa_cfg.footprint,
+                            footprint_extra=tuple(v for r in self.footprint_extra for v in r))
         self.frenet_cfg = FrenetConfig(**{
             k: (tuple(float(x) for x in self.declare_parameter(f'frenet.{k}', [float(x) for x in v]).value)
                 if isinstance(v, tuple) else type(v)(self.declare_parameter(f'frenet.{k}', v).value))
@@ -424,7 +425,8 @@ class BridgeNode(Node):
         self.rec_local = None  # 이번 주기 로컬 플래너 ('dwa' | 'frenet', 입력/결과) (dwa_compute / frenet_compute 가 채움)
         self.add_on_set_parameters_callback(self.on_set_params)
         self.create_timer(0.2, self.flush_params)
-        self.get_logger().info('브리지 시작 (A* + hybrid: pure pursuit / 장애물 근처 DWA)')
+        self.get_logger().info('브리지 시작 (A* + ' + ('Frenet 로컬 플래너)' if self.controller == 'frenet'
+                                                   else 'hybrid: pure pursuit / 장애물 근처 DWA)'))
 
     # ---------------------------------------------------------- 서버 메시지 처리
     def process_inbox(self):
@@ -1107,8 +1109,8 @@ class BridgeNode(Node):
             # DWA: 안전한 궤적이 없음 (사람이 막고 있음 등) → 기다리다 오래 막히면 장애물을 피하는 경로로 재계획
             if f['blocked_since'] is None:
                 f['blocked_since'] = now
-                self.get_logger().warn('DWA: 안전한 궤적 없음, 정지 후 대기')
-                self.record_event('DWA: 안전한 궤적 없음, 정지 후 대기')
+                self.get_logger().warn(f'{"Frenet" if "frenet" in f else "DWA"}: 안전한 궤적 없음, 정지 후 대기')
+                self.record_event(f'{"Frenet" if "frenet" in f else "DWA"}: 안전한 궤적 없음, 정지 후 대기')
             if now - f['blocked_since'] > self.blocked_timeout:
                 self.start_recovery(f, now, '앞이 막혀 진행할 수 없습니다.')
                 return

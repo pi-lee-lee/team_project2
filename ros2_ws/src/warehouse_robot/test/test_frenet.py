@@ -3,14 +3,15 @@ import math
 
 import numpy as np
 
-from warehouse_robot.frenet import FrenetConfig, FrenetFollower, body_circles, build_reference, lateral_shape
+from warehouse_robot.frenet import FrenetConfig, FrenetFollower, body_circles, body_points, build_reference, lateral_shape
 
 
 def drive(path, pts, start=(0.0, 0.0, 0.0), goal_yaw=0.0, steps=400, moving=None, cfg=None):
     f = FrenetFollower(path, goal_yaw, cfg or FrenetConfig())
     x, y, yaw = start
     v = 0.0
-    offs, rad = body_circles(f.cfg.footprint)
+    offs, rad = body_circles(f.cfg.footprint)                # 움직이는 물체 (플래너와 같은 원 모델)
+    body = body_points(f.cfg.footprint, f.cfg.footprint_extra)   # 정적 (차체 + 붙인 물건 둘레)
     pts = np.asarray(pts, dtype=float).reshape(-1, 2)
     log = {'v': [], 'state': [], 'clear': math.inf, 'xy': []}
     for k in range(steps):
@@ -27,7 +28,9 @@ def drive(path, pts, start=(0.0, 0.0, 0.0), goal_yaw=0.0, steps=400, moving=None
         log['xy'].append((x, y))
         cx, cy = x + offs * math.cos(yaw), y + offs * math.sin(yaw)
         if len(pts):
-            log['clear'] = min(log['clear'], float(np.min(np.hypot(pts[:, None, 0] - cx, pts[:, None, 1] - cy))) - rad)
+            bx = x + body[:, 0] * math.cos(yaw) - body[:, 1] * math.sin(yaw)
+            by = y + body[:, 0] * math.sin(yaw) + body[:, 1] * math.cos(yaw)
+            log['clear'] = min(log['clear'], float(np.min(np.hypot(pts[:, None, 0] - bx, pts[:, None, 1] - by))))
         for o in mv:
             log['clear'] = min(log['clear'], float(np.min(np.hypot(o[0] - cx, o[1] - cy))) - rad - o[4])
     return f, log
@@ -92,3 +95,22 @@ def test_avoids_crossing_mover():
     f, log = drive(STRAIGHT, WALLS, moving=lambda t: np.array([[1.2, -0.4 + 0.1 * t, 0.0, 0.1, 0.1]]))
     assert log['state'][-1] == 'done'
     assert log['clear'] > 0.0
+
+
+def test_escapes_corner_then_turns():
+    # 실물 기록과 같은 구석: 앞 벽 13 cm, 왼쪽 벽 9 cm, 경로는 뒤쪽 아래 → 제자리에서는 양쪽 다 모서리가 닿음.
+    # 짧게 움직여 돌 자리를 만들고, 돌아서 경로로
+    walls = ([(x, 0.25) for x in np.arange(-0.6, 0.21, 0.02)] + [(0.2, y) for y in np.arange(-0.65, 0.26, 0.02)]
+             + [(x, -0.65) for x in np.arange(-0.6, 0.21, 0.02)])
+    path = [(0.0, 0.0)] + [(-0.05 * i, -0.3 * min(i, 6) / 6) for i in range(1, 30)]
+    f, log = drive(path, walls, steps=600)
+    assert log['state'][-1] == 'done'
+    assert log['clear'] > 0.0
+
+
+def test_actual_speed_stays_below_max_when_shifting_on_curve():
+    # 커브 바깥쪽으로 비켜 가도 실제 속도는 max_speed 를 넘지 않음 (실물: 0.15 설정에 0.25 m/s 가 나왔음)
+    arc = [(1.0 * math.sin(a), 1.0 - 1.0 * math.cos(a)) for a in np.linspace(0, math.pi / 2, 40)]
+    obstacle = [(0.71 + 0.05 * math.cos(a) - 0.0, 0.29 + 0.05 * math.sin(a)) for a in np.linspace(0, 2 * math.pi, 12)]
+    f, log = drive(arc, obstacle, steps=300)
+    assert max(log['v']) <= f.cfg.max_speed + 1e-6
