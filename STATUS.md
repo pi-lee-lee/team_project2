@@ -465,4 +465,9 @@ cd ../ros2_ws && source /opt/ros/humble/setup.bash && colcon build --symlink-ins
   어디서도 안 쓰는 sim 전용 도구 `tools/sim_record.py`, `tools/track_eval.py` 제거. `tools/slam_drift.py`(SLAM map->odom 기록, 어디서도 안 씀), 테스트에서만 쓰던 `tracker.Track.velocity` 속성, `tools/explore.py` 의 부르는 곳 없는 `pick_goal` 도 제거.
   vulture 가 더 잡은 것(발행 메시지 필드 angle_max, TF 수신 유지용 tf_listener, 콜백 인자, Django admin/모델 필드, websocket 콜백 인자)은 아래 확인대로 처리
 - 확인: 단위 테스트 52개(scan_noise 3개 빠짐), pyflakes 깨끗, vulture 에 남은 2개도 실제로 쓰임을 확인: LaserScan `angle_max` 는 `scan_slam` 을 받는 slam_toolbox(libtoolbox_common)가 읽음, `_on_close` 의 `code` 는 websocket-client 가 (ws, code, reason) 으로 호출. `tf_listener` 속성은 참조 없이도 TF 를 받는 것을 실험으로 확인해 대입을 뺌, bash -n, 이 브랜치 코드로 브리지 기동. **실물 미확인**
+- 전체 점검 (마지막): 추적 파일마다 다른 곳에서 언급되는지 세어 봄 → 빈 파일 `bbackdaegari.txt`, DB 계정 메모 `db_info.md`(같은 값이 `server/.env` 에 있음) 제거.
+  나머지 미언급 파일은 문서(AUTO_MAP_FLOW.md 등), pytest 가 찾는 테스트, Django apps.py, README 에 적힌 측정 도구(delivery_demo/latency_test/step_test)라 남김.
+  params.yaml 값은 전부 코드가 읽음, 코드가 선언한 파라미터도 전부 읽음(hybrid.box_* 는 p('box_front') 처럼 이름 조합으로 읽음),
+  app.js / robot.js 에 부르지 않는 함수 없음, 브리지 ↔ 서버 메시지 종류 일치(_connected/_relocalized 는 브리지 내부 메시지).
+  문서에 지운 기능 이름이 남은 곳은 PROJECT_PLAN.md (처음 계획, 기록이라 그대로)뿐
 
