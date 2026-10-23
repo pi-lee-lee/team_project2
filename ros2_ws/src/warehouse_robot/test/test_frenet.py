@@ -73,7 +73,7 @@ def test_passes_obstacle_beside_path_without_slowing():
     assert 'blocked' not in log['state']
     assert log['clear'] >= f.cfg.safety_margin - 0.01
     passing = [v for (x, _), v in zip(log['xy'], log['v']) if 1.2 < x < 1.8]
-    assert min(passing) > 0.12                           # DWA 는 여기서 0.03 아래로 기어감
+    assert min(passing) > 0.12                           # 예전 DWA 는 여기서 0.03 아래로 기어갔음
 
 
 def test_stops_when_corridor_fully_blocked():

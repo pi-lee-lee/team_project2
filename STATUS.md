@@ -530,3 +530,18 @@ cd ../ros2_ws && source /opt/ros/humble/setup.bash && colcon build --symlink-ins
   - 경로 끝을 지난 상태에서 검사 구간이 비면 예외가 나던 버그 수정 (브리지가 죽을 수 있었음)
   - **실물 미확인** (다음 주 실험)
 
+### (브랜치 frenet-only, hybrid-predict-box 에서 갈라짐) 안 쓰는 PP / DWA / hybrid 전부 제거 (2026-10-23)
+- 주행은 A* + Frenet 로컬 플래너 하나. 예전 방식(PP + DWA hybrid)이 필요하면 `git checkout hybrid-predict-box`
+- 지운 것: `follower.py`(PP), `dwa.py`(DWA), 브리지의 hybrid 전환(전환 사각형/움직이는 물체 사각형 예측/DWA 계산/PP 준비/`drive.controller`),
+  설정 `dwa.*` `dwa_follow.*` `hybrid.*` `drive.*` 와 PP 전용 `max_speed` `max_turn_speed` `max_accel` `max_turn_accel`,
+  테스트 `test_follower.py` `test_dwa_closed_loop.py` 와 `test_tracker_dwa.py` 의 DWA 부분, 도구 `dwa_tune.py` `planner_compare.py`,
+  웹 hybrid 전환 사각형 그리기·중계, 주행 파라미터 카드의 DWA/hybrid 묶음
+- 옮긴/바꾼 이름: `dwa_follow.moving_speed` → `tracking.moving_speed`, `dwa.footprint` → `footprint`, `transform_points` → frenet.py,
+  웹 메시지 `dwa` → `local_plan`, 분석 도구 `tools/dwa_replay.py` → `tools/drive_replay.py`(Frenet 전용, 예전 PP/DWA 기록은 사건/표만),
+  `test_tracker_dwa.py` → `test_tracker.py`, 기록 세션 폴더는 항상 `_frenet`
+- `stop_distance` 는 남김: 기운 채 앞이 막힌 '걸침' 감지에 씀. 경로 점이 하나뿐인 목표(이미 목표 칸 안)는 5 cm 경로로 바로 도착 → 방향만 맞춤
+- `tools/frenet_bench.py` 는 이제 기본이 지금 params.yaml 값 (`--recorded` 면 기록 당시 값)
+- 문서: CLAUDE.md, README, RUN_GUIDE, user_guide, AUTO_MAP_FLOW, guide/architecture*.html, run.sh/start_nav2.sh 주석
+- 확인: 단위 테스트 35개, pyflakes, 브리지를 다른 도메인에서 기동(파라미터 목록, 실행 중 변경), 브리지 기록 메서드 → drive_replay 왕복
+  (다시 계산 = 기록), 실물 기록 폐루프 비교 도구. **실물 미확인**
+

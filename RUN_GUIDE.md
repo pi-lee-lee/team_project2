@@ -104,7 +104,7 @@ scripts/run.sh --robot sim --mode map --map ~/maps/<이름>_clean.yaml   # 저�
 - 기존 맵 모드는 출발 위치를 알고 있어 초기 위치를 자동 지정합니다 (5단계).
 - 화면 없이 돌리면(`--gui` 생략) gzserver 만 뜹니다.
 
-### 3.5 실행 옵션 (주행은 항상 A* + hybrid)
+### 3.5 실행 옵션 (주행은 항상 A* + Frenet 로컬 플래너)
 
 | 옵션 | 의미 |
 |---|---|

@@ -173,7 +173,7 @@ Django(HTTP + WebSocket) 를 `0.0.0.0:8000` 으로. 보통 `run.sh` 가 부름. 
 `scripts/start_nav2.sh <map.yaml>` — Nav2 의 map_server + AMCL 만 (주행은 브리지). AMCL 설정은 `run.sh --amcl` 이 정한 파일(기본 `config/amcl_waffle_pi.yaml`). 맵 파일이 없으면 바로 오류로 끝남.
 
 ### `start_bridge.sh` — A* 플래너 + 브리지
-`scripts/start_bridge.sh [맵이름] [서버 URL]` — `warehouse.launch.py` 실행. SLAM 모드는 맵 이름 `slam_live`, 미탐색 칸 통과 허용. 주행은 항상 A* + hybrid (pure pursuit / 장애물 근처 DWA).
+`scripts/start_bridge.sh [맵이름] [서버 URL]` — `warehouse.launch.py` 실행. SLAM 모드는 맵 이름 `slam_live`, 미탐색 칸 통과 허용. 주행은 항상 A* + Frenet 로컬 플래너.
 - 브리지: 웹 서버와 WebSocket 으로 연결, 목표 주행, 안전 정지, 웹에 위치·지도·실시간 LiDAR 전송
 - A* 플래너: 기존 맵 모드에서 지도를 계획용으로 가공(미탐색 줄무늬 메움, 책상/의자 다리 점 부풀림)하고 웹의 금지 구역을 피함 (`ros2_ws/src/warehouse_robot/config/params.yaml`)
 

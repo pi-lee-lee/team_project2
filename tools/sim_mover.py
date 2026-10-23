@@ -1,4 +1,4 @@
-"""(sim) 움직이는 장애물: 원기둥(사람 다리 정도)을 두 점 사이로 왕복시킨다. 추적/DWA 시험용.
+"""(sim) 움직이는 장애물: 원기둥(사람 다리 정도)을 두 점 사이로 왕복시킨다. 추적/Frenet 시험용.
 
     source scripts/env.sh
     python3 tools/sim_mover.py --from 1.0 -1.6 --to 2.1 -1.6 --speed 0.2 [--radius 0.12] [--seconds 120]

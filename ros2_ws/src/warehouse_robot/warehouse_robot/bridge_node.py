@@ -3,13 +3,12 @@
 서버 → 로봇: goto, cancel, stop, initial_pose
 로봇 → 서버: hello, map, pose, battery, path, nav_status
 
-이동 방식: astar_planner 노드로 경로 계획 후 drive.controller 로 추종
-  frenet (기본): A* 경로를 기준선으로 Frenet 로컬 플래너가 매 주기 옆 오프셋 x 속도 후보 중 안전한 궤적을 골라 따라감
-  hybrid: 평소 pure pursuit, 로봇 앞 사각형(hybrid.box_*) 안에 지도에 없는 물체가 보이거나 움직이는 물체가
-    hybrid.moving_predict 초 안에 사각형에 들어올 것 같으면 DWA 로 바꿔 피하고, 지나가면 pure pursuit 로 복귀.
+이동 방식: astar_planner 노드로 경로 계획 후 Frenet 로컬 플래너(frenet.py)로 추종
+  A* 경로를 기준선으로 매 0.1초 '옆 오프셋 x 속도' 후보 중 안전하고 비용이 가장 낮은 궤적을 골라 그 앞부분을 실행.
+  정적 장애물만으로 막히면 1초 뒤 A* 재계획, 그 밖에는 대기 후 물러나기/재계획.
 
-안전장치: 위치 TF가 끊기면 정지, (pure pursuit) 앞쪽 장애물이 있으면 정지 후 대기,
-경로 이탈/진행 없음/장애물로 오래 막힘 → 정지 후 재계획 또는 실패.
+안전장치: 위치 TF가 끊기면 정지, 앞쪽 estop_distance 안이면 전진 금지, 부딪힘(기울기/끼임) 감지 후 물러나기,
+진행 없음/오래 막힘 → 물러나기 후 재계획 또는 실패.
 """
 import base64
 import gzip
@@ -42,9 +41,7 @@ from tf2_ros import Buffer, TransformException, TransformListener
 from .astar import obstacle_distance
 from .cmd_mux import CmdMux
 from .astar_planner_node import quaternion_from_yaw, yaw_from_quaternion
-from .dwa import DWAConfig, DWAFollower, transform_points
-from .frenet import FrenetConfig, FrenetFollower
-from .follower import PurePursuit
+from .frenet import FrenetConfig, FrenetFollower, transform_points
 from .tracker import MultiObjectTracker, detect_clusters
 
 
@@ -197,13 +194,8 @@ class BridgeNode(Node):
         self.declare_parameter('base_frame', 'base_footprint')
         self.declare_parameter('pose_rate', 5.0)
         self.declare_parameter('max_retries', 2)   # 이동 실패 시 재계획 횟수
-        # 경로 추종기 (pure pursuit)
-        self.declare_parameter('max_speed', 0.1)           # m/s
-        self.declare_parameter('max_turn_speed', 0.6)      # rad/s
-        self.declare_parameter('max_accel', 0.3)           # m/s², pure pursuit 출발 가속/정지 감속
-        self.declare_parameter('max_turn_accel', 1.5)      # rad/s², pure pursuit 제자리 회전
-        self.declare_parameter('stop_distance', 0.35)      # (pure pursuit) 앞쪽 ±25° 이 거리 안에 무엇이든 있으면 DWA 로 (m, LiDAR 기준)
-        self.declare_parameter('estop_distance', 0.2)      # 앞쪽 ±25° 이 거리 안이면 모드와 상관없이 앞으로는 안 감 (m, LiDAR 기준)
+        self.declare_parameter('stop_distance', 0.35)      # 차체가 기운 채 앞쪽 ±25° 이 거리 안이 막히면 '걸침' 으로 보고 물러남 (m, LiDAR 기준)
+        self.declare_parameter('estop_distance', 0.2)      # 앞쪽 ±25° 이 거리 안이면 앞으로는 안 감 (비상 정지, m, LiDAR 기준)
         self.declare_parameter('blocked_timeout', 10.0)    # 이 시간 넘게 막히면 재계획/실패 (s)
         self.declare_parameter('progress_timeout', 15.0)   # 이 시간 동안 5cm도 못 가면 실패 (s)
         self.declare_parameter('tf_timeout', 0.5)          # 위치 TF가 이보다 오래되면 즉시 정지 (s)
@@ -221,10 +213,6 @@ class BridgeNode(Node):
         self.global_frame = p('global_frame')
         self.base_frame = p('base_frame')
         self.max_retries = p('max_retries')
-        self.max_speed = p('max_speed')
-        self.max_turn_speed = p('max_turn_speed')
-        self.max_accel = p('max_accel')
-        self.max_turn_accel = p('max_turn_accel')
         self.stop_distance = p('stop_distance')
         self.estop_distance = p('estop_distance')
         self.blocked_timeout = p('blocked_timeout')
@@ -297,7 +285,7 @@ class BridgeNode(Node):
         self.create_timer(1.0, self.poll_yolo)
 
         # 움직이는 장애물 추적 (tb3_nav 의 obstacle_tracker 를 브리지 안으로): 스캔 → odom 점 → 지도 벽 근처 제외
-        # → 덩어리 → 칼만필터로 위치/속도. DWA 가 미래 위치를 피하는 데 쓰고, 웹 지도에 표시한다
+        # → 덩어리 → 칼만필터로 위치/속도. Frenet 이 미래 위치를 피하는 데 쓰고, 웹 지도에 표시한다
         tp = lambda n, d: self.declare_parameter(f'tracking.{n}', d).value  # noqa: E731
         self.tracking = tp('enabled', True)
         self.track_cfg = dict(max_range=tp('max_range', 5.0), static_match_dist=tp('static_match_dist', 0.15),
@@ -306,62 +294,28 @@ class BridgeNode(Node):
         self.tracker = MultiObjectTracker(gate=tp('gate', 0.5), min_hits=tp('min_hits', 3),
                                           max_misses=tp('max_misses', 5), accel_noise=tp('accel_noise', 1.0),
                                           meas_noise=tp('meas_noise', 0.05), max_speed=tp('max_speed', 1.5))
+        # 이보다 빠른 track 만 움직이는 물체로 예측/웹 표시 (멈춘 물체 속도 노이즈 중앙값 0.06, 느린 사람 0.1)
+        self.declare_parameter('tracking.moving_speed', 0.08)
         self.tracks = []                   # 확정된 track (odom)
-        self.scan_odom = np.empty((0, 2))  # 최근 스캔 점 (odom) - DWA 정적 장애물
-        self.scan_unmapped = np.empty((0, 2))
+        self.scan_odom = np.empty((0, 2))  # 최근 스캔 점 (odom) - Frenet 정적 장애물
+        self.scan_unmapped = np.empty((0, 2))   # 그중 지도에 없는 점 (기록용)
         self.map_dist = None               # 지도 벽까지 거리 (벽 근처 점 = 정적) (dist, msg)
         self.last_obstacles_sent = 0.0
-        self.last_dwa_sent = 0.0
-        # DWA (hybrid 에서 장애물 피할 때). 기본값은 tb3_nav 값에서 속도/외곽(직사각형)/여유를 이 프로젝트에 맞춤 (params.yaml 과 같음)
-        defaults = DWAConfig(max_v=0.15, max_w=1.0, max_acc_v=0.3, max_acc_w=1.5, robot_radius=0.17, footprint=(-0.197, 0.069, 0.153), allow_escape=True,
-                             safety_margin=0.08, dynamic_margin=0.15, dynamic_growth=0.03, predict_time=2.5,
-                             w_collision=2.0, reverse_only_when_needed=True)
-        self.dwa_cfg = DWAConfig(**{
-            k: (tuple(float(x) for x in self.declare_parameter(f'dwa.{k}', [float(x) for x in v]).value)
-                if isinstance(v, tuple) else type(v)(self.declare_parameter(f'dwa.{k}', v).value))
-            for k, v in vars(defaults).items()})
-        self.dwa_cfg.control_period = 0.1    # DWA 계산 주기 (dwa_compute)
+        self.last_plan_sent = 0.0
+        # 차체 직사각형 (base_footprint 기준 x_min, x_max, 반폭): Waffle Pi 외곽
+        fp = tuple(float(v) for v in self.declare_parameter('footprint', [-0.197, 0.069, 0.153]).value)
         # 차체에 붙인 물건 (base_footprint 기준 사각형 x_min, x_max, y_min, y_max 를 4개씩 이어 붙인 목록).
-        # 기본: 뒤쪽 가운데 8cm x 8cm (차체 뒤 끝 x=-0.197 에서 8cm 더 나옴). 제자리 회전/후진 여유와 웹 로봇 모양에 반영.
-        # DWA 충돌 검사(dwa.footprint 직사각형)에는 아직 안 들어감
+        # 기본: 뒤쪽 가운데 8cm x 8cm (차체 뒤 끝 x=-0.197 에서 8cm 더 나옴). Frenet 충돌 검사, 물러나기/제자리 회전 여유, 웹 로봇 모양
         ex = [float(v) for v in self.declare_parameter('footprint_extra', [-0.277, -0.197, -0.04, 0.04]).value]
         self.footprint_extra = [tuple(ex[i:i + 4]) for i in range(0, len(ex) - 3, 4)]
-        # 추종 방식 (재시작해야 바뀜): frenet = Frenet 로컬 플래너 하나로, hybrid = pure pursuit + 장애물 근처 DWA
-        self.controller = self.declare_parameter('drive.controller', 'frenet').value
-        fdef = FrenetConfig(footprint=self.dwa_cfg.footprint,
-                            footprint_extra=tuple(v for r in self.footprint_extra for v in r))
+        # Frenet 로컬 플래너 설정 (frenet.* : 목록 값 빼고 실행 중에 바꿀 수 있음)
+        fdef = FrenetConfig(footprint=fp, footprint_extra=tuple(v for r in self.footprint_extra for v in r))
         self.frenet_cfg = FrenetConfig(**{
             k: (tuple(float(x) for x in self.declare_parameter(f'frenet.{k}', [float(x) for x in v]).value)
                 if isinstance(v, tuple) else type(v)(self.declare_parameter(f'frenet.{k}', v).value))
             for k, v in vars(fdef).items()})
         if self.mode == 'slam':   # 지도를 만드는 중에는 천천히 돈다 (빨리 돌면 스캔이 휘어 SLAM 매칭이 나빠짐)
             self.frenet_cfg.rotate_speed = min(self.frenet_cfg.rotate_speed, 0.6)
-        self.declare_parameter('dwa_follow.lookahead', 0.5)
-        self.declare_parameter('dwa_follow.goal_tolerance', 0.1)
-        # 앞쪽 경로가 지도에 없는 장애물에서 이 거리 안을 지나면 목표점을 그 너머 경로점으로 (m, 0 이면 끔), target_max 까지
-        self.declare_parameter('dwa_follow.target_clear', 0.233)
-        self.declare_parameter('dwa_follow.target_max', 2.0)
-        self.declare_parameter('dwa_follow.moving_speed', 0.08)  # 이보다 빠른 track 만 움직이는 장애물로 (멈춘 물체 속도 노이즈 ~0.06, 느린 사람 0.1)
-        # hybrid: 평소 pure pursuit, 장애물이 가까우면 DWA
-        self.declare_parameter('hybrid.release_time', 2.0)      # 장애물이 이 시간 동안 안 보이면 pure pursuit 로 (s)
-        self.declare_parameter('hybrid.rejoin_offset', 0.25)    # 경로에서 이 거리 안으로 돌아왔을 때만 pure pursuit 로 (m)
-        # 전환 조건: 로봇 앞(+뒤 조금) 사각형 안에 지도에 없는 스캔 점이 있거나 (box_*),
-        # 움직이는 track 이 moving_predict 초 안에 사각형에 들어올 것 같으면 DWA
-        self.declare_parameter('hybrid.box_front', 1.0)         # 차체 앞 끝(x=0.069)에서 앞으로 (m)
-        self.declare_parameter('hybrid.box_back', 0.2)          # 차체 뒤 끝(x=-0.197)에서 뒤로 (m)
-        self.declare_parameter('hybrid.box_half_width', 0.25)   # 좌우 반폭 (m): 차체 반폭 0.153 + 여유
-        self.declare_parameter('hybrid.box_min_points', 3)      # 사각형 안 점이 이만큼 이상이어야 (AMCL 오차로 벽 점 몇 개가 새는 것 무시)
-        self.declare_parameter('hybrid.box_min_scans', 2)       # 이만큼 연속 스캔에서 보여야 전환 (깜빡임 방지)
-        # 움직이는 track: 지금 ~ 이 시간 뒤까지 속도로 예측한 위치가 사각형과 겹치면 전환 (s).
-        # 로봇도 지금 속도로 직진한다고 보고 사각형을 같이 옮긴다. 0 이면 지금 위치만 (= 정적인 물체와 같음)
-        self.declare_parameter('hybrid.moving_predict', 2.0)
-        self.box_streak = 0      # 사각형 안에 점이 있던 연속 스캔 수
-        self.box_count = 0       # 마지막 스캔에서 사각형 안 점 수
-        self.box_near = math.inf # 그중 차체에서 가장 가까운 거리 (m, 로그용)
-        self.last_box_sent = 0.0
-        self.box_pts = np.empty((0, 2))      # 사각형 안의 지도에 없는 점 (odom) - 웹 표시
-        self.unmapped_near = np.empty((0, 2))  # 사각형 밖, 로봇 2m 안의 지도에 없는 점 (odom) - 웹 표시
-        self.hybrid_info = {}                # 지금 전환 상태 (hybrid_switch 가 채움) - 웹 표시
         self.odom_vw = (0.0, 0.0)
         self.create_subscription(Odometry, 'odom', self.on_odom, qos_profile_sensor_data)
         # A* 가 기억 중인 장애물 (맵에 없는 LiDAR 장애물, 부딪힌 자리) → 웹 지도 표시
@@ -401,7 +355,7 @@ class BridgeNode(Node):
         self.last_battery_sent = 0.0
         self.battery_history = []  # (시각, 전압)
         self.stop_count = 0
-        self.follower = None  # 추종기 상태 (pp / dwa, hybrid 전환)
+        self.follower = None  # 추종 상태 {'frenet': FrenetFollower, 막힘/진행/회복 상태}
         self.last_goal_id = None
 
         self.server = ServerConnection(p('server_url'), self.get_logger())
@@ -418,19 +372,18 @@ class BridgeNode(Node):
         # 시작 값을 기억해 웹에서 바뀐 것을 표시/되돌림. declare 가 모두 끝난 뒤에 등록 (declare 도 콜백을 부름)
         self.param_start = {n: self.get_parameter(n).value for n in self.tunable_params()}
         self.params_dirty = False
-        # 주행 기록 (tools/dwa_replay.py 로 분석): 브리지를 켤 때마다 세션 폴더 logs/records/<켠 시각>_<추종 방식>/,
+        # 주행 기록 (tools/drive_replay.py 로 분석): 브리지를 켤 때마다 세션 폴더 logs/records/<켠 시각>_frenet/,
         # 그 안에 목표 하나 = <시각>_<목표>/record.jsonl.gz (분석 그림도 그 폴더에).
-        # 0.1초마다 위치/속도/명령/hybrid 상태/트래킹/스캔 점, DWA 로 달릴 땐 그 입력과 후보별 판정·비용까지
+        # 0.1초마다 위치/속도/명령/트래킹/스캔 점, Frenet 을 계산한 주기엔 그 입력과 후보별 판정·비용까지
         self.record_enabled = self.declare_parameter('record.enabled', True).value
         self.record_dir = os.path.join(os.environ.get('WAREHOUSE_HOME') or os.getcwd(), 'logs', 'records')
         self.record_session = None   # 이번 브리지 세션 폴더 (첫 기록 때 만듦)
         self.rec = None        # 열린 기록 {'file', 't0', 'last', 'flushed', 'path'}
-        self.rec_raw = None    # 이번 주기 추종기(PP/DWA)가 낸 값 (v, w, state). 비상 정지 등으로 바뀌기 전
-        self.rec_local = None  # 이번 주기 로컬 플래너 ('dwa' | 'frenet', 입력/결과) (dwa_compute / frenet_compute 가 채움)
+        self.rec_raw = None    # 이번 주기 Frenet 추종기가 낸 값 (v, w, state). 비상 정지 등으로 바뀌기 전
+        self.rec_frenet = None  # 이번 주기 Frenet 입력/결과 (frenet_compute 가 채움)
         self.add_on_set_parameters_callback(self.on_set_params)
         self.create_timer(0.2, self.flush_params)
-        self.get_logger().info('브리지 시작 (A* + ' + ('Frenet 로컬 플래너)' if self.controller == 'frenet'
-                                                   else 'hybrid: pure pursuit / 장애물 근처 DWA)'))
+        self.get_logger().info('브리지 시작 (A* + Frenet 로컬 플래너)')
 
     # ---------------------------------------------------------- 서버 메시지 처리
     def process_inbox(self):
@@ -728,34 +681,15 @@ class BridgeNode(Node):
         self.stop_count = 0  # 이전 목표의 정지 명령이 새 주행에 섞이지 않게
         points = [(ps.pose.position.x, ps.pose.position.y) for ps in plan.poses]
         self.record_write({'type': 'plan', 'retries': self.goal['retries'], 'start': start, 'path': points})
-        # pp / dwa 는 같은 경로 점 목록을 쓰므로 진행 index 를 서로 넘겨줄 수 있다 (hybrid 전환)
-        dwa = DWAFollower(points, self.goal['yaw'], self.dwa_cfg,
-                          goal_tolerance=self.get_parameter('dwa_follow.goal_tolerance').value,
-                          lookahead=self.get_parameter('dwa_follow.lookahead').value)
-        dwa.target_clear = self.get_parameter('dwa_follow.target_clear').value
-        dwa.target_max = self.get_parameter('dwa_follow.target_max').value
-        if self.controller == 'frenet':
-            try:
-                fr = FrenetFollower(points, self.goal['yaw'], self.frenet_cfg)
-            except ValueError as e:   # 경로 점이 너무 적음 (이미 목표 근처) → 이번 목표는 hybrid
-                self.get_logger().warn(f'Frenet 기준선을 못 만들어 hybrid 로 갑니다: {e}')
-                fr = None
-            if fr is not None:
-                self.follower = {'gen': gen, 'blocked_since': None, 'mark_pos': start[:2],
-                                 'mark_time': time.monotonic(), 'frenet': fr, 'use_dwa': False, 'clear_since': None}
-                self.hybrid_info = {}
-                return
-        self.follower = {
-            'gen': gen,
-            'blocked_since': None,
-            'mark_pos': start[:2],
-            'mark_time': time.monotonic(),
-            'dwa': dwa,
-            'pp': PurePursuit(points, self.goal['yaw'], max_v=self.max_speed, max_w=self.max_turn_speed,
-                              max_acc=self.max_accel, max_acc_w=self.max_turn_accel),
-            'use_dwa': False,
-            'clear_since': None,
-        }
+        try:
+            fr = FrenetFollower(points, self.goal['yaw'], self.frenet_cfg)
+        except ValueError:
+            # 경로 점이 하나뿐 (이미 목표 칸 안): 목표 방향으로 5 cm 짜리 경로 → 바로 도착으로 보고 방향만 맞춤
+            sx, sy = points[0]
+            yaw = self.goal['yaw']
+            fr = FrenetFollower([(sx, sy), (sx + 0.05 * math.cos(yaw), sy + 0.05 * math.sin(yaw))], yaw, self.frenet_cfg)
+        self.follower = {'gen': gen, 'blocked_since': None, 'mark_pos': start[:2], 'mark_time': time.monotonic(),
+                         'frenet': fr}
 
     def fail_or_retry(self, reason):
         """재시도 횟수가 남았으면 현재 위치에서 다시 계획, 아니면 실패 보고."""
@@ -806,35 +740,27 @@ class BridgeNode(Node):
         fut.add_done_callback(done)
 
     # 실행 중에 바꾸면 바로 쓰이는 파라미터 → 브리지 속성 (나머지 tunable 은 쓸 때마다 get_parameter 로 읽음)
-    LIVE_ATTRS = {'max_speed': 'max_speed', 'max_turn_speed': 'max_turn_speed', 'max_accel': 'max_accel',
-                  'max_turn_accel': 'max_turn_accel', 'stop_distance': 'stop_distance',
-                  'estop_distance': 'estop_distance',
+    LIVE_ATTRS = {'stop_distance': 'stop_distance', 'estop_distance': 'estop_distance',
                   'blocked_timeout': 'blocked_timeout', 'progress_timeout': 'progress_timeout',
                   'tf_timeout': 'tf_timeout', 'rotate_timeout': 'rotate_timeout', 'stall_timeout': 'stall_timeout',
                   'backoff_distance': 'backoff_distance',
                   'max_retries': 'max_retries', 'bump_tilt_deg': 'bump_tilt'}
 
     def tunable_params(self):
-        """실행 중에 바꿀 수 있는 파라미터 이름 (웹 카드 순서). dwa.* 중 목록 값(footprint 등)은 ros2 param set 으로만."""
-        names = list(self.LIVE_ATTRS)
-        names += [f'dwa.{k}' for k, v in vars(self.dwa_cfg).items()
-                  if k != 'control_period' and not isinstance(v, tuple)]
-        names += [f'frenet.{k}' for k, v in vars(self.frenet_cfg).items() if not isinstance(v, tuple)]
-        names += ['dwa_follow.lookahead', 'dwa_follow.goal_tolerance', 'dwa_follow.moving_speed',
-                  'dwa_follow.target_clear', 'dwa_follow.target_max']
-        names += [f'hybrid.{k}' for k in ('box_front', 'box_back', 'box_half_width', 'box_min_points', 'box_min_scans',
-                                          'moving_predict', 'release_time', 'rejoin_offset')]
+        """실행 중에 바꿀 수 있는 파라미터 이름 (웹 카드 순서). frenet.* 의 목록 값(lateral_dists 등)은 재시작해야 바뀜."""
+        names = [f'frenet.{k}' for k, v in vars(self.frenet_cfg).items() if not isinstance(v, tuple)]
+        names += ['tracking.moving_speed']
+        names += list(self.LIVE_ATTRS)
         return names
 
     def on_set_params(self, params):
         """파라미터가 바뀌기 직전에 불림: 실행 중에 못 바꾸는 것은 거절하고, 나머지는 지금 주행에도 바로 반영."""
         for prm in params:
             n = prm.name
-            if not (n in self.param_start or (n.startswith('dwa.') and n != 'dwa.control_period')):
+            if n not in self.param_start:
                 return SetParametersResult(successful=False, reason=f'{n} 은(는) 실행 중에 못 바꿉니다 (재시작 필요)')
-            if n in ('dwa.v_samples', 'dwa.w_samples') and prm.value < 2:
-                return SetParametersResult(successful=False, reason=f'{n} 은(는) 2 이상이어야 합니다')
-        f = self.follower or {}
+            if n in ('frenet.n_speed',) and prm.value < 0:
+                return SetParametersResult(successful=False, reason=f'{n} 은(는) 0 이상이어야 합니다')
         for prm in params:
             n, v = prm.name, prm.value
             if n in self.LIVE_ATTRS:
@@ -842,19 +768,8 @@ class BridgeNode(Node):
             elif n.startswith('frenet.'):
                 # FrenetFollower 들이 같은 FrenetConfig 객체를 쓰므로 주행 중에도 바로 적용 (기준선 간격/스무딩은 다음 목표부터)
                 setattr(self.frenet_cfg, n[7:], v)
-            elif n.startswith('dwa.'):
-                # DWAFollower 들이 같은 DWAConfig 객체를 쓰므로 주행 중인 DWA 에도 바로 적용
-                k = n[4:]
-                setattr(self.dwa_cfg, k, tuple(float(x) for x in v) if isinstance(getattr(self.dwa_cfg, k), tuple) else v)
-            elif n in ('dwa_follow.lookahead', 'dwa_follow.goal_tolerance', 'dwa_follow.target_clear',
-                       'dwa_follow.target_max') and 'dwa' in f:
-                setattr(f['dwa'], n.split('.')[1], v)
             self.get_logger().info(f'파라미터 변경: {n} = {v}')
             self.record_event(f'파라미터 변경: {n} = {v}', param=n, value=v)
-        if 'pp' in f:
-            pp = f['pp']
-            pp.max_v, pp.max_w, pp.max_acc, pp.max_acc_w = (self.max_speed, self.max_turn_speed,
-                                                            self.max_accel, self.max_turn_accel)
         self.params_dirty = True
         return SetParametersResult(successful=True)
 
@@ -952,7 +867,7 @@ class BridgeNode(Node):
         if self.scan_gated_since is None or now - self.scan_gated_since > 3.0:
             self.level_scan_pub.publish(msg)
             self.slam_scan_pub.publish(to_slam_scan(msg))
-            self.update_tracks(msg)   # 기울어진 스캔은 바닥을 보므로 추적/DWA 에도 쓰지 않음
+            self.update_tracks(msg)   # 기울어진 스캔은 바닥을 보므로 추적/Frenet 에도 쓰지 않음
 
     def send_scan(self, msg):
         """웹 화면용 실시간 LiDAR: 빔 순서대로 지도 좌표 점 (응답 없는 빔은 None). 웹이 이웃 점끼리 선으로 잇는다.
@@ -1084,23 +999,12 @@ class BridgeNode(Node):
         x, y, yaw, _ = pose
         if self.tilt_rel < math.radians(2):
             f['level_pose'] = (x, y, yaw)   # 부딪힌 자리는 기울기 시작 전 위치/방향으로 계산 (밀리면서 돌아가므로)
-        if 'frenet' in f:
-            v, w, state = self.frenet_compute(f['frenet'])
-        else:
-            self.hybrid_switch(f, x, y, now)
-            if f['use_dwa']:
-                v, w, state = self.dwa_compute(f['dwa'], obstacle_near=bool(f.get('why')))
-            else:
-                v, w, state = f['pp'].compute(x, y, yaw)
+        v, w, state = self.frenet_compute(f['frenet'])
         self.rec_raw = (v, w, state)
 
         if state == 'done':
             self.stop_following()
             self.report('succeeded')
-            return
-        if state == 'off_path':
-            self.stop_following()
-            self.fail_or_retry('경로에서 벗어났습니다.')
             return
 
         # 기울었으면(낮은 장애물에 올라탐) 앞이 막힌 것(LiDAR 가 바닥을 봄)보다 먼저 처리한다.
@@ -1110,16 +1014,15 @@ class BridgeNode(Node):
                                f'차체가 {math.degrees(self.tilt_rel):.0f}도 기울었습니다 (낮은 장애물에 올라탐).')
             return
         if state == 'blocked':
-            # DWA: 안전한 궤적이 없음 (사람이 막고 있음 등) → 기다리다 오래 막히면 장애물을 피하는 경로로 재계획
+            # 안전한 후보 없음 (사람이 막고 있음 등) → 기다리다 오래 막히면 물러나서 장애물을 피하는 경로로 재계획
             if f['blocked_since'] is None:
                 f['blocked_since'] = now
-                self.get_logger().warn(f'{"Frenet" if "frenet" in f else "DWA"}: 안전한 궤적 없음, 정지 후 대기')
-                self.record_event(f'{"Frenet" if "frenet" in f else "DWA"}: 안전한 궤적 없음, 정지 후 대기')
+                self.get_logger().warn('Frenet: 안전한 궤적 없음, 정지 후 대기')
+                self.record_event('Frenet: 안전한 궤적 없음, 정지 후 대기')
             # Frenet 이 정적 장애물만으로 막힘 (A* 경로가 아직 몰랐던 물체 옆 좁은 틈으로 남): 기다려도 안 풀리므로 1초 뒤
             # 바로 A* 재계획 (A* 는 본 장애물을 기억해서 피함). 실물: 5초 대기 + 물러나기 + 재계획에 매번 8초쯤 걸렸음.
-            # 같은 목표에서 4번까지, 그 뒤는 예전처럼 대기/물러나기
-            fr = f.get('frenet')
-            if (fr is not None and fr.static_blocked and now - f['blocked_since'] > 1.0
+            # 같은 목표에서 4번까지, 그 뒤는 대기/물러나기
+            if (f['frenet'].static_blocked and now - f['blocked_since'] > 1.0
                     and self.goal.get('reroutes', 0) < 4):
                 self.goal['reroutes'] = self.goal.get('reroutes', 0) + 1
                 self.get_logger().info(f'Frenet: 정적 장애물로 막힘 → A* 재계획 ({self.goal["reroutes"]}/4)')
@@ -1136,8 +1039,7 @@ class BridgeNode(Node):
             self.cmd_vel_pub.publish(Twist())
             return
         if v > 0.0:
-            # 앞쪽 stop_distance 안의 물체는 hybrid_switch 가 이미 DWA 로 넘겼다 (예전: pure pursuit 가 서서 기다림).
-            # 여기서는 비상 정지와 '걸침' 만 본다
+            # 장애물은 Frenet 이 피한다. 여기서는 비상 정지와 '걸침' 만 본다
             clearance = self.front_clearance()
             if clearance < self.stop_distance and self.tilt_rel > math.radians(3):
                 # 장애물 모서리에 걸쳐 조금 기운 상태: LiDAR 가 아래를 보고 바닥/상자 윗면을 장애물로 본다.
@@ -1146,15 +1048,13 @@ class BridgeNode(Node):
                                    f'차체가 {math.degrees(self.tilt_rel):.0f}도 기운 채 앞이 막혔습니다 (장애물에 걸침).')
                 return
             if clearance < self.estop_distance:
-                # 비상 정지: 모드와 상관없이 앞으로는 안 간다 (회전/후진은 허용). DWA 는 여유 0.08 m 를 지키므로
+                # 비상 정지: 앞으로는 안 간다 (회전/후진은 허용). Frenet 은 여유 safety_margin 을 지키므로
                 # 보통 여기까지 오지 않음 → 갑자기 튀어나온 물체, 위치 추정 오차 등
                 if not f.get('estop'):
                     self.get_logger().warn(f'비상 정지: 앞쪽 {clearance:.2f} m')
                     self.record_event(f'비상 정지: 앞쪽 {clearance:.2f} m')
                 f['estop'] = True
                 v = 0.0
-                if 'pp' in f and not f['use_dwa']:
-                    f['pp'].set_speed(0.0, w)
             else:
                 f['estop'] = False
         if state != 'blocked':
@@ -1178,11 +1078,7 @@ class BridgeNode(Node):
         if math.hypot(x - f['mark_pos'][0], y - f['mark_pos'][1]) > 0.05 or state == 'rotating':
             f['mark_pos'], f['mark_time'] = (x, y), now
         elif now - f['mark_time'] > self.progress_timeout:
-            if f['use_dwa'] or 'frenet' in f:
-                self.start_recovery(f, now, '진행이 없습니다.')
-                return
-            self.stop_following()
-            self.fail_or_retry('진행이 없습니다.')
+            self.start_recovery(f, now, '진행이 없습니다.')
             return
 
         cmd = Twist()
@@ -1190,7 +1086,7 @@ class BridgeNode(Node):
         cmd.angular.z = w
         self.cmd_vel_pub.publish(cmd)
 
-    # 주행 기록 (tools/dwa_replay.py 로 분석) ------------------------
+    # 주행 기록 (tools/drive_replay.py 로 분석) ----------------------
     def record_open(self):
         """목표를 받으면 기록 파일을 새로 연다 (재시도/재계획은 같은 파일)."""
         self.record_close('replaced')
@@ -1198,7 +1094,7 @@ class BridgeNode(Node):
             return
         try:
             if self.record_session is None:
-                self.record_session = os.path.join(self.record_dir, f'{time.strftime("%Y%m%d_%H%M%S")}_{self.controller}')
+                self.record_session = os.path.join(self.record_dir, f'{time.strftime("%Y%m%d_%H%M%S")}_frenet')
             folder = os.path.join(self.record_session, f'{time.strftime("%H%M%S")}_{self.goal["id"]}')
             os.makedirs(folder, exist_ok=True)
             path = os.path.join(folder, 'record.jsonl.gz')
@@ -1209,9 +1105,7 @@ class BridgeNode(Node):
         now = time.monotonic()
         self.rec = {'file': fh, 't0': now, 'last': 0.0, 'flushed': now, 'path': path}
         params = {n: self.get_parameter(n).value for n in self.tunable_params()}
-        params.update({f'dwa.{k}': v for k, v in vars(self.dwa_cfg).items()})
-        params.update({f'frenet.{k}': v for k, v in vars(self.frenet_cfg).items()})
-        params['drive.controller'] = self.controller
+        params.update({f'frenet.{k}': v for k, v in vars(self.frenet_cfg).items()})   # 목록 값까지 전부 (다시 계산용)
         self.record_write({'type': 'start', 'wall': time.strftime('%Y-%m-%d %H:%M:%S'), 'goal': self.goal,
                            'map': self.get_parameter('map_name').value, 'global_frame': self.global_frame,
                            'base_frame': self.base_frame, 'footprint_extra': self.footprint_extra,
@@ -1248,189 +1142,36 @@ class BridgeNode(Node):
         self.record_write({'type': 'event', 'text': text, **extra})
 
     def record_step(self):
-        """제어 주기마다 (0.1초 간격, DWA 를 새로 계산한 주기는 항상): 위치/속도/명령/hybrid 상태/트래킹/스캔.
-        raw 는 추종기(PP/DWA)가 낸 값, cmd 는 비상 정지 등을 거쳐 실제로 낸 값."""
+        """제어 주기마다 (0.1초 간격, Frenet 을 새로 계산한 주기는 항상): 위치/속도/명령/트래킹/스캔.
+        raw 는 Frenet 추종기가 낸 값, cmd 는 비상 정지 등을 거쳐 실제로 낸 값."""
         r = self.rec
         if r is None:
             return
         now = time.monotonic()
-        loc, self.rec_local = self.rec_local, None
-        if loc is None and now - r['last'] < 0.1:
+        fr, self.rec_frenet = self.rec_frenet, None
+        if fr is None and now - r['last'] < 0.1:
             return
         r['last'] = now
         f = self.follower or {}
         mode = None
         if f:
-            mode = ('backoff' if 'backoff' in f else 'recovery' if 'recovery' in f
-                    else 'frenet' if 'frenet' in f else 'dwa' if f.get('use_dwa') else 'pp')
+            mode = 'backoff' if 'backoff' in f else 'recovery' if 'recovery' in f else 'frenet'
         cmd = self.cmd_vel_pub.last
-        out = {'type': 'step', 'mode': mode, 'why': f.get('why'),
+        out = {'type': 'step', 'mode': mode,
                'pose': self.xyyaw(self.global_frame, self.base_frame),
                'odom': self.xyyaw('odom', self.base_frame), 'vw': self.odom_vw,
                'raw': self.rec_raw, 'cmd': cmd[:2] if cmd and now - cmd[2] < 0.06 else None,
                'estop': bool(f.get('estop')),
                'blocked_for': round(now - f['blocked_since'], 2) if f.get('blocked_since') else None,
-               'hybrid': self.hybrid_info if f else None, 'front': self.front_clearance(),
-               'box': [self.box_count, self.box_streak, self.box_near], 'tilt': self.tilt_rel,
-               'progress': f['pp'].index if 'pp' in f else None,
+               'front': self.front_clearance(), 'tilt': self.tilt_rel,
                'tracks': [[t.id, *t.x, t.radius, t.hits, t.misses] for t in self.tracks]}
-        if loc is not None:
-            out[loc[0]] = loc[1]    # 스캔 점은 로컬 플래너 입력 안에
+        if fr is not None:
+            out['frenet'] = fr      # 스캔 점은 Frenet 입력 안에
         else:
             out['map_to_odom'] = self.xyyaw('odom', self.global_frame)
             out['scan'], out['unmapped'] = self.scan_odom, self.scan_unmapped
         self.record_write(out)
 
-    # hybrid: 평소 pure pursuit, 장애물이 가까우면 DWA ---------------
-    # DWA 만 쓰면 실물에서 벽 옆/좁은 곳에서 '안전한 궤적 없음', '진행 없음' 이 잦았다 → 지도에 있는 벽은
-    # A* 경로 + pure pursuit 로 충분하므로, 지도에 없는 물체(추적 track: 상자, 사람)가 경로 가까이 올 때만 DWA
-    def update_box(self, pts):
-        """스캔마다: 로봇 앞(+뒤 조금) 사각형 안의 지도에 없는 점 수 → 연속 스캔 수."""
-        pose = self.xyyaw('odom', self.base_frame)
-        if pose is None or not len(pts):
-            self.box_streak, self.box_count, self.box_near = 0, 0, math.inf
-            self.box_pts = self.unmapped_near = np.empty((0, 2))
-            self.send_box()
-            return
-        x, y, yaw = pose
-        c, s = math.cos(yaw), math.sin(yaw)
-        lx = c * (pts[:, 0] - x) + s * (pts[:, 1] - y)
-        ly = -s * (pts[:, 0] - x) + c * (pts[:, 1] - y)
-        x0, x1, _ = self.dwa_cfg.footprint if self.dwa_cfg.footprint else (-0.197, 0.069, 0.153)
-        p = lambda n: self.get_parameter(f'hybrid.{n}').value
-        inside = (lx >= x0 - p('box_back')) & (lx <= x1 + p('box_front')) & (np.abs(ly) <= p('box_half_width'))
-        self.box_count = int(np.count_nonzero(inside))
-        self.box_pts = pts[inside]
-        self.unmapped_near = pts[~inside & (np.hypot(lx, ly) < 2.0)]
-        if self.box_count >= p('box_min_points'):
-            self.box_streak += 1
-            gx = np.maximum(np.maximum(x0 - lx[inside], lx[inside] - x1), 0.0)
-            self.box_near = float(np.min(np.hypot(gx, np.maximum(np.abs(ly[inside]) - 0.153, 0.0))))
-        else:
-            self.box_streak, self.box_near = 0, math.inf
-        self.send_box()
-
-    def send_box(self):
-        """hybrid 전환 조건을 웹에 (0.2초마다, hybrid 일 때만, map 좌표):
-        사각형 네 꼭짓점 + 안의 점(실제로 센 점) / 밖의 지도에 없는 점, 움직이는 물체 전환 반경, 지금 상태(이유, 복귀 대기)."""
-        now = time.monotonic()
-        if now - self.last_box_sent < 0.2 or self.controller == 'frenet':   # Frenet 은 hybrid 전환을 안 씀
-            return
-        pose = self.xyyaw(self.global_frame, self.base_frame)
-        m_o = self.xyyaw(self.global_frame, 'odom')
-        if pose is None or m_o is None:
-            return
-        self.last_box_sent = now
-        p = lambda n: self.get_parameter(f'hybrid.{n}').value
-        x0, x1, _ = self.dwa_cfg.footprint if self.dwa_cfg.footprint else (-0.197, 0.069, 0.153)
-        bx0, bx1, hw = x0 - p('box_back'), x1 + p('box_front'), p('box_half_width')
-        r3 = lambda a: [[round(float(u), 3), round(float(v), 3)] for u, v in a]
-        corners = transform_points([[bx0, -hw], [bx1, -hw], [bx1, hw], [bx0, hw]], *pose)
-        info = self.hybrid_info if self.follower else {}
-        # 움직이는 track 의 예측 선 (지금 → moving_predict 초 뒤, map) 과 사각형에 들어오는 시각
-        movers = []
-        odom_pose = self.xyyaw('odom', self.base_frame)
-        horizon = p('moving_predict')
-        for t in self.tracks:
-            if math.hypot(t.x[2], t.x[3]) < self.get_parameter('dwa_follow.moving_speed').value:
-                continue
-            a, b = transform_points([t.x[:2], [t.x[0] + t.x[2] * horizon, t.x[1] + t.x[3] * horizon]], *m_o)
-            movers.append({'from': r3([a])[0], 'to': r3([b])[0], 'r': round(float(t.radius), 3),
-                           'enter': self.moving_into_box(t, odom_pose)})
-        self.server.send({
-            'type': 'hybrid_box', 'corners': r3(corners),
-            'points': r3(transform_points(self.box_pts[:80], *m_o)) if len(self.box_pts) else [],
-            'others': r3(transform_points(self.unmapped_near[:150], *m_o)) if len(self.unmapped_near) else [],
-            'count': self.box_count, 'min_points': p('box_min_points'),
-            'active': self.box_streak >= p('box_min_scans'),
-            'movers': movers, 'moving_predict': horizon,
-            'driving': bool(info), 'dwa': bool(info.get('use_dwa')), 'why': info.get('why'),
-            'clear_for': info.get('clear_for'), 'release_time': p('release_time'),
-            'offset': info.get('offset'), 'rejoin_offset': p('rejoin_offset')})
-
-    def box_bounds(self):
-        """hybrid 사각형 (로봇 좌표 x_min, x_max, 반폭)."""
-        x0, x1, _ = self.dwa_cfg.footprint if self.dwa_cfg.footprint else (-0.197, 0.069, 0.153)
-        p = lambda n: self.get_parameter(f'hybrid.{n}').value
-        return x0 - p('box_back'), x1 + p('box_front'), p('box_half_width')
-
-    def moving_into_box(self, t, pose=None):
-        """움직이는 track t (odom) 가 지금 ~ moving_predict 초 뒤 사이에 사각형과 겹치는 첫 시각 (s), 없으면 None.
-        물체는 지금 속도로, 로봇은 지금 선속도로 직진한다고 본다 (사각형도 로봇과 같이 움직임)."""
-        pose = pose or self.xyyaw('odom', self.base_frame)
-        if pose is None:
-            return None
-        x, y, yaw = pose
-        v = self.odom_vw[0]
-        ts = np.arange(0.0, self.get_parameter('hybrid.moving_predict').value + 1e-9, 0.1)
-        c, s = math.cos(yaw), math.sin(yaw)
-        dx = t.x[0] + t.x[2] * ts - (x + v * c * ts)
-        dy = t.x[1] + t.x[3] * ts - (y + v * s * ts)
-        lx, ly = c * dx + s * dy, -s * dx + c * dy
-        bx0, bx1, hw = self.box_bounds()
-        gap = np.hypot(np.maximum(np.maximum(bx0 - lx, lx - bx1), 0.0), np.maximum(np.abs(ly) - hw, 0.0))
-        hit = gap <= t.radius
-        return float(ts[int(np.argmax(hit))]) if hit.any() else None
-
-    def hybrid_obstacle(self, f, x, y):
-        """DWA 로 피해야 할 장애물이 있으면 설명 글자, 없으면 None.
-        사각형 안에 지도에 없는 점 (정적이든 동적이든), 또는 사각형에 곧 들어올 움직이는 track.
-        멀어지거나 나란히 가는 사람은 무시하고, 옆/뒤에서 다가오는 사람은 미리 잡는다."""
-        if self.box_streak >= self.get_parameter('hybrid.box_min_scans').value:
-            return f'앞쪽 장애물 {self.box_near:.2f} m (점 {self.box_count}개)'
-        # 바로 앞(±25°, stop_distance)에 무엇이든(지도 벽, 점이 적은 가는 물체 포함): 사각형이 못 잡는 것.
-        # 예전에는 pure pursuit 가 여기서 서서 기다리다 재계획했다 → DWA 가 피하거나 멈출지 정하게 한다
-        front = self.front_clearance()
-        if front < self.stop_distance:
-            return f'바로 앞 {front:.2f} m'
-        if not self.tracks:
-            return None
-        pose = self.xyyaw('odom', self.base_frame)
-        if pose is None:
-            return None
-        moving_v = self.get_parameter('dwa_follow.moving_speed').value
-        for t in self.tracks:
-            if math.hypot(t.x[2], t.x[3]) < moving_v:
-                continue
-            when = self.moving_into_box(t, pose)
-            if when is not None:
-                d = math.hypot(t.x[0] - pose[0], t.x[1] - pose[1]) - t.radius
-                return f'움직이는 장애물 {when:.1f}초 뒤 사각형 ({d:.2f} m)'
-        return None
-
-    def hybrid_switch(self, f, x, y, now):
-        why = self.hybrid_obstacle(f, x, y)
-        f['why'] = why                 # DWA 에 '피할 장애물 있음' 으로 넘김 (있으면 경로이탈 비용 끔)
-        pp, dwa = f['pp'], f['dwa']
-        self.hybrid_info = {'use_dwa': f['use_dwa'], 'why': why}   # 웹 표시용 (send_box)
-        if not f['use_dwa']:
-            if why and not pp.at_goal:
-                dwa.progress, dwa.turning, dwa.sidestep, dwa.last_cmd = pp.index, False, None, None
-                f['use_dwa'], f['clear_since'] = True, None
-                self.hybrid_info['use_dwa'] = True
-                self.get_logger().info(f'{why} → DWA 로 피함')
-                self.record_event(f'{why} → DWA 로 피함')
-            return
-        # 경로 가까이 돌아왔을 때만 (멀면 pure pursuit 가 off_path 로 실패하므로 DWA 가 경로로 데려올 때까지)
-        rest = np.asarray(pp.points[dwa.progress:dwa.progress + 60], dtype=float)
-        offset = float(np.min(np.hypot(rest[:, 0] - x, rest[:, 1] - y)))
-        self.hybrid_info['offset'] = round(offset, 3)
-        if why or dwa.arrived:
-            f['clear_since'] = None
-            return
-        f['clear_since'] = f['clear_since'] or now
-        self.hybrid_info['clear_for'] = round(now - f['clear_since'], 1)
-        if now - f['clear_since'] < self.get_parameter('hybrid.release_time').value:
-            return
-        if offset < self.get_parameter('hybrid.rejoin_offset').value:
-            pp.index = dwa.progress
-            pp.set_speed(*self.odom_vw)   # DWA 로 달리던 속도에서 이어서 (0 으로 뚝 떨어지지 않게)
-            f['use_dwa'] = False
-            self.hybrid_info = {'use_dwa': False, 'why': None}
-            self.get_logger().info(f'장애물 지나감 (경로에서 {offset:.2f} m) → pure pursuit')
-            self.record_event(f'장애물 지나감 (경로에서 {offset:.2f} m) → pure pursuit')
-
-    # 움직이는 장애물 추적 + DWA -----------------------------------
     def on_odom(self, msg):
         self.odom_vw = (msg.twist.twist.linear.x, msg.twist.twist.angular.z)
 
@@ -1443,7 +1184,7 @@ class BridgeNode(Node):
         return tr.x, tr.y, yaw_from_quaternion(t.transform.rotation)
 
     def update_tracks(self, scan):
-        """스캔 → odom 점 (DWA 정적 장애물) + 움직이는 장애물 추적."""
+        """스캔 → odom 점 (Frenet 정적 장애물) + 움직이는 장애물 추적."""
         c = self.track_cfg
         sensor = self.xyyaw('odom', scan.header.frame_id, Time.from_msg(scan.header.stamp)) \
             or self.xyyaw('odom', scan.header.frame_id)
@@ -1454,14 +1195,14 @@ class BridgeNode(Node):
         ok = np.isfinite(r) & (r >= scan.range_min) & (r <= min(scan.range_max, c['max_range']))
         pts = transform_points(np.column_stack([r[ok] * np.cos(a[ok]), r[ok] * np.sin(a[ok])]), *sensor)
         self.scan_odom = pts
-        # 지도에 없는 물체의 스캔 점 (odom): DWA 목표점을 장애물 너머로 옮길 때, hybrid 앞 사각형 전환. 지도와 못 맞추면 비움
+        # 지도에 없는 물체의 스캔 점 (odom, 기록용). 지도와 못 맞추면 비움
         self.scan_unmapped = pts[:0]
         if not self.tracking:
             return
         # 지도 벽 근처 점은 정적이므로 추적하지 않는다 (판별에만 map 을 쓰므로 AMCL 이 몇 cm 틀려도 속도에는 영향 없음).
         # 맵 밖/벽 너머/미탐색 칸의 점도 뺀다: 지도의 빈 칸에 있는 점만 추적 (SLAM 도 같음).
         # SLAM 중에는 아직 지도에 안 들어간 벽이 미탐색 칸에 있어 전부 '장애물' 로 잡혔고(실물 350건 중 345건),
-        # 그 속도 노이즈(중앙값 0.06 m/s)가 움직이는 물체 기준을 넘었음. 미탐색 칸의 물체도 DWA 는 스캔 점으로 피한다
+        # 그 속도 노이즈(중앙값 0.06 m/s)가 움직이는 물체 기준을 넘었음. 미탐색 칸의 물체도 Frenet 은 스캔 점으로 피한다
         if self.map_dist is None:
             pts = pts[:0]   # 지도가 아직 없으면 추적하지 않음
         if self.map_dist is not None and len(pts):
@@ -1478,7 +1219,6 @@ class BridgeNode(Node):
                 keep[inside] = free & (dist[row[inside], col[inside]] > c['static_match_dist'])
                 pts = pts[keep]
                 self.scan_unmapped = pts
-        self.update_box(self.scan_unmapped)
         dets = detect_clusters(pts, c['cluster_gap'], c['min_points'], c['max_diameter'], c['min_radius'],
                                sensor[:2])
         self.tracks = self.tracker.update(dets, Time.from_msg(scan.header.stamp).nanoseconds * 1e-9)
@@ -1509,7 +1249,7 @@ class BridgeNode(Node):
             return
         c, s = math.cos(m_o[2]), math.sin(m_o[2])
         out = []
-        moving = self.get_parameter('dwa_follow.moving_speed').value
+        moving = self.get_parameter('tracking.moving_speed').value
         for t in self.tracks:
             # 추적은 지도의 빈 칸에서만 하므로 멈춘 track 은 '지도에 없는 멈춘 물체' (상자, 서 있는 사람 등)
             (x, y), = transform_points([t.x[:2]], *m_o)
@@ -1520,7 +1260,7 @@ class BridgeNode(Node):
         self.server.send({'type': 'obstacles', 'obstacles': out})
 
     def frenet_compute(self, follower):
-        """Frenet 추종기 한 주기 (0.1초마다만 계산, 그 사이에는 같은 명령. dwa_compute 와 같은 방식)."""
+        """Frenet 추종기 한 주기. 0.1초마다만 계산하고 그 사이에는 같은 명령 (브리지 한 스레드에서 TF 수신 등과 같이 돌기 때문)."""
         now = time.monotonic()
         last = getattr(follower, 'last_cmd', None)
         if last is not None and now - last[0] < 0.1:
@@ -1530,66 +1270,37 @@ class BridgeNode(Node):
         if pose is None or map_to_odom is None:
             return 0.0, 0.0, 'blocked'
         dyn = np.array([[t.x[0], t.x[1], t.x[2], t.x[3], t.radius] for t in self.tracks]).reshape(-1, 5)
-        moving_speed = self.get_parameter('dwa_follow.moving_speed').value
+        moving_speed = self.get_parameter('tracking.moving_speed').value
         # 기록용: 계산 전 추종기 상태 (같은 입력으로 다시 계산하면 같은 결과가 나오게)
         pre = {'progress': follower.progress, 'offset': follower.offset, 'turning': follower.turning,
                'arrived': follower.arrived}
         result = follower.compute(pose, *self.odom_vw, map_to_odom, self.scan_odom, dyn, moving_speed=moving_speed)
         follower.last_cmd = (now, result)
         if self.rec is not None:
-            ev = follower.planner.last_eval
-            self.rec_local = ('frenet', {'pose': pose, 'vw': self.odom_vw, 'map_to_odom': map_to_odom, 'dyn': dyn,
-                                         'moving_speed': moving_speed, 'pre': pre, 'scan': self.scan_odom,
-                                         'result': result, 'debug': follower.last_debug, 'eval': ev,
-                                         'traj': follower.last_trajectory})
-        self.send_dwa(follower, result)
+            self.rec_frenet = {'pose': pose, 'vw': self.odom_vw, 'map_to_odom': map_to_odom, 'dyn': dyn,
+                               'moving_speed': moving_speed, 'pre': pre, 'scan': self.scan_odom,
+                               'result': result, 'debug': follower.last_debug, 'eval': follower.planner.last_eval,
+                               'traj': follower.last_trajectory}
+        self.send_local_plan(follower, result)
         return result
 
-    def dwa_compute(self, follower, obstacle_near=None):
-        # DWA 는 0.1초마다만 계산하고 그 사이에는 같은 명령 (브리지 한 스레드에서 TF 수신 등과 같이 돌기 때문)
+    def send_local_plan(self, follower, result):
+        """Frenet 이 고른 궤적을 웹에 (map 좌표, 0.2초마다). 제자리 회전/막힘이면 빈 궤적."""
         now = time.monotonic()
-        last = getattr(follower, 'last_cmd', None)
-        if last is not None and now - last[0] < 0.1:
-            return last[1]
-        pose = self.xyyaw('odom', self.base_frame)
-        map_to_odom = self.xyyaw('odom', self.global_frame)
-        if pose is None or map_to_odom is None:
-            return 0.0, 0.0, 'blocked'
-        dyn = np.array([[t.x[0], t.x[1], t.x[2], t.x[3], t.radius] for t in self.tracks]).reshape(-1, 5)
-        moving_speed = self.get_parameter('dwa_follow.moving_speed').value
-        # 기록용: 계산 전 추종기 상태 (같은 입력으로 다시 계산하면 같은 결과가 나오게)
-        pre = {'progress': follower.progress, 'sidestep': follower.sidestep, 'turning': follower.turning,
-               'arrived': follower.arrived}
-        result = follower.compute(pose, *self.odom_vw, map_to_odom, self.scan_odom, dyn,
-                                  unmapped_points=self.scan_unmapped, obstacle_near=obstacle_near,
-                                  moving_speed=moving_speed)
-        follower.last_cmd = (now, result)
-        if self.rec is not None:
-            self.rec_local = ('dwa', {'pose': pose, 'vw': self.odom_vw, 'map_to_odom': map_to_odom, 'dyn': dyn,
-                                      'obstacle_near': obstacle_near, 'moving_speed': moving_speed, 'pre': pre,
-                                      'scan': self.scan_odom, 'unmapped': self.scan_unmapped,
-                                      'result': result, 'debug': follower.last_debug, 'eval': follower.dwa.last_eval})
-        self.send_dwa(follower, result)
-        return result
-
-    def send_dwa(self, follower, result):
-        """로컬 플래너(DWA / Frenet)가 고른 궤적을 웹에 (map 좌표, 0.2초마다). 제자리 회전/막힘이면 빈 궤적."""
-        now = time.monotonic()
-        if now - self.last_dwa_sent < 0.2:
+        if now - self.last_plan_sent < 0.2:
             return
-        self.last_dwa_sent = now
+        self.last_plan_sent = now
         traj = follower.last_trajectory
         m_o = self.xyyaw(self.global_frame, 'odom')
         pts = []
         if traj is not None and m_o is not None:
             pts = [[round(float(px), 3), round(float(py), 3)] for px, py in transform_points(np.asarray(traj)[:, :2], *m_o)]
         v, w, state = result
-        planner = 'frenet' if isinstance(follower, FrenetFollower) else 'dwa'
-        self.server.send({'type': 'dwa', 'traj': pts, 'v': round(float(v), 3), 'w': round(float(w), 3), 'state': state,
-                          'planner': planner})
+        self.server.send({'type': 'local_plan', 'traj': pts, 'v': round(float(v), 3), 'w': round(float(w), 3),
+                          'state': state})
 
-    # DWA 막힘 대처 (단순 fallback) --------------------------------
-    # ① DWA 가 막히면 blocked_timeout(5초) 동안 기다림 (움직이는 장애물이 지나가길)
+    # 막힘 대처 --------------------------------------------------
+    # ① 막히면 blocked_timeout(5초) 동안 기다림 (움직이는 장애물이 지나가길). 정적으로만 막히면 1초 뒤 바로 A* 재계획 (drive_step)
     # ② 그래도 막히거나 진행이 없으면: 뒤가 비었으면 15cm 물러나고, 뒤도 막혔으면 가장 트인 쪽으로 제자리 회전
     # ③ A* 로 다시 계획 (fail_or_retry, 최대 max_retries 번)  ④ 그래도 안 되면 실패 보고
     def start_recovery(self, f, now, reason):
@@ -1632,7 +1343,7 @@ class BridgeNode(Node):
 
     def body_rects(self):
         """차체 + 붙인 물건 사각형 목록 (x_min, x_max, y_min, y_max), base_footprint 기준."""
-        x0, x1, hw = self.dwa_cfg.footprint if self.dwa_cfg.footprint else (-0.197, 0.069, 0.153)
+        x0, x1, hw = self.frenet_cfg.footprint
         return [(x0, x1, -hw, hw)] + self.footprint_extra
 
     def body_radius(self):

@@ -24,7 +24,7 @@
 #   scripts/run.sh --robot real --mode map --map ~/maps/backup/maze_map_straight.yaml
 #   scripts/run.sh --robot real --mode slam
 #
-# 주행: 브리지의 A* + hybrid (평소 pure pursuit, 로봇 앞 사각형에 장애물이 보이면 DWA 로 피함)
+# 주행: 브리지의 A* + Frenet 로컬 플래너 (경로를 기준선으로 옆으로 비키며 장애물을 피함)
 set -e
 DIR="$(cd "$(dirname "$0")" && pwd)"
 HOME_DIR="$(cd "$DIR/.." && pwd)"

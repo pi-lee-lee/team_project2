@@ -12,7 +12,7 @@
     소화기 지나 경로가 벽 쪽으로 꺾임) 오프셋을 계속 유지한 후보가 벽에 걸려 다 막혔음
   - 속도: 다항식 대신 지금 속도에서 max_accel 로 목표 속도까지 가/감속 (cmd_vel 로 속도를 직접 주므로)
   - 경로 모양과 속도를 나눔: 정적 장애물은 모양만으로 '거리' 0~check_dist 를 검사 → 속도와 무관.
-    (DWA 는 '시간' 으로 굴려서, 느린 궤적이 장애물까지 못 가 안전으로 남아 장애물 옆/앞에서 기어갔음)
+    (예전 DWA 는 '시간' 으로 굴려서, 느린 궤적이 장애물까지 못 가 안전으로 남아 장애물 옆/앞에서 기어갔음)
     움직이는 물체만 시간(속도 프로필)으로 등속 예측 원과 검사 (반경 + dynamic_margin + dynamic_growth·t)
   - 후보: 오프셋 ±max_offset (offset_step) x 옆 이동 거리 lateral_dists x 유지 거리 hold_dists x 속도 (target 에서
     speed_step 씩 n_speed 개 더) → 약 450 개, 0.1초 주기에 10 ms 안팎
@@ -46,6 +46,14 @@ REASONS = {OK: '통과', KINEMATIC: '운동 한계', STATIC: '정적 장애물',
 
 def normalize(a):
     return (a + np.pi) % (2.0 * np.pi) - np.pi
+
+
+def transform_points(points, x, y, yaw):
+    """(N, 2) 점들을 (x, y, yaw) 만큼 회전+이동."""
+    points = np.asarray(points, dtype=float).reshape(-1, 2)
+    c, s = np.cos(yaw), np.sin(yaw)
+    return np.column_stack([x + c * points[:, 0] - s * points[:, 1],
+                            y + s * points[:, 0] + c * points[:, 1]])
 
 
 @dataclass
@@ -462,8 +470,8 @@ class FrenetPlanner:
 
 # ------------------------------------------------------------------ 추종기
 class FrenetFollower:
-    """A* 경로(map)를 Frenet 플래너로 따라가는 추종기. 브리지에서 PurePursuit / DWAFollower 자리에 들어간다.
-    계산은 odom 프레임 (DWAFollower 와 같은 이유: AMCL 이 map->odom 을 고칠 때 로봇/스캔이 튀지 않게, 기준선만 옮김).
+    """A* 경로(map)를 Frenet 플래너로 따라가는 추종기 (브리지의 유일한 추종기).
+    계산은 odom 프레임: AMCL 이 map->odom 을 고칠 때 로봇/스캔이 튀지 않게, 기준선만 옮김.
     compute() 반환 state: driving | blocked (안전한 후보 없음) | rotating (출발 전 돌아서기, 도착 후 방향 맞춤) | done"""
 
     def __init__(self, path_map, goal_yaw, cfg=None, goal_tolerance=0.08, yaw_tolerance=0.1):
@@ -588,7 +596,7 @@ class FrenetFollower:
             if abs(w) < 0.3:
                 w = math.copysign(0.3, err)
             return 0.0, w, 'rotating'
-        # 움직이는 물체는 예측으로, 그 자리의 스캔 점은 정적 목록에서 뺀다 (DWAFollower 와 같음)
+        # 움직이는 물체는 예측으로, 그 자리의 스캔 점은 정적 목록에서 뺀다 (같은 물체를 두 번 세지 않게)
         dyn = np.asarray(dynamic_obstacles, dtype=float).reshape(-1, 5)
         moving = dyn[np.hypot(dyn[:, 2], dyn[:, 3]) > moving_speed] if len(dyn) else dyn
         pts = np.asarray(static_points, dtype=float).reshape(-1, 2)

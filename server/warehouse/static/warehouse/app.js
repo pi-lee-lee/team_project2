@@ -136,14 +136,9 @@ function handle(msg) {
       S.obstaclesAt = Date.now();
       draw();
       break;
-    case 'hybrid_box':
-      S.hbox = msg;
-      S.hboxAt = Date.now();
-      draw();
-      break;
-    case 'dwa':
-      S.dwa = msg;
-      S.dwaAt = Date.now();
+    case 'local_plan':
+      S.localPlan = msg;
+      S.localPlanAt = Date.now();
       draw();
       break;
     case 'memory':
@@ -275,8 +270,7 @@ function clearPose() {
   S.pose = null;
   S.path = [];
   S.obstacles = [];
-  S.dwa = null;
-  S.hbox = null;
+  S.localPlan = null;
   draw();
   if (had) renderPanel();
 }
@@ -776,72 +770,10 @@ function draw() {
     ctx.stroke();
   }
 
-  // hybrid → DWA 전환 조건 (브리지가 실제로 쓰는 값 그대로). 1.5초 넘게 안 오면 숨김
-  //  ① 움직이는 물체: 지금 → moving_predict 초 뒤 예측 선 (사각형에 들어오면 빨강 + 'n초 뒤', 아니면 회색)
-  //  ② 사각형 (box_*): 점선. 안에 지도에 없는 점 → 주황, 전환 조건(점 수 + 연속 스캔) 넘음 → 빨강 + 채움
-  //     실제로 센 점 = 빨간 점, 사각형 밖의 지도에 없는 점(2m 안) = 회색 점. 지도 벽에서 0.15m 안의 점은 벽으로 보고 안 셈
-  //  ③ 글자: 지금 PP/DWA, 전환 이유, DWA → PP 복귀 조건 (장애물 없음 release_time 초 + 경로에서 rejoin_offset 안)
-  if (S.hbox && S.hbox.corners && S.hbox.corners.length === 4 && Date.now() - (S.hboxAt || 0) < 1500) {
-    const col = S.hbox.active ? '#dc2626' : S.hbox.count > 0 ? '#f59e0b' : '#0ea5e9';
-    ctx.save();
-    for (const m of S.hbox.movers || []) {
-      const [ax, ay] = worldToCanvas(...m.from);
-      const [bx, by] = worldToCanvas(...m.to);
-      const hit = m.enter !== null && m.enter !== undefined;
-      ctx.setLineDash([4, 4]);
-      ctx.lineWidth = 2;
-      ctx.strokeStyle = hit ? '#dc2626' : '#9ca3af';
-      ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.stroke();
-      ctx.setLineDash([]);
-      ctx.beginPath(); ctx.arc(bx, by, Math.max(2, m.r * pxPerM), 0, 2 * Math.PI); ctx.stroke();
-      if (hit) {
-        ctx.font = '11px system-ui, sans-serif';
-        ctx.fillStyle = '#dc2626';
-        ctx.fillText(`${(+m.enter).toFixed(1)}초 뒤 사각형`, bx + 4, by - 4);
-      }
-    }
-    for (const [list, c, r] of [[S.hbox.others || [], '#9ca3af', 1.5], [S.hbox.points || [], '#dc2626', 2.5]]) {
-      ctx.fillStyle = c;
-      for (const [x, y] of list) {
-        const [px, py] = worldToCanvas(x, y);
-        ctx.beginPath(); ctx.arc(px, py, r, 0, 2 * Math.PI); ctx.fill();
-      }
-    }
-    ctx.setLineDash([6, 4]);
-    ctx.lineWidth = 2;
-    ctx.strokeStyle = col;
-    ctx.beginPath();
-    S.hbox.corners.forEach(([x, y], i) => {
-      const [cx, cy] = worldToCanvas(x, y);
-      i ? ctx.lineTo(cx, cy) : ctx.moveTo(cx, cy);
-    });
-    ctx.closePath();
-    if (S.hbox.active) { ctx.fillStyle = 'rgba(220, 38, 38, 0.12)'; ctx.fill(); }
-    ctx.stroke();
-    ctx.setLineDash([]);
-    const [fx, fy] = worldToCanvas(...S.hbox.corners[2]);
-    ctx.font = '11px system-ui, sans-serif';
-    ctx.fillStyle = col;
-    const lines = [`사각형 점 ${S.hbox.count}/${S.hbox.min_points}`];
-    if (S.hbox.driving) {
-      if (!S.hbox.dwa) lines.push('PP 주행');
-      else if (S.hbox.why) lines.push(`DWA: ${S.hbox.why}`);
-      else {
-        const c = S.hbox.clear_for == null ? 0 : S.hbox.clear_for;
-        const off = S.hbox.offset == null ? '-' : (+S.hbox.offset).toFixed(2);
-        lines.push(`DWA → PP 대기: 장애물 없음 ${c.toFixed(1)}/${S.hbox.release_time}s, 경로 ${off}/${S.hbox.rejoin_offset}m`);
-      }
-    }
-    lines.forEach((t, i) => ctx.fillText(t, fx + 4, fy - 4 + i * 13));
-    ctx.restore();
-  }
-
-  // 로컬 플래너가 고른 궤적: DWA = 보라 (predict_time 동안 굴려 본 best), Frenet = 초록 (고른 후보, 앞으로 갈 궤적).
-  // 굵은 선 + 끝점, 옆에 명령 속도/상태. 1초 넘게 안 오면 숨김
-  if (S.dwa && Date.now() - (S.dwaAt || 0) < 1000) {
-    const t = S.dwa.traj || [];
-    const frenet = S.dwa.planner === 'frenet';
-    const color = frenet ? '#059669' : '#9333ea';
+  // Frenet 로컬 플래너가 고른 궤적 (앞으로 4초 동안 갈 궤적): 초록 굵은 선 + 끝점, 옆에 명령 속도/상태. 1초 넘게 안 오면 숨김
+  if (S.localPlan && Date.now() - (S.localPlanAt || 0) < 1000) {
+    const t = S.localPlan.traj || [];
+    const color = '#059669';
     let lx, ly;
     if (t.length > 1) {
       ctx.strokeStyle = color;
@@ -858,10 +790,10 @@ function draw() {
       [lx, ly] = worldToCanvas(S.pose.x, S.pose.y);
     }
     if (lx !== undefined) {
-      const name = { driving: '주행', blocked: '막힘', rotating: '회전', done: '도착' }[S.dwa.state] || S.dwa.state;
+      const name = { driving: '주행', blocked: '막힘', rotating: '회전', done: '도착' }[S.localPlan.state] || S.localPlan.state;
       ctx.font = '11px system-ui, sans-serif';
-      ctx.fillStyle = frenet ? '#047857' : '#7e22ce';
-      ctx.fillText(`${frenet ? 'Frenet' : 'DWA'} ${name} v=${(+S.dwa.v).toFixed(2)} w=${(+S.dwa.w).toFixed(2)}`, lx + 8, ly - 8);
+      ctx.fillStyle = '#047857';
+      ctx.fillText(`Frenet ${name} v=${(+S.localPlan.v).toFixed(2)} w=${(+S.localPlan.w).toFixed(2)}`, lx + 8, ly - 8);
     }
   }
 
@@ -1181,8 +1113,7 @@ function renderCargo() {
 }
 // 주행 파라미터: 브리지가 보낸 목록(params: 이름, 지금 값, 시작 값)을 묶음별 입력칸으로.
 // 값을 바꾸면 param_set → 브리지가 ROS 파라미터로 바꾸고 결과(param_result)와 새 목록을 보낸다
-const PARAM_GROUPS = [['frenet.', 'Frenet 로컬 플래너'], ['dwa_follow.', 'DWA 경로 따라가기'], ['dwa.', 'DWA'], ['hybrid.', 'hybrid 전환'],
-                      ['', '속도 / 안전 (pure pursuit 등)']];
+const PARAM_GROUPS = [['frenet.', 'Frenet 로컬 플래너'], ['tracking.', '움직이는 물체 추적'], ['', '안전 / 회복']];
 const paramGroup = (name) => PARAM_GROUPS.find(([p]) => name.startsWith(p));
 S.paramRows = new Map();      // 이름 → {row, input, item}
 S.paramPending = new Set();   // 이 화면에서 보내고 답을 기다리는 이름

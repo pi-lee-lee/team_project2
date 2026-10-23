@@ -5,7 +5,7 @@
 
 - ROS 2 Humble, TurtleBot3 Waffle Pi (Raspberry Pi 4 + LDS-02)
 - Django 4.2 + Channels(WebSocket) + MySQL
-- 경로 계획: 직접 구현한 A* / 경로 추종: 직접 구현한 pure pursuit
+- 경로 계획: 직접 구현한 A* / 경로 추종: 직접 구현한 Frenet 로컬 플래너 (장애물을 옆으로 비켜 감)
 - 위치 추정: Nav2 AMCL (map_server + amcl만 사용)
 
 기획 내용은 [PROJECT_PLAN.md](PROJECT_PLAN.md), 현재 진행 상태는 [STATUS.md](STATUS.md) 참고.
@@ -51,11 +51,12 @@ webserver/
 │   ├── warehouse_robot/
 │   │   ├── astar.py             A* (numpy, ROS 의존성 없음)
 │   │   ├── astar_planner_node.py  A*를 nav_msgs/GetPlan 서비스로 제공
-│   │   ├── follower.py          pure pursuit 경로 추종 (ROS 의존성 없음)
-│   │   └── bridge_node.py       서버 ↔ ROS 브리지, 경로 추종/안전장치
+│   │   ├── frenet.py            Frenet 로컬 플래너 + 궤적 추종 (ROS 의존성 없음)
+│   │   ├── tracker.py           움직이는 장애물 추적 (칼만 필터)
+│   │   └── bridge_node.py       서버 ↔ ROS 브리지, 경로 추종/안전장치/주행 기록
 │   ├── config/params.yaml       노드 파라미터
 │   ├── launch/warehouse.launch.py
-│   └── test/                    A*, 추종기 단위 테스트
+│   └── test/                    A*, Frenet, 추적 단위 테스트
 ├── scripts/                     실행 스크립트 (env.sh, start_*.sh)
 ├── tools/                       점검 도구 (위치 맞추기, TF 측정, 이동 시험)
 └── logs/                        실행 로그
@@ -300,12 +301,15 @@ SIGINT → SIGTERM → SIGKILL 순서로 보내고 남은 프로세스가 없는
 
 | 파라미터 | 기본값 | 설명 |
 |---|---|---|
-| `astar_planner.robot_radius` | 0.24 | 차체 반폭 0.153 + DWA 여유 0.08 이상. 이 안쪽은 통과 불가 (A* 가 낸 틈을 DWA 도 들어갈 수 있게) |
+| `astar_planner.robot_radius` | 0.24 | 차체 반폭 0.153 + 여유보다 크게. 이 안쪽은 통과 불가 (A* 가 낸 틈을 로컬 플래너도 들어갈 수 있게) |
 | `astar_planner.inflation_radius` | 0.55 | 이 거리까지 벽에서 멀어지도록 비용 부여 |
-| `warehouse_bridge.hybrid.*` | | 주행은 항상 A* + hybrid: 평소 pure pursuit, 로봇 앞 사각형(`box_front`/`box_back`/`box_half_width`) 안에 지도에 없는 점이 `box_min_points` 개 이상 `box_min_scans` 번 연속이거나, 움직이는 물체가 `moving_predict` 초 안에 사각형에 들어오면 DWA. `release_time` 동안 없고 경로에서 `rejoin_offset` 안이면 pure pursuit |
-| `warehouse_bridge.max_speed` | 0.18 | pure pursuit 최고 속도 (m/s). 회전은 `max_turn_speed` 1.82 rad/s, DWA 는 `dwa.max_v` 0.13 / `dwa.max_w` 1.82 |
-| `warehouse_bridge.stop_distance` | 0.35 | (pure pursuit) 앞쪽 ±25° 안에 이 거리(LiDAR 기준) 이내 무엇이든 있으면 DWA 로 전환 |
-| `warehouse_bridge.estop_distance` | 0.2 | 앞쪽 ±25° 안에 이 거리 이내면 모드와 상관없이 전진 금지 (비상 정지) |
+| `warehouse_bridge.frenet.*` | | 주행은 A* + Frenet 로컬 플래너: A* 경로를 기준선으로 '옆 오프셋(±`max_offset`, `offset_step`) x 옆 이동 거리(`lateral_dists`) x 유지 거리(`hold_dists`) x 속도(`target_speed` 부터 `speed_step` 씩)' 후보 중 안전하고 비용이 가장 낮은 궤적을 0.1초마다 골라 그 앞부분을 실행 |
+| `warehouse_bridge.frenet.target_speed` / `max_speed` | 0.15 / 0.18 | 목표 속도 / 최고 속도 (m/s) |
+| `warehouse_bridge.frenet.safety_margin` / `clear_pref` | 0.06 / 0.15 | 차체(+뒤 부착물)와 장애물 최소 여유(제약) / 이보다 가까우면 비용 (m) |
+| `warehouse_bridge.frenet.rotate_speed` | 1.0 | 출발 전 돌아서기 각속도 (rad/s). SLAM 모드는 0.6 |
+| `warehouse_bridge.tracking.moving_speed` | 0.08 | 이보다 빠른 트랙만 움직이는 물체로 예측 (m/s) |
+| `warehouse_bridge.stop_distance` | 0.35 | 차체가 기운 채 앞쪽 ±25° 이 거리(LiDAR 기준) 안이 막히면 장애물에 걸친 것으로 보고 물러남 |
+| `warehouse_bridge.estop_distance` | 0.2 | 앞쪽 ±25° 안에 이 거리 이내면 전진 금지 (비상 정지) |
 | `astar_planner.scan_obstacles` / `scan_memory` | true / 20.0 | AMCL 모드: LiDAR 로 본, 맵에 없는 장애물을 이 시간(초) 기억해 피함 (SLAM 모드는 SLAM 맵이 대신함) |
 | `astar_planner.bump_memory` / `bump_radius` | 120.0 / 0.15 | 부딪힌 자리를 장애물로 기억하는 시간(초)과 반경(m) |
 | `astar_planner.stripe_cells` | 2 | (기존 맵 모드) 빈 칸 사이 폭 4칸 미만 미탐색 줄무늬를 빈 칸으로 (먼 곳 LiDAR 빔 사이). 0 이면 끔 |
@@ -363,7 +367,7 @@ sudo apt update && sudo apt install --only-upgrade ros-humble-tf2 ros-humble-tf2
 dpkg -l ros-humble-tf2 ros-humble-tf2-ros | grep ^ii   # 0.25.24 확인
 ```
 
-이 문제 때문에 경로 추종을 브리지의 내장 추종기(`follower.py` + `dwa.py`, hybrid)로 만들었습니다.
+이 문제 때문에 경로 추종을 브리지의 내장 추종기(지금은 `frenet.py` Frenet 로컬 플래너)로 만들었습니다.
 지금은 Nav2 의 map_server + AMCL 만 쓰고 Nav2 주행 노드(planner/controller_server)는 쓰지 않습니다.
 
 ## 9. 점검 도구 (`tools/`)

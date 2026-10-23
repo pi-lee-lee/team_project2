@@ -259,7 +259,7 @@ def run(args):
 
 def main():
     ap = argparse.ArgumentParser(description='cmd_vel → odom 지연(L) / 시정수(τ) 측정')
-    ap.add_argument('--v', type=float, default=0.13, help='직진 계단 크기 (m/s), 기본 = dwa.max_v')
+    ap.add_argument('--v', type=float, default=0.13, help='직진 계단 크기 (m/s)')
     ap.add_argument('--w', type=float, default=1.0, help='회전 계단 크기 (rad/s)')
     ap.add_argument('--trials', type=int, default=5)
     ap.add_argument('--hold', type=float, default=2.0, help='계단 유지 시간 (s)')

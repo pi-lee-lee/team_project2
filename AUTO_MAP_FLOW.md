@@ -5,7 +5,7 @@
 
 - 탐색기 본체: `tools/explore.py` (ROS 노드 `explore_tool` + 서버 `/ws/ui/` WebSocket 클라이언트, 즉 **웹 화면과 같은 자격으로** 이동 명령을 보냄)
 - 실행/중지: `server/warehouse/runner.py` 의 `explore()` / `cancel()` (서버가 별도 스레드에서 프로세스를 띄움)
-- 실제 주행: 일반 "여기로 이동" 과 같은 경로 (`services.goto_point` → 브리지 `start_goal` → A* → pure pursuit/DWA → `/cmd_vel`)
+- 실제 주행: 일반 "여기로 이동" 과 같은 경로 (`services.goto_point` → 브리지 `start_goal` → A* → Frenet 로컬 플래너 → `/cmd_vel`)
 
 > 아래 다이어그램은 Mermaid 입니다. GitHub, VS Code(Markdown Preview Mermaid Support) 등에서 그림으로 보입니다.
 
@@ -111,7 +111,7 @@ flowchart LR
         B1["on_scan<br/>기울지 않았을 때만 재발행"]
         B2["on_map / flush_map<br/>/ send_map"]
         B3["process_inbox<br/>→ start_goal → request_plan"]
-        B4["on_plan<br/>send_path, PurePursuit / DWAFollower 생성"]
+        B4["on_plan<br/>send_path, FrenetFollower 생성"]
         B5["control_step 20 Hz<br/>앞 장애물 정지 · TF 끊김 · 재계획<br/>→ CmdMux → mux_step"]
         B6["report<br/>도착 / 실패"]
     end
@@ -264,8 +264,8 @@ sequenceDiagram
 | `process_inbox` | 서버 메시지 분기 (`goto`, `cancel`, `zones`, `save_map` …) | WS 수신 |
 | `on_zones` | 금지 구역이 바뀌면 플래너에 전달, 이동 중이면 0.3초 뒤 재계획 | 발행 `/astar/zones` |
 | `start_goal` / `request_plan` | 넘어짐·기울어짐 확인, A* 요청 | 서비스 호출 `/astar/get_plan` |
-| `on_plan` | 경로 전송, `PurePursuit` / `DWAFollower` 생성 (hybrid 는 둘 다) | WS `path`; 실패면 `/astar/fail_reason` 을 붙여 `report('failed')` |
-| `control_step` (20 Hz) | 금지 구역 재계획, TF 나이·기울기 확인, hybrid 전환, 속도 계산 → `CmdMux` | 구독 `/odom`, `/imu`, TF; (실패·부딪힘 시 발행 `/astar/obstacle`) |
+| `on_plan` | 경로 전송, `FrenetFollower` 생성 | WS `path`; 실패면 `/astar/fail_reason` 을 붙여 `report('failed')` |
+| `control_step` (20 Hz) | 금지 구역 재계획, TF 나이·기울기 확인, Frenet 계획(0.1초마다)·막힘 처리, 속도 계산 → `CmdMux` | 구독 `/odom`, `/imu`, TF; (실패·부딪힘 시 발행 `/astar/obstacle`) |
 | `mux_step` | 자동 주행·웹 수동 조작·정지 중 우선순위로 골라 내보냄 | 발행 `/cmd_vel` |
 | `report` | 결과 전송, 목표 비움, 경로 지움 | WS `nav_status {goal_id, status, message}`, `path []` |
 | `save_map` → `run_script` | `scripts/save_map.sh <이름>` 실행 | WS `map_saved {ok, message}` |

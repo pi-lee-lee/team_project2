@@ -10,6 +10,7 @@
   python3 tools/frenet_bench.py                 오늘(가장 최근 날짜) 기록 전부
   python3 tools/frenet_bench.py 폴더 [폴더 ...]   그 기록들
   python3 tools/frenet_bench.py --set frenet.w_change=1.0   파라미터 바꿔서
+  python3 tools/frenet_bench.py --recorded                  기록 당시 파라미터로 (기본은 지금 params.yaml 의 frenet.*)
 
 지표: 도착(done)/시간, 막힘(blocked) 시간, 주행 중 제자리 회전(출발 전 제외) 횟수, 각속도 흔들림(명령 w 의 주기당 변화 합/초),
 오프셋 바뀜 횟수, 최소 여유(차체+부착물, m).
@@ -24,7 +25,7 @@ import numpy as np
 HOME = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(HOME, 'tools'))
 sys.path.insert(0, os.path.join(HOME, 'ros2_ws', 'src', 'warehouse_robot'))
-import dwa_replay as R  # noqa: E402
+import drive_replay as R  # noqa: E402
 from warehouse_robot.frenet import FrenetFollower, FrenetPlanner, StaticGrid, body_points  # noqa: E402
 
 
@@ -37,7 +38,7 @@ def environment(rec, min_hits=10):
     rects = [(x0, x1, -hw, hw)] + [tuple(ex[i:i + 4]) for i in range(0, len(ex) - 3, 4)]
     cells = {}
     for s in rec.steps:
-        src = s.get('frenet') or s.get('dwa') or s
+        src = s.get('frenet') or s.get('dwa') or s   # 예전 DWA 기록도 스캔은 'dwa' 안에
         p = R.arr(src.get('scan'))
         pose = src.get('pose') if 'pose' in src and src is not s else s.get('odom')
         if not len(p):
@@ -141,17 +142,32 @@ def run(rec, overrides=None, max_time=120.0):
     return out
 
 
+def current_params():
+    """지금 params.yaml 의 브리지 frenet.* (다음 실험에 쓸 값)."""
+    import yaml
+    path = os.path.join(HOME, 'ros2_ws', 'src', 'warehouse_robot', 'config', 'params.yaml')
+    p = yaml.safe_load(open(path, encoding='utf-8'))['warehouse_bridge']['ros__parameters']
+    out = {f'frenet.{k}': v for k, v in p.get('frenet', {}).items()}
+    if 'footprint' in p:
+        out['frenet.footprint'] = p['footprint']
+    if 'footprint_extra' in p:
+        out['frenet.footprint_extra'] = p['footprint_extra']
+    return out
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument('records', nargs='*', help='기록 (목표 폴더/파일). 기본: 가장 최근 날짜의 Frenet 기록 전부')
     ap.add_argument('--set', action='append', metavar='이름=값', help='frenet.* 파라미터 바꿔서')
+    ap.add_argument('--recorded', action='store_true', help='기록 당시 파라미터로 (기본: 지금 params.yaml)')
     a = ap.parse_args()
     files = [R.resolve(p) for p in a.records] if a.records else None
     if not files:
         allf = [f for f in R.all_records() if '_frenet' in f]
         day = os.path.basename(os.path.dirname(os.path.dirname(allf[-1])))[:8] if allf else ''
         files = [f for f in allf if os.path.basename(os.path.dirname(os.path.dirname(f))).startswith(day)]
-    ov = R.parse_set(a.set)
+    ov = {} if a.recorded else current_params()
+    ov.update(R.parse_set(a.set))
     print(f"{'주행':<34} {'결과':<8} {'시간':>6} {'막힘':>6} {'재계획':>5} {'주행중회전':>8} {'w흔들림':>8} {'오프셋바뀜':>8} {'최소여유':>8}")
     tot = {'done': 0, 'n': 0, 'time': 0.0, 'blocked': 0.0, 'mid_turns': 0, 'w_jerk': 0.0, 'offset_changes': 0}
     for f in files:

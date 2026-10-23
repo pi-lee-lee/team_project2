@@ -1,7 +1,7 @@
 #!/bin/bash
 # 위치 추정 실행 (기존 맵): Nav2 의 map_server + AMCL (localization_launch.py). /map 과 map->odom TF 를 낸다.
 #   사용: scripts/start_nav2.sh <map.yaml>
-# 주행은 브리지가 직접 한다 (A* + pure pursuit / 장애물 근처 DWA). Nav2 주행 노드는 쓰지 않는다.
+# 주행은 브리지가 직접 한다 (A* + Frenet 로컬 플래너). Nav2 주행 노드는 쓰지 않는다.
 source "$(dirname "$0")/env.sh"
 MAP="$1"
 # 위치 추정(AMCL)은 이 프로젝트 설정을 쓴다 (TurtleBot3 기본값은 작은 방에서 10cm 넘게 어긋남, config/amcl_waffle_pi.yaml 참고)

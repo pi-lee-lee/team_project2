@@ -1,9 +1,9 @@
 astar_planner:
   ros__parameters:
     map_topic: map
-    robot_radius: 0.24        # (m) 차체 반폭 0.153 + DWA safety_margin 0.08 = 0.233 이상: A* 가 낸 틈을 DWA 도 들어갈 수 있게.
-                              # 0.20 이면 A* 는 장애물 옆 0.40 m 틈으로 경로를 내는데 DWA 는 0.47 m 미만이라 못 들어가 재계획해도 같은 길에서 멈춤
-                              # (tools/planner_compare.py 2026-10-22). 제자리 회전 원(뒤 모서리 0.238, 뒤 부착물 0.28)은 회전 전 검사가 맡음
+    robot_radius: 0.24        # (m) 차체 반폭 0.153 + 여유보다 크게: A* 가 낸 틈을 로컬 플래너도 들어갈 수 있게.
+                              # 0.20 이면 장애물 옆 0.40 m 틈으로 경로를 내서 재계획해도 같은 길에서 멈췄음 (2026-10-22).
+                              # 제자리 회전 원(뒤 모서리 0.238, 뒤 부착물 0.28)은 회전 전 검사가 맡음
     inflation_radius: 0.55    # 이 거리까지는 벽에서 멀어지도록 비용 부여
     cost_weight: 3.0
     occupied_threshold: 65
@@ -30,13 +30,10 @@ warehouse_bridge:
     base_frame: base_footprint
     pose_rate: 5.0
     max_retries: 2
-    max_speed: 0.18           # m/s (pure pursuit). Waffle Pi 하드웨어 한계 (2026-10-22: 0.1 이 느리다고 해서 올림, 실물 미시험)
-    max_turn_speed: 1.82      # rad/s (pure pursuit 회전, 제자리 회전). 하드웨어 한계 (예전 1.0 → 0.6 → 1.82)
-    max_accel: 0.3            # m/s² (pure pursuit). 출발은 이 가속으로 점점 빨라지고, 목표 앞은 이 감속으로 멈춤 (0.26 m/s 까지 0.9초, 정지 거리 약 11cm)
-    max_turn_accel: 1.5       # rad/s² (pure pursuit 제자리 회전). DWA 의 max_acc_v / max_acc_w 와 같은 값
-    footprint_extra: [-0.277, -0.197, -0.04, 0.04]   # 차체에 붙인 물건 사각형 (x_min, x_max, y_min, y_max) x N. 뒤쪽 가운데 8x8cm. 제자리 회전/후진 여유, 웹 로봇 모양
-    stop_distance: 0.35       # (pure pursuit) 앞쪽 ±25° 이 거리(LiDAR 기준) 안에 무엇이든(지도 벽 포함) 있으면 DWA 로 전환 (예전: 서서 기다림)
-    estop_distance: 0.2       # 앞쪽 ±25° 이 거리(LiDAR 기준, 차체 앞 끝에서 약 7cm) 안이면 모드와 상관없이 앞으로는 안 감 (비상 정지)
+    footprint: [-0.197, 0.069, 0.153]   # Waffle Pi 외곽 직사각형 (x_min, x_max, 반폭). Frenet 충돌 검사, 물러나기/회전 여유
+    footprint_extra: [-0.277, -0.197, -0.04, 0.04]   # 차체에 붙인 물건 사각형 (x_min, x_max, y_min, y_max) x N. 뒤쪽 가운데 8x8cm. Frenet 충돌 검사, 제자리 회전/후진 여유, 웹 로봇 모양
+    stop_distance: 0.35       # 차체가 기운 채 앞쪽 ±25° 이 거리(LiDAR 기준) 안이 막히면 장애물에 걸친 것으로 보고 물러남
+    estop_distance: 0.2       # 앞쪽 ±25° 이 거리(LiDAR 기준, 차체 앞 끝에서 약 7cm) 안이면 앞으로는 안 감 (비상 정지)
     blocked_timeout: 5.0      # 이 시간 넘게 막히면 장애물을 피하는 경로로 재계획, 재시도도 다 쓰면 실패 (s)
     progress_timeout: 15.0    # 이 시간 동안 5cm도 못 가면 실패 (s)
     tf_timeout: 0.5           # 로봇 위치 TF가 이보다 오래되면 즉시 정지 (s)
@@ -46,10 +43,11 @@ warehouse_bridge:
     backoff_distance: 0.15    # 부딪힌 뒤 뒤로 물러나는 거리 (m). 이후 부딪힌 자리를 피해 재계획
     battery_cells: 3          # 배터리 % 계산용 LiPo 셀 수 (TurtleBot3 11.1V = 3셀)
     battery_empty_v: 11.0     # 이 전압을 0% 로 표시 (TurtleBot3 는 11V 아래에서 충전 경고)
-    # 움직이는 장애물 추적 (tb3_nav obstacle_tracker 이식). 웹 지도에 주황 원 + 속도 화살표, hybrid 전환/DWA 가 사용
+    # 움직이는 장애물 추적 (tb3_nav obstacle_tracker 이식). 웹 지도에 주황 원 + 속도 화살표, Frenet 이 예측해서 피함
     tracking:
       enabled: true
-      max_range: 5.0          # 추적 + DWA 정적 장애물에 쓰는 LiDAR 거리 (m). SLAM/AMCL 과 같은 5 m (예전 3.0)
+      moving_speed: 0.08      # 이보다 빠른 track 만 움직이는 물체로 예측/웹 표시 (멈춘 물체 속도 노이즈 중앙값 0.06, 느린 사람 0.1)
+      max_range: 5.0          # 추적 + Frenet 정적 장애물에 쓰는 LiDAR 거리 (m). SLAM/AMCL 과 같은 5 m (예전 3.0)
       static_match_dist: 0.15 # 지도 벽에서 이 거리 이내 점은 정적 (AMCL 오차 감안)
       cluster_gap: 0.25
       min_points: 2
@@ -61,58 +59,6 @@ warehouse_bridge:
       accel_noise: 1.8
       meas_noise: 0.13
       max_speed: 1.5
-    # DWA (hybrid 에서 장애물 피할 때, tb3_nav local_planner 이식). 실수는 소수점을 붙일 것
-    dwa:
-      max_v: 0.13           # 하드웨어 한계 (2026-10-22: 0.07 이 느리다고 해서 올림. 튜닝은 0.15 에서 했음, 0.26 은 실물/sim 미시험)
-      min_v: -0.1             # 후진 (다가오는 장애물에서 물러나기). -0.05 는 마주 오는 사람(0.15 m/s)보다 느려 sim 에서 부딪혔음
-      max_w: 1.82             # 하드웨어 한계 (2026-10-22 올림). 돌아서기 회전은 dwa.py rotate_speed 0.6 이하
-      max_acc_v: 0.3          # sim 실측 1.0~1.2 m/s² (tools/step_test.py). 실물 미측정이라 보수적으로
-      max_acc_w: 4.0          # sim 실측 7~12 rad/s². 보수적으로
-      v_samples: 9
-      w_samples: 21
-      sim_dt: 0.1
-      predict_time: 2.0       # 3.5 는 비스듬히 앞에 있는 정적 장애물 옆을 지날 때 거의 멈춤 (느린 궤적은 3.5초 안에 장애물까지 못 가서 장애물 비용이 0 → 느린 쪽을 고름, 2026-10-23). 1.0~3.0 비교(dwa_tune, 2026-10-22): 3.0 은 마주 올 때 오래 기다림, 1.0 은 여유 줄어듦, 2.0 이 여유 유지
-      robot_radius: 0.17      # 정규화/탐색 범위용 (충돌은 아래 footprint 직사각형으로 봄)
-      footprint: [-0.197, 0.069, 0.153]   # Waffle Pi 외곽 직사각형 (x_min, x_max, 반폭). 원으로 덮으면 앞뒤가 커서 벽 옆에서 갇힘
-      allow_escape: true      # 벽에 바짝 붙어 갈 궤적이 없으면 여유가 줄지 않는 이동은 허용
-      reverse_only_when_needed: true   # 후진은 전진/회전으로 피할 수 없을 때만
-      safety_margin: 0.08
-      dynamic_margin: 0.15    # 움직이는 장애물 추가 여유. sim 추적 오차(95% 10cm)보다 크게. 0.25 는 너무 오래 기다림
-      dynamic_growth: 0.03    # 예측 1초당 반경 증가
-      obstacle_influence: 0.3   # 이 거리 안쪽부터 장애물 비용 (0.5 는 좁은 통로에서 항상 비용이 붙어 상자 앞에서 섰음)
-      w_heading: 0.3
-      w_path: 0.6             # 경로이탈 비용. hybrid 에서 피할 장애물이 있는 동안은 0 (장애물 쪽 경로로 끌려가지 않게),
-                              # 다 지나가면 이 값으로 경로에 다시 붙음. sim 21개: 0 → 14/21, 0.3 → 14/21, 0.6 → 15/21 (2026-10-23)
-      w_goal: 0.86
-      w_obstacle: 0.3         # 1.0 은 장애물 가까이 지나가는 궤적을 크게 벌점 → 옆 장애물 앞에서 느린 궤적을 고름 (2026-10-23, predict_time 2.0 과 같이 바꿈)
-      w_speed: 0.2
-      w_collision: 2.0        # 1.0~6.0 사이에서 결과 차이 없음 (tools/dwa_tune.py), 덜 극단적인 값
-    dwa_follow:
-      lookahead: 0.3          # 경로 위 이 거리 앞 점을 DWA 목표로
-      goal_tolerance: 0.1     # 이 안에 들면 제자리에서 도착 방향 맞춤
-      target_clear: 0.233     # 앞쪽 경로(lookahead ~ target_max)가 지도에 없는 장애물에서 이 거리 안을 지나면 목표점을 그 너머의
-                              # 첫 경로점으로 (차체 반폭 + safety_margin). 0 이면 끔. 목표가 상자 바로 뒤면 '다가가기' 와 '피하기' 가 싸워 멈췄음
-      target_max: 2.0         # 목표점을 옮기는 최대 거리 (경로를 따라, m)
-      moving_speed: 0.08      # 이보다 빠른 track 만 움직이는 장애물로 예측/웹 표시 (멈춘 물체 속도 노이즈 중앙값 0.06, 느린 사람 0.1)
-    # hybrid: pure pursuit ↔ DWA 전환
-    hybrid:
-      # DWA 로 바뀌는 조건 (둘 중 하나):
-      #  ① 로봇 앞(+뒤 조금) 사각형 안에 지도에 없는 LiDAR 점이 box_min_points 개 이상, box_min_scans 번 연속 (정적/동적 구분 없음).
-      #     track(지름 0.8m 이하, 5번 연속 확정)을 거치지 않아 큰 물체도 바로 잡음
-      #  ② 움직이는 track 의 moving_predict 초 안 예측 위치가 사각형과 겹침
-      # pure pursuit 로 돌아오는 조건: release_time 동안 둘 다 없고 경로에서 rejoin_offset 안
-      box_front: 0.5          # 차체 앞 끝에서 앞으로 (m)
-      box_back: 0.2           # 차체 뒤 끝에서 뒤로 (m). 뒤 부착물/후진/제자리 회전 여유
-      box_half_width: 0.25    # 좌우 반폭 (m): 차체 반폭 0.153 + 여유 0.1. 0.33 은 경로 옆을 지나는 물체에도 DWA 로 바뀌어 느려짐 (sim 17/21 → 18/21)
-      box_min_points: 3       # AMCL 오차로 벽 점 몇 개가 '지도에 없는 점' 으로 새는 것 무시
-      box_min_scans: 2        # 깜빡임 방지 (스캔 약 9 Hz → 약 0.2초)
-      moving_predict: 2.0     # 움직이는 track: 지금 ~ 이 시간(s) 뒤 예측 위치가 사각형과 겹치면 DWA (로봇도 지금 속도로 직진한다고 봄).
-                              # 옆/뒤에서 다가오는 사람은 미리 잡고, 멀어지거나 나란히 가는 사람은 무시
-      release_time: 2.0       # 장애물이 이 시간 동안 안 보이면 pure pursuit 로 (s)
-      rejoin_offset: 0.25     # 경로에서 이 거리 안으로 돌아왔을 때만 pure pursuit 로 (m)
-    # 추종 방식 (재시작해야 바뀜): frenet = Frenet 로컬 플래너 하나로 (기본), hybrid = pure pursuit + 장애물 근처 DWA (예전)
-    drive:
-      controller: frenet
     # Frenet 로컬 플래너 (frenet.py). A* 경로를 기준선으로 '옆 오프셋 x 옆 이동/유지 거리 x 속도' 후보 중 안전하고 싼 궤적.
     # 정적 장애물은 거리(check_dist)로, 움직이는 물체는 시간(horizon)으로 검사. 실행 중에 바꿀 수 있음 (목록 값 제외)
     frenet:
@@ -134,12 +80,12 @@ warehouse_bridge:
       dynamic_margin: 0.15    # 움직이는 물체 추가 여유 (m)
       dynamic_growth: 0.03    # 예측 1초당 여유 증가
       w_offset: 1.0           # 비용 계수: 경로에서 벗어남 / 오프셋 바뀜 / 꺾는 기울기 / 느림 / 정적 여유 / 움직이는 물체 여유
-      w_change: 1.0           # 0.3 은 좁은 곳에서 오프셋이 주기마다 바뀌어 w 가 튐 (기록 18개 폐루프: 오프셋 바뀜 181 → 81, 도착 수 같음)
+      w_change: 1.0           # 경로로 돌아오는 쪽은 1/4. 0.3 은 좁은 곳에서 오프셋이 주기마다 바뀌어 w 가 튐 (기록 18개 폐루프: 오프셋 바뀜 181 → 107, 도착 수 같음)
       w_turn: 0.5
       w_speed: 1.0
       w_clear: 1.0
       w_dynamic: 1.0
-    # 주행 기록: 목표 하나마다 logs/records/<시각>_<목표>.jsonl.gz (0.1초마다 위치/명령/hybrid/트래킹/스캔,
-    # DWA 구간은 후보별 판정·비용까지). 분석: python3 tools/dwa_replay.py. 1분에 수 MB
+    # 주행 기록: logs/records/<브리지 켠 시각>_frenet/<시각>_<목표>/record.jsonl.gz (0.1초마다 위치/명령/트래킹/스캔,
+    # Frenet 입력과 후보별 판정·비용까지). 분석: python3 tools/drive_replay.py. 1분에 약 2 MB
     record:
       enabled: true
