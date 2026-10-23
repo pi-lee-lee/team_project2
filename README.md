@@ -379,6 +379,7 @@ dpkg -l ros-humble-tf2 ros-humble-tf2-ros | grep ^ii   # 0.25.24 확인
 | `python3 tools/localize.py [x y 방향°] [--dry-run]` | 스캔으로 위치를 찾아 초기 위치 지정 (`--dry-run`: 찾기만) |
 | `python3 tools/localize.py --global` | 맵 전체에서 찾기 (10cm·5° 로 넓게 → 상위 5곳을 2.5cm·1° 로 정밀). 웹 "위치 자동 찾기" 와 같음 |
 | `python3 tools/tf_rates.py [초]` | TF별 수신 빈도와 지연 측정 |
+| `python3 tools/bag_to_csv.py ~/bags/<이름> [--fixed map\|odom]` | `ros2 bag` 녹화의 odom / scan / tf 를 CSV 로 (`<bag>_csv/`): `odom.csv`, `scan.csv`(한 줄 = 스캔 한 번), `tf.csv`, `pose.csv`(tf 를 이어 붙인 지도 위 궤적). ROS 노드 없이 파일만 읽음 |
 | `python3 tools/sim_watch.py --world worlds/maze_room.world [--world 상자.sdf] [--seconds N]` | (sim) Gazebo 정답 위치와 비교한 위치 오차, 충돌, 벽 여유, 기울기 기록. Ctrl-C 로 끝내도 요약 출력 |
 | `python3 tools/make_hall_world.py` | 강당 월드 `worlds/lecture_hall.world` 다시 만들기 (강단 + 가로 복도 6 × 세로 복도 5, 책상 20개 · 의자 40개, 치수는 파일 위쪽 상수) |
 | `python3 tools/make_hall_world.py --real` | 실물형 강당 `worlds/lecture_hall_real.world` (책상 앞판 없음, 좌우 끝 세로 복도 없음, 좌석 줄 사이 0.25m `--row-gap`, 의자 ±0.12m/±15° 무작위, `--seed` 로 배치 바꿈) |
