@@ -73,7 +73,8 @@ class FrenetConfig:
     grid_res: float = 0.01        # 정적 거리 격자 (m). 2 cm 는 오차 때문에 소화기 옆 0.5 m 틈을 못 지나갔음
     grid_half: float = 1.6        # 정적 격자 최대 범위: 로봇 중심 ±grid_half (실제 범위는 후보가 지나가는 곳에 맞춤, m)
     w_offset: float = 1.0         # 검사 구간 평균 |d| / max_offset
-    w_change: float = 0.3         # |오프셋 - 직전 오프셋| / max_offset
+    w_change: float = 1.0         # |오프셋 - 직전 오프셋| / max_offset (경로로 돌아오는 쪽은 1/4). 0.3 은 좁은 곳에서 오프셋이 주기마다 바뀌어 w 가 튐
+                                  # (실물 기록 18개 폐루프: 0.3 → 1.0 에 오프셋 바뀜 181 → 81, 도착 수 같음, 2.5 는 1개 실패)
     w_turn: float = 0.5           # max|d'| (옆으로 꺾는 기울기, 1 = 45°)
     w_speed: float = 1.0          # (목표 - 속도) / 목표
     w_clear: float = 1.0          # 정적: (clear_pref - 최소 여유) / clear_pref
@@ -338,6 +339,8 @@ class FrenetPlanner:
         # 인지 범위: 이번 후보들이 지나가는 곳(+ 지금 자세) + 차체 끝 + 선호 여유. 그 밖의 점은 어느 후보의 여유/비용에도
         # 영향이 없다 (뒤쪽은 차체 뒤 끝 근처까지만). ±grid_half 를 넘지 않게
         gx, gy = g[..., 0][on_path], g[..., 1][on_path]
+        if not len(gx):               # 경로 끝을 지났거나 아주 짧은 경로: 지금 자세 둘레만 (빈 배열이면 min() 이 예외 → 브리지가 죽음)
+            gx, gy = np.array([x]), np.array([y])
         pad = r_body + c.clear_pref + 2 * c.grid_res
         bx0, bx1 = max(min(gx.min(), x) - pad, x - c.grid_half), min(max(gx.max(), x) + pad, x + c.grid_half)
         by0, by1 = max(min(gy.min(), y) - pad, y - c.grid_half), min(max(gy.max(), y) + pad, y + c.grid_half)
@@ -399,7 +402,10 @@ class FrenetPlanner:
         pref = max(c.clear_pref, 1e-6)
         terms = {
             'offset': c.w_offset * mean_d / c.max_offset,
-            'change': c.w_change * np.abs(OFF - prev) / c.max_offset,
+            # 오프셋 바뀜: 경로에서 멀어지거나 반대쪽으로 넘어가면 다, 같은 쪽에서 경로로 돌아오면 1/4 만
+            # (대칭이면 장애물을 지나서도 비킨 오프셋에 머물러 경로로 안 돌아왔음)
+            'change': c.w_change * np.abs(OFF - prev) / c.max_offset
+            * np.where((OFF * prev >= 0.0) & (np.abs(OFF) < abs(prev)), 0.25, 1.0),
             'turn': c.w_turn * steep,
             'clear': c.w_clear * np.clip((pref - stat) / pref, 0.0, 1.0),
         }
@@ -473,7 +479,7 @@ class FrenetFollower:
         self.arrived = False
         self.turning = False          # 출발 전 돌아서는 중
         self.turn_dir = 0.0           # 돌아서는 방향 (+1 / -1). 돌기 시작하면 끝날 때까지 유지
-        self.rotate_first = math.radians(60)   # 기준선 방향과 이보다 차이 나면 제자리에서 먼저 돎
+        self.rotate_first = math.radians(60)   # 서 있을 때 기준선 방향과 이보다 차이 나면 제자리에서 먼저 돎
         self.turn_done = math.radians(30)      # 이 안으로 들어오면 돌기 끝
         self.min_v = 0.03             # 이보다 느린 전진 명령은 실제 로봇이 안 움직임 (기록: 0.007 → 실제 0)
         self.last_trajectory = None
@@ -515,6 +521,30 @@ class FrenetFollower:
             dbg.update(branch='make_room', err=err)
             return room[0], room[1], 'driving'
         return None
+
+    def _approach(self, pts, x, y, yaw, gx, gy, dbg):
+        """경로 끝 너머에서 목표 (gx, gy) 로: 크게 틀어졌으면 제자리에서 돌고, 아니면 차체가 지나갈 직선을 검사한 뒤 천천히."""
+        c = self.cfg
+        dist = math.hypot(gx - x, gy - y)
+        err = math.atan2(gy - y, gx - x) - yaw
+        err = math.atan2(math.sin(err), math.cos(err))
+        if abs(err) > 0.3:
+            turn = self._turn(pts, x, y, yaw, err, self.turning, dbg)
+            if turn is not None:
+                self.turning = True
+                return turn
+            return 0.0, 0.0, 'blocked'
+        grid = StaticGrid.around(pts, x, y, 0.6, c.grid_res)
+        body = body_points(c.footprint, c.footprint_extra)
+        ds = np.linspace(0.0, dist, max(int(dist / 0.02), 1) + 1)
+        th = np.full_like(ds, yaw)
+        clear = FrenetPlanner._static_clear(grid, x + ds * math.cos(yaw), y + ds * math.sin(yaw), th, body)
+        need = c.safety_margin if clear[0] >= c.safety_margin else max(float(clear[0]) - 0.02, 0.01)
+        if float(clear.min()) < need:
+            return 0.0, 0.0, 'blocked'
+        dbg.update(branch='approach', err=err, dist=dist)
+        v = min(0.08, max(self.min_v, dist))
+        return v, float(np.clip(2.0 * err, -c.max_w, c.max_w)), 'driving'
 
     def _make_room(self, grid, x, y, yaw):
         """제자리에서 양쪽 다 못 돌 때: 1초 동안 ±0.05 m/s 로 짧게 움직이는 후보 중, 차체가 지금보다 장애물에 가까워지지
@@ -566,13 +596,22 @@ class FrenetFollower:
             dd = np.linalg.norm(pts[:, None, :] - moving[None, :, :2], axis=2)
             pts = pts[np.all(dd > moving[None, :, 4] + 0.1, axis=1)]
         self.progress, s0 = ref.project(x, y, self.progress - 20, self.progress + 400)
-        # 출발 전 돌아서기: 기준선(조금 앞) 방향과 크게 다르면 제자리에서
-        tx, ty = (float(v) for v in ref.at(min(s0 + 0.15, ref.s_end))[:2])
-        err = math.atan2(ty - y, tx - x) - yaw if math.hypot(tx - x, ty - y) > 0.05 else float(ref.at(s0)[2]) - yaw
+        if s0 >= ref.s_end - 0.01:
+            # 경로 끝을 지났는데 아직 목표 허용 오차 밖 (옆으로 몇 cm 비켜 지나감): 가까우면 도착으로, 아니면 목표를 보고
+            # 천천히 다가감. 그대로 두면 끝 너머 연장선을 따라 최저 속도로 계속 갔음 (실물 기록 폐루프 2595, 2597)
+            dist_goal = math.hypot(gx - x, gy - y)
+            if dist_goal < 2.0 * self.goal_tolerance:
+                self.arrived = True
+                return self.compute(pose, v0, w0, map_to_odom, static_points, dynamic_obstacles, moving_speed)
+            return self._approach(pts, x, y, yaw, gx, gy, dbg)
+        # 돌아서기: 그 자리 기준선 방향과 크게 다르면 제자리에서. 달리는 중(v0 > 0.05)에는 100° 넘게 틀어질 때만.
+        # (예전: 기준선 15 cm 앞 점 방향 기준 → 경로가 급하게 꺾이는 곳에서 달리다 60° 가 넘어 서서 돌기를 반복했음, 실물 2610)
+        err = float(ref.at(s0)[2]) - yaw
         err = math.atan2(math.sin(err), math.cos(err))
         near_moving = len(moving) and float(np.min(np.hypot(moving[:, 0] - x, moving[:, 1] - y))) < 1.5
         was_turning = self.turning
-        self.turning = abs(err) > (self.turn_done if self.turning else self.rotate_first) and not near_moving
+        start = self.rotate_first if v0 < 0.05 else math.radians(100)
+        self.turning = abs(err) > (self.turn_done if self.turning else start) and not near_moving
         if self.turning:
             turn = self._turn(pts, x, y, yaw, err, was_turning, dbg)
             if turn is not None:

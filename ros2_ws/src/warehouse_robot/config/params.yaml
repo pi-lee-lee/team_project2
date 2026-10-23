@@ -134,7 +134,7 @@ warehouse_bridge:
       dynamic_margin: 0.15    # 움직이는 물체 추가 여유 (m)
       dynamic_growth: 0.03    # 예측 1초당 여유 증가
       w_offset: 1.0           # 비용 계수: 경로에서 벗어남 / 오프셋 바뀜 / 꺾는 기울기 / 느림 / 정적 여유 / 움직이는 물체 여유
-      w_change: 0.3
+      w_change: 1.0           # 0.3 은 좁은 곳에서 오프셋이 주기마다 바뀌어 w 가 튐 (기록 18개 폐루프: 오프셋 바뀜 181 → 81, 도착 수 같음)
       w_turn: 0.5
       w_speed: 1.0
       w_clear: 1.0
