@@ -1292,7 +1292,7 @@ class BridgeNode(Node):
         """hybrid 전환 조건을 웹에 (0.2초마다, hybrid 일 때만, map 좌표):
         사각형 네 꼭짓점 + 안의 점(실제로 센 점) / 밖의 지도에 없는 점, 움직이는 물체 전환 반경, 지금 상태(이유, 복귀 대기)."""
         now = time.monotonic()
-        if now - self.last_box_sent < 0.2:
+        if now - self.last_box_sent < 0.2 or self.controller == 'frenet':   # Frenet 은 hybrid 전환을 안 씀
             return
         pose = self.xyyaw(self.global_frame, self.base_frame)
         m_o = self.xyyaw(self.global_frame, 'odom')
@@ -1551,7 +1551,7 @@ class BridgeNode(Node):
         return result
 
     def send_dwa(self, follower, result):
-        """DWA 가 고른 궤적(best)을 웹에 (map 좌표, 0.2초마다). 제자리 회전/막힘이면 빈 궤적."""
+        """로컬 플래너(DWA / Frenet)가 고른 궤적을 웹에 (map 좌표, 0.2초마다). 제자리 회전/막힘이면 빈 궤적."""
         now = time.monotonic()
         if now - self.last_dwa_sent < 0.2:
             return
@@ -1562,7 +1562,9 @@ class BridgeNode(Node):
         if traj is not None and m_o is not None:
             pts = [[round(float(px), 3), round(float(py), 3)] for px, py in transform_points(np.asarray(traj)[:, :2], *m_o)]
         v, w, state = result
-        self.server.send({'type': 'dwa', 'traj': pts, 'v': round(float(v), 3), 'w': round(float(w), 3), 'state': state})
+        planner = 'frenet' if isinstance(follower, FrenetFollower) else 'dwa'
+        self.server.send({'type': 'dwa', 'traj': pts, 'v': round(float(v), 3), 'w': round(float(w), 3), 'state': state,
+                          'planner': planner})
 
     # DWA 막힘 대처 (단순 fallback) --------------------------------
     # ① DWA 가 막히면 blocked_timeout(5초) 동안 기다림 (움직이는 장애물이 지나가길)

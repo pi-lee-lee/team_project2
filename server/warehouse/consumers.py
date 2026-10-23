@@ -152,9 +152,10 @@ class RobotConsumer(AsyncJsonWebsocketConsumer):
             # hybrid 전환 조건 (사각형 꼭짓점, 센 점, 움직이는 물체 예측 선, 지금 상태; map 좌표, 초당 5번) - 화면 표시용, 저장 안 함
             await self.broadcast({**msg, 'type': 'hybrid_box', 'robot': self.robot_name})
         elif kind == 'dwa':
-            # DWA 가 고른 궤적 (map 좌표) + 명령 속도/상태 (초당 5번) - 화면 표시용, 저장/스냅샷 안 함
+            # 로컬 플래너(DWA / Frenet)가 고른 궤적 (map 좌표) + 명령 속도/상태 (초당 5번) - 화면 표시용, 저장/스냅샷 안 함
             await self.broadcast({'type': 'dwa', 'robot': self.robot_name, 'traj': msg.get('traj', []),
-                                  'v': msg.get('v'), 'w': msg.get('w'), 'state': msg.get('state')})
+                                  'v': msg.get('v'), 'w': msg.get('w'), 'state': msg.get('state'),
+                                  'planner': msg.get('planner', 'dwa')})
         elif kind == 'memory':
             # A* 가 기억 중인 장애물: remembered = 맵에 없는 LiDAR 장애물 칸, bumps = 부딪힌 자리
             live['memory'] = {'remembered': msg.get('remembered', []), 'bumps': msg.get('bumps', [])}

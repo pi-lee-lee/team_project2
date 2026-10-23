@@ -836,12 +836,15 @@ function draw() {
     ctx.restore();
   }
 
-  // DWA 가 고른 궤적 (predict_time 동안 굴려 본 best): 보라 굵은 선 + 끝점, 옆에 명령 속도/상태. 1초 넘게 안 오면 숨김
+  // 로컬 플래너가 고른 궤적: DWA = 보라 (predict_time 동안 굴려 본 best), Frenet = 초록 (고른 후보, 앞으로 갈 궤적).
+  // 굵은 선 + 끝점, 옆에 명령 속도/상태. 1초 넘게 안 오면 숨김
   if (S.dwa && Date.now() - (S.dwaAt || 0) < 1000) {
     const t = S.dwa.traj || [];
+    const frenet = S.dwa.planner === 'frenet';
+    const color = frenet ? '#059669' : '#9333ea';
     let lx, ly;
     if (t.length > 1) {
-      ctx.strokeStyle = '#9333ea';
+      ctx.strokeStyle = color;
       ctx.lineWidth = 4;
       ctx.beginPath();
       t.forEach(([x, y], i) => {
@@ -850,15 +853,15 @@ function draw() {
       });
       ctx.stroke();
       [lx, ly] = worldToCanvas(...t[t.length - 1]);
-      ctx.beginPath(); ctx.arc(lx, ly, 4, 0, 2 * Math.PI); ctx.fillStyle = '#9333ea'; ctx.fill();
+      ctx.beginPath(); ctx.arc(lx, ly, 4, 0, 2 * Math.PI); ctx.fillStyle = color; ctx.fill();
     } else if (S.pose) {
       [lx, ly] = worldToCanvas(S.pose.x, S.pose.y);
     }
     if (lx !== undefined) {
       const name = { driving: '주행', blocked: '막힘', rotating: '회전', done: '도착' }[S.dwa.state] || S.dwa.state;
       ctx.font = '11px system-ui, sans-serif';
-      ctx.fillStyle = '#7e22ce';
-      ctx.fillText(`DWA ${name} v=${(+S.dwa.v).toFixed(2)} w=${(+S.dwa.w).toFixed(2)}`, lx + 8, ly - 8);
+      ctx.fillStyle = frenet ? '#047857' : '#7e22ce';
+      ctx.fillText(`${frenet ? 'Frenet' : 'DWA'} ${name} v=${(+S.dwa.v).toFixed(2)} w=${(+S.dwa.w).toFixed(2)}`, lx + 8, ly - 8);
     }
   }
 
@@ -1178,7 +1181,8 @@ function renderCargo() {
 }
 // 주행 파라미터: 브리지가 보낸 목록(params: 이름, 지금 값, 시작 값)을 묶음별 입력칸으로.
 // 값을 바꾸면 param_set → 브리지가 ROS 파라미터로 바꾸고 결과(param_result)와 새 목록을 보낸다
-const PARAM_GROUPS = [['dwa_follow.', 'DWA 경로 따라가기'], ['dwa.', 'DWA'], ['hybrid.', 'hybrid 전환'], ['', '속도 / 안전 (pure pursuit 등)']];
+const PARAM_GROUPS = [['frenet.', 'Frenet 로컬 플래너'], ['dwa_follow.', 'DWA 경로 따라가기'], ['dwa.', 'DWA'], ['hybrid.', 'hybrid 전환'],
+                      ['', '속도 / 안전 (pure pursuit 등)']];
 const paramGroup = (name) => PARAM_GROUPS.find(([p]) => name.startsWith(p));
 S.paramRows = new Map();      // 이름 → {row, input, item}
 S.paramPending = new Set();   // 이 화면에서 보내고 답을 기다리는 이름
