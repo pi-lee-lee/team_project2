@@ -1,0 +1,170 @@
+<?xml version="1.0"?>
+<!-- tools/map_to_world.py 로 맵에서 만든 월드: map2_room -->
+<sdf version="1.6">
+  <world name="map2_room">
+    <!-- 모델 위치를 서비스로 바꿀 수 있게 (/set_entity_state): tools/sim_mover.py 로 움직이는 장애물 시험 -->
+    <plugin name="gazebo_ros_state" filename="libgazebo_ros_state.so">
+      <ros><namespace>/</namespace></ros>
+      <update_rate>20.0</update_rate>
+    </plugin>
+    <include><uri>model://ground_plane</uri></include>
+    <include><uri>model://sun</uri></include>
+    <scene>
+      <shadows>false</shadows>
+    </scene>
+    <physics type="ode">
+      <real_time_update_rate>1000.0</real_time_update_rate>
+      <max_step_size>0.001</max_step_size>
+      <real_time_factor>1</real_time_factor>
+    </physics>
+    <model name="walls">
+      <static>true</static>
+      <link name="link">
+        <collision name="c0">
+          <pose>-0.750 2.275 0.200 0 0 0</pose>
+          <geometry><box><size>4.200 0.050 0.400</size></box></geometry>
+        </collision>
+        <visual name="v0">
+          <pose>-0.750 2.275 0.200 0 0 0</pose>
+          <geometry><box><size>4.200 0.050 0.400</size></box></geometry>
+          <material><ambient>0.6 0.6 0.6 1</ambient><diffuse>0.7 0.7 0.7 1</diffuse></material>
+        </visual>
+        <collision name="c1">
+          <pose>-2.825 2.125 0.200 0 0 0</pose>
+          <geometry><box><size>0.050 0.250 0.400</size></box></geometry>
+        </collision>
+        <visual name="v1">
+          <pose>-2.825 2.125 0.200 0 0 0</pose>
+          <geometry><box><size>0.050 0.250 0.400</size></box></geometry>
+          <material><ambient>0.6 0.6 0.6 1</ambient><diffuse>0.7 0.7 0.7 1</diffuse></material>
+        </visual>
+        <collision name="c2">
+          <pose>-2.725 2.075 0.200 0 0 0</pose>
+          <geometry><box><size>0.050 0.350 0.400</size></box></geometry>
+        </collision>
+        <visual name="v2">
+          <pose>-2.725 2.075 0.200 0 0 0</pose>
+          <geometry><box><size>0.050 0.350 0.400</size></box></geometry>
+          <material><ambient>0.6 0.6 0.6 1</ambient><diffuse>0.7 0.7 0.7 1</diffuse></material>
+        </visual>
+        <collision name="c3">
+          <pose>1.325 0.900 0.200 0 0 0</pose>
+          <geometry><box><size>0.050 2.700 0.400</size></box></geometry>
+        </collision>
+        <visual name="v3">
+          <pose>1.325 0.900 0.200 0 0 0</pose>
+          <geometry><box><size>0.050 2.700 0.400</size></box></geometry>
+          <material><ambient>0.6 0.6 0.6 1</ambient><diffuse>0.7 0.7 0.7 1</diffuse></material>
+        </visual>
+        <collision name="c4">
+          <pose>-2.875 0.975 0.200 0 0 0</pose>
+          <geometry><box><size>0.050 2.150 0.400</size></box></geometry>
+        </collision>
+        <visual name="v4">
+          <pose>-2.875 0.975 0.200 0 0 0</pose>
+          <geometry><box><size>0.050 2.150 0.400</size></box></geometry>
+          <material><ambient>0.6 0.6 0.6 1</ambient><diffuse>0.7 0.7 0.7 1</diffuse></material>
+        </visual>
+        <collision name="c5">
+          <pose>-1.775 1.775 0.200 0 0 0</pose>
+          <geometry><box><size>0.650 0.050 0.400</size></box></geometry>
+        </collision>
+        <visual name="v5">
+          <pose>-1.775 1.775 0.200 0 0 0</pose>
+          <geometry><box><size>0.650 0.050 0.400</size></box></geometry>
+          <material><ambient>0.6 0.6 0.6 1</ambient><diffuse>0.7 0.7 0.7 1</diffuse></material>
+        </visual>
+        <collision name="c6">
+          <pose>-2.075 1.300 0.200 0 0 0</pose>
+          <geometry><box><size>0.050 0.900 0.400</size></box></geometry>
+        </collision>
+        <visual name="v6">
+          <pose>-2.075 1.300 0.200 0 0 0</pose>
+          <geometry><box><size>0.050 0.900 0.400</size></box></geometry>
+          <material><ambient>0.6 0.6 0.6 1</ambient><diffuse>0.7 0.7 0.7 1</diffuse></material>
+        </visual>
+        <collision name="c7">
+          <pose>-1.475 1.300 0.200 0 0 0</pose>
+          <geometry><box><size>0.050 0.900 0.400</size></box></geometry>
+        </collision>
+        <visual name="v7">
+          <pose>-1.475 1.300 0.200 0 0 0</pose>
+          <geometry><box><size>0.050 0.900 0.400</size></box></geometry>
+          <material><ambient>0.6 0.6 0.6 1</ambient><diffuse>0.7 0.7 0.7 1</diffuse></material>
+        </visual>
+        <collision name="c8">
+          <pose>0.400 1.375 0.200 0 0 0</pose>
+          <geometry><box><size>1.800 0.050 0.400</size></box></geometry>
+        </collision>
+        <visual name="v8">
+          <pose>0.400 1.375 0.200 0 0 0</pose>
+          <geometry><box><size>1.800 0.050 0.400</size></box></geometry>
+          <material><ambient>0.6 0.6 0.6 1</ambient><diffuse>0.7 0.7 0.7 1</diffuse></material>
+        </visual>
+        <collision name="c9">
+          <pose>-1.775 0.875 0.200 0 0 0</pose>
+          <geometry><box><size>0.550 0.050 0.400</size></box></geometry>
+        </collision>
+        <visual name="v9">
+          <pose>-1.775 0.875 0.200 0 0 0</pose>
+          <geometry><box><size>0.550 0.050 0.400</size></box></geometry>
+          <material><ambient>0.6 0.6 0.6 1</ambient><diffuse>0.7 0.7 0.7 1</diffuse></material>
+        </visual>
+        <collision name="c10">
+          <pose>0.025 0.475 0.200 0 0 0</pose>
+          <geometry><box><size>0.950 0.050 0.400</size></box></geometry>
+        </collision>
+        <visual name="v10">
+          <pose>0.025 0.475 0.200 0 0 0</pose>
+          <geometry><box><size>0.950 0.050 0.400</size></box></geometry>
+          <material><ambient>0.6 0.6 0.6 1</ambient><diffuse>0.7 0.7 0.7 1</diffuse></material>
+        </visual>
+        <collision name="c11">
+          <pose>-0.425 0.000 0.200 0 0 0</pose>
+          <geometry><box><size>0.050 0.900 0.400</size></box></geometry>
+        </collision>
+        <visual name="v11">
+          <pose>-0.425 0.000 0.200 0 0 0</pose>
+          <geometry><box><size>0.050 0.900 0.400</size></box></geometry>
+          <material><ambient>0.6 0.6 0.6 1</ambient><diffuse>0.7 0.7 0.7 1</diffuse></material>
+        </visual>
+        <collision name="c12">
+          <pose>-2.950 0.025 0.200 0 0 0</pose>
+          <geometry><box><size>0.100 0.050 0.400</size></box></geometry>
+        </collision>
+        <visual name="v12">
+          <pose>-2.950 0.025 0.200 0 0 0</pose>
+          <geometry><box><size>0.100 0.050 0.400</size></box></geometry>
+          <material><ambient>0.6 0.6 0.6 1</ambient><diffuse>0.7 0.7 0.7 1</diffuse></material>
+        </visual>
+        <collision name="c13">
+          <pose>-2.975 -0.225 0.200 0 0 0</pose>
+          <geometry><box><size>0.050 0.450 0.400</size></box></geometry>
+        </collision>
+        <visual name="v13">
+          <pose>-2.975 -0.225 0.200 0 0 0</pose>
+          <geometry><box><size>0.050 0.450 0.400</size></box></geometry>
+          <material><ambient>0.6 0.6 0.6 1</ambient><diffuse>0.7 0.7 0.7 1</diffuse></material>
+        </visual>
+        <collision name="c14">
+          <pose>-1.700 -0.425 0.200 0 0 0</pose>
+          <geometry><box><size>2.500 0.050 0.400</size></box></geometry>
+        </collision>
+        <visual name="v14">
+          <pose>-1.700 -0.425 0.200 0 0 0</pose>
+          <geometry><box><size>2.500 0.050 0.400</size></box></geometry>
+          <material><ambient>0.6 0.6 0.6 1</ambient><diffuse>0.7 0.7 0.7 1</diffuse></material>
+        </visual>
+        <collision name="c15">
+          <pose>0.450 -0.425 0.200 0 0 0</pose>
+          <geometry><box><size>1.700 0.050 0.400</size></box></geometry>
+        </collision>
+        <visual name="v15">
+          <pose>0.450 -0.425 0.200 0 0 0</pose>
+          <geometry><box><size>1.700 0.050 0.400</size></box></geometry>
+          <material><ambient>0.6 0.6 0.6 1</ambient><diffuse>0.7 0.7 0.7 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+  </world>
+</sdf>

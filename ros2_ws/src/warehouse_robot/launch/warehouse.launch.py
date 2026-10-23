@@ -49,7 +49,7 @@ def launch_nodes(context):
         Node(
             package='warehouse_robot', executable='bridge', name='warehouse_bridge', namespace=namespace,
             output='screen', remappings=remaps,
-            parameters=[params, {'use_sim_time': use_sim_time, 'server_url': server_url,
+            parameters=[params, {'use_sim_time': use_sim_time, 'server_url': server_url, 'controller': arg('controller'),
                                  'map_name': arg('map_name'), 'mode': arg('mode'),
                                  'sim_scan.enabled': arg('scan_noise') == 'true'}]),
     ]
@@ -77,6 +77,7 @@ def generate_launch_description():
                               description='시뮬레이션 LiDAR 를 실물 LDS-02 처럼 (빔 개수 변동, 흔들림, 값 빠짐)'),
         DeclareLaunchArgument('yolo', default_value='',
                               description='YOLO 검출기 실행 스크립트 (scripts/start_yolo.sh 경로, start_bridge.sh 가 넘김). 비우면 실행 안 함'),
+        DeclareLaunchArgument('controller', default_value='hybrid', description='hybrid | rl (강화학습 지역 계획기)'),
         DeclareLaunchArgument('allow_unknown', default_value='false',
                               description='A*가 미탐색 칸을 지나갈 수 있는지 (SLAM 모드에서 true)'),
         OpaqueFunction(function=launch_nodes),

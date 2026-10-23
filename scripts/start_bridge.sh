@@ -15,12 +15,12 @@ else
 fi
 # YOLO 부품 검출기도 같이 실행 (scripts/start_yolo.sh, enabled=false 로 시작). 끄려면 WAREHOUSE_YOLO=0
 ROBOT_NAME="${WAREHOUSE_ROBOT_NAME:-tb3}"
-echo "[start_bridge] 로봇 $ROBOT_NAME, 네임스페이스 ${WAREHOUSE_NAMESPACE:-(없음)}, 모드 $WAREHOUSE_MODE, 맵 이름 $MAP_NAME, 시뮬레이션 시간 $WAREHOUSE_SIM_TIME, LiDAR 노이즈 ${WAREHOUSE_SCAN_NOISE:-false}, 도메인 $ROS_DOMAIN_ID"
+echo "[start_bridge] 주행 ${WAREHOUSE_CONTROLLER:-hybrid}, 로봇 $ROBOT_NAME, 네임스페이스 ${WAREHOUSE_NAMESPACE:-(없음)}, 모드 $WAREHOUSE_MODE, 맵 이름 $MAP_NAME, 시뮬레이션 시간 $WAREHOUSE_SIM_TIME, LiDAR 노이즈 ${WAREHOUSE_SCAN_NOISE:-false}, 도메인 $ROS_DOMAIN_ID"
 # ros2 launch 는 값이 빈 인자(namespace:=)를 받지 않으므로 값이 있을 때만 넘긴다 (없으면 launch 기본값 '')
 EXTRA=()
 [ -n "$WAREHOUSE_NAMESPACE" ] && EXTRA+=(namespace:="$WAREHOUSE_NAMESPACE")
 [ "${WAREHOUSE_YOLO:-1}" = 1 ] && EXTRA+=(yolo:="$(cd "$(dirname "$0")" && pwd)/start_yolo.sh")
 exec ros2 launch warehouse_robot warehouse.launch.py map_name:="$MAP_NAME" \
   mode:="$WAREHOUSE_MODE" use_sim_time:="$WAREHOUSE_SIM_TIME" allow_unknown:="$ALLOW_UNKNOWN" \
-  scan_noise:="${WAREHOUSE_SCAN_NOISE:-false}" \
+  scan_noise:="${WAREHOUSE_SCAN_NOISE:-false}" controller:="${WAREHOUSE_CONTROLLER:-hybrid}" \
   robot_name:="$ROBOT_NAME" server_url:="${2:-ws://localhost:8000/ws/robot/$ROBOT_NAME/}" "${EXTRA[@]}"

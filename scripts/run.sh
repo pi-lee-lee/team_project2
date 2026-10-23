@@ -16,6 +16,7 @@
 #   --gui          (sim) Gazebo 화면 표시
 #   --scan-noise   (sim) LiDAR 를 실물 LDS-02 처럼: 빔 개수 238~244 변동, 거리 흔들림, 먼 곳 값 빠짐 (scan_noise.py)
 #                  실물과 비슷한 강당은 --world lecture_hall_real (책상 앞판 없음, 의자 무작위 배치)
+#   --controller C hybrid(기본, pure pursuit ↔ DWA) | rl (강화학습 정책, config/rl_policy.npz)
 #   --amcl A       (map) 위치 추정 설정: default(기본, config/amcl_waffle_pi.yaml, 작은 방) | hall(config/amcl_hall.yaml,
 #                  책상/의자가 흩어진 강당·교실: 지도와 안 맞는 빔에 너그럽게) | yaml 파일 경로
 #
@@ -45,6 +46,7 @@ while [ $# -gt 0 ]; do
     --gui) GUI=--gui ;;
     --amcl) AMCL="$2"; shift ;;
     --scan-noise) SCAN_NOISE=true ;;
+    --controller) export WAREHOUSE_CONTROLLER="$2"; shift ;;
     -h|--help) sed -n '2,28p' "$0"; exit 0 ;;
     *) echo "알 수 없는 옵션: $1 (scripts/run.sh --help)"; exit 1 ;;
   esac

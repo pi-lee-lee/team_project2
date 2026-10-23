@@ -42,6 +42,7 @@ from .cmd_mux import CmdMux
 from .astar_planner_node import quaternion_from_yaw, yaw_from_quaternion
 from .dwa import DWAConfig, DWAFollower, transform_points
 from .follower import PurePursuit
+from .rl_follower import MLPPolicy, RLFollower
 from .scan_noise import ScanNoiseConfig, degrade
 from .tracker import MultiObjectTracker, detect_clusters
 
@@ -309,6 +310,14 @@ class BridgeNode(Node):
         defaults = DWAConfig(max_v=0.15, max_w=1.0, max_acc_v=0.3, max_acc_w=1.5, robot_radius=0.17, footprint=(-0.197, 0.069, 0.153), allow_escape=True,
                              safety_margin=0.08, dynamic_margin=0.15, dynamic_growth=0.03, predict_time=2.5,
                              w_collision=2.0, reverse_only_when_needed=True)
+        # controller: hybrid(기본, pure pursuit ↔ DWA) | rl (강화학습 정책 rl_follower.py, 안전 필터 포함. 전역 경로는 A* 그대로)
+        self.declare_parameter('controller', 'hybrid')
+        self.declare_parameter('rl.model', os.path.expanduser('~/webserver/config/rl_policy.npz'))
+        self.declare_parameter('rl.goal_tolerance', 0.15)
+        self.controller = self.get_parameter('controller').value
+        self.rl_policy = MLPPolicy(self.get_parameter('rl.model').value) if self.controller == 'rl' else None
+        if self.rl_policy is not None:
+            self.get_logger().info(f"controller=rl: {self.get_parameter('rl.model').value}")
         self.dwa_cfg = DWAConfig(**{
             k: (tuple(float(x) for x in self.declare_parameter(f'dwa.{k}', [float(x) for x in v]).value)
                 if isinstance(v, tuple) else type(v)(self.declare_parameter(f'dwa.{k}', v).value))
@@ -703,6 +712,9 @@ class BridgeNode(Node):
                           lookahead=self.get_parameter('dwa_follow.lookahead').value)
         dwa.target_clear = self.get_parameter('dwa_follow.target_clear').value
         dwa.target_max = self.get_parameter('dwa_follow.target_max').value
+        if self.rl_policy is not None:   # RL 이 DWA 자리에 들어가 처음부터 끝까지 주행 (막힘/복구 처리는 DWA 와 같음)
+            dwa = RLFollower(points, self.goal['yaw'], self.rl_policy,
+                             goal_tolerance=self.get_parameter('rl.goal_tolerance').value)
         self.follower = {
             'gen': gen,
             'blocked_since': None,
@@ -711,7 +723,7 @@ class BridgeNode(Node):
             'dwa': dwa,
             'pp': PurePursuit(points, self.goal['yaw'], max_v=self.max_speed, max_w=self.max_turn_speed,
                               max_acc=self.max_accel, max_acc_w=self.max_turn_accel),
-            'use_dwa': False,
+            'use_dwa': self.rl_policy is not None,
             'clear_since': None,
         }
 
@@ -1041,7 +1053,8 @@ class BridgeNode(Node):
         x, y, yaw, _ = pose
         if self.tilt_rel < math.radians(2):
             f['level_pose'] = (x, y, yaw)   # 부딪힌 자리는 기울기 시작 전 위치/방향으로 계산 (밀리면서 돌아가므로)
-        self.hybrid_switch(f, x, y, now)
+        if self.rl_policy is None:
+            self.hybrid_switch(f, x, y, now)
         if f['use_dwa']:
             v, w, state = self.dwa_compute(f['dwa'])
         else:
