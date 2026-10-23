@@ -91,7 +91,7 @@ class AStarPlannerNode(Node):
         self.path_pub = self.create_publisher(Path, 'astar/plan', 1)
         self.create_service(GetPlan, 'astar/get_plan', self.on_get_plan)
         self.tf_buffer = Buffer()
-        self.tf_listener = TransformListener(self.tf_buffer, self)
+        TransformListener(self.tf_buffer, self)   # 구독 콜백이 리스너를 붙잡고 있어 참조를 따로 안 들어도 됨
         self.create_subscription(PointStamped, 'astar/obstacle', self.on_bump, 10)
         self.create_service(Empty, 'astar/clear_obstacles', self.on_clear)
         self.create_subscription(String, 'astar/zones', self.on_zones, map_qos)

@@ -463,6 +463,6 @@ cd ../ros2_ws && source /opt/ros/humble/setup.bash && colcon build --symlink-ins
   `run.sh --scan-noise` / run_mode.env `SCAN_NOISE`, `start_bridge.sh` 전달, 웹 실행 모드 'LiDAR 를 실물처럼' 체크(`index.html`, `app.js`, `runner.py`, `consumers.py`).
   `dwa.py` 의 `last_terms`(쓰기만 하고 읽는 곳 없음), 안 쓰는 import 3개(`dwa_tune.py` asdict, `sim_watch.py` re, `test_tracker_dwa.py` transform_points),
   어디서도 안 쓰는 sim 전용 도구 `tools/sim_record.py`, `tools/track_eval.py` 제거. `tools/slam_drift.py`(SLAM map->odom 기록, 어디서도 안 씀), 테스트에서만 쓰던 `tracker.Track.velocity` 속성, `tools/explore.py` 의 부르는 곳 없는 `pick_goal` 도 제거.
-  vulture 가 더 잡은 것(발행 메시지 필드 angle_max, TF 수신 유지용 tf_listener, 콜백 인자, Django admin/모델 필드, websocket 콜백 인자)은 실행에 꼭 필요해서 남김 (angle_max 는 발행하는 LaserScan 필드, tf_listener 는 참조가 없으면 TF 수신이 멈춤)
-- 확인: 단위 테스트 52개(scan_noise 3개 빠짐), pyflakes 깨끗, vulture 는 실행에 꼭 필요한 4개(angle_max, tf_listener x2, 콜백 인자)만 남음, bash -n, 이 브랜치 코드로 브리지 기동. **실물 미확인**
+  vulture 가 더 잡은 것(발행 메시지 필드 angle_max, TF 수신 유지용 tf_listener, 콜백 인자, Django admin/모델 필드, websocket 콜백 인자)은 아래 확인대로 처리
+- 확인: 단위 테스트 52개(scan_noise 3개 빠짐), pyflakes 깨끗, vulture 에 남은 2개도 실제로 쓰임을 확인: LaserScan `angle_max` 는 `scan_slam` 을 받는 slam_toolbox(libtoolbox_common)가 읽음, `_on_close` 의 `code` 는 websocket-client 가 (ws, code, reason) 으로 호출. `tf_listener` 속성은 참조 없이도 TF 를 받는 것을 실험으로 확인해 대입을 뺌, bash -n, 이 브랜치 코드로 브리지 기동. **실물 미확인**
 

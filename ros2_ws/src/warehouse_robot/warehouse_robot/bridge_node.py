@@ -236,7 +236,7 @@ class BridgeNode(Node):
         self.tf_node = rclpy.create_node('warehouse_bridge_tf', namespace=ns, use_global_arguments=False, cli_args=tf_args,
                                          parameter_overrides=[rclpy.parameter.Parameter(
                                              'use_sim_time', value=self.get_parameter('use_sim_time').value)])
-        self.tf_listener = TransformListener(self.tf_buffer, self.tf_node, spin_thread=True)
+        TransformListener(self.tf_buffer, self.tf_node, spin_thread=True)   # 구독 콜백이 리스너를 붙잡고 있음
 
         map_qos = QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL,
                              reliability=ReliabilityPolicy.RELIABLE)
