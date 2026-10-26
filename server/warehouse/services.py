@@ -179,7 +179,13 @@ def finish_task(out, robot, task, status, message):
     task.save(update_fields=['status', 'finished_at'])
     log(out, robot, message)
     if is_order(task):   # 주문이 켠 YOLO 는 주문이 끝나면 끈다 (웹 YOLO 버튼으로 켠 것은 그대로)
-        out.to_robot(robot, {'type': 'yolo_set', 'enabled': False})
+        yolo_power(out, robot, False)
+
+
+def yolo_power(out, robot, on):
+    """주문: YOLO 는 섹션/사람 위치에 서 있을 때만 켠다. 주행 중에는 꺼서 카메라 영상이 Wi-Fi 를 안 쓰고
+    (검출기는 켜져 있을 때만 영상을 구독) PC CPU 도 주행 계산에 양보한다."""
+    out.to_robot(robot, {'type': 'yolo_set', 'enabled': bool(on)})
 
 
 def advance(out, robot, task):
@@ -248,6 +254,8 @@ def robot_connected(name, active_goal_id, mode='map', session=''):
         set_state(robot, Robot.STATE_WAITING_UNLOAD, f'{step.name} 수령 대기')
     elif step.status == TaskStep.STATUS_ARRIVED:
         set_state(robot, Robot.STATE_WAITING_LOAD, f'{step.name} 적재 대기')
+    if step is not None and step.status == TaskStep.STATUS_ARRIVED and step.items:
+        yolo_power(out, robot, True)   # 브리지를 다시 켜면 검출기도 꺼진 채로 뜸 → 기다리는 중이면 다시 켬
     elif step.status == TaskStep.STATUS_MOVING and active_goal_id == step.goal_id:
         set_state(robot, Robot.STATE_MOVING, f'{step.name}(으)로 이동 중')
     elif task.steps.count() == 1:
@@ -375,6 +383,7 @@ def handle_nav_status(name, goal_id, status, message=''):
             step.status = TaskStep.STATUS_ARRIVED
             step.save(update_fields=['status'])
             if step.items:
+                yolo_power(out, robot, True)
                 set_state(robot, Robot.STATE_WAITING_LOAD, f'{step.name} 도착, {items_text(step.items)} 실어 주세요')
                 log(out, robot, f'{step.name} 도착 - {items_text(step.items)} 적재 대기 ("적재 완료" 또는 "다음 경유지로")')
             elif step.cargo:
@@ -390,6 +399,8 @@ def handle_nav_status(name, goal_id, status, message=''):
             step.status = TaskStep.STATUS_ARRIVED
             step.save(update_fields=['status'])
             what = items_text(step.items) if step.items else f'{step.cargo} 을(를)'
+            if step.items:
+                yolo_power(out, robot, True)
             set_state(robot, Robot.STATE_WAITING_UNLOAD, f'{step.name} 도착, {what} 꺼내 주세요')
             log(out, robot, f'{step.name} 도착 - {what} 수령 대기 ("꺼냈어요" 또는 "강제 보내기")')
         else:
@@ -488,6 +499,8 @@ def confirm_load(robot_name):
     step.status = TaskStep.STATUS_DONE
     step.save(update_fields=['status'])
     log(out, robot, f'{step.name} 적재 완료')
+    if step.items:
+        yolo_power(out, robot, False)   # 다음 목적지로 출발: 주행 중에는 끔
     advance(out, robot, task)
     push_state(out, robot)
     return out
@@ -521,6 +534,8 @@ def complete_cargo_step(out, robot, task, step, message):
     step.status = TaskStep.STATUS_DONE
     step.save(update_fields=['status'])
     log(out, robot, message)
+    if step.items:
+        yolo_power(out, robot, False)   # 다음 목적지로 출발: 주행 중에는 끔
     advance(out, robot, task)
 
 
@@ -577,7 +592,7 @@ def handle_cargo(name, label):
 
 
 # ---------------------------------------------------------------- 주문 (여러 물건)
-# 사람이 받을 자리(dropoff)와 {라벨: 개수} 를 주문 → 서버가 YOLO 를 켜고 라벨마다 그 물건이 있는 섹션(Location.cargo 에
+# 사람이 받을 자리(dropoff)와 {라벨: 개수} 를 주문 → 라벨마다 그 물건이 있는 섹션(Location.cargo 에
 # 쉼표로 여러 라벨)을 찾아 섹션 단위로 묶고 가장 빠른 순서로 돈다. 섹션에 도착하면 그곳 사람이 그 섹션 물건을 다 싣고 "적재 완료"
 # → YOLO 개수가 맞으면 다음, 틀리면 "적재 잘못" (태블릿이 사람에게 물어보고, 확인했으면 force_next(confirmed)로 보냄).
 # 사람 위치에서는 꺼내고 "꺼냈어요" → 주문한 물건이 안 보이면 홈, 보이면 같은 방식으로 물어봄.
@@ -731,7 +746,7 @@ def start_order(robot_name, dropoff_id, items):
                             name=dropoff.name, x=dropoff.x, y=dropoff.y, yaw=dropoff.yaw, items=all_items)
     TaskStep.objects.create(task=task, order=n + 1, action=TaskStep.ACTION_MOVE, location=home,
                             name=home.name, x=home.x, y=home.y, yaw=home.yaw)
-    out.to_robot(robot, {'type': 'yolo_set', 'enabled': True})
+    yolo_power(out, robot, False)   # 출발: 섹션에 도착하면 켬
     if not (LIVE.get(robot.name, {}).get('yolo') or {}).get('available'):
         log(out, robot, '주의: YOLO 검출기가 없습니다. 개수 확인 없이 "다음 경유지로/강제 보내기"로만 진행됩니다')
     log(out, robot, f'주문 (작업 #{task.id}) {dropoff.name}: {items_text(all_items)} - '
@@ -786,6 +801,8 @@ def skip_step(robot_name):
     step.status = TaskStep.STATUS_SKIPPED
     step.save(update_fields=['status'])
     log(out, robot, f'{step.name} 건너뜀')
+    if step.items:
+        yolo_power(out, robot, False)
     advance(out, robot, task)
     push_state(out, robot)
     return out

@@ -573,3 +573,5 @@ cd ../ros2_ws && source /opt/ros/humble/setup.bash && colcon build --symlink-ins
   `cargo_detector` 실행 이름. 물건 인식은 `yolo/` 의 YOLO 검출기만 씀
 - (같은 날) Pi 카메라 기본 해상도를 다시 320x240 으로 (`yolo/camera.sh` CAMERA_SIZE 기본, Pi 의 `~/camera.sh` 와 같음). YOLO imgsz 는 640 그대로.
   640x480 은 압축 영상도 약 5~6 Mbit/s (프레임 55 KB) 라 Pi Wi-Fi(송신 7~26 Mbit/s)에 부담. 320x240 은 약 1.6 Mbit/s
+- (같은 날) 주문 중 YOLO 는 섹션/사람 위치에 서 있을 때만 켬 (도착 → 켬, 적재 완료/꺼냄/확인 후 진행/건너뛰기로 출발 → 끔,
+  대기 중 브리지 재연결 → 다시 켬). 주행 중 카메라 영상 Wi-Fi·PC CPU 를 주행에 양보. 확인: 임시 DB 로 주문 전체의 켜기/끄기 순서
