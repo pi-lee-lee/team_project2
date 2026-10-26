@@ -487,6 +487,7 @@ class FrenetFollower:
         self.arrived = False
         self.turning = False          # 출발 전 돌아서는 중
         self.turn_dir = 0.0           # 돌아서는 방향 (+1 / -1). 돌기 시작하면 끝날 때까지 유지
+        self.align_dir = 0.0          # 도착 후 방향 맞추기 회전 방향 (정하면 끝날 때까지 유지, 0 = 아직)
         self.rotate_first = math.radians(60)   # 서 있을 때 기준선 방향과 이보다 차이 나면 제자리에서 먼저 돎
         self.turn_done = math.radians(30)      # 이 안으로 들어오면 돌기 끝
         self.min_v = 0.03             # 이보다 느린 전진 명령은 실제 로봇이 안 움직임 (기록: 0.007 → 실제 0)
@@ -529,6 +530,33 @@ class FrenetFollower:
             dbg.update(branch='make_room', err=err)
             return room[0], room[1], 'driving'
         return None
+
+    def _align(self, pts, x, y, yaw, err, dbg):
+        """도착 후 목표 방향으로 제자리 회전 (v, w, state). 회전 중 차체(+부착물)가 안전 여유 안으로 들어가면 그 방향은 안 돌고
+        반대쪽을 본다. 둘 다 안 되면 지금 방향에서 끝낸다 ('done', dbg align='skipped'): 도착 방향은 '되면 좋은 것' 이라
+        벽을 긁으며 맞추지 않는다. 예전에는 검사 없이 돌아 뒤 부착물이 벽 0~0.8 cm 까지 붙었음 (실물 2609, 2627, 2636 등).
+        이미 여유 안에 서 있으면 지금보다 가까워지지만 않으면 허용. 정한 방향은 끝날 때까지 유지 (예전: ±w 로 번갈아 냄)"""
+        c = self.cfg
+        grid = StaticGrid.around(pts, x, y, 0.6, c.grid_res)
+        body = body_points(c.footprint, c.footprint_extra)
+        now = float(FrenetPlanner._static_clear(grid, np.array([x]), np.array([y]), np.array([yaw]), body)[0])
+        need = min(c.safety_margin, now - 0.005)
+        near = math.copysign(1.0, err)
+        # 정한 방향 유지. 다만 거의 다 왔으면(0.5 rad 안) 가까운 쪽으로: 살짝 넘쳤을 때 한 바퀴를 더 돌지 않게
+        dirs = [self.align_dir] if self.align_dir and abs(err) > 0.5 else [near, -near]
+        for k in dirs:
+            rem = abs(err) if k == near else 2.0 * math.pi - abs(err)        # 이 방향으로 남은 각도
+            ang = np.linspace(0.0, k * rem, max(int(rem / 0.05), 1) + 1)
+            clear = FrenetPlanner._static_clear(grid, np.full_like(ang, x), np.full_like(ang, y), yaw + ang, body)
+            if float(clear.min()) >= need:
+                self.align_dir = k
+                w = float(np.clip(2.0 * k * rem, -c.max_w, c.max_w))
+                if abs(w) < 0.3:
+                    w = math.copysign(0.3, w)
+                dbg.update(align=k, align_clear=float(clear.min()))
+                return 0.0, w, 'rotating'
+        dbg.update(align='skipped', align_err=err, align_now=now)
+        return 0.0, 0.0, 'done'
 
     def _approach(self, pts, x, y, yaw, gx, gy, dbg):
         """경로 끝 너머에서 목표 (gx, gy) 로: 크게 틀어졌으면 제자리에서 돌고, 아니면 차체가 지나갈 직선을 검사한 뒤 천천히."""
@@ -586,16 +614,6 @@ class FrenetFollower:
         ref = self.ref_map.transformed(*map_to_odom)
         goal_yaw = self.goal_yaw + map_to_odom[2]
         gx, gy = (float(v) for v in ref.at(ref.s_end)[:2])
-        if self.arrived or math.hypot(gx - x, gy - y) < self.goal_tolerance:
-            self.arrived = True
-            dbg['branch'] = 'arrived'
-            err = math.atan2(math.sin(goal_yaw - yaw), math.cos(goal_yaw - yaw))
-            if abs(err) < self.yaw_tolerance:
-                return 0.0, 0.0, 'done'
-            w = float(np.clip(2.0 * err, -c.max_w, c.max_w))
-            if abs(w) < 0.3:
-                w = math.copysign(0.3, err)
-            return 0.0, w, 'rotating'
         # 움직이는 물체는 예측으로, 그 자리의 스캔 점은 정적 목록에서 뺀다 (같은 물체를 두 번 세지 않게)
         dyn = np.asarray(dynamic_obstacles, dtype=float).reshape(-1, 5)
         moving = dyn[np.hypot(dyn[:, 2], dyn[:, 3]) > moving_speed] if len(dyn) else dyn
@@ -603,6 +621,13 @@ class FrenetFollower:
         if len(moving) and len(pts):
             dd = np.linalg.norm(pts[:, None, :] - moving[None, :, :2], axis=2)
             pts = pts[np.all(dd > moving[None, :, 4] + 0.1, axis=1)]
+        if self.arrived or math.hypot(gx - x, gy - y) < self.goal_tolerance:
+            self.arrived = True
+            dbg['branch'] = 'arrived'
+            err = math.atan2(math.sin(goal_yaw - yaw), math.cos(goal_yaw - yaw))
+            if abs(err) < self.yaw_tolerance:
+                return 0.0, 0.0, 'done'
+            return self._align(pts, x, y, yaw, err, dbg)
         self.progress, s0 = ref.project(x, y, self.progress - 20, self.progress + 400)
         if s0 >= ref.s_end - 0.01:
             # 경로 끝을 지났는데 아직 목표 허용 오차 밖 (옆으로 몇 cm 비켜 지나감): 가까우면 도착으로, 아니면 목표를 보고

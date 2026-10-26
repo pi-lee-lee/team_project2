@@ -121,3 +121,52 @@ def test_mover_behind_does_not_stop_robot():
     f, log = drive(STRAIGHT, WALLS, steps=120, moving=lambda t: np.array([[-0.45 + 0.12 * t, 0.0, 0.12, 0.0, 0.1]]))
     assert 'blocked' not in log['state'][:60]
     assert np.mean(log['v'][20:60]) > 0.12
+
+
+def _arrived_at_origin():
+    """목표에 이미 도착한 추종기 (경로 끝 = 원점)."""
+    f = FrenetFollower([(-1.0, 0.0), (0.0, 0.0)], 0.0, FrenetConfig())
+    f.arrived = True
+    return f
+
+
+def _align_clear(f, pts, yaw0, w_steps):
+    """도착 후 회전을 굴려서 (마지막 상태, 회전한 각도, 차체~점 최소 거리)."""
+    body = body_points(f.cfg.footprint, f.cfg.footprint_extra)
+    pts = np.asarray(pts, dtype=float).reshape(-1, 2)
+    yaw, turned, clear, st = yaw0, 0.0, math.inf, None
+    for _ in range(w_steps):
+        v, w, st = f.compute((0.0, 0.0, yaw), 0.0, 0.0, (0.0, 0.0, 0.0), pts, np.zeros((0, 5)))
+        if st == 'done':
+            break
+        yaw += w * 0.1
+        turned += w * 0.1
+        if len(pts):
+            bx = body[:, 0] * math.cos(yaw) - body[:, 1] * math.sin(yaw)
+            by = body[:, 0] * math.sin(yaw) + body[:, 1] * math.cos(yaw)
+            clear = min(clear, float(np.min(np.hypot(pts[:, None, 0] - bx, pts[:, None, 1] - by))))
+    return st, turned, clear
+
+
+def test_arrival_turn_in_open_space():
+    st, turned, _ = _align_clear(_arrived_at_origin(), [], math.radians(90), 100)
+    assert st == 'done' and turned < -1.3          # 가까운 쪽(오른쪽)으로 약 90°
+
+
+def test_arrival_turn_takes_far_side_when_near_side_hits():
+    # 위를 보고(90°) 서서 0° 로 맞춰야 함. 가까운 쪽(오른쪽)으로 돌면 뒤 끝(반경 약 0.28 m)이 왼쪽 아래 대각선을 지나며
+    # (-0.23, -0.23) 근처 물체에 4.5 cm 까지 다가감 → 반대쪽(왼쪽)으로 270° 돌아서 맞춤 (끝 자세에서는 8 cm 넘게 떨어짐)
+    f = _arrived_at_origin()
+    chunk = [(-0.23 + dx, -0.23 + dy) for dx in (-0.01, 0.0, 0.01) for dy in (-0.01, 0.0, 0.01)]
+    st, turned, clear = _align_clear(f, chunk, math.radians(90), 200)
+    assert st == 'done' and turned > 3.5           # 왼쪽으로 약 270°
+    assert clear >= f.cfg.safety_margin - 1e-3
+
+
+def test_arrival_turn_skipped_in_tight_corner():
+    # 옛 골방처럼 뒤/옆 벽이 회전 반경(약 0.28 m)보다 가까움 → 벽을 긁으며 돌지 않고 지금 방향에서 끝냄
+    f = _arrived_at_origin()
+    walls = [(-0.30, y) for y in np.arange(-0.5, 0.5, 0.02)] + [(x, 0.27) for x in np.arange(-0.3, 0.5, 0.02)]
+    st, turned, clear = _align_clear(f, walls, math.radians(180), 50)
+    assert st == 'done' and abs(turned) < 1e-6
+    assert f.last_debug.get('align') == 'skipped'
