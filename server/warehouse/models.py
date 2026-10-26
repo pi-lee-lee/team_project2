@@ -45,8 +45,9 @@ class Location(models.Model):
     x = models.FloatField()
     y = models.FloatField()
     yaw = models.FloatField(default=0.0)  # rad, 도착 시 바라볼 방향
-    # 이 위치에 놓인 물건(LED)을 카메라가 인식했을 때의 라벨 (예: red, B). 비우면 위치 이름으로 비교
-    cargo = models.CharField(max_length=50, blank=True, default='')
+    # 이 위치에 놓인 물건(LED)을 카메라가 인식했을 때의 라벨 (예: red, B). 비우면 위치 이름으로 비교.
+    # 주문 섹션은 쉼표로 여러 개 (예: led_red, led_green)
+    cargo = models.CharField(max_length=200, blank=True, default='')
 
     class Meta:
         ordering = ['kind', 'name']

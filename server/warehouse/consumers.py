@@ -346,7 +346,7 @@ class UIConsumer(AsyncJsonWebsocketConsumer):
             'start_delivery': lambda: (services.start_delivery, robot, int(msg['location_id']),
                                        float(msg['x']), float(msg['y']), float(msg.get('yaw', 0.0))),
             'start_order': lambda: (services.start_order, robot, int(msg['dropoff_id']), dict(msg.get('items') or {})),
-            'force_next': lambda: (services.force_next, robot),
+            'force_next': lambda: (services.force_next, robot, bool(msg.get('confirmed'))),
             'retry_step': lambda: (services.retry_step, robot),
             'skip_step': lambda: (services.skip_step, robot),
             'cancel_task': lambda: (services.cancel_task, robot),

@@ -1108,7 +1108,7 @@ function renderDeliveryButtons() {
 }
 
 // ------------------------------------------------------------------ 주문 (여러 물건)
-// 받을 곳 = 종류 '사람 위치' 인 위치, 물건 = 물류 위치의 인식 라벨 (구역마다 한 종류)
+// 받을 곳 = 종류 '사람 위치' 인 위치, 물건 = 물류 위치(섹션)의 인식 라벨 (쉼표로 여러 개)
 function locPrefix(loc) { return loc.kind === 'home' ? '⌂ ' : loc.kind === 'dropoff' ? '👤 ' : ''; }
 S.orderCounts = {};   // 라벨 → 입력한 개수 (목록을 다시 그려도 유지)
 function renderOrder() {
@@ -1119,7 +1119,8 @@ function renderOrder() {
   sel.innerHTML = drops.length ? '' : '<option value="">(위치 종류 "사람 위치"를 먼저 등록하세요)</option>';
   for (const l of drops) sel.add(new Option(l.name, l.id));
   if (drops.some((l) => String(l.id) === keep)) sel.value = keep;
-  const labels = [...new Set((S.locations || []).filter((l) => l.kind === 'pickup').map((l) => l.cargo))];
+  const labels = [...new Set((S.locations || []).filter((l) => l.kind === 'pickup')
+    .flatMap((l) => l.cargo.split(',').map((x) => x.trim()).filter(Boolean)))];
   const box = $('#order-items');
   const sig = labels.join('|');
   if (box.dataset.sig !== sig) {

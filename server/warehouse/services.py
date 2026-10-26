@@ -577,9 +577,10 @@ def handle_cargo(name, label):
 
 
 # ---------------------------------------------------------------- 주문 (여러 물건)
-# 사람이 받을 자리(dropoff)와 {라벨: 개수} 를 주문 → 서버가 YOLO 를 켜고 라벨마다 그 물건 구역(Location.cargo)을 찾아
-# 가장 빠른 순서로 돈다. 구역에 도착하면 그곳 사람이 싣고 "적재 완료" → YOLO 개수가 맞으면 다음, 틀리면 "적재 잘못" 표시.
-# 사람 위치에서는 꺼내고 "꺼냈어요" → 주문한 물건이 안 보이면 홈. 어느 단계든 "다음 경유지로/강제 보내기"(force_next)로 넘길 수 있다.
+# 사람이 받을 자리(dropoff)와 {라벨: 개수} 를 주문 → 서버가 YOLO 를 켜고 라벨마다 그 물건이 있는 섹션(Location.cargo 에
+# 쉼표로 여러 라벨)을 찾아 섹션 단위로 묶고 가장 빠른 순서로 돈다. 섹션에 도착하면 그곳 사람이 그 섹션 물건을 다 싣고 "적재 완료"
+# → YOLO 개수가 맞으면 다음, 틀리면 "적재 잘못" (태블릿이 사람에게 물어보고, 확인했으면 force_next(confirmed)로 보냄).
+# 사람 위치에서는 꺼내고 "꺼냈어요" → 주문한 물건이 안 보이면 홈, 보이면 같은 방식으로 물어봄.
 
 YOLO_WINDOW = 3.0   # 버튼을 누를 때 최근 이 시간(초) 동안 가장 많이 나온 개수로 판단 (한 프레임 흔들림 방지)
 
@@ -612,15 +613,11 @@ def yolo_counts(robot_name):
 
 
 def expected_counts(task, step):
-    """이 단계에서 적재함에 보여야 할 개수. 적재: 이 단계까지 실었어야 할 누적량 (카메라는 적재함 전체를 보므로),
-    수령: 주문한 라벨이 모두 0."""
+    """이 단계에서 확인할 개수. 적재: 이 섹션에서 실을 물건만 (앞 섹션 물건은 보이든 말든 안 봄 — 앞에서 덜 싣고 넘겨도
+    다음 섹션 판단에 영향 없음), 수령: 주문한 라벨이 모두 0."""
     if step.action == TaskStep.ACTION_UNLOAD:
         return {k: 0 for k in step.items}
-    total = {}
-    for s in task.steps.filter(action=TaskStep.ACTION_LOAD, order__lte=step.order):
-        for k, v in (s.items or {}).items():
-            total[k] = total.get(k, 0) + int(v)
-    return total
+    return {k: int(v) for k, v in step.items.items()}
 
 
 def check_counts(expected, counts):
@@ -661,9 +658,15 @@ def order_check(out, robot, task, step):
     return False
 
 
+def area_labels(loc):
+    """섹션에 있는 물건 라벨들 (인식 라벨 칸에 쉼표로 여러 개, 비우면 위치 이름 하나)."""
+    return [x.strip() for x in loc.cargo_label().split(',') if x.strip()]
+
+
 def find_area(m, label):
+    """그 물건이 있는 섹션 (여러 곳이면 처음 찾은 곳 — 지금은 섹션끼리 물건이 겹치지 않는다는 전제)."""
     for loc in m.locations.filter(kind=Location.KIND_PICKUP):
-        if loc.cargo_label().strip().lower() == label.strip().lower():
+        if label.strip().lower() in (x.lower() for x in area_labels(loc)):
             return loc
     return None
 
@@ -689,7 +692,7 @@ def order_route(robot, dropoff_id, items):
     for label in items:
         loc = find_area(m, label)
         if loc is None:
-            raise ServiceError(f'{label} 구역이 없습니다 (물류 위치의 인식 라벨을 {label} 로 등록하세요).')
+            raise ServiceError(f'{label} 이(가) 있는 섹션이 없습니다 (물류 위치의 인식 라벨에 {label} 를 넣으세요).')
         areas.setdefault(loc.id, (loc, {}))[1][label] = items[label]
     locs = [loc for loc, _ in areas.values()]
     try:
@@ -739,8 +742,9 @@ def start_order(robot_name, dropoff_id, items):
 
 
 @transaction.atomic
-def force_next(robot_name):
-    """주문 단계에서 YOLO 확인 없이 다음으로 ("다음 경유지로" / "강제 보내기"). 그때 개수를 기록에 남긴다."""
+def force_next(robot_name, confirmed=False):
+    """주문 단계에서 YOLO 확인 없이 다음으로. confirmed: YOLO 가 다르다고 물어본 뒤 사람이 확인하고 보냄,
+    아니면 "다음 경유지로" 버튼 (YOLO 꺼짐 등). 그때 개수를 기록에 남긴다."""
     out = Outbox()
     robot = get_robot(robot_name)
     task = active_task(robot)
@@ -749,7 +753,8 @@ def force_next(robot_name):
         raise ServiceError('적재/수령 대기 중인 단계가 없습니다.')
     counts = yolo_counts(robot.name)
     detail = check_counts(expected_counts(task, step), counts)[1] if counts is not None and step.items else 'YOLO 개수 없음'
-    complete_cargo_step(out, robot, task, step, f'{step.name} 강제 진행 (YOLO: {detail})')
+    how = 'YOLO 와 다름, 사람이 확인하고 진행' if confirmed else '확인 없이 진행'
+    complete_cargo_step(out, robot, task, step, f'{step.name} {how} (YOLO: {detail})')
     push_state(out, robot)
     return out
 
@@ -850,7 +855,7 @@ def save_location(data):
     fields = dict(name=name, kind=kind, x=float(data['x']), y=float(data['y']),
                   yaw=float(data.get('yaw', 0.0)))
     if 'cargo' in data:  # 카메라 인식 라벨 (비우면 위치 이름)
-        fields['cargo'] = str(data.get('cargo') or '').strip()[:50]
+        fields['cargo'] = str(data.get('cargo') or '').strip()[:200]
     if data.get('id'):
         loc = Location.objects.filter(map=m, id=data['id']).first()
         if loc is None:

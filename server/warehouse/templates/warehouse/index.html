@@ -108,7 +108,8 @@
     <section class="card" id="order-card">
       <div class="card-head"><h2>주문</h2><a href="/robot" target="_blank" class="muted small">로봇 화면 ↗</a></div>
       <p class="muted small">받을 사람 위치와 물건별 개수를 정하면 로봇이 홈에서 출발해 물건 구역들을 가장 빠른 순서로 돌고
-        사람 위치를 거쳐 홈으로 돌아옵니다. 구역마다 실은 뒤 "적재 완료"를 누르면 YOLO 개수로 확인합니다.</p>
+        사람 위치를 거쳐 홈으로 돌아옵니다. 섹션마다 실은 뒤 "적재 완료"를 누르면 YOLO 로 그 섹션 물건 개수를 확인하고,
+        다르면 태블릿이 물어봅니다 (사람이 확인했으면 그대로 보냄).</p>
       <label>받을 곳 <select id="order-dropoff"></select></label>
       <div id="order-items" class="order-items"></div>
       <p id="order-preview" class="muted small"></p>
@@ -196,7 +197,7 @@
             <option value="dropoff">사람 위치(수령)</option>
           </select>
         </label>
-        <label>카메라 인식 라벨 <input name="cargo" maxlength="50" placeholder="비우면 위치 이름 (예: A)"></label>
+        <label>카메라 인식 라벨 <input name="cargo" maxlength="200" placeholder="비우면 위치 이름. 섹션은 쉼표로 여러 개 (예: led_red, led_green)"></label>
         <div class="grid3">
           <label>x(m) <input name="x" type="number" step="0.01" required></label>
           <label>y(m) <input name="y" type="number" step="0.01" required></label>

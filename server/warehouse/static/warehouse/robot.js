@@ -2,7 +2,9 @@
 // 관제 화면과 같은 /ws/ui/ 를 쓴다 (snapshot / state / cargo / log 메시지).
 
 const $ = (sel) => document.querySelector(sel);
-const S = { robot: null, task: null, cargo: null, yolo: null, lastLog: '', stateKey: '', stateSince: Date.now(), ws: null };
+const S = { robot: null, task: null, cargo: null, yolo: null, lastLog: '', stateKey: '', stateSince: Date.now(), ws: null,
+            view: null,         // 지금 그린 화면 (버튼이 쓸 동작)
+            dismissed: null };  // "다시 싣기/다시 꺼내기" 로 닫은 YOLO 불일치 질문 (같은 문구면 다시 안 물음)
 
 // 카메라가 이 시간 안에 인식하지 못하면 수동 버튼을 보여준다 (초)
 const MANUAL_AFTER = 20;
@@ -80,15 +82,10 @@ function parseCounts(text) {
   return out;
 }
 
-// 이 단계에서 적재함에 보여야 할 개수 (서버 expected_counts 와 같음): 적재는 이 단계까지 누적, 수령은 모두 0
+// 이 단계에서 확인할 개수 (서버 expected_counts 와 같음): 적재는 이 섹션 물건만, 수령은 주문한 것 모두 0
 function expected(step) {
   if (step.action === 'unload') return Object.fromEntries(Object.keys(step.items).map((k) => [k, 0]));
-  const total = {};
-  for (const s of S.task.steps) {
-    if (s.action !== 'load' || s.order > step.order) continue;
-    for (const [k, v] of Object.entries(s.items || {})) total[k] = (total[k] || 0) + v;
-  }
-  return total;
+  return { ...step.items };
 }
 
 function renderCounts(step) {
@@ -102,7 +99,7 @@ function renderCounts(step) {
   for (const [label, n] of Object.entries(want)) {
     const tr = document.createElement('tr');
     const h = fresh ? (have[label.toLowerCase()] || 0) : null;
-    tr.className = (h === null ? '' : h === n ? 'ok' : 'bad') + (step.items[label] && step.action === 'load' ? ' now' : '');
+    tr.className = h === null ? '' : h === n ? 'ok' : 'bad';
     const mark = h === null ? '?' : h === n ? '✓' : '✗';
     const cells = step.action === 'unload'
       ? [label, h === null ? '-' : `${h}개 남음`, mark]
@@ -117,17 +114,22 @@ function renderCounts(step) {
 }
 
 function orderView(state, step, r) {
-  // 서버가 남긴 판단 결과 (적재 잘못 / 꺼내기 덜 됨 / YOLO 개수 없음) 는 note 로
-  const warn = /^(적재 잘못|꺼내기 덜 됨|YOLO)/.test(r.message || '') ? r.message : '';
-  if (state === 'WAITING_LOAD') {
-    return { key: 'LOAD', title: `${itemsText(step.items)} 실어 주세요`, sub: `${step.name} · 다 실으면 "적재 완료"`, warn,
-             manual: { label: '✓ 적재 완료', action: 'confirm_load', now: true },
-             force: { label: '⏭ 다음 경유지로', action: 'force_next', ask: 'YOLO 확인 없이 다음 경유지로 보낼까요?' } };
-  }
-  if (state === 'WAITING_UNLOAD') {
-    return { key: 'UNLOAD', title: '물건을 꺼내 주세요', sub: `${itemsText(step.items)} · 다 꺼내면 "꺼냈어요"`, warn,
-             manual: { label: '✓ 꺼냈어요', action: 'confirm_unload', now: true },
-             force: { label: '⏭ 강제 보내기', action: 'force_next', ask: 'YOLO 확인 없이 홈으로 보낼까요?' } };
+  if (state === 'WAITING_LOAD' || state === 'WAITING_UNLOAD') {
+    const load = state === 'WAITING_LOAD';
+    const base = load
+      ? { key: 'LOAD', title: `${itemsText(step.items)} 실어 주세요`, sub: `${step.name} · 다 실으면 "적재 완료"` }
+      : { key: 'UNLOAD', title: '물건을 꺼내 주세요', sub: `${itemsText(step.items)} · 다 꺼내면 "꺼냈어요"` };
+    // 버튼을 눌렀는데 서버가 YOLO 와 다르다고 판단함 (적재 잘못 / 꺼내기 덜 됨 / YOLO 개수 없음) → 사람에게 물어봄
+    const warn = /^(적재 잘못|꺼내기 덜 됨|YOLO)/.test(r.message || '') ? r.message : '';
+    if (warn && S.dismissed !== warn) {
+      return { ...base, ask: true, warn: `${warn} — 직접 확인하셨으면 보내 주세요`,
+               manual: { label: load ? '✓ 확인했어요, 보내기' : '✓ 확인했어요, 홈으로', action: 'force_next', extra: { confirmed: true }, now: true },
+               force: { label: load ? '↺ 다시 싣기' : '↺ 다시 꺼내기', local: 'dismiss', key: warn } };
+    }
+    return { ...base,
+             manual: { label: load ? '✓ 적재 완료' : '✓ 꺼냈어요', action: load ? 'confirm_load' : 'confirm_unload', now: true, check: true },
+             force: { label: load ? '다음 경유지로 (확인 없이)' : '홈으로 보내기 (확인 없이)', action: 'force_next', small: true,
+                      ask: load ? 'YOLO 확인 없이 다음 경유지로 보낼까요?' : 'YOLO 확인 없이 홈으로 보낼까요?' } };
   }
   if (state === 'MOVING' && step.action === 'load') {
     return { key: 'GO_LOAD', title: `${step.name}(으)로 가는 중`, sub: `${itemsText(step.items)} 실으러 가요` };
@@ -188,13 +190,14 @@ function render() {
   // 카메라가 다른 물건을 봤다는 등 최근 안내 (적재/수령 대기 중일 때만)
   $('#note').textContent = v.warn || ((v.key === 'LOAD' || v.key === 'UNLOAD') && S.lastLog.startsWith('카메라') ? S.lastLog : '');
   renderCounts(currentStep());
+  S.view = v;
   const force = $('#btn-force');
   force.hidden = !v.force;
   if (v.force) {
     force.textContent = v.force.label;
-    force.dataset.action = v.force.action;
-    force.dataset.ask = v.force.ask;
+    force.classList.toggle('small', !!v.force.small);
   }
+  document.body.classList.toggle('ask', !!v.ask);
   const btn = $('#btn-manual');
   const waited = (Date.now() - S.stateSince) / 1000;
   if (v.manual && (v.manual.now || waited >= MANUAL_AFTER || S.cargo === null || S.cargo === undefined)) {
@@ -214,12 +217,16 @@ function render() {
 }
 
 $('#btn-manual').addEventListener('click', () => {
-  const action = $('#btn-manual').dataset.action;
-  if (action) send(action);
+  const m = S.view && S.view.manual;
+  if (m && m.check) S.dismissed = null;   // 다시 확인 요청: 또 다르면 다시 물어봄
+  if (m && m.extra) send(m.action, m.extra);
+  else send($('#btn-manual').dataset.action);
 });
 $('#btn-force').addEventListener('click', () => {
-  const b = $('#btn-force');
-  if (b.dataset.action && confirm(b.dataset.ask)) send(b.dataset.action);
+  const f = S.view && S.view.force;
+  if (!f) return;
+  if (f.local === 'dismiss') { S.dismissed = f.key; render(); return; }
+  if (!f.ask || confirm(f.ask)) send(f.action);
 });
 $('#btn-stop').addEventListener('click', () => {
   if (confirm('로봇을 멈추고 진행 중인 요청을 취소할까요?')) send('estop');
