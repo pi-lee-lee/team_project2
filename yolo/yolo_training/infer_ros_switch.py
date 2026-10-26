@@ -32,7 +32,7 @@ class Detector(Node):
         # true 면 input_topic + '/compressed' (JPEG) 를 받는다. 원본은 Wi-Fi 를 가득 채워 LiDAR/오도메트리까지 늦어짐
         self.declare_parameter('compressed',True)
         self.declare_parameter('confidence',0.35)
-        self.declare_parameter('imgsz',320)
+        self.declare_parameter('imgsz',640)  # 겹친 물건 개수 판정 때문에 320 에서 올림 (카메라도 640x480)
         self.declare_parameter('person_only',False)
         self.declare_parameter('enabled',False)  # 웹 'YOLO 시작' 버튼이 true, 'YOLO 정지' 가 false
         self.declare_parameter('capture_once',False)

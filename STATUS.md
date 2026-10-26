@@ -567,3 +567,5 @@ cd ../ros2_ws && source /opt/ros/humble/setup.bash && colcon build --symlink-ins
 - (같은 날) 사용자 화면 `/order` (`order.html` / `order.js` / `order.css`): 받을 위치 → 물건 개수 −/+ → 예상 순서 → 주문,
   주문 뒤 진행 상황(단계별 ✓/▶, 남은 시간, YOLO 불일치 안내, 도착 알림), 주문 취소. `?place=<id>` 로 위치 미리 고름, 고른 위치는 기기에 기억.
   관제 화면 주문 카드에 '사용자 화면 ↗' 링크. 확인: 가짜 데이터로 입력/진행 화면 그림 확인, JS 문법. **실제 주문으로는 미확인**
+- (같은 날) 겹친 물건 개수 판정 때문에 Pi 카메라 320x240 → 640x480 (`yolo/camera.sh` CAMERA_SIZE 기본), YOLO imgsz 320 → 640.
+  **실물 미확인**: Pi 카메라 노드를 다시 띄워야 적용(이미 떠 있으면 run.sh 가 그대로 둠), 압축 영상 대역폭·Pi JPEG 부하·PC YOLO 계산 시간이 늘어남
