@@ -279,6 +279,12 @@ class BridgeNode(Node):
         self.yolo_get = self.create_client(GetParameters, f'{yn}/get_parameters')
         self.yolo_set = self.create_client(SetParameters, f'{yn}/set_parameters')
         self.yolo_enabled = None     # None = 모름 (검출기 없음)
+        # Pi 카메라는 YOLO 를 켤 때만 켠다 (scripts/pi_camera.sh, 실물만). 카메라가 돌면 주행 중 Pi Wi-Fi 가 끊겨
+        # 위치 TF 지연 정지와 명령 미도달(벽 충돌)이 났음. 켜기 ~5초/끄기 ~2초라 한 작업 스레드가 '마지막으로 원한 상태' 만 맞춘다
+        self.camera_lock = threading.Lock()
+        self.camera_want = None      # 원하는 상태 (True/False)
+        self.camera_state = None     # 마지막으로 맞춘 상태 (None = 모름)
+        self.camera_busy = False
         self.yolo_counts = ('', None)   # (글자, 받은 시각)
         self.yolo_pending = None     # 답을 기다리는 enabled 조회 (future, 보낸 시각)
         self.create_subscription(String, self.get_parameter('yolo_counts_topic').value, self.on_yolo_counts, 10)
@@ -802,8 +808,44 @@ class BridgeNode(Node):
         self.server.send({'type': 'params', 'items': [
             {'name': n, 'value': self.get_parameter(n).value, 'start': s} for n, s in self.param_start.items()]})
 
+    def set_pi_camera(self, on):
+        """실물 Pi 카메라 켜기/끄기 (별도 스레드, 겹치면 마지막 요청만 반영). 시뮬레이션이면 아무것도 안 함."""
+        if os.environ.get('WAREHOUSE_ROBOT', 'real') != 'real':
+            return
+        with self.camera_lock:
+            self.camera_want = bool(on)
+            if self.camera_busy:
+                return
+            self.camera_busy = True
+        script = os.path.join(os.environ.get('WAREHOUSE_HOME', ''), 'scripts', 'pi_camera.sh')
+
+        def work():
+            while True:
+                with self.camera_lock:
+                    want = self.camera_want
+                    if want == self.camera_state:
+                        self.camera_busy = False
+                        return
+                try:
+                    r = subprocess.run([script, 'on' if want else 'off'], capture_output=True, text=True, timeout=30)
+                    ok = r.returncode == 0
+                    text = (r.stdout + r.stderr).strip().splitlines()
+                    self.get_logger().info(f'Pi 카메라 {"켜기" if want else "끄기"}: {text[-1] if text else ""}')
+                except Exception as e:   # Pi 접속 실패, 시간 초과
+                    ok = False
+                    self.get_logger().warn(f'Pi 카메라 {"켜기" if want else "끄기"} 실패: {e}')
+                with self.camera_lock:
+                    self.camera_state = want if ok else None
+                    if not ok and want == self.camera_want:   # 같은 요청을 계속 재시도하지 않음
+                        self.camera_busy = False
+                        return
+        threading.Thread(target=work, daemon=True).start()
+
     def set_yolo(self, msg):
-        """웹 버튼: {'enabled': bool} 또는 {'capture': True} (검출 장면 한 장 저장)."""
+        """웹 버튼: {'enabled': bool} 또는 {'capture': True} (검출 장면 한 장 저장).
+        enabled 에 맞춰 Pi 카메라도 켜고 끈다 (주행 중에는 카메라를 끄기 위해)."""
+        if 'enabled' in msg and not msg['enabled']:
+            self.set_pi_camera(False)
         if not self.yolo_set.service_is_ready():
             self.get_logger().warn('YOLO 검출기 노드가 없습니다 (scripts/start_yolo.sh 로 실행)')
             self.yolo_enabled = None
@@ -818,6 +860,8 @@ class BridgeNode(Node):
                 type=ParameterType.PARAMETER_BOOL, bool_value=True)))
         if not params:
             return
+        if msg.get('enabled'):
+            self.set_pi_camera(True)
         fut = self.yolo_set.call_async(SetParameters.Request(parameters=params))
 
         def done(f):

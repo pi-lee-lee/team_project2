@@ -15,7 +15,8 @@
 #                  | no_roof_small_warehouse (AWS 창고, ~/sim_ws 에 받아야 함) ...
 #                  실물과 비슷한 강당은 --world lecture_hall_real (책상 앞판 없음, 의자 무작위 배치)
 #   --gui          (sim) Gazebo 화면 표시
-#   --no-camera    (real) Pi 카메라(yolo/camera.sh)를 띄우지 않음. 기본은 bringup 과 같이 띄움 (이미 떠 있으면 그대로)
+#   --camera       (real) Pi 카메라(yolo/camera.sh)를 처음부터 계속 켜 둠 (YOLO 수동 시험용).
+#                  기본은 꺼 둠: 카메라가 돌면 주행 중 Pi Wi-Fi 가 끊겨서, 브리지가 YOLO 를 켤 때만 켬 (scripts/pi_camera.sh)
 #   --amcl A       (map) 위치 추정 설정: default(기본, config/amcl_waffle_pi.yaml, 작은 방) | hall(config/amcl_hall.yaml,
 #                  책상/의자가 흩어진 강당·교실: 지도와 안 맞는 빔에 너그럽게) | yaml 파일 경로
 #
@@ -33,7 +34,7 @@ LOGS="$HOME_DIR/logs"
 PI_HOST="test@192.168.0.181"
 
 ROBOT=""; MODE=""; MAP=""; NAME=""; ENGINE=slam_toolbox; WORLD=turtlebot3_world; GUI=""
-AMCL=default; CAMERA=1
+AMCL=default; CAMERA=0
 while [ $# -gt 0 ]; do
   case "$1" in
     --robot) ROBOT="$2"; shift ;;
@@ -44,8 +45,9 @@ while [ $# -gt 0 ]; do
     --world) WORLD="$2"; WORLD_SET=1; shift ;;
     --gui) GUI=--gui ;;
     --amcl) AMCL="$2"; shift ;;
-    --no-camera) CAMERA=0 ;;
-    -h|--help) sed -n '2,28p' "$0"; exit 0 ;;
+    --camera) CAMERA=1 ;;
+    --no-camera) CAMERA=0 ;;   # 예전 옵션 (지금 기본과 같음)
+    -h|--help) sed -n '2,29p' "$0"; exit 0 ;;
     *) echo "알 수 없는 옵션: $1 (scripts/run.sh --help)"; exit 1 ;;
   esac
   shift
@@ -146,13 +148,13 @@ else
     export ROS_DOMAIN_ID=44 LDS_MODEL=LDS-02 TURTLEBOT3_MODEL=waffle_pi
     setsid nohup ros2 launch turtlebot3_bringup robot.launch.py > ~/warehouse_bringup.log 2>&1 < /dev/null &
     sleep 12; grep -q "Run!" ~/warehouse_bringup.log && echo "   bringup 시작됨" || echo "   bringup 확인 필요: Pi ~/warehouse_bringup.log"; }'
-  # 카메라 (YOLO 검출기 입력 /csi/image_raw/compressed). 저장소의 yolo/camera.sh 를 Pi 에 복사해서 띄운다.
-  # stop_ros.sh 는 bringup 처럼 카메라도 끄지 않음 (끄기: Pi 에서 pkill -f v4l2_camera_node)
+  # 카메라 (YOLO 검출기 입력 /csi/image_raw/compressed). 기본은 꺼 두고 브리지가 YOLO 를 켤 때만 켬 (scripts/pi_camera.sh).
+  # 카메라가 돌면 (영상을 안 보내도) 주행 중 Pi Wi-Fi 가 끊겨 위치 TF 지연 정지/명령 미도달이 났음 (실물 2026-10-26).
+  # 지난 실행에서 남은 카메라도 끈다. stop_ros.sh 는 카메라를 건드리지 않음
   if [ "$CAMERA" = 1 ]; then
-    ssh -o BatchMode=yes "$PI_HOST" 'cat > ~/warehouse_camera.sh' < "$HOME_DIR/yolo/camera.sh"
-    ssh -o BatchMode=yes "$PI_HOST" 'pgrep -f "[v]4l2_camera_node" >/dev/null && echo "   카메라: 이미 실행 중" || {
-      setsid nohup bash ~/warehouse_camera.sh > ~/warehouse_camera.log 2>&1 < /dev/null &
-      sleep 4; pgrep -f "[v]4l2_camera_node" >/dev/null && echo "   카메라 시작됨" || echo "   카메라 확인 필요: Pi ~/warehouse_camera.log"; }'
+    echo "   $(WAREHOUSE_PI_HOST="$PI_HOST" "$HOME_DIR/scripts/pi_camera.sh" on)"
+  else
+    echo "   $(WAREHOUSE_PI_HOST="$PI_HOST" "$HOME_DIR/scripts/pi_camera.sh" off) (YOLO 를 켤 때만 켬)"
   fi
 fi
 

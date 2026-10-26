@@ -220,8 +220,10 @@ SIGINT → SIGTERM → SIGKILL 순서로 보내고 남은 프로세스가 없는
 
 - `yolo/` = [team_project2](https://github.com/obloodobladeo-spec/team_project2) 를 합친 것 (YOLO11n 부품 검출기, 가중치, Colab 학습 노트북). 자세한 설명은 `yolo/README.md`
 - 검출기(`/component_detector_switch`)는 **브리지와 같이 자동 실행**됩니다 (`start_bridge.sh` → `scripts/start_yolo.sh`, 출력은 `logs/bridge.log` 의 `[yolo-3]`). 빼려면 `WAREHOUSE_YOLO=0`
-- 카메라: 실물 `run.sh` 가 bringup 다음에 Pi 에서 `yolo/camera.sh` 를 띄웁니다 (Pi 의 `~/warehouse_camera.sh` 로 복사, 로그 `~/warehouse_camera.log`, 이미 떠 있으면 그대로). 빼려면 `--no-camera`.
-  `stop_ros.sh` 는 카메라를 끄지 않음 (끄기: Pi 에서 `pkill -f v4l2_camera_node`). 직접 띄울 때는 Pi 에서 `bash camera.sh /dev/video0` (장치는 `v4l2-ctl --list-devices`)
+- 카메라: **YOLO 를 켤 때만 Pi 카메라(`yolo/camera.sh`)를 켜고, 끌 때 끕니다** (브리지가 `scripts/pi_camera.sh on|off` 실행,
+  켜기 약 5초 / 끄기 약 2초). 카메라가 돌면 영상을 안 보내도 주행 중 Pi Wi-Fi 가 끊겨 위치 TF 지연 정지, 정지 명령 미도달(벽 충돌)이
+  났기 때문 (실물 2026-10-26). 실물 `run.sh` 는 시작할 때 남은 카메라를 끄고, `--camera` 면 처음부터 계속 켜 둡니다 (수동 시험용).
+  상태 확인: `scripts/pi_camera.sh status`. `stop_ros.sh` 는 카메라를 건드리지 않음. 직접 띄울 때는 Pi 에서 `bash camera.sh /dev/video0` (장치는 `v4l2-ctl --list-devices`)
 - 입력 영상: 검출기는 **`/csi/image_raw/compressed` (JPEG, 약 1.6 Mbit/s)** 를 받습니다 (`compressed:=false` 면 원본 `/csi/image_raw`).
   원본 320x240 rgb8 15fps 는 약 28 Mbit/s 라 Pi Wi-Fi 가 가득 차서 LiDAR/오도메트리가 2초 넘게 늦어지고 웹에 "로봇(Pi) 응답 없음" ↔ "연결됨" 이 반복됐음
 - `enabled` (카메라 영상 구독 + 추론 + 검출 영상 `/yolo/image_raw` + 개수 `/yolo/counts` 발행) **기본값 false**. false 면 카메라 영상 구독도 끊어 추론하지 않음 (모델은 메모리에 남아 다시 시작이 빠름). 웹 **"카메라 검출 (YOLO)"** 카드:
@@ -275,8 +277,8 @@ SIGINT → SIGTERM → SIGKILL 순서로 보내고 남은 프로세스가 없는
    보이면 같은 방식으로 물어봄 ("확인했어요, 홈으로" / "다시 꺼내기")
 5. 홈에 도착하면 작업 완료
 
-- **YOLO 는 섹션/사람 위치에 서 있을 때만 켜짐** (도착하면 켜고, 출발할 때 끔). 주행 중에는 카메라 영상이 Wi-Fi 를 안 쓰고
-  (검출기는 켜져 있을 때만 영상을 구독) PC CPU 도 주행 계산에 양보
+- **YOLO 와 Pi 카메라는 섹션/사람 위치에 서 있을 때만 켜짐** (도착하면 켜고, 출발할 때 끔). 카메라가 뜨는 데 약 5초라
+  도착 직후 "적재 완료" 를 누르면 "YOLO 개수를 못 받았습니다" 가 뜰 수 있음 (몇 초 뒤 다시 누르거나 확인 후 보내기)
 
 - 판단 기준(지금): 주문한 라벨만 보고 개수가 정확히 같아야 맞음. 요청에 없는 물건이 섞이거나 더 많은 경우는 아직 따지지 않음
   (`services.check_counts` 한 곳만 바꾸면 됨)
