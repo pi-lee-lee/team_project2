@@ -198,7 +198,8 @@ class BridgeNode(Node):
         self.declare_parameter('estop_distance', 0.2)      # 앞쪽 ±25° 이 거리 안이면 앞으로는 안 감 (비상 정지, m, LiDAR 기준)
         self.declare_parameter('blocked_timeout', 10.0)    # 이 시간 넘게 막히면 재계획/실패 (s)
         self.declare_parameter('progress_timeout', 15.0)   # 이 시간 동안 5cm도 못 가면 실패 (s)
-        self.declare_parameter('tf_timeout', 0.5)          # 위치 TF가 이보다 오래되면 즉시 정지 (s)
+        self.declare_parameter('tf_timeout', 0.5)          # 위치(오도메트리)가 이보다 오래되면 즉시 정지 (s)
+        self.declare_parameter('pose_lost_timeout', 3.0)   # 위치가 이 시간 넘게 계속 안 오면 목표 실패 (그 전엔 서서 기다렸다 이어 감, s)
         self.declare_parameter('rotate_timeout', 15.0)     # 제자리 회전이 이보다 길면 정지 후 재계획/실패 (s)
         # 부딪힘 감지 (LiDAR 보다 낮은 장애물 등): 기울기가 이 각도를 넘거나, 앞으로 가는데 이 시간 동안
         # 3cm 도 못 가면 멈추고 뒤로 물러난 뒤, 부딪힌 자리를 플래너에 장애물로 알리고 재계획
@@ -218,6 +219,7 @@ class BridgeNode(Node):
         self.blocked_timeout = p('blocked_timeout')
         self.progress_timeout = p('progress_timeout')
         self.tf_timeout = p('tf_timeout')
+        self.pose_lost_timeout = p('pose_lost_timeout')
         self.battery_cells = p('battery_cells')
         self.battery_empty_v = p('battery_empty_v')
         self.rotate_timeout = p('rotate_timeout')
@@ -323,6 +325,9 @@ class BridgeNode(Node):
         if self.mode == 'slam':   # 지도를 만드는 중에는 천천히 돈다 (빨리 돌면 스캔이 휘어 SLAM 매칭이 나빠짐)
             self.frenet_cfg.rotate_speed = min(self.frenet_cfg.rotate_speed, 0.6)
         self.odom_vw = (0.0, 0.0)
+        # 로봇 위치(odom 프레임)는 /tf 대신 /odom 메시지로: /tf 는 신뢰성(재전송) 전송이라 Wi-Fi 에서 패킷 하나가 빠지면 뒤 데이터까지
+        # 재전송을 기다려 최대 2.4초 멈췄고, /odom(best effort)은 같은 때 0.67초 (실물 측정 2026-10-26: 0.5초 넘는 사건 3 → 1)
+        self.odom_msg = None   # (x, y, yaw, 스탬프 Time)
         self.create_subscription(Odometry, 'odom', self.on_odom, qos_profile_sensor_data)
         # 기록용: 바퀴 엔코더 속도(rad/s)와 IMU 회전 속도. 명령보다 실제 회전이 절반쯤만 나와서(실물 2026-10-26, 오도메트리·AMCL 둘 다)
         # 바퀴는 명령대로 도는데 몸체가 덜 도는지(미끄러짐/끌림) 바퀴부터 덜 도는지(모터/펌웨어) 가르려고
@@ -758,7 +763,7 @@ class BridgeNode(Node):
     # 실행 중에 바꾸면 바로 쓰이는 파라미터 → 브리지 속성 (나머지 tunable 은 쓸 때마다 get_parameter 로 읽음)
     LIVE_ATTRS = {'stop_distance': 'stop_distance', 'estop_distance': 'estop_distance',
                   'blocked_timeout': 'blocked_timeout', 'progress_timeout': 'progress_timeout',
-                  'tf_timeout': 'tf_timeout', 'rotate_timeout': 'rotate_timeout', 'stall_timeout': 'stall_timeout',
+                  'tf_timeout': 'tf_timeout', 'pose_lost_timeout': 'pose_lost_timeout', 'rotate_timeout': 'rotate_timeout', 'stall_timeout': 'stall_timeout',
                   'backoff_distance': 'backoff_distance',
                   'max_retries': 'max_retries', 'bump_tilt_deg': 'bump_tilt'}
 
@@ -996,15 +1001,31 @@ class BridgeNode(Node):
         ok = np.isfinite(r) & (r > s.range_min) & (np.abs(ang) <= half_angle)
         return float(r[ok].min()) if ok.any() else math.inf
 
-    def pose_with_age(self):
-        """(x, y, yaw, TF 나이[s]) 또는 None."""
+    def odom_pose(self):
+        """odom 프레임 로봇 위치 (x, y, yaw, 나이[s]) 또는 None. /odom 메시지 (없으면 예전처럼 TF)."""
+        now = self.get_clock().now()
+        if self.odom_msg is not None:
+            x, y, yaw, stamp = self.odom_msg
+            return x, y, yaw, (now - stamp).nanoseconds / 1e9
         try:
-            t = self.tf_buffer.lookup_transform(self.global_frame, self.base_frame, Time())
+            t = self.tf_buffer.lookup_transform('odom', self.base_frame, Time())
         except TransformException:
             return None
-        age = (self.get_clock().now() - Time.from_msg(t.header.stamp)).nanoseconds / 1e9
         tr = t.transform.translation
-        return tr.x, tr.y, yaw_from_quaternion(t.transform.rotation), age
+        return tr.x, tr.y, yaw_from_quaternion(t.transform.rotation), (now - Time.from_msg(t.header.stamp)).nanoseconds / 1e9
+
+    def pose_with_age(self):
+        """지도(global_frame) 위치 (x, y, yaw, 나이[s]) 또는 None. 나이는 오도메트리(Pi) 쪽:
+        map→odom(AMCL/SLAM)은 TF 에서 가장 최근 것을 쓴다 (AMCL 은 1초 앞 스탬프라 나이로 따질 게 아님)."""
+        o = self.odom_pose()
+        if o is None:
+            return None
+        m = self.xyyaw(self.global_frame, 'odom')
+        if m is None:
+            return None
+        c, sn = math.cos(m[2]), math.sin(m[2])
+        return (m[0] + c * o[0] - sn * o[1], m[1] + sn * o[0] + c * o[1],
+                math.atan2(math.sin(m[2] + o[2]), math.cos(m[2] + o[2])), o[3])
 
     def stop_following(self):
         self.follower = None
@@ -1039,18 +1060,22 @@ class BridgeNode(Node):
             self.recovery_step(f, now)
             return
         pose = self.pose_with_age()
-        # map->base TF 스탬프는 odom 쪽(Pi) 스탬프를 따른다. AMCL은 미래 스탬프라 나이가 음수일 수 있음
+        # 위치 나이 = 오도메트리(Pi → Wi-Fi) 쪽. 늦으면 바로 서되 목표는 버리지 않고 기다렸다가 다시 오면 그 자리에서 이어 간다.
+        # Wi-Fi 지연은 보통 0.3~0.7초라 (실물 측정) 예전처럼 한 번 늦었다고 목표를 실패시키면 사람이 다시 보내야 했음.
+        # pose_lost_timeout(3초) 넘게 계속 안 오면 그때 실패. 서 있는 동안 PC→Pi 명령도 끊기면 Pi 명령 감시가 세운다
         if pose is None or pose[3] > self.tf_timeout:
-            if pose is not None and self.tilt_rel > math.radians(3):
-                # 기울어진 동안은 AMCL 에 스캔을 안 넘기므로 map TF 가 멈춘다 → 넘어짐이 아니라 부딪힘으로 처리
-                self.start_backoff(f, *pose[:3], now,
-                                   f'차체가 {math.degrees(self.tilt_rel):.0f}도 기울었습니다 (낮은 장애물에 올라탐).')
-                return
-            self.stop_following()
-            why = 'TF 없음' if pose is None else f'TF 나이 {pose[3]:.2f}초'
-            self.get_logger().warn(f'위치 TF 끊김: {why}, 기울기 {math.degrees(self.tilt_rel):.1f}°')
-            self.report('failed', f'로봇 위치 정보가 갱신되지 않아 정지했습니다 ({why}).')
+            why = '위치 없음' if pose is None else f'위치 나이 {pose[3]:.2f}초'
+            if 'pose_wait' not in f:
+                f['pose_wait'] = now
+                self.get_logger().warn(f'위치 정보 지연: {why}, 서서 기다림 (기울기 {math.degrees(self.tilt_rel):.1f}°)')
+            self.cmd_vel_pub.publish(Twist())
+            self.rec_raw = (0.0, 0.0, 'pose_wait')
+            if now - f['pose_wait'] > self.pose_lost_timeout:
+                self.stop_following()
+                self.report('failed', f'로봇 위치 정보가 {self.pose_lost_timeout:.0f}초 넘게 갱신되지 않아 정지했습니다 ({why}).')
             return
+        if 'pose_wait' in f:
+            self.get_logger().info(f'위치 정보 다시 받음 ({now - f.pop("pose_wait"):.1f}초 기다림), 이어서 감')
         x, y, yaw, _ = pose
         if self.tilt_rel < math.radians(2):
             f['level_pose'] = (x, y, yaw)   # 부딪힌 자리는 기울기 시작 전 위치/방향으로 계산 (밀리면서 돌아가므로)
@@ -1212,9 +1237,10 @@ class BridgeNode(Node):
         if f:
             mode = 'backoff' if 'backoff' in f else 'recovery' if 'recovery' in f else 'frenet'
         cmd = self.cmd_vel_pub.last
+        pm = self.pose_with_age()
         out = {'type': 'step', 'mode': mode,
-               'pose': self.xyyaw(self.global_frame, self.base_frame),
-               'odom': self.xyyaw('odom', self.base_frame), 'vw': self.odom_vw,
+               'pose': pm[:3] if pm else None, 'pose_age': round(pm[3], 3) if pm else None,
+               'odom': self.odom_xyyaw(), 'vw': self.odom_vw,
                'raw': self.rec_raw, 'cmd': cmd[:2] if cmd and now - cmd[2] < 0.06 else None,
                'estop': bool(f.get('estop')),
                'blocked_for': round(now - f['blocked_since'], 2) if f.get('blocked_since') else None,
@@ -1230,6 +1256,9 @@ class BridgeNode(Node):
 
     def on_odom(self, msg):
         self.odom_vw = (msg.twist.twist.linear.x, msg.twist.twist.angular.z)
+        q = msg.pose.pose
+        self.odom_msg = (q.position.x, q.position.y, yaw_from_quaternion(q.orientation),
+                         Time.from_msg(msg.header.stamp))
 
     def on_joint_states(self, msg):
         if msg.velocity:
@@ -1325,7 +1354,7 @@ class BridgeNode(Node):
         last = getattr(follower, 'last_cmd', None)
         if last is not None and now - last[0] < 0.1:
             return last[1]
-        pose = self.xyyaw('odom', self.base_frame)
+        pose = self.odom_xyyaw()
         map_to_odom = self.xyyaw('odom', self.global_frame)
         if pose is None or map_to_odom is None:
             return 0.0, 0.0, 'blocked'
@@ -1364,7 +1393,7 @@ class BridgeNode(Node):
     # ② 그래도 막히거나 진행이 없으면: 뒤가 비었으면 15cm 물러나고, 뒤도 막혔으면 가장 트인 쪽으로 제자리 회전
     # ③ A* 로 다시 계획 (fail_or_retry, 최대 max_retries 번)  ④ 그래도 안 되면 실패 보고
     def start_recovery(self, f, now, reason):
-        odom = self.xyyaw('odom', self.base_frame)
+        odom = self.odom_xyyaw()
         if odom is None:
             self.stop_following()
             self.fail_or_retry(reason)
@@ -1416,7 +1445,7 @@ class BridgeNode(Node):
 
     def recovery_step(self, f, now):
         r = f['recovery']
-        odom = self.xyyaw('odom', self.base_frame)
+        odom = self.odom_xyyaw()
         done = odom is None or now > r['until']
         cmd = Twist()
         if not done and r['mode'] in ('back', 'forward'):
@@ -1450,11 +1479,12 @@ class BridgeNode(Node):
         self.cmd_vel_pub.publish(Twist())
 
     def odom_xy(self):
-        try:
-            t = self.tf_buffer.lookup_transform('odom', self.base_frame, Time()).transform.translation
-            return t.x, t.y
-        except TransformException:
-            return None
+        o = self.odom_pose()
+        return None if o is None else (o[0], o[1])
+
+    def odom_xyyaw(self):
+        o = self.odom_pose()
+        return None if o is None else o[:3]
 
     def detect_stall(self, f, x, y, v, state, now):
         """앞으로 가라고 하는데 못 가고 있으면 이유 문자열, 아니면 None."""
