@@ -297,8 +297,6 @@ SIGINT → SIGTERM → SIGKILL 순서로 보내고 남은 프로세스가 없는
 - 카메라 인식 결과 연결 방법 (학습 모델로 바꿀 때도 같음):
   - 인식 노드가 **`cargo/detected` (`std_msgs/String`)** 에 지금 보이는 라벨을 발행 (`''` = 비어 있음). 라벨은 위치의 인식 라벨과 같게 (대소문자 무시)
   - 브리지가 1초(`cargo_stable_sec`) 동안 같은 값일 때만 서버에 알림 → 서버가 적재/수령을 자동 확인
-  - 임시 인식 노드: `ros2 run warehouse_robot cargo_detector --ros-args -p image_topic:=camera/image_raw/compressed`
-    (색 덩어리로 판단, 기본 A 빨강 / B 초록 / C 파랑, `hsv_<라벨>` 로 HSV 범위, `roi` 로 적재 칸만, `publish_debug:=true` 면 `cargo/debug` 영상)
   - 카메라 없이 시험: `python3 tools/cargo_sim.py B` (실림), `python3 tools/cargo_sim.py ''` (꺼냄)
 
 지도 표시: 빨간 원 = 로봇, 초록 선 = A* 경로, 주황 화살표 = 이동 목표, 빨강/초록 축 = 맵 원점(0,0)

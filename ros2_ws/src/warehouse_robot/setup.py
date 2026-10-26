@@ -25,7 +25,6 @@ setup(
         'console_scripts': [
             'astar_planner = warehouse_robot.astar_planner_node:main',
             'bridge = warehouse_robot.bridge_node:main',
-            'cargo_detector = warehouse_robot.cargo_detector_node:main',
         ],
     },
 )
