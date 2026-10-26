@@ -856,6 +856,14 @@ def save_location(data):
                   yaw=float(data.get('yaw', 0.0)))
     if 'cargo' in data:  # 카메라 인식 라벨 (비우면 위치 이름)
         fields['cargo'] = str(data.get('cargo') or '').strip()[:200]
+    if kind == Location.KIND_PICKUP:   # 같은 물건은 한 섹션에만 (주문이 갈 섹션을 하나로 정하려고)
+        old = Location.objects.filter(map=m, id=data['id']).first() if data.get('id') else None
+        cargo = fields['cargo'] if 'cargo' in fields else (old.cargo if old else '')
+        mine = {x.lower() for x in area_labels(Location(name=name, cargo=cargo))}
+        for other in m.locations.filter(kind=Location.KIND_PICKUP).exclude(id=data.get('id') or None):
+            dup = sorted(x for x in area_labels(other) if x.lower() in mine)
+            if dup:
+                raise ServiceError(f'{", ".join(dup)} 은(는) 이미 섹션 "{other.name}" 에 있습니다. 같은 물건은 한 섹션에만 둘 수 있습니다.')
     if data.get('id'):
         loc = Location.objects.filter(map=m, id=data['id']).first()
         if loc is None:
