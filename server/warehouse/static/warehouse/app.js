@@ -1296,7 +1296,7 @@ function yoloTick() {
   }
   if (now - j.t0 > YOLO_JOB[j.kind].limit) {
     yoloFinish(`${YOLO_JOB[j.kind].title.replace(' 중', '')} 시간 초과 (${sec(now - j.t0)}초)`
-      + (j.ack === null ? ': 검출기 응답 없음' : ': 검출 결과 없음, 카메라 영상(/csi/image_raw) 확인'), false);
+      + (j.ack === null ? ': 검출기 응답 없음' : ': 검출 결과 없음, 카메라 영상(/csi/image_raw/compressed) 확인'), false);
   }
 }
 $('#btn-yolo-on').addEventListener('click', () => yoloStart('on', { enabled: true }));

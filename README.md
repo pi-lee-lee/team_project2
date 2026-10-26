@@ -220,7 +220,10 @@ SIGINT → SIGTERM → SIGKILL 순서로 보내고 남은 프로세스가 없는
 
 - `yolo/` = [team_project2](https://github.com/obloodobladeo-spec/team_project2) 를 합친 것 (YOLO11n 부품 검출기, 가중치, Colab 학습 노트북). 자세한 설명은 `yolo/README.md`
 - 검출기(`/component_detector_switch`)는 **브리지와 같이 자동 실행**됩니다 (`start_bridge.sh` → `scripts/start_yolo.sh`, 출력은 `logs/bridge.log` 의 `[yolo-3]`). 빼려면 `WAREHOUSE_YOLO=0`
-- 입력 영상 `/csi/image_raw`: Pi 에서 `bash yolo/camera.sh /dev/video0` (카메라 장치는 `v4l2-ctl --list-devices` 로 확인)
+- 카메라: 실물 `run.sh` 가 bringup 다음에 Pi 에서 `yolo/camera.sh` 를 띄웁니다 (Pi 의 `~/warehouse_camera.sh` 로 복사, 로그 `~/warehouse_camera.log`, 이미 떠 있으면 그대로). 빼려면 `--no-camera`.
+  `stop_ros.sh` 는 카메라를 끄지 않음 (끄기: Pi 에서 `pkill -f v4l2_camera_node`). 직접 띄울 때는 Pi 에서 `bash camera.sh /dev/video0` (장치는 `v4l2-ctl --list-devices`)
+- 입력 영상: 검출기는 **`/csi/image_raw/compressed` (JPEG, 약 1.6 Mbit/s)** 를 받습니다 (`compressed:=false` 면 원본 `/csi/image_raw`).
+  원본 320x240 rgb8 15fps 는 약 28 Mbit/s 라 Pi Wi-Fi 가 가득 차서 LiDAR/오도메트리가 2초 넘게 늦어지고 웹에 "로봇(Pi) 응답 없음" ↔ "연결됨" 이 반복됐음
 - `enabled` (카메라 영상 구독 + 추론 + 검출 영상 `/yolo/image_raw` + 개수 `/yolo/counts` 발행) **기본값 false**. false 면 카메라 영상 구독도 끊어 추론하지 않음 (모델은 메모리에 남아 다시 시작이 빠름). 웹 **"카메라 검출 (YOLO)"** 카드:
   - **▶ YOLO 시작 / ■ YOLO 정지** = `enabled` true / false (브리지가 검출기 파라미터 서비스로 바꿈)
   - **📷 장면 캡처** = `capture_once` (다음 검출 장면을 `~/camera_dataset/captures/` 에 PNG 로)
