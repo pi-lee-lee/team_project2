@@ -564,3 +564,6 @@ cd ../ros2_ws && source /opt/ros/humble/setup.bash && colcon build --symlink-ins
   확인: 임시 DB 흐름(두 종류 섹션 불일치 → 확인 후 진행, 다음 섹션은 자기 물건만 봄, 꺼냄 → 홈), JS 문법. **실물·브라우저 조작 미확인**
 - (같은 날) 관제 화면의 "LED 요청" 카드와 로봇 카드의 '카메라 인식(cargo/detected)' 줄 제거 (주문으로 대신, 섹션 라벨과도 안 맞음).
   서버 `start_delivery`/`handle_cargo`, 태블릿의 예전 LED 화면 분기, `cargo_detector`, `tools/cargo_sim.py` 는 남김
+- (같은 날) 사용자 화면 `/order` (`order.html` / `order.js` / `order.css`): 받을 위치 → 물건 개수 −/+ → 예상 순서 → 주문,
+  주문 뒤 진행 상황(단계별 ✓/▶, 남은 시간, YOLO 불일치 안내, 도착 알림), 주문 취소. `?place=<id>` 로 위치 미리 고름, 고른 위치는 기기에 기억.
+  관제 화면 주문 카드에 '사용자 화면 ↗' 링크. 확인: 가짜 데이터로 입력/진행 화면 그림 확인, JS 문법. **실제 주문으로는 미확인**

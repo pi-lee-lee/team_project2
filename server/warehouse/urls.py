@@ -5,5 +5,6 @@ from . import views
 urlpatterns = [
     path('', views.index, name='index'),
     path('robot', views.robot_screen, name='robot_screen'),
+    path('order', views.order_screen, name='order_screen'),
     path('map/<int:map_id>.png', views.map_image, name='map_image'),
 ]

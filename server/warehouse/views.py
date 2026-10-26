@@ -22,6 +22,11 @@ def robot_screen(request):
     return render(request, 'warehouse/robot.html', {'static_version': static_version('robot.js', 'robot.css')})
 
 
+def order_screen(request):
+    """사용자(주문하는 사람)용 화면: 내 위치와 물건 개수를 골라 주문하고 진행 상황을 본다 (http://<PC>:8000/order)."""
+    return render(request, 'warehouse/order.html', {'static_version': static_version('order.js', 'order.css')})
+
+
 def map_image(request, map_id):
     m = Map.objects.filter(id=map_id).first()
     if m is None:

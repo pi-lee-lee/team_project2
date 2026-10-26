@@ -1,0 +1,56 @@
+{% load static %}<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <title>물건 주문</title>
+  <link rel="stylesheet" href="{% static 'warehouse/order.css' %}?v={{ static_version }}">
+</head>
+<body>
+<!-- 주문하는 사람용 화면 (휴대폰/PC). 같은 와이파이에서 http://<PC>:8000/order -->
+<header>
+  <h1>물건 주문</h1>
+  <span id="robot-state" class="pill">연결 중</span>
+</header>
+
+<main>
+  <!-- 주문 입력 (진행 중인 주문이 없을 때) -->
+  <section id="form-view">
+    <div class="card">
+      <h2>1. 받을 위치</h2>
+      <div id="places" class="places"></div>
+    </div>
+    <div class="card">
+      <h2>2. 필요한 물건</h2>
+      <div id="items" class="items"></div>
+    </div>
+    <div class="card summary">
+      <p id="summary" class="muted">위치와 물건을 고르세요</p>
+      <p id="preview" class="muted small"></p>
+      <button id="btn-order" class="primary" disabled>주문하기</button>
+      <p id="busy" class="warn"></p>
+    </div>
+  </section>
+
+  <!-- 진행 상황 (주문이 진행 중이거나 방금 끝났을 때) -->
+  <section id="status-view" hidden>
+    <div class="card">
+      <h2 id="status-title">주문 진행 중</h2>
+      <p id="status-sub" class="muted"></p>
+      <ol id="steps" class="steps"></ol>
+      <p id="status-note" class="warn"></p>
+    </div>
+    <div class="row">
+      <button id="btn-cancel" class="outline">주문 취소</button>
+      <button id="btn-new" class="primary" hidden>새 주문</button>
+    </div>
+  </section>
+
+  <p id="error" class="error" hidden></p>
+</main>
+
+<script src="{% static 'warehouse/order.js' %}?v={{ static_version }}"></script>
+</body>
+</html>
