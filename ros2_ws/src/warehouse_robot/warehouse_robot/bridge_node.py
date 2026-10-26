@@ -33,7 +33,7 @@ from rclpy.node import Node
 from rclpy.parameter import Parameter
 from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy, qos_profile_sensor_data
 from rclpy.time import Time
-from sensor_msgs.msg import BatteryState, Imu, LaserScan
+from sensor_msgs.msg import BatteryState, Imu, JointState, LaserScan
 from std_msgs.msg import String
 from std_srvs.srv import Empty
 from tf2_ros import Buffer, TransformException, TransformListener
@@ -324,6 +324,11 @@ class BridgeNode(Node):
             self.frenet_cfg.rotate_speed = min(self.frenet_cfg.rotate_speed, 0.6)
         self.odom_vw = (0.0, 0.0)
         self.create_subscription(Odometry, 'odom', self.on_odom, qos_profile_sensor_data)
+        # 기록용: 바퀴 엔코더 속도(rad/s)와 IMU 회전 속도. 명령보다 실제 회전이 절반쯤만 나와서(실물 2026-10-26, 오도메트리·AMCL 둘 다)
+        # 바퀴는 명령대로 도는데 몸체가 덜 도는지(미끄러짐/끌림) 바퀴부터 덜 도는지(모터/펌웨어) 가르려고
+        self.wheel_vel = None    # {관절 이름: rad/s}
+        self.imu_wz = None
+        self.create_subscription(JointState, 'joint_states', self.on_joint_states, qos_profile_sensor_data)
         # A* 가 기억 중인 장애물 (맵에 없는 LiDAR 장애물, 부딪힌 자리) → 웹 지도 표시
         self.memory = {'remembered': [], 'bumps': []}
         self.create_subscription(PoseArray, 'astar/remembered', lambda m: self.on_memory('remembered', m), 1)
@@ -940,6 +945,7 @@ class BridgeNode(Node):
 
     def on_imu(self, msg):
         """기울기가 35도를 넘은 채 0.5초 지나면 넘어진 것으로 보고 정지."""
+        self.imu_wz = round(float(msg.angular_velocity.z), 4)
         q = msg.orientation
         # 로봇 z축이 수직에서 얼마나 기울었는지
         cos_tilt = 1.0 - 2.0 * (q.x * q.x + q.y * q.y)
@@ -1213,6 +1219,7 @@ class BridgeNode(Node):
                'estop': bool(f.get('estop')),
                'blocked_for': round(now - f['blocked_since'], 2) if f.get('blocked_since') else None,
                'front': self.front_clearance(), 'tilt': self.tilt_rel,
+               'wheels': self.wheel_vel, 'imu_wz': self.imu_wz,
                'tracks': [[t.id, *t.x, t.radius, t.hits, t.misses] for t in self.tracks]}
         if fr is not None:
             out['frenet'] = fr      # 스캔 점은 Frenet 입력 안에
@@ -1223,6 +1230,10 @@ class BridgeNode(Node):
 
     def on_odom(self, msg):
         self.odom_vw = (msg.twist.twist.linear.x, msg.twist.twist.angular.z)
+
+    def on_joint_states(self, msg):
+        if msg.velocity:
+            self.wheel_vel = {n: round(float(v), 4) for n, v in zip(msg.name, msg.velocity)}
 
     def xyyaw(self, target, source, stamp=None):
         try:
