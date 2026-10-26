@@ -248,14 +248,14 @@ def robot_connected(name, active_goal_id, mode='map', session=''):
 
     task = active_task(robot)
     step = task.current_step() if task else None
+    if step is not None and step.status == TaskStep.STATUS_ARRIVED and step.items:
+        yolo_power(out, robot, True)   # 브리지를 다시 켜면 검출기도 꺼진 채로 뜸 → 기다리는 중이면 다시 켬
     if step is None:
         set_state(robot, Robot.STATE_IDLE)
     elif step.status == TaskStep.STATUS_ARRIVED and step.action == TaskStep.ACTION_UNLOAD:
         set_state(robot, Robot.STATE_WAITING_UNLOAD, f'{step.name} 수령 대기')
     elif step.status == TaskStep.STATUS_ARRIVED:
         set_state(robot, Robot.STATE_WAITING_LOAD, f'{step.name} 적재 대기')
-    if step is not None and step.status == TaskStep.STATUS_ARRIVED and step.items:
-        yolo_power(out, robot, True)   # 브리지를 다시 켜면 검출기도 꺼진 채로 뜸 → 기다리는 중이면 다시 켬
     elif step.status == TaskStep.STATUS_MOVING and active_goal_id == step.goal_id:
         set_state(robot, Robot.STATE_MOVING, f'{step.name}(으)로 이동 중')
     elif task.steps.count() == 1:
