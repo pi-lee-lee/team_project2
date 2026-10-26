@@ -148,6 +148,15 @@ else
     export ROS_DOMAIN_ID=44 LDS_MODEL=LDS-02 TURTLEBOT3_MODEL=waffle_pi
     setsid nohup ros2 launch turtlebot3_bringup robot.launch.py > ~/warehouse_bringup.log 2>&1 < /dev/null &
     sleep 12; grep -q "Run!" ~/warehouse_bringup.log && echo "   bringup 시작됨" || echo "   bringup 확인 필요: Pi ~/warehouse_bringup.log"; }'
+  # 명령 감시 (scripts/pi_cmd_watchdog.py): 브리지의 cmd_vel_pc 를 cmd_vel 로 넘기고, 0.5초 넘게 끊기면 로봇을 세움.
+  # 이게 없으면 실물 브리지 명령이 로봇에 안 닿음 (움직이지 않음). 고친 내용이 반영되게 매번 다시 띄움
+  ssh -o BatchMode=yes "$PI_HOST" 'cat > ~/warehouse_cmd_watchdog.py' < "$HOME_DIR/scripts/pi_cmd_watchdog.py"
+  # 끄기와 띄우기를 따로: 한 명령 줄에 파일 이름이 있으면 pkill -f 가 그 원격 셸까지 죽임
+  ssh -o BatchMode=yes "$PI_HOST" 'pkill -f "[w]arehouse_cmd_watchdog.py"; sleep 0.5'
+  ssh -o BatchMode=yes "$PI_HOST" 'source /opt/ros/humble/setup.bash; export ROS_DOMAIN_ID=44
+    setsid nohup python3 ~/warehouse_cmd_watchdog.py > ~/warehouse_cmd_watchdog.log 2>&1 < /dev/null &'
+  ssh -o BatchMode=yes "$PI_HOST" 'sleep 3; pgrep -f "[w]arehouse_cmd_watchdog.py" >/dev/null && echo "   명령 감시 시작됨 (통신 0.5초 끊기면 정지)" \
+      || echo "   명령 감시 확인 필요: Pi ~/warehouse_cmd_watchdog.log (없으면 로봇이 움직이지 않음)"'
   # 카메라 (YOLO 검출기 입력 /csi/image_raw/compressed). 기본은 꺼 두고 브리지가 YOLO 를 켤 때만 켬 (scripts/pi_camera.sh).
   # 카메라가 돌면 (영상을 안 보내도) 주행 중 Pi Wi-Fi 가 끊겨 위치 TF 지연 정지/명령 미도달이 났음 (실물 2026-10-26).
   # 지난 실행에서 남은 카메라도 끈다. stop_ros.sh 는 카메라를 건드리지 않음

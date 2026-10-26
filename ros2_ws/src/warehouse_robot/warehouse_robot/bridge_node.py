@@ -333,8 +333,13 @@ class BridgeNode(Node):
         self.nomotion_left = 0
         self.create_timer(0.3, self.nomotion_step)
         # /cmd_vel 은 브리지만 내보낸다. 자동 이동은 self.cmd_vel_pub.publish(...) 로 선택기(CmdMux)에 넣고,
-        # 수동 조작(웹 teleop, 외부 키보드 cmd_vel_teleop)·정지와 우선순위를 가려 20Hz 로 내보낸다
-        self._cmd_out = self.create_publisher(Twist, 'cmd_vel', 1)
+        # 수동 조작(웹 teleop, 외부 키보드 cmd_vel_teleop)·정지와 우선순위를 가려 20Hz 로 내보낸다.
+        # 실물은 cmd_vel_pc 로 보내고 Pi 의 명령 감시(scripts/pi_cmd_watchdog.py)가 cmd_vel 로 넘긴다: 명령이 0.5초 넘게
+        # 안 오면 로봇 쪽에서 세움 (Wi-Fi 끊김으로 정지 명령이 9초 안 들어가 벽에 부딪힌 적 있음). 시뮬레이션은 cmd_vel 바로
+        default_cmd = 'cmd_vel_pc' if os.environ.get('WAREHOUSE_ROBOT', 'real') == 'real' else 'cmd_vel'
+        self.cmd_topic = self.declare_parameter('cmd_vel_topic', default_cmd).value
+        self._cmd_out = self.create_publisher(Twist, self.cmd_topic, 1)
+        self.watchdog_warned = 0.0
         self.mux = CmdMux()
         self.cmd_vel_pub = _AutoCmd(self.mux)
         self.create_subscription(Twist, 'cmd_vel_teleop', self.on_external_teleop, 10)
@@ -1610,6 +1615,11 @@ class BridgeNode(Node):
         cmd = Twist()
         cmd.linear.x, cmd.angular.z = out
         self._cmd_out.publish(cmd)
+        if self.cmd_topic != 'cmd_vel' and (out[0] or out[1]) and now - self.watchdog_warned > 10.0 \
+                and self._cmd_out.get_subscription_count() == 0:
+            self.watchdog_warned = now
+            self.get_logger().warn(f'{self.cmd_topic} 를 받는 Pi 명령 감시 노드가 없어 로봇이 움직이지 않습니다 '
+                                   '(실물 run.sh 가 Pi 에 띄움: ~/warehouse_cmd_watchdog.py)')
 
     def publish_stop(self):
         if self.stop_count > 0:

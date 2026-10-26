@@ -223,7 +223,11 @@ SIGINT → SIGTERM → SIGKILL 순서로 보내고 남은 프로세스가 없는
 - 카메라: **YOLO 를 켤 때만 Pi 카메라(`yolo/camera.sh`)를 켜고, 끌 때 끕니다** (브리지가 `scripts/pi_camera.sh on|off` 실행,
   켜기 약 5초 / 끄기 약 2초). 카메라가 돌면 영상을 안 보내도 주행 중 Pi Wi-Fi 가 끊겨 위치 TF 지연 정지, 정지 명령 미도달(벽 충돌)이
   났기 때문 (실물 2026-10-26). 실물 `run.sh` 는 시작할 때 남은 카메라를 끄고, `--camera` 면 처음부터 계속 켜 둡니다 (수동 시험용).
-  상태 확인: `scripts/pi_camera.sh status`. `stop_ros.sh` 는 카메라를 건드리지 않음. 직접 띄울 때는 Pi 에서 `bash camera.sh /dev/video0` (장치는 `v4l2-ctl --list-devices`)
+  상태 확인: `scripts/pi_camera.sh status`. `stop_ros.sh` 는 카메라를 건드리지 않음.
+- **명령 감시 (통신 끊기면 정지)**: 실물 `run.sh` 가 Pi 에 `scripts/pi_cmd_watchdog.py` 를 띄움. 브리지 명령(`cmd_vel_pc`)을 로봇(`cmd_vel`)으로
+  넘기다가 0.5초 넘게 끊기면 로봇을 세움 (터틀봇은 마지막 명령을 계속 실행해서, Wi-Fi 가 끊기면 벽까지 간 적 있음). 이게 없으면 로봇이
+  움직이지 않으니 브리지 로그의 경고나 Pi `~/warehouse_cmd_watchdog.log` 확인. 직접 띄우기: Pi 에서
+  `source /opt/ros/humble/setup.bash; ROS_DOMAIN_ID=44 python3 ~/warehouse_cmd_watchdog.py` 직접 띄울 때는 Pi 에서 `bash camera.sh /dev/video0` (장치는 `v4l2-ctl --list-devices`)
 - 입력 영상: 검출기는 **`/csi/image_raw/compressed` (JPEG, 약 1.6 Mbit/s)** 를 받습니다 (`compressed:=false` 면 원본 `/csi/image_raw`).
   원본 320x240 rgb8 15fps 는 약 28 Mbit/s 라 Pi Wi-Fi 가 가득 차서 LiDAR/오도메트리가 2초 넘게 늦어지고 웹에 "로봇(Pi) 응답 없음" ↔ "연결됨" 이 반복됐음
 - `enabled` (카메라 영상 구독 + 추론 + 검출 영상 `/yolo/image_raw` + 개수 `/yolo/counts` 발행) **기본값 false**. false 면 카메라 영상 구독도 끊어 추론하지 않음 (모델은 메모리에 남아 다시 시작이 빠름). 웹 **"카메라 검출 (YOLO)"** 카드:
