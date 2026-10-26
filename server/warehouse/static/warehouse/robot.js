@@ -169,7 +169,7 @@ function view() {
     return { key: 'MOVING', title: '이동 중', sub: r.message };
   }
   if (state === 'MOVING') return { key: 'MOVING', title: '이동 중', sub: r.message };
-  return { key: 'IDLE', title: '대기 중', sub: '관제 화면의 "주문" 또는 "LED 요청" 으로 부를 수 있어요' };
+  return { key: 'IDLE', title: '대기 중', sub: '관제 화면의 "주문" 으로 부를 수 있어요' };
 }
 
 function render() {

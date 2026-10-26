@@ -562,3 +562,5 @@ cd ../ros2_ws && source /opt/ros/humble/setup.bash && colcon build --symlink-ins
   주문은 섹션별로 묶임. 판단은 **그 섹션 물건만** (누적 아님 — 앞에서 덜 싣고 보내도 다음 섹션이 계속 틀리지 않게).
   "적재 완료/꺼냈어요" 가 YOLO 와 다르면 태블릿이 물어봄 → "확인했어요, 보내기"(`force_next confirmed`) / "다시 싣기".
   확인: 임시 DB 흐름(두 종류 섹션 불일치 → 확인 후 진행, 다음 섹션은 자기 물건만 봄, 꺼냄 → 홈), JS 문법. **실물·브라우저 조작 미확인**
+- (같은 날) 관제 화면의 "LED 요청" 카드와 로봇 카드의 '카메라 인식(cargo/detected)' 줄 제거 (주문으로 대신, 섹션 라벨과도 안 맞음).
+  서버 `start_delivery`/`handle_cargo`, 태블릿의 예전 LED 화면 분기, `cargo_detector`, `tools/cargo_sim.py` 는 남김

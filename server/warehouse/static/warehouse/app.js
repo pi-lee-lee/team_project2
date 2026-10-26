@@ -12,7 +12,7 @@ const S = {
   pose: null,         // {x, y, yaw}
   path: [],           // [[x, y], ...]
   selected: new Set(),
-  mode: 'view',       // view | goto | add | initpose | deliver | zone | wall
+  mode: 'view',       // view | goto | add | initpose | zone | wall
   view: { scale: 1, ox: 0, oy: 0 },  // scale = 맵 한 칸의 캔버스 픽셀 수, (ox, oy) = 돌린 좌표 (0, 0) 의 캔버스 위치
   rot: Math.PI / 2,   // 화면 회전 (rad, 반시계): 맵의 x 축이 화면 위쪽, y 축이 왼쪽 (로봇 정면 = x 가 위로 보이게, ROS 관례)
   drag: null,
@@ -81,8 +81,6 @@ function handle(msg) {
       renderHealth();
       if (msg.runner) setRunner(msg.runner);
       setMap(msg.map);
-      S.cargo = msg.cargo;
-      renderCargo();
       S.yolo = msg.yolo;
       renderYolo();
       S.params = msg.params;
@@ -109,10 +107,6 @@ function handle(msg) {
       break;
     case 'map':
       setMap(msg.map);
-      break;
-    case 'cargo':
-      S.cargo = msg.label;
-      renderCargo();
       break;
     case 'yolo':
       // 개수 글자가 새로 온 시각 (bridge 의 age 가 작으면 새 결과)
@@ -1039,10 +1033,6 @@ canvas.addEventListener('pointerup', () => {
     S.lastCommandAt = now;
     send('goto_point', { x: wx, y: wy, yaw });
     setMode('view');
-  } else if (S.mode === 'deliver' && S.deliveryLoc) {
-    S.lastCommandAt = now;
-    send('start_delivery', { location_id: S.deliveryLoc.id, x: wx, y: wy, yaw });
-    setMode('view');
   } else if (S.mode === 'add') {
     openLocationForm({ x: wx, y: wy, yaw });
   }
@@ -1054,7 +1044,6 @@ const HINTS = {
   goto: '갈 지점을 클릭하세요 (드래그하면 도착 후 바라볼 방향 지정). A* 경로로 이동합니다',
   add: '위치를 클릭하고, 바라볼 방향으로 드래그하세요',
   initpose: '로봇의 실제 위치를 클릭하고, 로봇이 바라보는 방향으로 드래그하세요',
-  deliver: 'LED 를 받을 자리를 클릭하세요 (드래그하면 도착 후 바라볼 방향)',
   zone: '로봇이 들어가면 안 되는 곳(책상 밑, 좌석 줄)을 끌어서 사각형으로 그리세요. 오른쪽 "금지 구역" 목록에서 삭제',
   wall: '지나가면 안 되는 선(가상 벽)을 끌어서 그리세요. 오른쪽 "금지 구역" 목록에서 삭제',
 };
@@ -1064,10 +1053,7 @@ function setMode(mode) {
   // 보기 모드에서는 지도 위를 손가락으로 쓸어도 페이지가 스크롤되게 (다른 모드는 지도에서 찍기/끌기)
   canvas.classList.toggle('pan', mode === 'view');
   document.querySelectorAll('button.mode').forEach((b) => b.classList.toggle('active', b.dataset.mode === mode));
-  $('#mode-hint').textContent = mode === 'deliver' && S.deliveryLoc
-    ? `${S.deliveryLoc.cargo} — ${HINTS.deliver}` : HINTS[mode];
-  if (mode !== 'deliver') S.deliveryLoc = null;
-  renderDeliveryButtons();
+  $('#mode-hint').textContent = HINTS[mode];
 }
 
 document.querySelectorAll('button.mode').forEach((b) => b.addEventListener('click', () => setMode(b.dataset.mode)));
@@ -1077,35 +1063,10 @@ const STATE_LABEL = {
   OFFLINE: '오프라인', IDLE: '대기', MOVING: '이동 중', WAITING_LOAD: '적재 대기', WAITING_UNLOAD: '수령 대기', ERROR: '오류',
 };
 
-// ------------------------------------------------------------------ LED 요청 (배달)
-// 인식 라벨이 색 이름이면 그 색으로 칩을 칠한다
+// 인식 라벨이 색 이름이면 그 색으로 칩을 칠한다 (주문 카드)
 const CARGO_COLORS = { red: '#ef4444', green: '#22c55e', blue: '#3b82f6', yellow: '#eab308', white: '#e5e7eb',
                        빨강: '#ef4444', 초록: '#22c55e', 파랑: '#3b82f6', 노랑: '#eab308' };
 function cargoColor(label) { return CARGO_COLORS[(label || '').toLowerCase()] || '#64748b'; }
-
-function renderDeliveryButtons() {
-  const box = $('#delivery-buttons');
-  if (!box) return;
-  box.innerHTML = '';
-  const busy = !!(S.task && S.task.status === 'running');
-  const online = S.robot && S.robot.state !== 'OFFLINE';
-  const items = (S.locations || []).filter((l) => l.kind === 'pickup');
-  if (!items.length) { box.textContent = '등록된 물류 위치가 없습니다.'; return; }
-  for (const loc of items) {
-    const b = document.createElement('button');
-    b.className = 'cargo-btn' + (S.deliveryLoc && S.deliveryLoc.id === loc.id ? ' active' : '');
-    b.innerHTML = `<i style="background:${cargoColor(loc.cargo)}"></i>${loc.cargo}` +
-                  (loc.cargo !== loc.name ? ` <small>(${loc.name})</small>` : '');
-    b.disabled = busy || !online;
-    b.title = busy ? '다른 요청을 처리 중입니다' : `${loc.cargo} 요청: 지도에서 받을 자리를 클릭`;
-    b.addEventListener('click', () => {
-      if (S.cargo) { toast(`로봇에 이미 ${S.cargo} 이(가) 실려 있습니다. 먼저 꺼내 주세요.`); return; }
-      S.deliveryLoc = loc;
-      setMode('deliver');
-    });
-    box.appendChild(b);
-  }
-}
 
 // ------------------------------------------------------------------ 주문 (여러 물건)
 // 받을 곳 = 종류 '사람 위치' 인 위치, 물건 = 물류 위치(섹션)의 인식 라벨 (쉼표로 여러 개)
@@ -1169,13 +1130,6 @@ $('#btn-order').addEventListener('click', () => {
   send('start_order', { dropoff_id: Number(dropoff), items });
 });
 
-function renderCargo() {
-  const el = $('#cargo-status');
-  if (!el) return;
-  el.textContent = S.cargo === undefined || S.cargo === null ? '카메라 인식: 인식 노드 없음'
-    : `카메라 인식: ${S.cargo || '비어 있음'}`;
-  el.className = 'cargo-status' + (S.cargo ? ' loaded' : '');
-}
 // 주행 파라미터: 브리지가 보낸 목록(params: 이름, 지금 값, 시작 값)을 묶음별 입력칸으로.
 // 값을 바꾸면 param_set → 브리지가 ROS 파라미터로 바꾸고 결과(param_result)와 새 목록을 보낸다
 const PARAM_GROUPS = [['frenet.', 'Frenet 로컬 플래너'], ['tracking.', '움직이는 물체 추적'], ['', '안전 / 회복']];
@@ -1412,7 +1366,6 @@ function renderPanel() {
   const orderWait = !!(step && step.status === 'arrived' && step.items && Object.keys(step.items).length);
   $('#btn-force').hidden = !orderWait;
   $('#btn-force').textContent = unload ? '⏭ 강제 보내기 (확인 없이 홈으로)' : '⏭ 다음 경유지로 (확인 없이)';
-  renderDeliveryButtons();
   renderOrder();
   $('#btn-retry').disabled = !(online && step && (step.status === 'failed' || state === 'ERROR'));
   $('#btn-skip').disabled = !(online && step);
