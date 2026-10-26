@@ -571,3 +571,5 @@ cd ../ros2_ws && source /opt/ros/humble/setup.bash && colcon build --symlink-ins
   **실물 미확인**: Pi 카메라 노드를 다시 띄워야 적용(이미 떠 있으면 run.sh 가 그대로 둠), 압축 영상 대역폭·Pi JPEG 부하·PC YOLO 계산 시간이 늘어남
 - (같은 날) 안 쓰는 색 기반 LED 인식 노드 삭제: `cargo_detect.py`, `cargo_detector_node.py`, `test_cargo_detect.py`, setup.py 의
   `cargo_detector` 실행 이름. 물건 인식은 `yolo/` 의 YOLO 검출기만 씀
+- (같은 날) Pi 카메라 기본 해상도를 다시 320x240 으로 (`yolo/camera.sh` CAMERA_SIZE 기본, Pi 의 `~/camera.sh` 와 같음). YOLO imgsz 는 640 그대로.
+  640x480 은 압축 영상도 약 5~6 Mbit/s (프레임 55 KB) 라 Pi Wi-Fi(송신 7~26 Mbit/s)에 부담. 320x240 은 약 1.6 Mbit/s
