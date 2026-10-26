@@ -132,6 +132,11 @@ class RobotConsumer(AsyncJsonWebsocketConsumer):
         elif kind == 'yolo':
             # YOLO 부품 검출기 상태 (available, enabled, counts 글자) - 화면 표시용, DB 에 저장하지 않음
             live['yolo'] = {k: msg.get(k) for k in ('available', 'enabled', 'counts', 'age')}
+            # 주문 적재 확인용: 최근 개수 글자 (services.yolo_counts 가 가장 많이 나온 값을 씀)
+            now = time.monotonic()
+            hist = [h for h in live.get('yolo_hist', []) if now - h[0] <= 10.0]
+            hist.append((now, str(msg.get('counts') or '')))
+            live['yolo_hist'] = hist
             await self.broadcast({'type': 'yolo', 'robot': self.robot_name, **live['yolo']})
         elif kind == 'params':
             # 실행 중에 바꿀 수 있는 브리지 파라미터 (이름, 지금 값, 시작 값) - 웹 '주행 파라미터' 카드, DB 에 저장하지 않음
@@ -301,17 +306,22 @@ class UIConsumer(AsyncJsonWebsocketConsumer):
             await self.channel_layer.group_send(robot_group(robot), {'type': 'send.msg', 'msg': {
                 'type': 'param_set', 'name': str(msg.get('name', '')), 'value': msg.get('value')}})
             return
-        if action in ('plan_order', 'travel_model'):
+        if action in ('plan_order', 'travel_model', 'preview_order'):
             # 계산 결과는 요청한 화면에만 돌려준다 (DB 를 바꾸지 않음)
             try:
                 if action == 'plan_order':
                     reply = await database_sync_to_async(services.plan_order)(
                         robot, [int(i) for i in msg.get('location_ids', [])], bool(msg.get('with_home', True)))
+                elif action == 'preview_order':
+                    reply = await database_sync_to_async(services.preview_order)(
+                        robot, int(msg['dropoff_id']), dict(msg.get('items') or {}))
                 else:
                     reply = await database_sync_to_async(services.travel_model_info)()
                 await self.send_json(reply)
             except services.ServiceError as e:
                 await self.send_json({'type': 'error', 'message': str(e)})
+            except (KeyError, ValueError, TypeError) as e:
+                await self.send_json({'type': 'error', 'message': f'잘못된 요청: {e}'})
             return
         if action == 'set_home_here':
             # 로봇의 현재 위치는 DB가 아니라 메모리(LIVE)에 있으므로 여기서 꺼내 넘긴다
@@ -335,6 +345,8 @@ class UIConsumer(AsyncJsonWebsocketConsumer):
             'confirm_unload': lambda: (services.confirm_unload, robot),
             'start_delivery': lambda: (services.start_delivery, robot, int(msg['location_id']),
                                        float(msg['x']), float(msg['y']), float(msg.get('yaw', 0.0))),
+            'start_order': lambda: (services.start_order, robot, int(msg['dropoff_id']), dict(msg.get('items') or {})),
+            'force_next': lambda: (services.force_next, robot),
             'retry_step': lambda: (services.retry_step, robot),
             'skip_step': lambda: (services.skip_step, robot),
             'cancel_task': lambda: (services.cancel_task, robot),

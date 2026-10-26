@@ -5,12 +5,14 @@ consumer에서 database_sync_to_async로 호출한다. 각 함수는 DB를 바�
 
     로봇 상태: OFFLINE / IDLE / MOVING / WAITING_LOAD / ERROR
     작업 흐름: 물류 위치(load) ... → 홈 복귀(move) → 완료
+    주문 (start_order): 홈 → 물건 구역들(load, YOLO 개수 확인) → 사람 위치(unload) → 홈
 """
 import base64
 import math
 import re
 import time
 import zlib
+from collections import Counter
 from datetime import timedelta
 
 from django.db import transaction
@@ -176,6 +178,8 @@ def finish_task(out, robot, task, status, message):
     task.finished_at = timezone.now()
     task.save(update_fields=['status', 'finished_at'])
     log(out, robot, message)
+    if is_order(task):   # 주문이 켠 YOLO 는 주문이 끝나면 끈다 (웹 YOLO 버튼으로 켠 것은 그대로)
+        out.to_robot(robot, {'type': 'yolo_set', 'enabled': False})
 
 
 def advance(out, robot, task):
@@ -240,6 +244,8 @@ def robot_connected(name, active_goal_id, mode='map', session=''):
     step = task.current_step() if task else None
     if step is None:
         set_state(robot, Robot.STATE_IDLE)
+    elif step.status == TaskStep.STATUS_ARRIVED and step.action == TaskStep.ACTION_UNLOAD:
+        set_state(robot, Robot.STATE_WAITING_UNLOAD, f'{step.name} 수령 대기')
     elif step.status == TaskStep.STATUS_ARRIVED:
         set_state(robot, Robot.STATE_WAITING_LOAD, f'{step.name} 적재 대기')
     elif step.status == TaskStep.STATUS_MOVING and active_goal_id == step.goal_id:
@@ -368,7 +374,10 @@ def handle_nav_status(name, goal_id, status, message=''):
         if step.action == TaskStep.ACTION_LOAD:
             step.status = TaskStep.STATUS_ARRIVED
             step.save(update_fields=['status'])
-            if step.cargo:
+            if step.items:
+                set_state(robot, Robot.STATE_WAITING_LOAD, f'{step.name} 도착, {items_text(step.items)} 실어 주세요')
+                log(out, robot, f'{step.name} 도착 - {items_text(step.items)} 적재 대기 ("적재 완료" 또는 "다음 경유지로")')
+            elif step.cargo:
                 set_state(robot, Robot.STATE_WAITING_LOAD, f'{step.name} 도착, {step.cargo} 을(를) 실어 주세요')
                 log(out, robot, f'{step.name} 도착 - {step.cargo} 적재 대기 (카메라 인식 또는 "실었어요")')
                 # 이미 실려 있으면 (도착 전에 실음) 바로 확인
@@ -380,8 +389,9 @@ def handle_nav_status(name, goal_id, status, message=''):
         elif step.action == TaskStep.ACTION_UNLOAD:
             step.status = TaskStep.STATUS_ARRIVED
             step.save(update_fields=['status'])
-            set_state(robot, Robot.STATE_WAITING_UNLOAD, f'{step.name} 도착, {step.cargo} 을(를) 꺼내 주세요')
-            log(out, robot, f'{step.name} 도착 - {step.cargo} 수령 대기 (카메라 인식 또는 "꺼냈어요")')
+            what = items_text(step.items) if step.items else f'{step.cargo} 을(를)'
+            set_state(robot, Robot.STATE_WAITING_UNLOAD, f'{step.name} 도착, {what} 꺼내 주세요')
+            log(out, robot, f'{step.name} 도착 - {what} 수령 대기 ("꺼냈어요" 또는 "강제 보내기")')
         else:
             step.status = TaskStep.STATUS_DONE
             step.save(update_fields=['status'])
@@ -473,6 +483,8 @@ def confirm_load(robot_name):
     step = task.current_step() if task else None
     if step is None or step.status != TaskStep.STATUS_ARRIVED:
         raise ServiceError('적재 대기 중인 위치가 없습니다.')
+    if step.items and not order_check(out, robot, task, step):
+        return out
     step.status = TaskStep.STATUS_DONE
     step.save(update_fields=['status'])
     log(out, robot, f'{step.name} 적재 완료')
@@ -490,6 +502,8 @@ def confirm_unload(robot_name):
     step = task.current_step() if task else None
     if step is None or step.status != TaskStep.STATUS_ARRIVED or step.action != TaskStep.ACTION_UNLOAD:
         raise ServiceError('수령 대기 중인 배달이 없습니다.')
+    if step.items and not order_check(out, robot, task, step):
+        return out
     complete_cargo_step(out, robot, task, step, f'{step.name} 수령 완료')
     push_state(out, robot)
     return out
@@ -549,8 +563,8 @@ def handle_cargo(name, label):
     robot = get_robot(name)
     task = active_task(robot)
     step = task.current_step() if task else None
-    if step is None or step.status != TaskStep.STATUS_ARRIVED or not step.cargo:
-        return out
+    if step is None or step.status != TaskStep.STATUS_ARRIVED or not step.cargo or step.items:
+        return out  # 주문 단계는 버튼으로만 넘어간다 (YOLO 개수는 버튼을 누를 때 확인)
     if step.action == TaskStep.ACTION_LOAD:
         if cargo_matches(label, step.cargo):
             complete_cargo_step(out, robot, task, step, f'카메라: {step.cargo} 적재 확인')
@@ -558,6 +572,184 @@ def handle_cargo(name, label):
             log(out, robot, f'카메라: {label} 이(가) 실렸습니다. 요청한 것은 {step.cargo} 입니다')
     elif step.action == TaskStep.ACTION_UNLOAD and not label:
         complete_cargo_step(out, robot, task, step, f'카메라: {step.cargo} 수령 확인 (꺼냄)')
+    push_state(out, robot)
+    return out
+
+
+# ---------------------------------------------------------------- 주문 (여러 물건)
+# 사람이 받을 자리(dropoff)와 {라벨: 개수} 를 주문 → 서버가 YOLO 를 켜고 라벨마다 그 물건 구역(Location.cargo)을 찾아
+# 가장 빠른 순서로 돈다. 구역에 도착하면 그곳 사람이 싣고 "적재 완료" → YOLO 개수가 맞으면 다음, 틀리면 "적재 잘못" 표시.
+# 사람 위치에서는 꺼내고 "꺼냈어요" → 주문한 물건이 안 보이면 홈. 어느 단계든 "다음 경유지로/강제 보내기"(force_next)로 넘길 수 있다.
+
+YOLO_WINDOW = 3.0   # 버튼을 누를 때 최근 이 시간(초) 동안 가장 많이 나온 개수로 판단 (한 프레임 흔들림 방지)
+
+
+def is_order(task):
+    return task.steps.exclude(items={}).exists()
+
+
+def items_text(items):
+    return ', '.join(f'{k} {v}개' for k, v in items.items())
+
+
+def parse_counts(text):
+    """YOLO 개수 글자 "DHT11: 0 / led_red: 1 / ..." → {'DHT11': 0, 'led_red': 1, ...}"""
+    out = {}
+    for part in (text or '').split('/'):
+        name, sep, n = part.partition(':')
+        if sep and name.strip() and n.strip().isdigit():
+            out[name.strip()] = int(n.strip())
+    return out
+
+
+def yolo_counts(robot_name):
+    """최근 YOLO_WINDOW 초 동안 받은 개수 글자 중 가장 많이 나온 것 (dict). 없으면 None (YOLO 꺼짐/영상 없음)."""
+    now = time.monotonic()
+    texts = [t for at, t in LIVE.get(robot_name, {}).get('yolo_hist', []) if now - at <= YOLO_WINDOW and t]
+    if not texts:
+        return None
+    return parse_counts(Counter(texts).most_common(1)[0][0])
+
+
+def expected_counts(task, step):
+    """이 단계에서 적재함에 보여야 할 개수. 적재: 이 단계까지 실었어야 할 누적량 (카메라는 적재함 전체를 보므로),
+    수령: 주문한 라벨이 모두 0."""
+    if step.action == TaskStep.ACTION_UNLOAD:
+        return {k: 0 for k in step.items}
+    total = {}
+    for s in task.steps.filter(action=TaskStep.ACTION_LOAD, order__lte=step.order):
+        for k, v in (s.items or {}).items():
+            total[k] = total.get(k, 0) + int(v)
+    return total
+
+
+def check_counts(expected, counts):
+    """판단 기준은 여기 한 곳. 지금은 주문한 라벨만, 정확히 같아야 맞음 (다른 물건/초과는 아직 안 봄).
+    반환: (맞음, '라벨 보임/기대 ...')."""
+    lower = {k.lower(): v for k, v in counts.items()}
+    ok, parts = True, []
+    for label, want in expected.items():
+        have = lower.get(label.lower(), 0)
+        ok &= have == want
+        if want == 0:   # 수령: 남은 것만 적는다
+            if have:
+                parts.append(f'{label} {have}개 남음')
+        else:
+            parts.append(f'{label} {have}/{want}{"" if have == want else " ✗"}')
+    return ok, ', '.join(parts) or '모두 꺼냄'
+
+
+def order_check(out, robot, task, step):
+    """버튼(적재 완료/꺼냈어요)을 눌렀을 때 YOLO 개수 확인. 틀리면 상태 메시지로 알리고 False."""
+    counts = yolo_counts(robot.name)
+    is_load = step.action == TaskStep.ACTION_LOAD
+    state = Robot.STATE_WAITING_LOAD if is_load else Robot.STATE_WAITING_UNLOAD
+    if counts is None:
+        msg = 'YOLO 개수를 못 받았습니다 (검출기 꺼짐 또는 영상 없음). 확인 후 강제로 보내세요'
+        set_state(robot, state, msg)
+        log(out, robot, f'{step.name}: {msg}')
+        push_state(out, robot)
+        return False
+    ok, detail = check_counts(expected_counts(task, step), counts)
+    if ok:
+        log(out, robot, f'{step.name} YOLO 확인: {detail}')
+        return True
+    msg = f'{"적재 잘못" if is_load else "꺼내기 덜 됨"}: {detail}'
+    set_state(robot, state, msg)
+    log(out, robot, f'{step.name} {msg}')
+    push_state(out, robot)
+    return False
+
+
+def find_area(m, label):
+    for loc in m.locations.filter(kind=Location.KIND_PICKUP):
+        if loc.cargo_label().strip().lower() == label.strip().lower():
+            return loc
+    return None
+
+
+def order_route(robot, dropoff_id, items):
+    """주문 검사 + 경유 순서. 반환: (사람 위치, [(구역, 라벨, 개수) 순서대로], optimize 결과, 홈)."""
+    m = active_map()
+    if m is None:
+        raise ServiceError('맵이 없습니다.')
+    try:
+        items = {str(k).strip(): int(v) for k, v in (items or {}).items() if int(v) > 0}
+    except (TypeError, ValueError):
+        raise ServiceError('개수는 숫자로 입력하세요.')
+    if not items:
+        raise ServiceError('주문할 물건 개수를 1개 이상 입력하세요.')
+    dropoff = Location.objects.filter(map=m, id=dropoff_id, kind=Location.KIND_DROPOFF).first()
+    if dropoff is None:
+        raise ServiceError('받을 사람 위치를 고르세요 (위치 종류 "사람 위치").')
+    home = home_location()
+    if home is None:
+        raise ServiceError('홈 위치가 등록되어 있지 않습니다.')
+    areas = {}
+    for label in items:
+        loc = find_area(m, label)
+        if loc is None:
+            raise ServiceError(f'{label} 구역이 없습니다 (물류 위치의 인식 라벨을 {label} 로 등록하세요).')
+        areas.setdefault(loc.id, (loc, {}))[1][label] = items[label]
+    locs = [loc for loc, _ in areas.values()]
+    try:
+        r = planning.optimize(m, LIVE.get(robot.name, {}).get('pose'), locs, dropoff)
+    except planning.PlanError as e:
+        raise ServiceError(str(e))
+    return dropoff, [(loc, areas[loc.id][1]) for loc in r['order']], r, home
+
+
+def preview_order(robot_name, dropoff_id, items):
+    """주문 경유 순서와 예상 시간 (DB 를 바꾸지 않음). 사람 위치 → 홈 구간은 순서와 상관없어 시간에 넣지 않는다."""
+    robot = get_robot(robot_name)
+    dropoff, route, r, home = order_route(robot, dropoff_id, items)
+    names = [home.name] + [loc.name for loc, _ in route] + [dropoff.name, home.name]
+    return {'type': 'order_preview', 'names': names, 'total': r['total'],
+            'stops': [{'name': loc.name, 'items': it} for loc, it in route]}
+
+
+@transaction.atomic
+def start_order(robot_name, dropoff_id, items):
+    out = Outbox()
+    robot = get_robot(robot_name)
+    require_online(robot)
+    task = active_task(robot)
+    if task:
+        raise ServiceError(f'다른 작업(#{task.id})을 처리 중입니다. 끝난 뒤 다시 주문하세요.')
+    dropoff, route, _, home = order_route(robot, dropoff_id, items)
+    all_items = {}
+    task = Task.objects.create(robot=robot)
+    for order, (loc, it) in enumerate(route):
+        TaskStep.objects.create(task=task, order=order, action=TaskStep.ACTION_LOAD, location=loc,
+                                name=loc.name, x=loc.x, y=loc.y, yaw=loc.yaw, items=it)
+        all_items.update(it)
+    n = len(route)
+    TaskStep.objects.create(task=task, order=n, action=TaskStep.ACTION_UNLOAD, location=dropoff,
+                            name=dropoff.name, x=dropoff.x, y=dropoff.y, yaw=dropoff.yaw, items=all_items)
+    TaskStep.objects.create(task=task, order=n + 1, action=TaskStep.ACTION_MOVE, location=home,
+                            name=home.name, x=home.x, y=home.y, yaw=home.yaw)
+    out.to_robot(robot, {'type': 'yolo_set', 'enabled': True})
+    if not (LIVE.get(robot.name, {}).get('yolo') or {}).get('available'):
+        log(out, robot, '주의: YOLO 검출기가 없습니다. 개수 확인 없이 "다음 경유지로/강제 보내기"로만 진행됩니다')
+    log(out, robot, f'주문 (작업 #{task.id}) {dropoff.name}: {items_text(all_items)} - '
+                    + ' → '.join(s.name for s in task.steps.all()))
+    advance(out, robot, task)
+    push_state(out, robot)
+    return out
+
+
+@transaction.atomic
+def force_next(robot_name):
+    """주문 단계에서 YOLO 확인 없이 다음으로 ("다음 경유지로" / "강제 보내기"). 그때 개수를 기록에 남긴다."""
+    out = Outbox()
+    robot = get_robot(robot_name)
+    task = active_task(robot)
+    step = task.current_step() if task else None
+    if step is None or step.status != TaskStep.STATUS_ARRIVED:
+        raise ServiceError('적재/수령 대기 중인 단계가 없습니다.')
+    counts = yolo_counts(robot.name)
+    detail = check_counts(expected_counts(task, step), counts)[1] if counts is not None and step.items else 'YOLO 개수 없음'
+    complete_cargo_step(out, robot, task, step, f'{step.name} 강제 진행 (YOLO: {detail})')
     push_state(out, robot)
     return out
 
@@ -653,7 +845,7 @@ def save_location(data):
     if not name:
         raise ServiceError('위치 이름을 입력하세요.')
     kind = data.get('kind', Location.KIND_PICKUP)
-    if kind not in (Location.KIND_PICKUP, Location.KIND_HOME):
+    if kind not in (Location.KIND_PICKUP, Location.KIND_HOME, Location.KIND_DROPOFF):
         raise ServiceError('잘못된 위치 종류입니다.')
     fields = dict(name=name, kind=kind, x=float(data['x']), y=float(data['y']),
                   yaw=float(data.get('yaw', 0.0)))

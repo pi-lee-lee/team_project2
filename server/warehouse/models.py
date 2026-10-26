@@ -36,7 +36,8 @@ class Map(models.Model):
 class Location(models.Model):
     KIND_PICKUP = 'pickup'
     KIND_HOME = 'home'
-    KIND_CHOICES = [(KIND_PICKUP, '물류 위치'), (KIND_HOME, '홈(복귀 위치)')]
+    KIND_DROPOFF = 'dropoff'   # 주문한 사람이 물건을 받는 자리 (예: 골방)
+    KIND_CHOICES = [(KIND_PICKUP, '물류 위치'), (KIND_HOME, '홈(복귀 위치)'), (KIND_DROPOFF, '사람 위치(수령)')]
 
     map = models.ForeignKey(Map, on_delete=models.CASCADE, related_name='locations')
     name = models.CharField(max_length=100)
@@ -172,6 +173,8 @@ class TaskStep(models.Model):
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default=STATUS_PENDING)
     # LED 배달: 이 단계에서 카메라로 확인할 물건 라벨 (적재: 이 라벨이 보이면 완료, 수령: 아무것도 안 보이면 완료)
     cargo = models.CharField(max_length=50, blank=True, default='')
+    # 주문: 이 단계의 요구량 {라벨: 개수} (적재: 이 구역에서 실을 것, 수령: 주문 전체). 비면 주문이 아님
+    items = models.JSONField(blank=True, default=dict)
     # 이동 기록 (이동 시간 학습용, planning.py). 출발할 때 채우고 도착하면 finished_at
     start_x = models.FloatField(null=True, blank=True)
     start_y = models.FloatField(null=True, blank=True)
@@ -192,6 +195,7 @@ class TaskStep(models.Model):
     def to_dict(self):
         return {'id': self.id, 'order': self.order, 'action': self.action, 'name': self.name,
                 'x': self.x, 'y': self.y, 'yaw': self.yaw, 'status': self.status, 'cargo': self.cargo,
+                'items': self.items or {},
                 'predicted_sec': self.predicted_sec,
                 'started_at': self.started_at.isoformat() if self.started_at else None}
 
