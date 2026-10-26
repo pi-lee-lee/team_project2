@@ -65,7 +65,7 @@ h1 { margin: 0; font-size: clamp(32px, 7vw, 72px); line-height: 1.15; }
   text-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
   box-shadow: 0 0 0 8px rgba(255, 255, 255, 0.7), 0 10px 30px rgba(0, 0, 0, 0.15);
 }
-.led[hidden], .manual[hidden] { display: none; }
+.led[hidden], .manual[hidden], .force[hidden], .counts[hidden] { display: none; }
 body.LOAD .led, body.UNLOAD .led { animation: pulse 1.6s ease-in-out infinite; }
 @keyframes pulse { 50% { transform: scale(1.06); } }
 .manual {
@@ -79,5 +79,23 @@ body.LOAD .led, body.UNLOAD .led { animation: pulse 1.6s ease-in-out infinite; }
   color: #fff;
   box-shadow: 0 6px 18px rgba(22, 163, 74, 0.35);
 }
-.manual:active { transform: translateY(2px); }
+.manual:active, .force:active { transform: translateY(2px); }
+.buttons { display: flex; flex-wrap: wrap; gap: 16px; justify-content: center; }
+.force {
+  margin-top: 8px;
+  font-size: clamp(18px, 3vw, 28px);
+  font-weight: 700;
+  padding: 18px 32px;
+  border: 3px solid #64748b;
+  border-radius: 20px;
+  background: #fff;
+  color: #334155;
+}
+/* 주문: 적재함 YOLO 개수 / 기대 개수 */
+.counts { border-collapse: collapse; font-size: clamp(20px, 3.6vw, 34px); font-weight: 700; }
+.counts td { padding: 4px 14px; }
+.counts td:first-child { text-align: left; }
+.counts tr.ok td:last-child { color: #16a34a; }
+.counts tr.bad td:last-child { color: #dc2626; }
+.counts tr.now td:first-child { text-decoration: underline; }
 footer { justify-content: space-between; font-size: 15px; flex-wrap: wrap; }

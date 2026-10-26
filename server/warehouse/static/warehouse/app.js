@@ -206,6 +206,9 @@ function handle(msg) {
     case 'plan_order':
       showPlan(msg);
       break;
+    case 'order_preview':
+      $('#order-preview').textContent = `순서: ${msg.names.join(' → ')} (사람 위치까지 약 ${fmtSec(msg.total)})`;
+      break;
     case 'travel_model':
       showModel(msg);
       break;
@@ -803,11 +806,11 @@ function draw() {
     const [cx, cy] = worldToCanvas(loc.x, loc.y);
     const isHome = loc.kind === 'home';
     const isTarget = current && current.x === loc.x && current.y === loc.y;
-    const color = isHome ? '#7c3aed' : S.selected.has(loc.id) ? '#d97706' : '#2563eb';
+    const color = isHome ? '#7c3aed' : loc.kind === 'dropoff' ? '#db2777' : S.selected.has(loc.id) ? '#d97706' : '#2563eb';
     drawArrow(cx, cy, loc.yaw, Math.max(8, 0.25 * pxPerM), color, isTarget);
     ctx.fillStyle = '#111';
     ctx.font = '12px system-ui, sans-serif';
-    ctx.fillText((isHome ? '⌂ ' : '') + loc.name, cx + 9, cy - 9);
+    ctx.fillText(locPrefix(loc) + loc.name, cx + 9, cy - 9);
   }
 
   // 등록된 위치가 아닌 목표(여기로 이동)
@@ -1086,7 +1089,7 @@ function renderDeliveryButtons() {
   box.innerHTML = '';
   const busy = !!(S.task && S.task.status === 'running');
   const online = S.robot && S.robot.state !== 'OFFLINE';
-  const items = (S.locations || []).filter((l) => l.kind !== 'home');
+  const items = (S.locations || []).filter((l) => l.kind === 'pickup');
   if (!items.length) { box.textContent = '등록된 물류 위치가 없습니다.'; return; }
   for (const loc of items) {
     const b = document.createElement('button');
@@ -1103,6 +1106,67 @@ function renderDeliveryButtons() {
     box.appendChild(b);
   }
 }
+
+// ------------------------------------------------------------------ 주문 (여러 물건)
+// 받을 곳 = 종류 '사람 위치' 인 위치, 물건 = 물류 위치의 인식 라벨 (구역마다 한 종류)
+function locPrefix(loc) { return loc.kind === 'home' ? '⌂ ' : loc.kind === 'dropoff' ? '👤 ' : ''; }
+S.orderCounts = {};   // 라벨 → 입력한 개수 (목록을 다시 그려도 유지)
+function renderOrder() {
+  const sel = $('#order-dropoff');
+  if (!sel) return;
+  const drops = (S.locations || []).filter((l) => l.kind === 'dropoff');
+  const keep = sel.value;
+  sel.innerHTML = drops.length ? '' : '<option value="">(위치 종류 "사람 위치"를 먼저 등록하세요)</option>';
+  for (const l of drops) sel.add(new Option(l.name, l.id));
+  if (drops.some((l) => String(l.id) === keep)) sel.value = keep;
+  const labels = [...new Set((S.locations || []).filter((l) => l.kind === 'pickup').map((l) => l.cargo))];
+  const box = $('#order-items');
+  const sig = labels.join('|');
+  if (box.dataset.sig !== sig) {
+    box.dataset.sig = sig;
+    box.innerHTML = labels.length ? '' : '<span class="muted small">물류 위치(인식 라벨)가 없습니다.</span>';
+    for (const label of labels) {
+      const lab = document.createElement('label');
+      lab.innerHTML = `<i style="background:${cargoColor(label.replace(/^led_/, ''))}"></i><span></span>`;
+      lab.querySelector('span').textContent = label;
+      const inp = document.createElement('input');
+      inp.type = 'number';
+      inp.min = '0';
+      inp.max = '9';
+      inp.value = S.orderCounts[label] || 0;
+      inp.addEventListener('input', () => { S.orderCounts[label] = Math.max(0, parseInt(inp.value, 10) || 0); previewOrder(); });
+      lab.appendChild(inp);
+      box.appendChild(lab);
+    }
+  }
+  const busy = !!(S.task && S.task.status === 'running');
+  const online = S.robot && S.robot.state !== 'OFFLINE';
+  $('#btn-order').disabled = busy || !online || !drops.length || !orderItems();
+  $('#btn-order').title = busy ? '다른 작업을 처리 중입니다' : '';
+}
+function orderItems() {
+  const items = {};
+  for (const [k, v] of Object.entries(S.orderCounts)) if (v > 0) items[k] = v;
+  return Object.keys(items).length ? items : null;
+}
+let orderPreviewTimer = null;
+function previewOrder() {
+  renderOrder();
+  clearTimeout(orderPreviewTimer);
+  const items = orderItems();
+  const dropoff = $('#order-dropoff').value;
+  if (!items || !dropoff) { $('#order-preview').textContent = ''; return; }
+  orderPreviewTimer = setTimeout(() => send('preview_order', { dropoff_id: Number(dropoff), items }), 300);
+}
+$('#order-dropoff').addEventListener('change', previewOrder);
+$('#btn-order').addEventListener('click', () => {
+  const items = orderItems();
+  const dropoff = $('#order-dropoff').value;
+  if (!items || !dropoff) return;
+  const text = Object.entries(items).map(([k, v]) => `${k} ${v}개`).join(', ');
+  if (!confirm(`${$('#order-dropoff').selectedOptions[0].text} 로 ${text} 주문할까요?`)) return;
+  send('start_order', { dropoff_id: Number(dropoff), items });
+});
 
 function renderCargo() {
   const el = $('#cargo-status');
@@ -1344,7 +1408,11 @@ function renderPanel() {
   const unload = step && step.action === 'unload';
   $('#btn-confirm').textContent = unload ? '✓ 수령 완료' : '✓ 적재 완료';
   $('#btn-confirm').disabled = !(step && step.status === 'arrived');
+  const orderWait = !!(step && step.status === 'arrived' && step.items && Object.keys(step.items).length);
+  $('#btn-force').hidden = !orderWait;
+  $('#btn-force').textContent = unload ? '⏭ 강제 보내기 (확인 없이 홈으로)' : '⏭ 다음 경유지로 (확인 없이)';
   renderDeliveryButtons();
+  renderOrder();
   $('#btn-retry').disabled = !(online && step && (step.status === 'failed' || state === 'ERROR'));
   $('#btn-skip').disabled = !(online && step);
   $('#btn-cancel').disabled = !running;
@@ -1404,7 +1472,7 @@ function renderLocations() {
     });
     const name = document.createElement('span');
     name.className = 'name';
-    name.textContent = (loc.kind === 'home' ? '⌂ ' : '') + loc.name;
+    name.textContent = locPrefix(loc) + loc.name;
     name.title = '클릭해서 수정';
     name.addEventListener('click', () => openLocationForm(loc));
     const coord = document.createElement('span');
@@ -1523,6 +1591,7 @@ $('#btn-confirm').addEventListener('click', () => {
 });
 $('#btn-retry').addEventListener('click', () => send('retry_step'));
 $('#btn-skip').addEventListener('click', () => send('skip_step'));
+$('#btn-force').addEventListener('click', () => send('force_next'));
 $('#btn-cancel').addEventListener('click', () => send('cancel_task'));
 $('#btn-home').addEventListener('click', () => send('go_home'));
 $('#btn-save-map').addEventListener('click', () => {

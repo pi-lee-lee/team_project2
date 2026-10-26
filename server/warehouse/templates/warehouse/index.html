@@ -105,12 +105,23 @@
       <div id="delivery-buttons" class="delivery-buttons"></div>
     </section>
 
+    <section class="card" id="order-card">
+      <div class="card-head"><h2>주문</h2><a href="/robot" target="_blank" class="muted small">로봇 화면 ↗</a></div>
+      <p class="muted small">받을 사람 위치와 물건별 개수를 정하면 로봇이 홈에서 출발해 물건 구역들을 가장 빠른 순서로 돌고
+        사람 위치를 거쳐 홈으로 돌아옵니다. 구역마다 실은 뒤 "적재 완료"를 누르면 YOLO 개수로 확인합니다.</p>
+      <label>받을 곳 <select id="order-dropoff"></select></label>
+      <div id="order-items" class="order-items"></div>
+      <p id="order-preview" class="muted small"></p>
+      <button id="btn-order" class="primary">주문 시작</button>
+    </section>
+
     <section class="card">
       <div class="card-head"><h2>주행 제어</h2></div>
       <div class="btn-row two">
         <button id="btn-confirm" class="primary lg">✓ 적재 완료</button>
         <button id="btn-home" class="outline lg">⌂ 홈 복귀</button>
       </div>
+      <button id="btn-force" class="outline" hidden title="YOLO 확인 없이 다음 경유지로 (그때 개수는 기록에 남음)">⏭ 다음 경유지로 (확인 없이)</button>
       <div class="btn-row three">
         <button id="btn-retry">↻ 재시도</button>
         <button id="btn-skip">⤼ 건너뛰기</button>
@@ -182,6 +193,7 @@
           <select name="kind">
             <option value="pickup">물류 위치</option>
             <option value="home">홈(복귀 위치)</option>
+            <option value="dropoff">사람 위치(수령)</option>
           </select>
         </label>
         <label>카메라 인식 라벨 <input name="cargo" maxlength="50" placeholder="비우면 위치 이름 (예: A)"></label>

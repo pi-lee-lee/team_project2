@@ -408,6 +408,11 @@ button[hidden] { display: none; }
 .cargo-btn { display: inline-flex; align-items: center; gap: 6px; font-weight: 700; }
 .cargo-btn i { width: 14px; height: 14px; border-radius: 50%; display: inline-block; box-shadow: 0 0 0 2px #fff, 0 0 0 3px #cbd5e1; }
 .cargo-btn.active { outline: 2px solid var(--primary, #2563eb); }
+.order-items { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 6px; margin: 8px 0; }
+.order-items label { display: flex; align-items: center; gap: 6px; font-weight: 600; }
+.order-items label i { width: 12px; height: 12px; border-radius: 50%; display: inline-block; flex: none; }
+.order-items input { width: 56px; }
+#btn-force { width: 100%; margin-top: 6px; }
 .cargo-status { margin: 6px 0 0; font-size: 12px; color: var(--muted, #64748b); }
 .cargo-status.loaded { color: #15803d; font-weight: 700; }
 
