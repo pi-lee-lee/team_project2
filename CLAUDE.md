@@ -81,4 +81,4 @@ browser ⇄ /ws/ui/ ⇄ Django (daphne, :8000) ⇄ /ws/robot/tb3/ ⇄ bridge_nod
 - AMCL, slam_toolbox (`config/slam_toolbox.yaml`) and the A* obstacle memory subscribe to **`scan_level`**, which `bridge_node` republishes from `/scan` only while the robot isn't tilted (relative to its usual tilt; passes again after 3 s). Without the bridge running, localization/SLAM get no scans.
 - A* planner remembers LiDAR obstacles not in the map (AMCL mode only, 20 s) and bump points from the bridge (`astar/obstacle`, 120 s); `astar/clear_obstacles` (called by web "상태 초기화") clears them. Diagnose planning failures with `logs/astar_fail.npz`.
 - Sim maps record their world as `# world: <name>` in the yaml; `run.sh` uses it when `--world` is omitted.
-- `ros2_ws/build|install|log`, `server/.venv`, `logs/` and `server/.env` are committed (no `.gitignore`); don't hand-edit build/install outputs.
+- `ros2_ws/build|install`, `server/.venv` and `server/.env` are committed; don't hand-edit build/install outputs. `logs/` (node logs, drive records), `ros2_ws/log/` and Python caches are in `.gitignore` — they stay on the PC only.

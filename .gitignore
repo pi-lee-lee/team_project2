@@ -10,5 +10,11 @@ Thumbs.db
 *~
 .idea/
 
-# 주의: ros2_ws/build|install|log, server/.venv, logs/, server/.env 는
-# 일부러 커밋하는 폴더라 여기에 넣지 않는다 (CLAUDE.md 참고)
+# 실행할 때마다 생기는 로그/기록 (PC 에만 두고 git 에는 안 올림)
+#   logs/: 노드 로그(*.log), 주행 기록(records/, 목표마다 record.jsonl.gz + 그림), run_mode.env, run.lock,
+#          A* 실패 격자(astar_fail.npz), 예전 분석 결과 등. run.sh 가 폴더를 만들고 env.sh 는 없으면 건너뜀
+logs/
+#   colcon 빌드 로그
+ros2_ws/log/
+
+# 주의: ros2_ws/build|install, server/.venv, server/.env 는 일부러 커밋하는 폴더라 여기에 넣지 않는다 (CLAUDE.md 참고)
