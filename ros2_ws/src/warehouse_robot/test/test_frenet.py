@@ -180,3 +180,29 @@ def test_very_short_paths_build_reference():
         assert np.all(np.isfinite(ref.at(0.0)[0]))
     f, log = drive([(0, 0), (0.06, 0.0), (0.1, 0.03)], [])
     assert log['state'][-1] in ('done', 'rotating', 'driving')
+
+
+def _corridor(half_gap):
+    """x 0.3~1.5 m 구간만 좁은 통로 (벽 y = ±half_gap), 나머지는 넓음."""
+    return [(x, s * half_gap) for x in np.arange(0.3, 1.5, 0.02) for s in (-1, 1)]
+
+
+def test_narrow_gap_passed_slowly_with_speed_dependent_margin():
+    # 차체 반폭 0.153 + 0.045 → 가운데로 가도 여유 약 4.5 cm: 빠른 후보(6 cm)는 탈락, 느린 후보(4 cm)만 통과 → 천천히 지나감
+    walls = _corridor(0.153 + 0.045)
+    f, log = drive(STRAIGHT, walls, steps=900)
+    assert log['state'][-1] == 'done'
+    assert log['clear'] > 0.03
+    xs = np.array(log['xy'])[:, 0]
+    v_gap = np.array(log['v'])[(xs > 0.5) & (xs < 1.2)]
+    assert v_gap.max() < 0.08                       # 좁은 곳에서는 느리게
+    # 여유를 속도와 상관없이 6 cm 로 두면 같은 통로에서 막힌다 (예전 동작)
+    cfg = FrenetConfig(safety_margin_slow=0.06)
+    f2, log2 = drive(STRAIGHT, walls, steps=200, cfg=cfg)
+    assert 'blocked' in log2['state'] and log2['state'][-1] != 'done'
+
+
+def test_wide_corridor_keeps_full_speed():
+    f, log = drive(STRAIGHT, _corridor(0.45), steps=400)
+    assert log['state'][-1] == 'done'
+    assert max(log['v']) > 0.13

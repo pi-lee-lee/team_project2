@@ -75,6 +75,10 @@ class FrenetConfig:
     footprint: tuple = (-0.197, 0.069, 0.153)   # 차체 직사각형 (x_min, x_max, 반폭)
     footprint_extra: tuple = (-0.277, -0.197, -0.04, 0.04)   # 차체에 붙인 물건 (x_min, x_max, y_min, y_max) x N. 정적 검사에 포함
     safety_margin: float = 0.06   # 차체와 장애물 사이 최소 여유 (제약, m). 0.08 은 실제 소화기 옆 0.5 m 틈(경로가 꺾여 비스듬히 지남)을 못 지나갔음
+    # 정적 장애물 여유는 후보 속도에 따라: target_speed 에서 safety_margin, 가장 느린 후보(target - n_speed*speed_step)에서
+    # safety_margin_slow, 그 사이는 비례. 좁은 틈은 느린 후보만 통과해 천천히 비집고, 넓은 곳은 그대로 넉넉하게.
+    # 실물: 약 0.5 m 틈/90° 모서리에서 가장 나은 후보가 0.040~0.054 라 0.06 고정이면 막혔음 (2026-10-27)
+    safety_margin_slow: float = 0.04
     clear_pref: float = 0.15      # 여유가 이보다 작으면 비용 (m)
     dynamic_margin: float = 0.15  # 움직이는 물체 추가 여유 (m)
     dynamic_growth: float = 0.03  # 예측 1초당 여유 증가 (m/s)
@@ -316,6 +320,15 @@ class FrenetPlanner:
         self.cfg = cfg or FrenetConfig()
         self.last_eval = None
 
+    def static_margins(self, vs):
+        """후보 속도별 정적 장애물 최소 여유: target_speed 에서 safety_margin, 가장 느린 후보 속도에서 safety_margin_slow."""
+        c = self.cfg
+        lo = max(c.target_speed - c.n_speed * c.speed_step, 0.0)
+        span = max(c.target_speed - lo, 1e-6)
+        r = np.clip((np.asarray(vs, dtype=float) - lo) / span, 0.0, 1.0)
+        slow = min(c.safety_margin_slow, c.safety_margin)
+        return slow + (c.safety_margin - slow) * r
+
     def plan(self, ref, pose, v0, static_points, moving, hint=0, prev_offset=None):
         """ref: Reference (pose 와 같은 좌표계), pose: (x, y, yaw), v0: 지금 선속도, static_points: (N, 2) 스캔 점,
         moving: (M, 5) [x, y, vx, vy, r] 움직이는 물체, prev_offset: 직전에 고른 오프셋 (흔들림 비용).
@@ -359,8 +372,16 @@ class FrenetPlanner:
         stat = np.where(on_path, FrenetPlanner._static_clear(grid, g[..., 0], g[..., 1], g[..., 2], body),
                         np.inf).min(axis=1)                               # (nS,)
         now_static = float(FrenetPlanner._static_clear(grid, np.array([x]), np.array([y]), np.array([yaw]), body)[0])
-        # 이미 여유 안이면(벽 옆/구석) 2 cm 까지는 더 가까워져도 됨 (빠져나오며 뒤 모서리가 잠깐 가까워짐), 1 cm 아래로는 안 됨
-        need_s = c.safety_margin if now_static >= c.safety_margin else max(now_static - 0.02, 0.01)
+        # 정적 여유는 속도마다 (빠를수록 크게, static_margins). 이미 여유 안이면(벽 옆/구석) 가장 느린 속도만 2 cm 까지 더 가까워져도
+        # 됨 (빠져나오며 뒤 모서리가 잠깐 가까워짐, 1 cm 아래로는 안 됨). 빠른 속도는 늘 제 여유를 지켜야 함: 이걸 모든 속도에 주면
+        # 좁은 틈에 들어선 뒤 빠른 후보도 통과해 0.15 m/s 로 지나갔음 (단위 테스트)
+        # 빠져나오기 허용은 '가장 큰 여유(빠를 때) 안에 있으면' (예전과 같은 조건): 가장 느린 여유(4 cm) 기준으로 하면 4.2 cm 에서
+        # 출발할 때 첫 움직임에 뒤 모서리가 3.6 cm 로 다가가 모든 후보가 빠졌음 (실물 기록 2728 폐루프)
+        margin_v = self.static_margins(vs)                                # (nV,)
+        need_v = margin_v.copy()
+        slowest = int(np.argmin(vs))
+        if now_static < margin_v.max():
+            need_v[slowest] = min(margin_v[slowest], max(now_static - 0.02, 0.01))
         curv = np.where(on_path, np.abs(g[..., 3]), 0.0).max(axis=1)      # 모양의 최대 곡률
         steep = np.abs(dpq).max(axis=1)
         mean_d = np.abs(dq).mean(axis=1)
@@ -408,7 +429,7 @@ class FrenetPlanner:
 
         # ---- 판정 + 비용
         stat3 = np.broadcast_to(stat[:, None], (nS, nV))
-        reason = np.where(~kin, KINEMATIC, np.where(stat3 < need_s, STATIC, np.where(dyn < need_d, DYNAMIC, OK)))
+        reason = np.where(~kin, KINEMATIC, np.where(stat3 < need_v[None, :], STATIC, np.where(dyn < need_d, DYNAMIC, OK)))
         prev = 0.0 if prev_offset is None else prev_offset
         pref = max(c.clear_pref, 1e-6)
         terms = {
@@ -428,7 +449,8 @@ class FrenetPlanner:
         best = np.unravel_index(int(np.argmin(cost)), cost.shape) if np.isfinite(cost).any() else None
         self.last_eval = {
             's0': s0, 'd0': d0, 'dp0': dp0, 'v_top': v_top, 'index': i0, 'now_static': now_static,
-            'need_static': need_s, 'need_dynamic': need_d,
+            'need_static': float(need_v.min()), 'need_dynamic': need_d,
+            'need_static_v': np.broadcast_to(need_v[None, :], cost.shape).ravel(),   # 후보별 (속도마다 다름)
             'off': np.broadcast_to(OFF[:, None], cost.shape).ravel(),
             'D': np.broadcast_to(DD[:, None], cost.shape).ravel(),
             'hold': np.broadcast_to(HH[:, None], cost.shape).ravel(),
@@ -503,7 +525,7 @@ class FrenetFollower:
         ev = self.planner.last_eval
         if not ev or ev.get('best') is not None:
             return False
-        return bool(np.all(np.asarray(ev['min_static']) < ev['need_static']))
+        return bool(np.all(np.asarray(ev['min_static']) < np.asarray(ev.get('need_static_v', ev['need_static']))))
 
     def _rotation_clear(self, grid, x, y, yaw, w, horizon):
         ts = np.arange(1, int(horizon / 0.1) + 1) * 0.1
