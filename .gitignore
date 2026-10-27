@@ -10,5 +10,8 @@ Thumbs.db
 *~
 .idea/
 
-# 주의: ros2_ws/build|install|log, server/.venv, logs/, server/.env 는
+# 주행 기록 (목표마다 record.jsonl.gz, 용량이 큼)
+logs/records
+
+# 주의: ros2_ws/build|install|log, server/.venv, logs/(records 제외), server/.env 는
 # 일부러 커밋하는 폴더라 여기에 넣지 않는다 (CLAUDE.md 참고)
