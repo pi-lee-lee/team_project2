@@ -1,0 +1,370 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" width="1600" height="900">
+  <defs>
+    <style>
+      text { font-family: "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", sans-serif; fill: #1f2937; }
+      .title { font-size: 34px; font-weight: 800; fill: #111827; }
+      .subtitle { font-size: 16px; fill: #4b5563; }
+      .colhead { font-size: 15px; font-weight: 700; fill: #ffffff; }
+      .cardtitle { font-size: 18px; font-weight: 800; }
+      .cardsub { font-size: 12.5px; fill: #6b7280; }
+      .boxtitle { font-size: 14px; font-weight: 700; }
+      .item { font-size: 12.5px; fill: #374151; }
+      .small { font-size: 11.5px; fill: #4b5563; }
+      .mono { font-family: Menlo, Consolas, monospace; font-size: 11px; }
+      .ms { font-family: Menlo, Consolas, monospace; font-size: 10px; fill: #1f2937; }
+      .lbl { font-family: Menlo, Consolas, monospace; font-size: 10.5px; font-weight: 700; }
+      .lane { font-size: 12px; font-weight: 700; }
+      .th { font-size: 12.5px; font-weight: 700; fill: #ffffff; }
+      .td { font-size: 12px; fill: #1f2937; }
+      .tk { font-size: 12px; font-weight: 700; fill: #374151; }
+      .badge { font-family: Menlo, Consolas, monospace; font-size: 10.5px; font-weight: 700; fill: #ffffff; }
+      .step { font-size: 12px; fill: #1f2937; }
+      .card { fill: #ffffff; stroke-width: 2; }
+      .inner { stroke-width: 1.2; }
+    </style>
+    <marker id="aW1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#2563eb"/></marker>
+    <marker id="aW2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#c026d3"/></marker>
+    <marker id="aGrp" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#7c3aed"/></marker>
+    <marker id="aHttp" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#6b7280"/></marker>
+    <marker id="aRos" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#059669"/></marker>
+    <marker id="aDb" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#4c1d95"/></marker>
+  </defs>
+
+  <!-- 배경 -->
+  <rect width="1600" height="900" fill="#f4f6fb"/>
+
+  <!-- 제목 -->
+  <rect x="30" y="28" width="8" height="56" rx="3" fill="#2563eb"/>
+  <text x="52" y="62" class="title">창고 로봇 통신 구성도 — WebSocket 구분</text>
+  <text x="54" y="86" class="subtitle">WebSocket 은 두 종류: ① 브라우저 ⇄ Django, ② 브리지 ⇄ Django. 브라우저와 브리지는 직접 연결하지 않고 Django 가 가운데서 중계</text>
+
+  <!-- 범례 -->
+  <g transform="translate(1110,26)">
+    <rect x="0" y="0" width="460" height="66" rx="8" fill="#ffffff" stroke="#e5e7eb"/>
+    <line x1="14" y1="20" x2="44" y2="20" stroke="#2563eb" stroke-width="4"/>
+    <text x="54" y="24" class="small">WS① UI 연결</text>
+    <line x1="160" y1="20" x2="190" y2="20" stroke="#c026d3" stroke-width="4"/>
+    <text x="200" y="24" class="small">WS② 로봇 연결</text>
+    <line x1="306" y1="20" x2="338" y2="20" stroke="#7c3aed" stroke-width="2.5" stroke-dasharray="5 3" marker-end="url(#aGrp)"/>
+    <text x="346" y="24" class="small">채널 그룹 전달</text>
+    <line x1="14" y1="46" x2="46" y2="46" stroke="#6b7280" stroke-width="2" stroke-dasharray="2 3" marker-end="url(#aHttp)"/>
+    <text x="54" y="50" class="small">HTTP · 실행</text>
+    <line x1="160" y1="46" x2="186" y2="46" stroke="#059669" stroke-width="2.5" marker-end="url(#aRos)"/>
+    <text x="200" y="50" class="small">ROS 2 (DDS)</text>
+    <line x1="306" y1="46" x2="332" y2="46" stroke="#4c1d95" stroke-width="2.5" marker-end="url(#aDb)"/>
+    <text x="346" y="50" class="small">DB (ORM)</text>
+  </g>
+
+  <!-- 열 머리표 -->
+  <rect x="30" y="110" width="200" height="28" rx="14" fill="#2563eb"/>
+  <text x="130" y="129" class="colhead" text-anchor="middle">① 브라우저 (접속하는 쪽)</text>
+  <rect x="240" y="110" width="240" height="28" rx="14" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
+  <text x="360" y="129" class="colhead" text-anchor="middle" style="fill:#1d4ed8">WS① UI 연결</text>
+  <rect x="490" y="110" width="440" height="28" rx="14" fill="#7c3aed"/>
+  <text x="710" y="129" class="colhead" text-anchor="middle">② Django 서버 (받는 쪽 · 중계)</text>
+  <rect x="940" y="110" width="250" height="28" rx="14" fill="#fae8ff" stroke="#c026d3" stroke-width="2"/>
+  <text x="1065" y="129" class="colhead" text-anchor="middle" style="fill:#a21caf">WS② 로봇 연결</text>
+  <rect x="1200" y="110" width="370" height="28" rx="14" fill="#059669"/>
+  <text x="1385" y="129" class="colhead" text-anchor="middle">③ 브리지 (접속하는 쪽) · ROS 2</text>
+
+  <!-- ===== ① 브라우저 ===== -->
+  <rect x="30" y="150" width="200" height="150" rx="12" class="card" stroke="#2563eb"/>
+  <text x="44" y="176" class="cardtitle">관제 화면</text>
+  <text x="44" y="194" class="cardsub">/ · index.html + app.js</text>
+  <text x="44" y="218" class="item">• 지도·위치·경로 표시</text>
+  <text x="44" y="238" class="item">• 이동·주문·파라미터</text>
+  <rect x="42" y="252" width="176" height="36" rx="6" fill="#eff6ff"/>
+  <text x="50" y="266" class="ms" style="fill:#1d4ed8">new WebSocket(</text>
+  <text x="50" y="280" class="ms" style="fill:#1d4ed8">  '/ws/ui/?robot=tb3')</text>
+
+  <rect x="30" y="312" width="200" height="86" rx="12" class="card" stroke="#2563eb"/>
+  <text x="44" y="338" class="cardtitle">로봇 태블릿</text>
+  <text x="44" y="356" class="cardsub">/robot · robot.js</text>
+  <text x="44" y="380" class="item">• 적재/하역 확인</text>
+
+  <rect x="30" y="410" width="200" height="86" rx="12" class="card" stroke="#2563eb"/>
+  <text x="44" y="436" class="cardtitle">주문 화면</text>
+  <text x="44" y="454" class="cardsub">/order · order.js</text>
+  <text x="44" y="478" class="item">• 주문 넣기·진행 보기</text>
+
+  <text x="130" y="520" class="small" text-anchor="middle">세 화면 모두 같은 /ws/ui/ 에</text>
+  <text x="130" y="536" class="small" text-anchor="middle">각자 연결 (탭 1개 = 연결 1개)</text>
+
+  <!-- 브라우저 → WS① 밴드 -->
+  <line x1="232" y1="225" x2="244" y2="225" stroke="#2563eb" stroke-width="4"/>
+  <line x1="232" y1="355" x2="244" y2="355" stroke="#2563eb" stroke-width="4"/>
+  <line x1="232" y1="453" x2="244" y2="453" stroke="#2563eb" stroke-width="4"/>
+
+  <!-- ===== WS① 밴드 ===== -->
+  <rect x="244" y="150" width="232" height="358" rx="12" fill="#eff6ff" stroke="#2563eb" stroke-width="2.5"/>
+  <text x="256" y="172" class="boxtitle" fill="#1d4ed8">WS① UI 연결</text>
+  <text x="256" y="190" class="ms" style="fill:#1d4ed8">ws://&lt;PC&gt;:8000/ws/ui/?robot=</text>
+  <text x="256" y="207" class="small">브라우저가 접속 → Django 가 받음</text>
+
+  <rect x="254" y="216" width="212" height="128" rx="7" fill="#ffffff" stroke="#93c5fd" class="inner"/>
+  <text x="264" y="234" class="lane" fill="#1d4ed8">요청 (action) ▶ Django</text>
+  <text x="264" y="252" class="ms">goto_point · goto_location</text>
+  <text x="264" y="267" class="ms">go_home · start_order</text>
+  <text x="264" y="282" class="ms">confirm_load · confirm_unload</text>
+  <text x="264" y="297" class="ms">force_next · cancel_task · estop</text>
+  <text x="264" y="312" class="ms">teleop · set_initial_pose</text>
+  <text x="264" y="327" class="ms">save_zone · param_set · yolo_set</text>
+  <text x="264" y="340" class="ms">runner_start · select_robot …</text>
+
+  <rect x="254" y="352" width="212" height="146" rx="7" fill="#ffffff" stroke="#93c5fd" class="inner"/>
+  <text x="264" y="370" class="lane" fill="#1d4ed8">◀ 화면 갱신 (type)</text>
+  <text x="264" y="388" class="ms">snapshot  (접속 직후 전체)</text>
+  <text x="264" y="403" class="ms">state · log · locations</text>
+  <text x="264" y="418" class="ms">zones · pose · path · health</text>
+  <text x="264" y="433" class="ms">scan · local_plan · obstacles</text>
+  <text x="264" y="448" class="ms">memory · cargo · yolo</text>
+  <text x="264" y="463" class="ms">params · runner</text>
+  <text x="264" y="480" class="ms">robot_summary</text>
+  <text x="264" y="493" class="small" style="font-size:10.5px">(선택 안 한 로봇은 요약만)</text>
+
+  <!-- HTTP: 페이지/JS 먼저 -->
+  <line x1="232" y1="528" x2="496" y2="528" stroke="#6b7280" stroke-width="2" stroke-dasharray="2 3" marker-end="url(#aHttp)"/>
+  <text x="364" y="546" class="small" text-anchor="middle">HTTP GET: 페이지·JS 를 먼저 받음 (views · static)</text>
+
+  <!-- ===== ② Django ===== -->
+  <rect x="490" y="150" width="440" height="408" rx="12" class="card" stroke="#7c3aed"/>
+  <text x="504" y="176" class="cardtitle">Django 서버</text>
+  <text x="614" y="176" class="mono" fill="#6d28d9">daphne :8000</text>
+  <text x="504" y="194" class="cardsub">Channels · 서버 프로세스 1개 · InMemoryChannelLayer</text>
+
+  <!-- UIConsumer -->
+  <rect x="504" y="208" width="130" height="122" rx="8" fill="#eff6ff" stroke="#2563eb" stroke-width="2"/>
+  <text x="514" y="228" class="boxtitle" fill="#1d4ed8">UIConsumer</text>
+  <text x="514" y="244" class="ms" style="fill:#1d4ed8">/ws/ui/</text>
+  <text x="514" y="264" class="small">화면 연결마다 1개</text>
+  <text x="514" y="281" class="small">그룹 ui 에 가입</text>
+  <text x="514" y="301" class="small">send_msg: 고른</text>
+  <text x="514" y="317" class="small">로봇 것만 보냄</text>
+
+  <!-- 채널 레이어 -->
+  <rect x="642" y="208" width="146" height="122" rx="8" fill="#faf5ff" stroke="#7c3aed" stroke-width="1.5" stroke-dasharray="5 3"/>
+  <text x="715" y="226" class="boxtitle" fill="#6d28d9" text-anchor="middle">채널 레이어</text>
+  <text x="715" y="241" class="small" text-anchor="middle">(메모리 · group_send)</text>
+  <line x1="636" y1="268" x2="794" y2="268" stroke="#7c3aed" stroke-width="2.5" stroke-dasharray="5 3" marker-end="url(#aGrp)"/>
+  <text x="715" y="261" class="ms" style="fill:#6d28d9" text-anchor="middle">robot_&lt;이름&gt;</text>
+  <text x="715" y="283" class="small" text-anchor="middle" style="font-size:10.5px">명령 → 그 브리지</text>
+  <line x1="794" y1="308" x2="636" y2="308" stroke="#7c3aed" stroke-width="2.5" stroke-dasharray="5 3" marker-end="url(#aGrp)"/>
+  <text x="715" y="301" class="ms" style="fill:#6d28d9" text-anchor="middle">ui</text>
+  <text x="715" y="323" class="small" text-anchor="middle" style="font-size:10.5px">모든 화면에 뿌림</text>
+
+  <!-- RobotConsumer -->
+  <rect x="796" y="208" width="120" height="122" rx="8" fill="#fdf4ff" stroke="#c026d3" stroke-width="2"/>
+  <text x="806" y="228" class="boxtitle" fill="#a21caf">RobotConsumer</text>
+  <text x="806" y="244" class="ms" style="fill:#a21caf">/ws/robot/&lt;이름&gt;/</text>
+  <text x="806" y="264" class="small">브리지 1개 = 1대</text>
+  <text x="806" y="281" class="small">그룹 robot_&lt;이름&gt;</text>
+  <text x="806" y="301" class="small">화면 데이터는</text>
+  <text x="806" y="317" class="small">LIVE 에 두고 중계</text>
+
+  <!-- services -->
+  <rect x="504" y="352" width="412" height="74" rx="8" fill="#ede9fe" stroke="#a78bfa" class="inner"/>
+  <text x="516" y="372" class="boxtitle">services.py · 작업 상태 머신</text>
+  <text x="516" y="390" class="small">입력: 화면 요청(action) · 브리지 보고(hello · nav_status · cargo · battery …)</text>
+  <text x="516" y="406" class="small">DB 갱신 → 결과 Outbox (to_robot / to_ui) → dispatch() 가 채널 그룹으로 보냄</text>
+  <text x="516" y="420" class="small" style="font-size:10.5px">ServiceError 는 요청한 화면 하나에만 돌려줌</text>
+
+  <!-- consumer → services -->
+  <line x1="569" y1="332" x2="569" y2="350" stroke="#2563eb" stroke-width="2.5" marker-end="url(#aW1)"/>
+  <text x="575" y="345" class="lbl" fill="#1d4ed8">action</text>
+  <line x1="856" y1="332" x2="856" y2="350" stroke="#c026d3" stroke-width="2.5" marker-end="url(#aW2)"/>
+  <text x="845" y="345" class="lbl" fill="#a21caf" text-anchor="end">보고</text>
+  <!-- services Outbox → 채널 그룹 -->
+  <line x1="715" y1="350" x2="715" y2="334" stroke="#7c3aed" stroke-width="2.5" stroke-dasharray="4 3" marker-end="url(#aGrp)"/>
+  <text x="721" y="346" class="lbl" fill="#6d28d9">Outbox</text>
+
+  <!-- LIVE / MySQL -->
+  <rect x="504" y="438" width="200" height="62" rx="8" fill="#f5f3ff" stroke="#c4b5fd" class="inner"/>
+  <text x="516" y="457" class="boxtitle">LIVE 메모리</text>
+  <text x="516" y="474" class="small">pose · path · health · yolo …</text>
+  <text x="516" y="490" class="small">DB 저장 안 함 · snapshot 용</text>
+
+  <rect x="716" y="438" width="200" height="62" rx="8" fill="#ffffff" stroke="#7c3aed" class="inner"/>
+  <ellipse cx="740" cy="456" rx="12" ry="4.5" fill="#ede9fe" stroke="#7c3aed"/>
+  <path d="M728,456 v16 a12,4.5 0 0 0 24,0 v-16" fill="#ede9fe" stroke="#7c3aed"/>
+  <text x="762" y="461" class="boxtitle">MySQL</text>
+  <text x="762" y="477" class="small">Map · Location · Zone</text>
+  <text x="762" y="492" class="small">Robot · Task · TaskStep</text>
+  <line x1="816" y1="426" x2="816" y2="438" stroke="#4c1d95" stroke-width="3"/>
+
+  <!-- runner -->
+  <rect x="504" y="510" width="412" height="38" rx="8" fill="#f9fafb" stroke="#d1d5db" class="inner"/>
+  <text x="516" y="528" class="boxtitle" fill="#374151">runner.py · 실행 모드</text>
+  <text x="516" y="542" class="small">run.sh · stop_ros.sh · localize.py 를 서버가 직접 실행 (WebSocket 아님)</text>
+
+  <!-- 밴드 ⇄ consumer -->
+  <line x1="476" y1="268" x2="504" y2="268" stroke="#2563eb" stroke-width="5"/>
+  <line x1="916" y1="268" x2="942" y2="268" stroke="#c026d3" stroke-width="5"/>
+
+  <!-- ===== WS② 밴드 ===== -->
+  <rect x="942" y="150" width="246" height="408" rx="12" fill="#fdf4ff" stroke="#c026d3" stroke-width="2.5"/>
+  <text x="954" y="172" class="boxtitle" fill="#a21caf">WS② 로봇 연결</text>
+  <text x="954" y="190" class="ms" style="fill:#a21caf">ws://localhost:8000/ws/robot/tb3/</text>
+  <text x="954" y="207" class="small">브리지가 접속 → Django 가 받음</text>
+  <text x="954" y="222" class="small">같은 PC 안 · 끊기면 2초마다 재접속</text>
+
+  <rect x="952" y="232" width="226" height="88" rx="7" fill="#ffffff" stroke="#f0abfc" class="inner"/>
+  <text x="962" y="250" class="lane" fill="#a21caf">명령 ▶ 브리지</text>
+  <text x="962" y="268" class="ms">goto · cancel · stop</text>
+  <text x="962" y="283" class="ms">initial_pose · zones · teleop</text>
+  <text x="962" y="298" class="ms">save_map · reset</text>
+  <text x="962" y="313" class="ms">yolo_set · param_set</text>
+
+  <rect x="952" y="328" width="226" height="220" rx="7" fill="#ffffff" stroke="#f0abfc" class="inner"/>
+  <text x="962" y="346" class="lane" fill="#a21caf">◀ 보고 (type)</text>
+  <rect x="960" y="354" width="210" height="96" rx="5" fill="#f5f3ff"/>
+  <text x="968" y="370" class="small" style="font-weight:700;fill:#6d28d9">중계만 → LIVE · 그룹 ui</text>
+  <text x="968" y="386" class="ms">pose · path · health</text>
+  <text x="968" y="400" class="ms">scan · local_plan</text>
+  <text x="968" y="414" class="ms">obstacles · memory</text>
+  <text x="968" y="428" class="ms">yolo · params · param_result</text>
+  <text x="968" y="443" class="small" style="font-size:10.5px">고빈도 · DB 에 안 씀</text>
+  <rect x="960" y="456" width="210" height="84" rx="5" fill="#ede9fe"/>
+  <text x="968" y="472" class="small" style="font-weight:700;fill:#4c1d95">상태 머신 → services · DB</text>
+  <text x="968" y="488" class="ms">hello · nav_status</text>
+  <text x="968" y="502" class="ms">cargo · battery · map</text>
+  <text x="968" y="516" class="ms">map_saved · reset_done</text>
+  <text x="968" y="532" class="small" style="font-size:10.5px">health 는 Pi 응답이 바뀔 때만</text>
+
+  <!-- 밴드 ⇄ 브리지 -->
+  <line x1="1188" y1="226" x2="1214" y2="226" stroke="#c026d3" stroke-width="5"/>
+
+  <!-- ===== ③ 브리지 ===== -->
+  <rect x="1200" y="150" width="370" height="196" rx="12" class="card" stroke="#059669"/>
+  <text x="1216" y="176" class="cardtitle">bridge_node</text>
+  <text x="1330" y="176" class="mono" fill="#047857">/warehouse_bridge</text>
+  <text x="1216" y="194" class="cardsub">WebSocket 클라이언트 (websocket-client 스레드)</text>
+
+  <rect x="1214" y="206" width="342" height="40" rx="7" fill="#fdf4ff" stroke="#f0abfc" class="inner"/>
+  <text x="1224" y="223" class="boxtitle" fill="#a21caf">WS 스레드</text>
+  <text x="1300" y="223" class="small">받은 명령 → inbox 큐</text>
+  <text x="1224" y="239" class="small">보낼 메시지는 연결돼 있을 때만 전송</text>
+
+  <rect x="1214" y="252" width="342" height="40" rx="7" fill="#f0fdf4" stroke="#86efac" class="inner"/>
+  <text x="1224" y="269" class="boxtitle" fill="#047857">ROS 타이머</text>
+  <text x="1310" y="269" class="small">inbox 처리 → 목표 실행 · 안전 감시</text>
+  <text x="1224" y="285" class="small">A* 경로 → Frenet 로컬 플래너 → cmd_vel</text>
+
+  <rect x="1214" y="298" width="342" height="40" rx="7" fill="#f0fdf4" stroke="#86efac" class="inner"/>
+  <text x="1224" y="315" class="boxtitle" fill="#047857">웹용 가공</text>
+  <text x="1300" y="315" class="small">TF 로 map 좌표 변환 · 보내는 간격 줄임</text>
+  <text x="1224" y="331" class="small">scan 초당 4번 · local_plan 초당 5번</text>
+
+  <!-- ROS 2 영역 -->
+  <rect x="1200" y="364" width="370" height="194" rx="12" fill="#ecfdf5" stroke="#059669" stroke-width="2" stroke-dasharray="7 5"/>
+  <text x="1214" y="385" class="boxtitle" fill="#065f46">ROS 2 · DDS — WebSocket 아님</text>
+  <text x="1556" y="385" class="small" text-anchor="end">도메인 44 실물 / 77 시뮬</text>
+  <line x1="1385" y1="346" x2="1385" y2="364" stroke="#059669" stroke-width="4"/>
+
+  <rect x="1212" y="396" width="110" height="58" rx="8" class="card" stroke="#059669" style="stroke-width:1.5"/>
+  <text x="1222" y="415" class="boxtitle">A* 플래너</text>
+  <text x="1222" y="431" class="ms" style="fill:#047857">astar/get_plan</text>
+  <text x="1222" y="446" class="small" style="font-size:10.5px">금지 구역 반영</text>
+
+  <rect x="1330" y="396" width="110" height="58" rx="8" class="card" stroke="#059669" style="stroke-width:1.5"/>
+  <text x="1340" y="415" class="boxtitle">위치 추정</text>
+  <text x="1340" y="431" class="small" style="font-size:10.5px">map_server+AMCL</text>
+  <text x="1340" y="446" class="small" style="font-size:10.5px">또는 slam_toolbox</text>
+
+  <rect x="1448" y="396" width="110" height="58" rx="8" class="card" stroke="#059669" style="stroke-width:1.5"/>
+  <text x="1458" y="415" class="boxtitle">YOLO 검출</text>
+  <text x="1458" y="431" class="ms" style="fill:#047857">/yolo/counts</text>
+  <text x="1458" y="446" class="small" style="font-size:10.5px">켤 때만 영상 받음</text>
+
+  <rect x="1212" y="466" width="346" height="82" rx="8" fill="#fff7ed" stroke="#ea580c" stroke-width="1.5"/>
+  <text x="1224" y="486" class="boxtitle" fill="#c2410c">TurtleBot3 Pi · Wi-Fi · Fast DDS</text>
+  <text x="1224" y="504" class="ms" style="fill:#c2410c">→ /scan /odom /tf /imu /battery_state</text>
+  <text x="1224" y="520" class="ms" style="fill:#c2410c">← /cmd_vel</text>
+  <text x="1224" y="536" class="ms" style="fill:#c2410c">→ /csi/image_raw/compressed</text>
+  <text x="1510" y="520" class="small" text-anchor="end" style="font-size:10.5px">(시뮬: Gazebo)</text>
+
+  <!-- ===== 하단 왼쪽: 두 연결 비교 ===== -->
+  <rect x="30" y="576" width="900" height="304" rx="14" fill="#ffffff" stroke="#e5e7eb" stroke-width="1.5"/>
+  <text x="50" y="604" class="cardtitle">두 WebSocket 비교</text>
+  <text x="222" y="604" class="cardsub">둘 다 Django(:8000) 가 받는 쪽, 접속은 각 클라이언트가 먼저 건다</text>
+
+  <rect x="46" y="616" width="868" height="26" rx="5" fill="#374151"/>
+  <text x="58" y="634" class="th">항목</text>
+  <rect x="226" y="616" width="344" height="26" fill="#2563eb"/>
+  <text x="238" y="634" class="th">WS① UI 연결</text>
+  <rect x="570" y="616" width="344" height="26" rx="5" fill="#c026d3"/>
+  <rect x="570" y="616" width="20" height="26" fill="#c026d3"/>
+  <text x="582" y="634" class="th">WS② 로봇 연결</text>
+
+  <g>
+    <rect x="46" y="642" width="868" height="29" fill="#f9fafb"/>
+    <text x="58" y="661" class="tk">주소</text>
+    <text x="238" y="661" class="td mono" style="font-size:11.5px">/ws/ui/?robot=&lt;이름&gt;</text>
+    <text x="582" y="661" class="td mono" style="font-size:11.5px">/ws/robot/&lt;이름&gt;/</text>
+
+    <text x="58" y="690" class="tk">접속하는 쪽</text>
+    <text x="238" y="690" class="td">브라우저 JS (app.js · robot.js · order.js)</text>
+    <text x="582" y="690" class="td">bridge_node (Python websocket-client)</text>
+
+    <rect x="46" y="700" width="868" height="29" fill="#f9fafb"/>
+    <text x="58" y="719" class="tk">받는 쪽</text>
+    <text x="238" y="719" class="td">Django UIConsumer</text>
+    <text x="582" y="719" class="td">Django RobotConsumer</text>
+
+    <text x="58" y="748" class="tk">연결 개수</text>
+    <text x="238" y="748" class="td">열린 화면(탭) 수만큼</text>
+    <text x="582" y="748" class="td">로봇 1대당 1개</text>
+
+    <rect x="46" y="758" width="868" height="29" fill="#f9fafb"/>
+    <text x="58" y="777" class="tk">채널 그룹</text>
+    <text x="238" y="777" class="td">ui (모든 화면이 함께 가입)</text>
+    <text x="582" y="777" class="td">robot_&lt;이름&gt; (그 브리지 하나)</text>
+
+    <text x="58" y="806" class="tk">처음 연결</text>
+    <text x="238" y="806" class="td">서버가 snapshot (전체 상태) 전송</text>
+    <text x="582" y="806" class="td">브리지가 hello → 진행 중 목표 복구</text>
+
+    <rect x="46" y="816" width="868" height="29" fill="#f9fafb"/>
+    <text x="58" y="835" class="tk">끊기면</text>
+    <text x="238" y="835" class="td">화면이 다시 접속 → snapshot 다시 받음</text>
+    <text x="582" y="835" class="td">2초마다 재접속 · 화면에 브리지 끊김 표시</text>
+
+    <text x="58" y="864" class="tk">오가는 것</text>
+    <text x="238" y="864" class="td">요청 action ▶ / ◀ 화면 갱신 type</text>
+    <text x="582" y="864" class="td">명령 goto 등 ▶ / ◀ 보고 pose 등</text>
+  </g>
+  <line x1="226" y1="616" x2="226" y2="872" stroke="#e5e7eb"/>
+  <line x1="570" y1="616" x2="570" y2="872" stroke="#e5e7eb"/>
+
+  <!-- ===== 하단 오른쪽: 지점 클릭 한 번 ===== -->
+  <rect x="950" y="576" width="620" height="304" rx="14" fill="#ffffff" stroke="#e5e7eb" stroke-width="1.5"/>
+  <text x="970" y="604" class="cardtitle">지점 클릭 한 번 — 어느 연결을 타는가</text>
+
+  <g>
+    <rect x="970" y="616" width="64" height="20" rx="10" fill="#2563eb"/><text x="1002" y="630" class="badge" text-anchor="middle">WS①</text>
+    <text x="1044" y="631" class="step">브라우저 → UIConsumer  {action: goto_point, x, y}</text>
+
+    <rect x="970" y="644" width="64" height="20" rx="10" fill="#7c3aed"/><text x="1002" y="658" class="badge" text-anchor="middle">서버</text>
+    <text x="1044" y="659" class="step">services: Task 생성 (DB) → Outbox.to_robot(goto)</text>
+
+    <rect x="970" y="672" width="64" height="20" rx="10" fill="#a78bfa"/><text x="1002" y="686" class="badge" text-anchor="middle">그룹</text>
+    <text x="1044" y="687" class="step">group robot_tb3 → RobotConsumer</text>
+
+    <rect x="970" y="700" width="64" height="20" rx="10" fill="#c026d3"/><text x="1002" y="714" class="badge" text-anchor="middle">WS②</text>
+    <text x="1044" y="715" class="step">RobotConsumer → 브리지  {type: goto, goal_id, x, y, yaw}</text>
+
+    <rect x="970" y="728" width="64" height="20" rx="10" fill="#059669"/><text x="1002" y="742" class="badge" text-anchor="middle">DDS</text>
+    <text x="1044" y="743" class="step">브리지 → A* astar/get_plan → Frenet → /cmd_vel → Pi</text>
+
+    <rect x="970" y="756" width="64" height="20" rx="10" fill="#c026d3"/><text x="1002" y="770" class="badge" text-anchor="middle">WS②</text>
+    <text x="1044" y="771" class="step">브리지 → RobotConsumer  pose · path · local_plan (계속)</text>
+
+    <rect x="970" y="784" width="64" height="20" rx="10" fill="#a78bfa"/><text x="1002" y="798" class="badge" text-anchor="middle">그룹</text>
+    <text x="1044" y="799" class="step">group ui → 모든 UIConsumer (고른 로봇 것만 통과)</text>
+
+    <rect x="970" y="812" width="64" height="20" rx="10" fill="#2563eb"/><text x="1002" y="826" class="badge" text-anchor="middle">WS①</text>
+    <text x="1044" y="827" class="step">UIConsumer → 브라우저  지도 위 위치·경로 갱신</text>
+
+    <rect x="970" y="840" width="64" height="20" rx="10" fill="#c026d3"/><text x="1002" y="854" class="badge" text-anchor="middle">WS②</text>
+    <text x="1044" y="855" class="step">도착: nav_status → services → state → WS① 로 화면에</text>
+  </g>
+</svg>
