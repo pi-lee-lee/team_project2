@@ -182,6 +182,17 @@ def test_very_short_paths_build_reference():
     assert log['state'][-1] in ('done', 'rotating', 'driving')
 
 
+
+def test_projection_ignores_extension_past_path_end():
+    # 지나온 쪽으로 되돌아와 끝나는 경로 (ㄷ자): 끝 너머 연장선이 출발 구간 옆을 지나간다. 연장선이 더 가까워도
+    # 실제 경로 위로 내려야 함 (예전: 끝을 지났다고 보고 1 m 앞에서 멈춤, 실물 2760)
+    pts = [(x, 0.0) for x in np.arange(0.0, 1.5, 0.05)] + [(1.5, y) for y in np.arange(0.0, 0.4, 0.05)] + \
+          [(x, 0.4) for x in np.arange(1.5, 0.89, -0.05)]
+    ref = build_reference(np.array(pts, dtype=float))
+    _, s0 = ref.project(0.3, 0.22, 0, 400)        # 출발 구간까지 0.22 m, 연장선까지 0.18 m
+    assert s0 < 0.5 < ref.s_end
+
+
 def _corridor(half_gap):
     """x 0.3~1.5 m 구간만 좁은 통로 (벽 y = ±half_gap), 나머지는 넓음."""
     return [(x, s * half_gap) for x in np.arange(0.3, 1.5, 0.02) for s in (-1, 1)]

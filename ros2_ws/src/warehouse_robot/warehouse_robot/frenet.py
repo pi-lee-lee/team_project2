@@ -118,8 +118,12 @@ class Reference:
                 np.interp(s, self.s, self.kappa), np.interp(s, self.s, self.dkappa))
 
     def project(self, px, py, lo=0, hi=None):
-        """(px, py) 에서 기준선 [lo, hi) 구간에 내린 수선의 발 → (index, s)."""
-        hi = len(self.s) if hi is None else min(hi, len(self.s))
+        """(px, py) 에서 기준선 [lo, hi) 구간에 내린 수선의 발 → (index, s).
+        가장 가까운 점은 경로 끝(s_end)까지에서만 찾는다 (끝 다음 선분으로는 s_end 를 넘을 수 있음). 끝 너머 연장선까지 찾으면
+        경로가 지나온 쪽으로 되돌아와 끝나는 경우(홈에 서쪽을 보며 도착) 연장선이 로봇 자리를 지나가, 1 m 앞인데 끝을 지났다고
+        보고 멈췄음 (실물 2760)"""
+        end = int(np.searchsorted(self.s, self.s_end, side='right'))
+        hi = end if hi is None else min(hi, end)
         lo = max(0, min(lo, hi - 1))
         i = lo + int(np.argmin(np.hypot(self.x[lo:hi] - px, self.y[lo:hi] - py)))
         best = (math.inf, self.s[i])
