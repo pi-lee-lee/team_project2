@@ -53,7 +53,7 @@ def run(preview=False):
     if '--help' in sys.argv[1:]:
         print('실행: python3 ' + Path(sys.argv[0]).name)
         print('모델: ' + str(WEIGHTS))
-        print('입력: /csi/image_raw | 도메인: 44 (YOLO_DOMAIN_ID로 변경 가능)')
+        print('입력: /csi/image_raw/compressed | 도메인: 44 (YOLO_DOMAIN_ID로 변경 가능)')
         print('종료: Ctrl+C' + (' 또는 영상 창 닫기' if preview else ''))
         return
     env = ros_environment()
@@ -78,7 +78,7 @@ def run(preview=False):
         for args in commands:
             processes.append(subprocess.Popen(args, env=env, cwd=PROJECT,
                                                start_new_session=True))
-        print(f"도메인 {env['ROS_DOMAIN_ID']} | 추가 학습 모델 | 입력 /csi/image_raw")
+        print(f"도메인 {env['ROS_DOMAIN_ID']} | 추가 학습 모델 | 입력 /csi/image_raw/compressed")
         if preview:
             print('미리보기 창을 열었습니다. 종료: 창 닫기 또는 Ctrl+C')
         else:

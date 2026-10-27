@@ -612,3 +612,6 @@ cd ../ros2_ws && source /opt/ros/humble/setup.bash && colcon build --symlink-ins
   ③ 제자리 회전 시험 (0.5 rad/s 6.3초 → 반 바퀴인지) ④ 남은 짧은 멈춤은 공용 공유기 지연 → 전용 공유기 검토
 - (2026-10-27) **Pi 카메라 계속 켜 두기로 되돌림**: `run.sh` 기본으로 켬 (`--no-camera` 로 빼기), 브리지의 YOLO 켜기/끄기 때 카메라 켜고 끄기 뺌.
   YOLO 검출기는 그대로 서 있을 때만 켜서 영상은 그때만 Wi-Fi 로 옴. `scripts/pi_camera.sh` 는 run.sh 와 수동용으로 남김
+- (2026-10-27) YOLO 입력 기본을 모두 압축 영상(`/csi/image_raw/compressed`)으로: 실제로 쓰는 `infer_ros_switch.py` 는 이미 압축이었고,
+  나머지 `yolo/yolo_training/infer_ros.py`(VS Code 실행기 `python_project/yolo_ros.py` 가 띄움), `zoom_camera.py` 도 `compressed:=true` 기본
+  (false 면 예전처럼 원본). 모델은 JPEG 사진 + JPEG 압축(75~95)·해상도 축소 보강으로 추가 학습돼 압축 입력이 학습 조건과 같음

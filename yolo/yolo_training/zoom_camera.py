@@ -9,7 +9,7 @@ from rclpy.executors import ExternalShutdownException
 from rclpy.node import Node
 from rclpy.qos import qos_profile_sensor_data
 from rcl_interfaces.msg import SetParametersResult
-from sensor_msgs.msg import Image
+from sensor_msgs.msg import CompressedImage, Image
 
 
 class ZoomCamera(Node):
@@ -17,13 +17,18 @@ class ZoomCamera(Node):
         super().__init__('zoom_camera')
         self.declare_parameter('zoom', 1.5)
         self.declare_parameter('input_topic', '/csi/image_raw')
+        # true 면 input_topic + '/compressed' (JPEG) 를 받는다 (기본). 원본은 Wi-Fi 를 가득 채움
+        self.declare_parameter('compressed', True)
         if not self.valid_zoom(self.get_parameter('zoom').value):
             raise ValueError('zoom must be between 1.0 and 8.0')
         self.add_on_set_parameters_callback(self.check_parameters)
         self.publisher = self.create_publisher(Image, '/camera/zoom', qos_profile_sensor_data)
-        self.subscription = self.create_subscription(
-            Image, self.get_parameter('input_topic').value,
-            self.callback, qos_profile_sensor_data)
+        topic = self.get_parameter('input_topic').value
+        if self.get_parameter('compressed').value:
+            self.subscription = self.create_subscription(
+                CompressedImage, topic + '/compressed', self.callback, qos_profile_sensor_data)
+        else:
+            self.subscription = self.create_subscription(Image, topic, self.callback, qos_profile_sensor_data)
         self.get_logger().info('확대 영상: /camera/zoom')
 
     @staticmethod
@@ -37,22 +42,30 @@ class ZoomCamera(Node):
         return SetParametersResult(successful=True)
 
     def callback(self, message):
-        if message.encoding not in ('rgb8', 'bgr8'):
-            self.get_logger().error(f'지원하지 않는 인코딩: {message.encoding}')
-            return
-        image = np.frombuffer(message.data, dtype=np.uint8).reshape(message.height, message.step)
-        image = image[:, :message.width * 3].reshape(message.height, message.width, 3)
+        if isinstance(message, CompressedImage):
+            image = cv2.imdecode(np.frombuffer(message.data, dtype=np.uint8), cv2.IMREAD_COLOR)
+            if image is None:
+                self.get_logger().error(f'압축 영상 풀기 실패 (format: {message.format})')
+                return
+            encoding = 'bgr8'
+        else:
+            if message.encoding not in ('rgb8', 'bgr8'):
+                self.get_logger().error(f'지원하지 않는 인코딩: {message.encoding}')
+                return
+            image = np.frombuffer(message.data, dtype=np.uint8).reshape(message.height, message.step)
+            image = image[:, :message.width * 3].reshape(message.height, message.width, 3)
+            encoding = message.encoding
+        h, w = image.shape[:2]
         factor = float(self.get_parameter('zoom').value)
-        width = max(1, round(message.width / factor))
-        height = max(1, round(message.height / factor))
-        x, y = (message.width - width) // 2, (message.height - height) // 2
-        enlarged = cv2.resize(image[y:y + height, x:x + width],
-                              (message.width, message.height), interpolation=cv2.INTER_LINEAR)
+        width = max(1, round(w / factor))
+        height = max(1, round(h / factor))
+        x, y = (w - width) // 2, (h - height) // 2
+        enlarged = cv2.resize(image[y:y + height, x:x + width], (w, h), interpolation=cv2.INTER_LINEAR)
         output = Image()
         output.header = message.header
-        output.width, output.height = message.width, message.height
-        output.encoding = message.encoding
-        output.step = message.width * 3
+        output.width, output.height = w, h
+        output.encoding = encoding
+        output.step = w * 3
         output.is_bigendian = 0
         output.data = enlarged.tobytes()
         if rclpy.ok():

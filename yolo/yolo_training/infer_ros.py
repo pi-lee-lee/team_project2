@@ -13,7 +13,7 @@ from rclpy.node import Node
 from rclpy.executors import ExternalShutdownException
 from rclpy.signals import SignalHandlerOptions
 from rclpy.qos import QoSProfile, ReliabilityPolicy, DurabilityPolicy
-from sensor_msgs.msg import Image
+from sensor_msgs.msg import CompressedImage, Image
 from ultralytics import YOLO
 import torch
 
@@ -23,6 +23,9 @@ class Detector(Node):
         super().__init__('component_detector')
         self.declare_parameter('weights',str(ROOT/'best_components7_finetuned.pt'))
         self.declare_parameter('input_topic','/csi/image_raw')
+        # true 면 input_topic + '/compressed' (JPEG) 를 받는다 (기본). 원본은 Wi-Fi 를 가득 채워 LiDAR/오도메트리까지 늦어짐.
+        # 모델은 JPEG 사진 + JPEG 압축(75~95) 보강으로 학습돼 압축 입력이 학습 조건과 같음
+        self.declare_parameter('compressed',True)
         self.declare_parameter('confidence',0.35)
         self.declare_parameter('imgsz',320)
         self.declare_parameter('person_only',False)
@@ -34,14 +37,18 @@ class Detector(Node):
         self.last_count_log=None
         qos=QoSProfile(depth=1,reliability=ReliabilityPolicy.BEST_EFFORT,
                        durability=DurabilityPolicy.VOLATILE)
-        self.sub=self.create_subscription(Image,self.get_parameter('input_topic').value,
-                                          self.receive,qos)
+        topic=self.get_parameter('input_topic').value
+        if self.get_parameter('compressed').value:
+            self.sub=self.create_subscription(CompressedImage,topic+'/compressed',self.receive,qos)
+        else:
+            self.sub=self.create_subscription(Image,topic,self.receive,qos)
         self.pub=self.create_publisher(Image,'/yolo/image_raw',qos)
         self.timer=self.create_timer(0.05,self.detect)
         self.last_received=self.get_clock().now()
         self.input_warning=self.create_timer(5.0,self.check_input)
         self.get_logger().info(f"모델: {self.get_parameter('weights').value}")
-        self.get_logger().info(f"입력: {self.get_parameter('input_topic').value}")
+        self.get_logger().info(f"입력: {self.get_parameter('input_topic').value}"
+                               + ('/compressed' if self.get_parameter('compressed').value else ''))
         self.get_logger().info('검출 결과 영상: /yolo/image_raw (CPU)')
 
     def receive(self,msg):
@@ -70,13 +77,19 @@ class Detector(Node):
         msg=self.latest
         if msg is None:return
         self.latest=None
-        if msg.encoding not in ('rgb8','bgr8'):
-            self.get_logger().error(f'지원 인코딩: rgb8/bgr8, 수신: {msg.encoding}')
-            return
-        # Respect row padding (step), rather than assuming packed rows.
-        frame=np.frombuffer(msg.data,dtype=np.uint8).reshape(msg.height,msg.step)
-        frame=frame[:,:msg.width*3].reshape(msg.height,msg.width,3)
-        if msg.encoding=='rgb8':frame=cv2.cvtColor(frame,cv2.COLOR_RGB2BGR)
+        if isinstance(msg,CompressedImage):
+            frame=cv2.imdecode(np.frombuffer(msg.data,dtype=np.uint8),cv2.IMREAD_COLOR)
+            if frame is None:
+                self.get_logger().error(f'압축 영상 풀기 실패 (format: {msg.format})')
+                return
+        else:
+            if msg.encoding not in ('rgb8','bgr8'):
+                self.get_logger().error(f'지원 인코딩: rgb8/bgr8, 수신: {msg.encoding}')
+                return
+            # Respect row padding (step), rather than assuming packed rows.
+            frame=np.frombuffer(msg.data,dtype=np.uint8).reshape(msg.height,msg.step)
+            frame=frame[:,:msg.width*3].reshape(msg.height,msg.width,3)
+            if msg.encoding=='rgb8':frame=cv2.cvtColor(frame,cv2.COLOR_RGB2BGR)
         result=self.model.predict(frame,imgsz=self.get_parameter('imgsz').value,
                                   device='cpu',verbose=False,
                                   conf=self.get_parameter('confidence').value,
