@@ -636,3 +636,11 @@ cd ../ros2_ws && source /opt/ros/humble/setup.bash && colcon build --symlink-ins
 - (2026-10-27) 웹 LiDAR 선이 지도와 어긋나 보이던 것: 위치 추정은 대체로 맞음 (다시 띄운 뒤 5 주행, 지도 벽 10 cm 안 점 중앙 91~95%, 순간 최저 59~71%).
   웹 표시만 스캔을 '가장 최근 자세'로 지도에 놓아 회전 중에 더 돈 방향으로 그려졌음 → 스캔 찍은 시각의 TF 로 (없으면 최근 것). 표시만 바뀜.
   11:39~11:44 세션(113908~114344)은 지도 맞음 7~49% 로 위치 추정이 크게 틀어져 있었음 (초기 위치 잘못 지정으로 추정)
+
+### 버전 고정: `stable-2026-10-27` (브랜치 frenet-only)
+실물에서 잘 되는 것으로 확인한 상태. 되돌리기: `git checkout stable-2026-10-27` (그 뒤 colcon build --symlink-install, run.sh).
+- 주행: A* + Frenet (속도별 정적 여유 0.06/0.04, 도착 회전 충돌 검사, 위치는 /odom + 늦으면 서서 기다림, Pi 명령 감시)
+- 주문/YOLO: 섹션 단위 주문, 서 있을 때만 YOLO, 카메라 계속 켬, 압축 영상 입력, 가중치 `best_components7_finetuned.pt` (10-26 15:25 판)
+- 기록: 목표마다 record.jsonl.gz + summary.txt + plot_*.png
+- **git 밖에 있어서 같이 맞춰야 하는 것**: OpenCR 펌웨어 Waffle (model_information 2, V230127R1), Pi 카메라 320x240 (`yolo/camera.sh`
+  를 run.sh 가 복사), Pi 명령 감시 (`scripts/pi_cmd_watchdog.py` 를 run.sh 가 복사), DB 위치 (map2: 섹션 led_yellow/led_red/led_green, 하역장, 홈)
