@@ -138,7 +138,10 @@ def _polyline(xy, ds):
     sg = np.append(np.arange(0.0, s[-1], ds), s[-1]) if s[-1] > ds else np.array([0.0, s[-1]])
     x, y = np.interp(sg, s, xy[:, 0]), np.interp(sg, s, xy[:, 1])
     yaw = np.unwrap(np.arctan2(np.gradient(y), np.gradient(x))) if len(sg) > 1 else np.zeros(1)
-    kappa = np.convolve(np.gradient(yaw, sg) if len(sg) > 2 else np.zeros(len(sg)), np.ones(5) / 5, mode='same')
+    k = np.gradient(yaw, sg) if len(sg) > 2 else np.zeros(len(sg))
+    # 5점 평균. 점이 5개보다 적으면 convolve(mode='same') 가 5개를 돌려줘 길이가 어긋나 예외가 났음
+    # (15 cm 안 되는 짧은 경로 → 브리지가 죽음, 실물 2026-10-27 step-2738)
+    kappa = np.convolve(k, np.ones(5) / 5, mode='same') if len(sg) >= 5 else k
     dkappa = np.gradient(kappa, sg) if len(sg) > 2 else np.zeros(len(sg))
     return sg, x, y, yaw, kappa, dkappa
 

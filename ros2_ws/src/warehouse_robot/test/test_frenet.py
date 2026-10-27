@@ -170,3 +170,13 @@ def test_arrival_turn_skipped_in_tight_corner():
     st, turned, clear = _align_clear(f, walls, math.radians(180), 50)
     assert st == 'done' and abs(turned) < 1e-6
     assert f.last_debug.get('align') == 'skipped'
+
+
+def test_very_short_paths_build_reference():
+    # 15 cm 안 되는 짧은 경로 (목표가 바로 옆): 예전엔 곡률 평균이 길이가 어긋나 예외 → 브리지가 죽었음 (실물 step-2738)
+    for pts in ([(0, 0), (0.05, 0.0), (0.1, 0.02)], [(0, 0), (0.08, 0.0), (0.08, 0.06)], [(0, 0), (0.05, 0.0)],
+                [(0, 0), (0.02, 0.01)]):
+        ref = build_reference(np.array(pts, dtype=float))
+        assert np.all(np.isfinite(ref.at(0.0)[0]))
+    f, log = drive([(0, 0), (0.06, 0.0), (0.1, 0.03)], [])
+    assert log['state'][-1] in ('done', 'rotating', 'driving')

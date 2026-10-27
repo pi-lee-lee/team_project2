@@ -699,12 +699,18 @@ class BridgeNode(Node):
         points = [(ps.pose.position.x, ps.pose.position.y) for ps in plan.poses]
         self.record_write({'type': 'plan', 'retries': self.goal['retries'], 'start': start, 'path': points})
         try:
-            fr = FrenetFollower(points, self.goal['yaw'], self.frenet_cfg)
-        except ValueError:
-            # 경로 점이 하나뿐 (이미 목표 칸 안): 목표 방향으로 5 cm 짜리 경로 → 바로 도착으로 보고 방향만 맞춤
-            sx, sy = points[0]
-            yaw = self.goal['yaw']
-            fr = FrenetFollower([(sx, sy), (sx + 0.05 * math.cos(yaw), sy + 0.05 * math.sin(yaw))], yaw, self.frenet_cfg)
+            try:
+                fr = FrenetFollower(points, self.goal['yaw'], self.frenet_cfg)
+            except ValueError:
+                # 경로 점이 하나뿐 (이미 목표 칸 안): 목표 방향으로 5 cm 짜리 경로 → 바로 도착으로 보고 방향만 맞춤
+                sx, sy = points[0]
+                yaw = self.goal['yaw']
+                fr = FrenetFollower([(sx, sy), (sx + 0.05 * math.cos(yaw), sy + 0.05 * math.sin(yaw))], yaw, self.frenet_cfg)
+        except Exception as e:   # 기준선을 못 만드는 경로가 와도 브리지가 죽지 않게 (죽으면 로봇이 '오프라인')
+            self.get_logger().error(f'경로로 기준선을 못 만듦 ({len(points)}개 점): {e!r}')
+            self.record_event(f'기준선 만들기 실패: {e!r}')
+            self.report('failed', '경로를 따라갈 기준선을 만들지 못했습니다.')
+            return
         self.follower = {'gen': gen, 'blocked_since': None, 'mark_pos': start[:2], 'mark_time': time.monotonic(),
                          'frenet': fr}
 
