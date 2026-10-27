@@ -2,9 +2,8 @@
 # Pi 카메라 노드(yolo/camera.sh) 켜기/끄기. 실물 로봇 전용.
 #   사용: scripts/pi_camera.sh on|off|status
 #
-# 주행 중에는 끈다: 카메라가 돌면 (영상을 PC 로 안 보내도) Pi 의 Wi-Fi 가 불안정해져 오도메트리/LiDAR 가
-# 0.3~0.5초씩 끊기고(위치 TF 지연 정지), PC 의 정지 명령이 9초 동안 안 들어가 벽에 부딪힌 적이 있음 (실물 2026-10-26).
-# 브리지가 YOLO 를 켤 때(주문 섹션/사람 위치 도착, 웹 YOLO 시작) on, 끌 때 off 를 부른다.
+# 실물 run.sh 가 시작할 때 on (기본, 계속 켜 둠) / --no-camera 면 off 로 부른다. 수동 확인/재시작용으로도 씀.
+# (한때 YOLO 를 켤 때만 카메라를 켰지만 켜는 데 실제 10~15초 걸려 섹션에서 YOLO 를 못 썼고, 측정상 카메라는 Wi-Fi 끊김 원인이 아니어서 되돌림)
 # on 은 저장소의 yolo/camera.sh 를 Pi 의 ~/warehouse_camera.sh 로 복사해서 띄운다 (이미 떠 있으면 그대로).
 PI_HOST="${WAREHOUSE_PI_HOST:-test@192.168.0.181}"
 HOME_DIR="$(cd "$(dirname "$0")/.." && pwd)"

@@ -15,8 +15,8 @@
 #                  | no_roof_small_warehouse (AWS 창고, ~/sim_ws 에 받아야 함) ...
 #                  실물과 비슷한 강당은 --world lecture_hall_real (책상 앞판 없음, 의자 무작위 배치)
 #   --gui          (sim) Gazebo 화면 표시
-#   --camera       (real) Pi 카메라(yolo/camera.sh)를 처음부터 계속 켜 둠 (YOLO 수동 시험용).
-#                  기본은 꺼 둠: 카메라가 돌면 주행 중 Pi Wi-Fi 가 끊겨서, 브리지가 YOLO 를 켤 때만 켬 (scripts/pi_camera.sh)
+#   --no-camera    (real) Pi 카메라(yolo/camera.sh)를 띄우지 않음 (기본은 bringup 과 같이 띄워 계속 켜 둠, 이미 떠 있으면 그대로).
+#                  YOLO 검출기가 꺼져 있으면 영상을 구독하지 않아 주행 중 Wi-Fi 로 오지 않음
 #   --amcl A       (map) 위치 추정 설정: default(기본, config/amcl_waffle_pi.yaml, 작은 방) | hall(config/amcl_hall.yaml,
 #                  책상/의자가 흩어진 강당·교실: 지도와 안 맞는 빔에 너그럽게) | yaml 파일 경로
 #
@@ -34,7 +34,7 @@ LOGS="$HOME_DIR/logs"
 PI_HOST="test@192.168.0.181"
 
 ROBOT=""; MODE=""; MAP=""; NAME=""; ENGINE=slam_toolbox; WORLD=turtlebot3_world; GUI=""
-AMCL=default; CAMERA=0
+AMCL=default; CAMERA=1
 while [ $# -gt 0 ]; do
   case "$1" in
     --robot) ROBOT="$2"; shift ;;
@@ -45,8 +45,8 @@ while [ $# -gt 0 ]; do
     --world) WORLD="$2"; WORLD_SET=1; shift ;;
     --gui) GUI=--gui ;;
     --amcl) AMCL="$2"; shift ;;
-    --camera) CAMERA=1 ;;
-    --no-camera) CAMERA=0 ;;   # 예전 옵션 (지금 기본과 같음)
+    --camera) CAMERA=1 ;;      # 예전 옵션 (지금 기본과 같음)
+    --no-camera) CAMERA=0 ;;
     -h|--help) sed -n '2,29p' "$0"; exit 0 ;;
     *) echo "알 수 없는 옵션: $1 (scripts/run.sh --help)"; exit 1 ;;
   esac
@@ -157,13 +157,13 @@ else
     setsid nohup python3 ~/warehouse_cmd_watchdog.py > ~/warehouse_cmd_watchdog.log 2>&1 < /dev/null &'
   ssh -o BatchMode=yes "$PI_HOST" 'sleep 3; pgrep -f "[w]arehouse_cmd_watchdog.py" >/dev/null && echo "   명령 감시 시작됨 (통신 0.5초 끊기면 정지)" \
       || echo "   명령 감시 확인 필요: Pi ~/warehouse_cmd_watchdog.log (없으면 로봇이 움직이지 않음)"'
-  # 카메라 (YOLO 검출기 입력 /csi/image_raw/compressed). 기본은 꺼 두고 브리지가 YOLO 를 켤 때만 켬 (scripts/pi_camera.sh).
-  # 카메라가 돌면 (영상을 안 보내도) 주행 중 Pi Wi-Fi 가 끊겨 위치 TF 지연 정지/명령 미도달이 났음 (실물 2026-10-26).
-  # 지난 실행에서 남은 카메라도 끈다. stop_ros.sh 는 카메라를 건드리지 않음
+  # 카메라 (YOLO 검출기 입력 /csi/image_raw/compressed). 계속 켜 둔다: 영상은 검출기가 켜졌을 때(주문 섹션/사람 위치에 서 있을 때)만
+  # 구독되어 Wi-Fi 로 온다. 주행 중에만 끄는 방식은 켜는 데 실제 10~15초 걸려 섹션에서 YOLO 를 못 써서 되돌림 (실물 2026-10-26,
+  # 측정상 카메라는 Wi-Fi 끊김 원인이 아니었음). 켜기/끄기/상태 수동: scripts/pi_camera.sh on|off|status. stop_ros.sh 는 카메라를 건드리지 않음
   if [ "$CAMERA" = 1 ]; then
     echo "   $(WAREHOUSE_PI_HOST="$PI_HOST" "$HOME_DIR/scripts/pi_camera.sh" on)"
   else
-    echo "   $(WAREHOUSE_PI_HOST="$PI_HOST" "$HOME_DIR/scripts/pi_camera.sh" off) (YOLO 를 켤 때만 켬)"
+    echo "   $(WAREHOUSE_PI_HOST="$PI_HOST" "$HOME_DIR/scripts/pi_camera.sh" off) (--no-camera)"
   fi
 fi
 

@@ -220,10 +220,9 @@ SIGINT → SIGTERM → SIGKILL 순서로 보내고 남은 프로세스가 없는
 
 - `yolo/` = [team_project2](https://github.com/obloodobladeo-spec/team_project2) 를 합친 것 (YOLO11n 부품 검출기, 가중치, Colab 학습 노트북). 자세한 설명은 `yolo/README.md`
 - 검출기(`/component_detector_switch`)는 **브리지와 같이 자동 실행**됩니다 (`start_bridge.sh` → `scripts/start_yolo.sh`, 출력은 `logs/bridge.log` 의 `[yolo-3]`). 빼려면 `WAREHOUSE_YOLO=0`
-- 카메라: **YOLO 를 켤 때만 Pi 카메라(`yolo/camera.sh`)를 켜고, 끌 때 끕니다** (브리지가 `scripts/pi_camera.sh on|off` 실행,
-  켜기 약 5초 / 끄기 약 2초). 카메라가 돌면 영상을 안 보내도 주행 중 Pi Wi-Fi 가 끊겨 위치 TF 지연 정지, 정지 명령 미도달(벽 충돌)이
-  났기 때문 (실물 2026-10-26). 실물 `run.sh` 는 시작할 때 남은 카메라를 끄고, `--camera` 면 처음부터 계속 켜 둡니다 (수동 시험용).
-  상태 확인: `scripts/pi_camera.sh status`. `stop_ros.sh` 는 카메라를 건드리지 않음.
+- 카메라: 실물 `run.sh` 가 bringup 다음에 Pi 카메라(`yolo/camera.sh`, 320x240)를 띄워 **계속 켜 둡니다** (빼려면 `--no-camera`).
+  영상은 YOLO 검출기가 켜졌을 때만 구독되어 Wi-Fi 로 옵니다 (주문 중에는 섹션/사람 위치에 서 있을 때만). 수동: `scripts/pi_camera.sh on|off|status`.
+  `stop_ros.sh` 는 카메라를 건드리지 않음. (한때 YOLO 를 켤 때만 카메라를 켰지만 켜는 데 실제 10~15초라 되돌림)
 - **명령 감시 (통신 끊기면 정지)**: 실물 `run.sh` 가 Pi 에 `scripts/pi_cmd_watchdog.py` 를 띄움. 브리지 명령(`cmd_vel_pc`)을 로봇(`cmd_vel`)으로
   넘기다가 0.5초 넘게 끊기면 로봇을 세움 (터틀봇은 마지막 명령을 계속 실행해서, Wi-Fi 가 끊기면 벽까지 간 적 있음). 이게 없으면 로봇이
   움직이지 않으니 브리지 로그의 경고나 Pi `~/warehouse_cmd_watchdog.log` 확인. 직접 띄우기: Pi 에서
@@ -281,8 +280,8 @@ SIGINT → SIGTERM → SIGKILL 순서로 보내고 남은 프로세스가 없는
    보이면 같은 방식으로 물어봄 ("확인했어요, 홈으로" / "다시 꺼내기")
 5. 홈에 도착하면 작업 완료
 
-- **YOLO 와 Pi 카메라는 섹션/사람 위치에 서 있을 때만 켜짐** (도착하면 켜고, 출발할 때 끔). 카메라가 뜨는 데 약 5초라
-  도착 직후 "적재 완료" 를 누르면 "YOLO 개수를 못 받았습니다" 가 뜰 수 있음 (몇 초 뒤 다시 누르거나 확인 후 보내기)
+- **YOLO 검출기는 섹션/사람 위치에 서 있을 때만 켜짐** (도착하면 켜고, 출발할 때 끔. Pi 카메라는 계속 켜져 있음).
+  첫 개수가 나오기까지 1~2초 걸릴 수 있음
 
 - 판단 기준(지금): 주문한 라벨만 보고 개수가 정확히 같아야 맞음. 요청에 없는 물건이 섞이거나 더 많은 경우는 아직 따지지 않음
   (`services.check_counts` 한 곳만 바꾸면 됨)
