@@ -900,10 +900,15 @@ class BridgeNode(Node):
         now = time.monotonic()
         if now - self.last_scan_sent < SCAN_SEND_INTERVAL or not self.server.connected:
             return
+        # 스캔을 찍은 시각의 자세로 지도에 놓는다. 가장 최근 자세(Time())로 놓으면 회전 중에 이미 더 돈 방향으로 그려져
+        # 웹에서 LiDAR 선이 지도와 어긋나 보였음 (1 rad/s 면 0.1초에 6°, 1 m 앞에서 10 cm). 그 시각 TF 가 아직 없으면 최근 것
         try:
-            t = self.tf_buffer.lookup_transform(self.global_frame, msg.header.frame_id, Time())
+            t = self.tf_buffer.lookup_transform(self.global_frame, msg.header.frame_id, Time.from_msg(msg.header.stamp))
         except TransformException:
-            return
+            try:
+                t = self.tf_buffer.lookup_transform(self.global_frame, msg.header.frame_id, Time())
+            except TransformException:
+                return
         self.last_scan_sent = now
         r = np.asarray(msg.ranges, dtype=float)
         ok = np.isfinite(r) & (r >= msg.range_min) & (r < msg.range_max)
