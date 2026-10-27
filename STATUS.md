@@ -615,3 +615,8 @@ cd ../ros2_ws && source /opt/ros/humble/setup.bash && colcon build --symlink-ins
 - (2026-10-27) YOLO 입력 기본을 모두 압축 영상(`/csi/image_raw/compressed`)으로: 실제로 쓰는 `infer_ros_switch.py` 는 이미 압축이었고,
   나머지 `yolo/yolo_training/infer_ros.py`(VS Code 실행기 `python_project/yolo_ros.py` 가 띄움), `zoom_camera.py` 도 `compressed:=true` 기본
   (false 면 예전처럼 원본). 모델은 JPEG 사진 + JPEG 압축(75~95)·해상도 축소 보강으로 추가 학습돼 압축 입력이 학습 조건과 같음
+- (2026-10-27) **'회전이 명령의 절반' 원인 확정 → OpenCR 펌웨어를 Waffle 용으로 다시 올림**: 보드에서 읽은 model_information = 1 (Burger).
+  펌웨어 모델표: 1 = Burger 바퀴 간격 0.160 m, 2 = Waffle 0.287 m → 회전 명령을 버거 간격으로 계산해 실제 회전이 0.160/0.287 = 0.557 배
+  (측정: 바퀴 엔코더 0.55, IMU 0.53, 이틀 같음, 배터리 16%~91% 무관, 직진 속도는 0.96 정상). Pi 의 `~/opencr_update/update.sh /dev/ttyACM0
+  waffle.opencr` (bringup 끈 채로) → model_information = 2 (Waffle), 펌웨어 V230127R1. 확인: 다음 주행 기록의 엔코더/명령 회전 비율이 약 1.0 인지.
+  되돌리기: 같은 명령으로 burger.opencr. 제자리 회전이 이제 설정대로(예전 실제 0.55 rad/s → 1.0) 빨라짐, 그 뒤 곡선 감속(frenet.max_w) 조정 예정
