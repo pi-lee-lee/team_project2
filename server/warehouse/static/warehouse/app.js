@@ -767,10 +767,11 @@ function draw() {
     ctx.stroke();
   }
 
-  // Frenet 로컬 플래너가 고른 궤적 (앞으로 4초 동안 갈 궤적): 초록 굵은 선 + 끝점, 옆에 명령 속도/상태. 1초 넘게 안 오면 숨김
+  // Frenet 로컬 플래너가 고른 궤적 (앞으로 4초 동안 갈 궤적): 자홍색 굵은 선 + 끝점, 옆에 명령 속도/상태. 1초 넘게 안 오면 숨김
+  // (A* 경로가 초록이라 예전 초록 궤적은 구분이 안 됐음)
   if (S.localPlan && Date.now() - (S.localPlanAt || 0) < 1000) {
     const t = S.localPlan.traj || [];
-    const color = '#059669';
+    const color = '#c026d3';
     let lx, ly;
     if (t.length > 1) {
       ctx.strokeStyle = color;
@@ -789,7 +790,7 @@ function draw() {
     if (lx !== undefined) {
       const name = { driving: '주행', blocked: '막힘', rotating: '회전', done: '도착' }[S.localPlan.state] || S.localPlan.state;
       ctx.font = '11px system-ui, sans-serif';
-      ctx.fillStyle = '#047857';
+      ctx.fillStyle = '#a21caf';
       ctx.fillText(`Frenet ${name} v=${(+S.localPlan.v).toFixed(2)} w=${(+S.localPlan.w).toFixed(2)}`, lx + 8, ly - 8);
     }
   }

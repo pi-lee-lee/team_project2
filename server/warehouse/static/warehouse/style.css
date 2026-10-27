@@ -168,6 +168,7 @@ main {
 .lgd { display: inline-block; width: 10px; height: 10px; border-radius: 50%; }
 .lgd.robot { background: rgba(220, 38, 38, 0.3); border: 2px solid #dc2626; }
 .lgd.path { width: 16px; height: 3px; border-radius: 2px; background: #16a34a; }
+.lgd.plan { width: 16px; height: 4px; border-radius: 2px; background: #c026d3; }
 .lgd.loc { background: #2563eb; }
 .lgd.home { background: #7c3aed; }
 .lgd.goal { background: #ea580c; }
