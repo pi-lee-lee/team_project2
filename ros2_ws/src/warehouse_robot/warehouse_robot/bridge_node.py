@@ -391,6 +391,8 @@ class BridgeNode(Node):
         # 그 안에 목표 하나 = <시각>_<목표>/record.jsonl.gz (분석 그림도 그 폴더에).
         # 0.1초마다 위치/속도/명령/트래킹/스캔 점, Frenet 을 계산한 주기엔 그 입력과 후보별 판정·비용까지
         self.record_enabled = self.declare_parameter('record.enabled', True).value
+        # 목표가 끝나면 그 폴더에 요약(summary.txt)과 중요한 순간 그림(plot_*.png)을 만든다 (tools/drive_replay.py, 낮은 우선순위)
+        self.record_plots = self.declare_parameter('record.plots', True).value
         self.record_dir = os.path.join(os.environ.get('WAREHOUSE_HOME') or os.getcwd(), 'logs', 'records')
         self.record_session = None   # 이번 브리지 세션 폴더 (첫 기록 때 만듦)
         self.rec = None        # 열린 기록 {'file', 't0', 'last', 'flushed', 'path'}
@@ -1160,6 +1162,23 @@ class BridgeNode(Node):
             r['file'].close()
         except OSError:
             pass
+        if self.record_plots:
+            self.record_summarize(os.path.dirname(r['path']))
+
+    def record_summarize(self, folder):
+        """끝난 목표 폴더에 요약 글자(summary.txt)와 중요한 순간 그림(plot_*.png)을 따로 프로세스로 만든다.
+        주행(브리지)에 방해되지 않게 nice 19 로, 기다리지 않음. 실패해도 기록(record.jsonl.gz)은 그대로."""
+        tool = os.path.join(os.environ.get('WAREHOUSE_HOME', ''), 'tools', 'drive_replay.py')
+        if not os.path.isfile(tool):
+            return
+        try:
+            out = open(os.path.join(folder, 'summary.txt'), 'w', encoding='utf-8')
+            subprocess.Popen(['nice', '-n', '19', 'python3', tool, folder], stdout=out, stderr=subprocess.STDOUT,
+                             stdin=subprocess.DEVNULL, start_new_session=True,
+                             env={**os.environ, 'PYTHONWARNINGS': 'ignore'})   # 라이브러리 경고로 요약이 지저분해지지 않게
+            out.close()   # 자식 프로세스가 자기 사본으로 씀
+        except OSError as e:
+            self.get_logger().warn(f'주행 기록 요약/그림 실패: {e}')
 
     def record_write(self, obj):
         r = self.rec

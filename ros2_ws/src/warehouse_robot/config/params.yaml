@@ -90,3 +90,4 @@ warehouse_bridge:
     # Frenet 입력과 후보별 판정·비용까지). 분석: python3 tools/drive_replay.py. 1분에 약 2 MB
     record:
       enabled: true
+      plots: true             # 목표가 끝나면 그 폴더에 summary.txt + 중요한 순간 그림 plot_*.png (tools/drive_replay.py, 낮은 우선순위)

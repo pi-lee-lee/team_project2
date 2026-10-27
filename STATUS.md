@@ -620,3 +620,6 @@ cd ../ros2_ws && source /opt/ros/humble/setup.bash && colcon build --symlink-ins
   (측정: 바퀴 엔코더 0.55, IMU 0.53, 이틀 같음, 배터리 16%~91% 무관, 직진 속도는 0.96 정상). Pi 의 `~/opencr_update/update.sh /dev/ttyACM0
   waffle.opencr` (bringup 끈 채로) → model_information = 2 (Waffle), 펌웨어 V230127R1. 확인: 다음 주행 기록의 엔코더/명령 회전 비율이 약 1.0 인지.
   되돌리기: 같은 명령으로 burger.opencr. 제자리 회전이 이제 설정대로(예전 실제 0.55 rad/s → 1.0) 빨라짐, 그 뒤 곡선 감속(frenet.max_w) 조정 예정
+- (2026-10-27) 목표가 끝날 때마다 그 기록 폴더에 `summary.txt`(요약) + 중요한 순간 그림 `plot_*.png` 자동 생성 (브리지가 `tools/drive_replay.py`
+  를 nice 19 로 따로 띄움, 끄기 `record.plots: false`). 오늘 폴더 28개는 손으로 채움. 좁은 틈 진입 실패 2번 (114731, 121436: 지도 (-1.15, 1.97) 근처
+  약 0.5 m 틈) 은 안전 여유 때문: 가장 나은 후보 0.050~0.054 m < 0.06, 그 순간을 0.05 로 다시 계산하면 둘 다 출발 (그때 적용된 값은 0.06)
