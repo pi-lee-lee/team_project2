@@ -579,7 +579,10 @@ class FrenetFollower:
             clear = FrenetPlanner._static_clear(grid, np.full_like(ang, x), np.full_like(ang, y), yaw + ang, body)
             if float(clear.min()) >= need:
                 self.align_dir = k
-                w = float(np.clip(2.0 * k * rem, -c.max_w, c.max_w))
+                # 돌아서기와 같은 rotate_speed 까지: max_w(1.82) 로 돌면 실제 2.0~2.4 rad/s 가 나와 회전마다 AMCL 방향이
+                # 최대 8° 틀어졌다 바로잡히고 회전 끝 LiDAR-지도 맞음이 67~80% 로 떨어졌음 (실물 141220 세션 11번 중 6번)
+                lim = min(c.max_w, c.rotate_speed)
+                w = float(np.clip(2.0 * k * rem, -lim, lim))
                 if abs(w) < 0.3:
                     w = math.copysign(0.3, w)
                 dbg.update(align=k, align_clear=float(clear.min()))

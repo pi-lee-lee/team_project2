@@ -64,6 +64,11 @@ class AStarPlannerNode(Node):
         # 같은 5cm 칸에서 이 시간 넘게 계속 보여야 기억한다. 지나가는 사람/물체(한 칸에 1~2초)는 기억하지 않음
         # (움직이는 원기둥이 지나간 궤적 전체가 727칸의 가짜 벽이 되어 통로가 막혔었음)
         self.declare_parameter('scan_persist', 2.5)       # s
+        # 기억한 장애물 때문에 경로가 없을 때: 장애물은 그대로 두고 반경만 이만큼으로 줄여 다시 (차체 반폭 0.153 + Frenet 느릴 때
+        # 여유 0.04). 그래도 없으면 최근 scan_recent 초 안에 다시 본 장애물만으로 (지나간 사람, 회전 중 번진 스캔 같은 틀린 기억을 뺌).
+        # 그래도 없으면 실패 (예전: 기억을 통째로 빼고 맵만으로 → 소화기 4 cm 옆 경로를 내 Frenet 이 멈추고 재계획마다 반복, 실물 2761/2771)
+        self.declare_parameter('fallback_radius', 0.20)  # m
+        self.declare_parameter('scan_recent', 3.0)        # s
         self.declare_parameter('bump_memory', 120.0)     # s, 부딪힌 자리를 장애물로 기억하는 시간
         self.declare_parameter('bump_radius', 0.15)      # m, 부딪힌 자리 주변을 이 반경만큼 막음
         # 경로 계획용 맵 가공 (기존 맵 모드만, plan_map.py). 0 이면 끔
@@ -83,6 +88,8 @@ class AStarPlannerNode(Node):
         self.cell_seen = {}          # 5cm 칸 -> [처음 본 시각, 마지막 본 시각, 본 횟수]
         self.bump_points = deque()   # (시각, xs, ys) 부딪힌 자리 주변 점
         self.last_scan_time = 0.0
+        self.last_remember_time = None   # 마지막으로 기억에 넣은 시각 (로그: 기억이 비어 있을 때 이유)
+        self.last_clear_time = None      # 웹 '상태 초기화' 로 지운 시각
 
         map_qos = QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL,
                              reliability=ReliabilityPolicy.RELIABLE)
@@ -105,14 +112,14 @@ class AStarPlannerNode(Node):
             self.create_subscription(LaserScan, 'scan_level', self.on_scan, qos_profile_sensor_data)
         self.get_logger().info(f'A* 플래너 시작, 맵 대기 중 ({topic})')
 
-    def make_planner(self, data, width=None, height=None, origin_x=None, origin_y=None):
+    def make_planner(self, data, width=None, height=None, origin_x=None, origin_y=None, robot_radius=None):
         p = lambda name: self.get_parameter(name).value  # noqa: E731
         info = self.map_msg.info
         return GridPlanner(
             data, width or info.width, height or info.height, info.resolution,
             info.origin.position.x if origin_x is None else origin_x,
             info.origin.position.y if origin_y is None else origin_y,
-            robot_radius=p('robot_radius'), inflation_radius=p('inflation_radius'),
+            robot_radius=p('robot_radius') if robot_radius is None else robot_radius, inflation_radius=p('inflation_radius'),
             cost_weight=p('cost_weight'), occupied_threshold=p('occupied_threshold'),
             allow_unknown=p('allow_unknown'), unknown_cost=p('unknown_cost'))
 
@@ -207,12 +214,14 @@ class AStarPlannerNode(Node):
         if steady:
             pts = (np.array(steady, dtype=float) + 0.5) * 0.05
             self.scan_points.append((now, pts[:, 0], pts[:, 1]))
+            self.last_remember_time = now
 
     def on_clear(self, request, response):
         self.scan_points.clear()
         self.cell_seen.clear()
         self.bump_points.clear()
         self.bump_centers.clear()
+        self.last_clear_time = time.monotonic()
         self.get_logger().info('기억한 장애물(LiDAR/부딪힌 자리)을 모두 지웠습니다')
         return response
 
@@ -250,7 +259,7 @@ class AStarPlannerNode(Node):
         self.get_logger().warn(f'부딪힌 자리 ({msg.point.x:.2f}, {msg.point.y:.2f}) 를 장애물로 기억')
 
     def planners_for(self, start, goal):
-        """(맵 + 부딪힌 자리 플래너, 여기에 LiDAR 장애물까지 더한 플래너 또는 None, LiDAR 로 더한 칸 수).
+        """(맵 + 부딪힌 자리 플래너, with_scan(반경, since) → (여기에 기억 장애물까지 더한 플래너 또는 None, 더한 칸 수)).
 
         부딪힌 자리(LiDAR 에 안 보이는 낮은 물체)는 LiDAR 장애물 때문에 경로가 없어 다시 계획할 때도 빼지 않는다.
         SLAM 모드(allow_unknown)에서 출발/목표가 아직 맵 밖이면 맵을 미탐색 칸으로 넓힌다.
@@ -297,11 +306,35 @@ class AStarPlannerNode(Node):
                  if start_inside or (w, h) != (info.width, info.height) else self.planner)
         base = self.make_planner(grid.ravel(), w, h, ox, oy) if mark(list(self.bump_points)) else plain
         self.plain_planner = plain   # 부딪힌 자리를 빼고 맵만 (실패 메시지 구분용)
-        cells = mark(list(self.scan_points))
-        if not cells:
-            return base, None, 0
-        self.last_grid = (grid.copy(), ox, oy, info.resolution)
-        return base, self.make_planner(grid.ravel(), w, h, ox, oy), cells
+        no_scan = grid.copy()        # 맵 + 부딪힌 자리 (다시 계획할 때 기억 장애물을 골라 넣는 바탕)
+
+        def with_scan(radius, since=None):
+            """바탕 격자 + 기억 장애물 (since 이후에 넣은 것만) 플래너, 더한 칸 수. 더한 칸이 없으면 (None, 0)."""
+            grid[:] = no_scan
+            n = mark([q for q in self.scan_points if since is None or q[0] >= since])
+            if not n:
+                return None, 0
+            self.last_grid = (grid.copy(), ox, oy, info.resolution)
+            return self.make_planner(grid.ravel(), w, h, ox, oy, robot_radius=radius), n
+
+        return base, with_scan
+
+    def log_memory(self):
+        """계획마다 기억 장애물 상태를 로그로 (비어 있으면 왜인지: 지움 / 만료 / 아직 없음)."""
+        now = time.monotonic()
+        if self.scan_points:
+            cells = len(set().union(*(set(zip(np.floor(q[1] / 0.05).astype(int).tolist(),
+                                              np.floor(q[2] / 0.05).astype(int).tolist())) for q in self.scan_points)))
+            self.get_logger().info(f'기억 장애물 {cells}칸 (가장 오래된 것 {now - self.scan_points[0][0]:.0f}초 전, '
+                                   f'가장 최근 {now - self.scan_points[-1][0]:.1f}초 전)')
+        elif self.last_clear_time is not None and (self.last_remember_time is None
+                                                   or self.last_clear_time >= self.last_remember_time):
+            self.get_logger().info(f'기억 장애물 없음: {now - self.last_clear_time:.0f}초 전 상태 초기화로 지움')
+        elif self.last_remember_time is not None:
+            self.get_logger().info(f'기억 장애물 없음: 마지막으로 넣은 지 {now - self.last_remember_time:.0f}초 '
+                                   f'(기억 {self.get_parameter("scan_memory").value:.0f}초 지나 만료)')
+        else:
+            self.get_logger().info('기억 장애물 없음: 아직 기억한 것 없음')
 
     def fail_reason(self, start, goal, tolerance, error):
         """경로가 없을 때 금지 구역 때문인지. 반환: 설명 문자열 또는 None (금지 구역과 상관없음)."""
@@ -345,16 +378,41 @@ class AStarPlannerNode(Node):
         s, g = request.start.pose, request.goal.pose
         tolerance = request.tolerance if request.tolerance > 0 else self.get_parameter('goal_tolerance').value
         start, goal = (s.position.x, s.position.y), (g.position.x, g.position.y)
-        base, with_scan, extra = self.planners_for(start, goal)
+        base, with_scan = self.planners_for(start, goal)
+        self.log_memory()
         points = None
-        if with_scan is not None:
+        radius, small = self.get_parameter('robot_radius').value, self.get_parameter('fallback_radius').value
+        recent = time.monotonic() - self.get_parameter('scan_recent').value
+        tries = [(radius, None, '기억 장애물'), (small, None, f'반경 {small:.2f} m 로 줄여 기억 장애물'),
+                 (small, recent, f'반경 {small:.2f} m, 최근 {self.get_parameter("scan_recent").value:.0f}초에 다시 본 장애물')]
+        tried = False
+        for r, since, what in tries:
+            planner, extra = with_scan(r, since)
+            if planner is None:
+                # 넣을 장애물이 없음 (처음부터 기억이 비었거나, 막던 것을 최근에 다시 못 봄) → 아래에서 맵(+부딪힌 자리)만으로
+                if tried:
+                    self.get_logger().warn(f'막던 기억 장애물을 최근 {self.get_parameter("scan_recent").value:.0f}초 안에 '
+                                           '다시 보지 못함 (지나간 물체로 보고) → 맵만으로 계획')
+                break
+            tried = True
             try:
-                points = with_scan.plan(start, goal, goal_tolerance=tolerance)
-                self.get_logger().info(f'맵에 없는 장애물 {extra}칸을 피해서 계획')
+                points = planner.plan(start, goal, goal_tolerance=tolerance)
+                self.get_logger().info(f'{what} {extra}칸을 피해서 계획')
+                break
             except PlanningError as e:
-                # 기억한 장애물 때문에 막히면(사람이 지나간 자리 등) 맵만으로 다시 계획
-                self.get_logger().warn(f'맵에 없는 장애물 {extra}칸 포함 경로 없음 ({e}), 맵만으로 다시 계획')
+                self.get_logger().warn(f'{what} {extra}칸 포함 경로 없음 ({e})')
                 self.dump_grid(start, goal)
+        if points is None and tried and planner is not None:
+            # 맵만으로는 길이 있으면(= 기억 장애물이 막음) 그 경로를 쓰지 않는다: 막고 있는 물체를 지나가서 Frenet 이 못 감.
+            # 맵만으로도 없으면 아래에서 원래 이유(금지 구역 등)로 실패
+            try:
+                base.plan(start, goal, goal_tolerance=tolerance)
+                reason = '맵에 없는 장애물(LiDAR 로 본 물체)에 막혀 지나갈 틈이 없습니다'
+                self.get_logger().warn(f'경로 계획 실패: {reason}')
+                self.fail_pub.publish(String(data=reason))
+                return response
+            except PlanningError:
+                pass
         if points is None:
             try:
                 points = base.plan(start, goal, goal_tolerance=tolerance)

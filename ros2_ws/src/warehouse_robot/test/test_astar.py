@@ -50,6 +50,19 @@ def test_start_inside_inflation_escapes():
     assert p.is_free(*path[-1])
 
 
+
+def test_start_inside_inflation_cannot_squeeze_through_gap():
+    # 장애물 옆(lethal 안)에서 출발해도 빠져나가기만 하고, 반경보다 좁은 틈을 lethal 띠를 따라 지나가면 안 됨 (실물 2771)
+    g = np.zeros((40, 80), dtype=np.int8)
+    g[:, 40] = 100
+    g[18:22, 40] = 0                      # 벽 가운데 20 cm 틈 (반경 0.24 로는 못 지나감)
+    p = make_planner(g)
+    with pytest.raises(PlanningError):
+        p.plan((1.9, 1.0), (3.5, 1.0))    # 틈 바로 앞(lethal 안)에서 출발
+    path = p.plan((1.9, 1.0), (0.5, 1.0))  # 뒤로는 빠져나감
+    assert p.is_free(*path[-1])
+
+
 def test_unknown_is_blocked_by_default():
     g = np.zeros((40, 40), dtype=np.int8)
     g[:, 20] = -1

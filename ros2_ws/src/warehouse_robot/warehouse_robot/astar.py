@@ -104,6 +104,7 @@ class GridPlanner:
         # 탐색 루프 속도를 위해 1차원 리스트로 변환
         self._obstacle = self.obstacle.ravel().tolist()
         self._lethal = self.lethal.ravel().tolist()
+        self._dist = self.dist.ravel().tolist()
         self._cost = self.cost.ravel().tolist()
 
     # -------------------------------------------------------------- 좌표 변환
@@ -171,7 +172,7 @@ class GridPlanner:
         w = self.width
         n = w * self.height
         start, goal = sr * w + sc, gr * w + gc
-        obstacle, lethal, cost = self._obstacle, self._lethal, self._cost
+        obstacle, lethal, cost, dist = self._obstacle, self._lethal, self._cost, self._dist
 
         g = [math.inf] * n
         parent = [-1] * n
@@ -202,8 +203,10 @@ class GridPlanner:
                     continue
                 extra = 0.0
                 if lethal[nxt]:
-                    # lethal 영역은 시작점이 이미 그 안에 있을 때만 빠져나가는 용도로 허용
-                    if not cur_lethal:
+                    # lethal 영역은 시작점이 이미 그 안에 있을 때 빠져나가는 용도로만: 장애물에서 멀어지는 칸으로만 간다.
+                    # (예전: lethal 안에서 lethal 로 자유롭게 → 장애물 옆에서 출발하면 lethal 띠를 따라 좁은 틈을 지나는
+                    #  경로를 냈음. 소화기 옆으로 물러난 뒤 '기억 장애물을 피한' 경로가 소화기 4 cm 옆, 실물 2771)
+                    if not cur_lethal or dist[nxt] <= dist[cur]:
                         continue
                     extra = ESCAPE_PENALTY
                 if dr and dc and (obstacle[r * w + nc] or obstacle[nr * w + c]):
