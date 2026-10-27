@@ -1,6 +1,13 @@
 package.xml
 setup.cfg
 setup.py
+../../build/warehouse_robot/warehouse_robot.egg-info/PKG-INFO
+../../build/warehouse_robot/warehouse_robot.egg-info/SOURCES.txt
+../../build/warehouse_robot/warehouse_robot.egg-info/dependency_links.txt
+../../build/warehouse_robot/warehouse_robot.egg-info/entry_points.txt
+../../build/warehouse_robot/warehouse_robot.egg-info/requires.txt
+../../build/warehouse_robot/warehouse_robot.egg-info/top_level.txt
+../../build/warehouse_robot/warehouse_robot.egg-info/zip-safe
 config/params.yaml
 launch/warehouse.launch.py
 resource/warehouse_robot
@@ -8,6 +15,10 @@ warehouse_robot/__init__.py
 warehouse_robot/astar.py
 warehouse_robot/astar_planner_node.py
 warehouse_robot/bridge_node.py
+warehouse_robot/cmd_mux.py
+warehouse_robot/frenet.py
+warehouse_robot/plan_map.py
+warehouse_robot/tracker.py
 warehouse_robot.egg-info/PKG-INFO
 warehouse_robot.egg-info/SOURCES.txt
 warehouse_robot.egg-info/dependency_links.txt

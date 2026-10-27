@@ -1,218 +1,107 @@
-[start_bridge] 모드 slam, 맵 이름 slam_live, planner=astar, controller=builtin, 시뮬레이션 시간 true, 도메인 77
-[INFO] [launch]: All log files can be found below /home/abc/.ros/log/2026-10-19-17-31-59-888031-abc-B360M-DS3H-6588
+[start_bridge] 로봇 tb3, 네임스페이스 (없음), 모드 map, 맵 이름 map2, 시뮬레이션 시간 false, 도메인 44
+[INFO] [launch]: All log files can be found below /home/abc/.ros/log/2026-10-27-12-34-32-789745-abc-B360M-DS3H-46650
 [INFO] [launch]: Default logging verbosity is set to INFO
-[INFO] [astar_planner-1]: process started with pid [6621]
-[INFO] [bridge-2]: process started with pid [6623]
+[INFO] [astar_planner-1]: process started with pid [46690]
+[INFO] [bridge-2]: process started with pid [46692]
+[INFO] [yolo-3]: process started with pid [46694]
 [astar_planner-1] /usr/lib/python3/dist-packages/scipy/__init__.py:146: UserWarning: A NumPy version >=1.17.3 and <1.25.0 is required for this version of SciPy (detected version 1.26.4
 [astar_planner-1]   warnings.warn(f"A NumPy version >={np_minversion} and <{np_maxversion}"
-[astar_planner-1] [INFO] [1792398720.367735978] [astar_planner]: A* 플래너 시작, 맵 대기 중 (map)
-[astar_planner-1] [INFO] [1792398720.369932431] [astar_planner]: 맵 수신: 80x102, 0.050 m/px
 [bridge-2] /usr/lib/python3/dist-packages/scipy/__init__.py:146: UserWarning: A NumPy version >=1.17.3 and <1.25.0 is required for this version of SciPy (detected version 1.26.4
 [bridge-2]   warnings.warn(f"A NumPy version >={np_minversion} and <{np_maxversion}"
-[bridge-2] [INFO] [1792398720.556216401] [warehouse_bridge]: 브리지 시작 (planner=astar, controller=builtin)
-[bridge-2] [INFO] [1792398720.556746346] [warehouse_bridge]: 서버 연결됨: ws://localhost:8000/ws/robot/tb3/
-[astar_planner-1] [INFO] [1792398722.420849743] [astar_planner]: 맵 수신: 80x102, 0.050 m/px
-[astar_planner-1] [INFO] [1792398727.420882389] [astar_planner]: 맵 수신: 80x102, 0.050 m/px
-[astar_planner-1] [INFO] [1792398732.420817078] [astar_planner]: 맵 수신: 80x102, 0.050 m/px
-[astar_planner-1] [INFO] [1792398737.422425522] [astar_planner]: 맵 수신: 80x102, 0.050 m/px
-[astar_planner-1] [INFO] [1792398742.420495530] [astar_planner]: 맵 수신: 80x102, 0.050 m/px
-[astar_planner-1] [INFO] [1792398747.421883883] [astar_planner]: 맵 수신: 80x102, 0.050 m/px
-[astar_planner-1] [INFO] [1792398752.421324005] [astar_planner]: 맵 수신: 80x102, 0.050 m/px
-[astar_planner-1] [INFO] [1792398757.421325641] [astar_planner]: 맵 수신: 80x102, 0.050 m/px
-[astar_planner-1] [INFO] [1792398762.420897605] [astar_planner]: 맵 수신: 80x102, 0.050 m/px
-[astar_planner-1] [INFO] [1792398767.420739990] [astar_planner]: 맵 수신: 80x102, 0.050 m/px
-[astar_planner-1] [INFO] [1792398772.421492077] [astar_planner]: 맵 수신: 80x102, 0.050 m/px
-[astar_planner-1] [INFO] [1792398777.421160768] [astar_planner]: 맵 수신: 87x102, 0.050 m/px
-[astar_planner-1] [INFO] [1792398782.421270961] [astar_planner]: 맵 수신: 87x102, 0.050 m/px
-[astar_planner-1] [INFO] [1792398787.421174622] [astar_planner]: 맵 수신: 87x102, 0.050 m/px
-[astar_planner-1] [INFO] [1792398792.421472677] [astar_planner]: 맵 수신: 105x102, 0.050 m/px
-[astar_planner-1] [INFO] [1792398797.421285816] [astar_planner]: 맵 수신: 109x102, 0.050 m/px
-[astar_planner-1] [INFO] [1792398802.421656825] [astar_planner]: 맵 수신: 111x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792398807.422539786] [astar_planner]: 맵 수신: 111x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792398812.421719024] [astar_planner]: 맵 수신: 111x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792398817.421395845] [astar_planner]: 맵 수신: 111x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792398822.421859130] [astar_planner]: 맵 수신: 111x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792398827.421344984] [astar_planner]: 맵 수신: 111x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792398832.422493551] [astar_planner]: 맵 수신: 111x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792398837.422005959] [astar_planner]: 맵 수신: 111x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792398842.422068745] [astar_planner]: 맵 수신: 111x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792398847.422851434] [astar_planner]: 맵 수신: 111x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792398852.422438369] [astar_planner]: 맵 수신: 111x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792398857.422421714] [astar_planner]: 맵 수신: 111x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792398862.423288732] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792398867.422922684] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792398872.422599471] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792398877.422540970] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792398882.422939047] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792398887.423119951] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792398892.423873117] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792398897.422271297] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792398902.423155904] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792398907.424606309] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792398912.423038315] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792398917.425202550] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792398922.422584232] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792398927.423745003] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792398932.423770690] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792398937.423394895] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792398942.423536783] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792398947.423412328] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792398952.422442297] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792398957.422838186] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792398962.424154157] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792398967.424789349] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792398972.425875995] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792398977.424061251] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792398982.423948634] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792398987.424903825] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792398992.424697217] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792398997.423332836] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399002.424489156] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399007.423631889] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399012.423375412] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399017.422594562] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399022.422925139] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399027.423800907] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399032.424789217] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399037.422699631] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399042.424100311] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399047.424490636] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399052.424427589] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399057.422798696] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399062.425677807] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399067.422932689] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399072.424291351] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399077.426144864] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399082.430379372] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399087.427009072] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399092.425307636] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399097.425783649] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399102.427409908] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399107.425566309] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399112.425556176] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399117.426682304] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399122.425540231] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399127.424220641] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399132.424360676] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399137.424364745] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399142.442202768] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399147.425508546] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399152.423812659] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399157.424268124] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399162.426110623] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399167.426810548] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399172.427681151] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399177.426455902] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399182.426803987] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399187.425776360] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399192.425235609] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399197.424807879] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399202.427779267] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399207.426836523] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399212.427880927] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399217.431447011] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399222.427339152] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399227.435283487] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399232.427009845] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399237.424276126] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399242.426173602] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399247.430151279] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399252.425921849] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399257.424946155] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399262.425955469] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399267.424694899] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399272.425596782] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399277.426917336] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399282.425099144] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399287.425244113] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399292.425425276] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399297.425899111] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399302.427476094] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399307.427936304] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399312.427391959] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399317.424617364] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399322.426475785] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399327.426368947] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399332.425354851] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399337.429084352] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399342.426833945] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399347.425650444] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399352.424800090] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399357.426964480] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399362.425614887] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399367.425789624] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399372.426386421] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399377.425547749] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399382.425373931] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399387.425463671] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399392.433775224] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399397.429550528] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399402.430513232] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399407.429159295] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399412.425390509] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399417.432123192] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399422.427506355] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399427.427928230] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399432.428802036] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399437.431386195] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399442.430045321] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399447.431450966] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399452.429289460] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399457.429954903] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399462.432110021] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399467.433602256] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399472.427468260] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399477.429111841] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399482.430021173] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399487.429409271] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399492.430074565] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399497.433289629] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399502.432349656] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399507.435198281] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399512.427492159] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399517.431633581] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399522.428511572] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399527.439802084] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399532.433423556] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399537.436556217] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399542.437683204] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399547.438998420] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399552.436343824] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399557.427352497] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399562.431776948] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399567.435198779] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399572.439645393] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399577.431945434] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399582.427047812] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399587.436539023] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399592.429403705] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399597.440077354] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399602.433011624] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399607.437815017] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399612.434224074] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399617.442217734] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399622.436032257] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399627.440766372] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399632.432243220] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399637.437322839] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399642.435463540] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399647.427158074] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399652.433686452] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399657.436217965] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399662.433278113] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399667.432641603] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399672.432423581] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399677.428757911] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399682.433287615] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399687.435130410] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399692.438022266] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399697.432667968] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399702.438322480] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399707.445860919] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399712.427847032] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399717.432277538] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399722.434956948] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399727.439669640] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399732.439888812] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399737.436940480] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
-[astar_planner-1] [INFO] [1792399742.428353154] [astar_planner]: 맵 수신: 112x103, 0.050 m/px
+[astar_planner-1] [INFO] [1793072073.271253193] [astar_planner]: A* 플래너 시작, 맵 대기 중 (map)
+[astar_planner-1] [INFO] [1793072073.276781362] [astar_planner]: 맵 수신: 109x76, 0.050 m/px, 계획용 가공: 줄무늬 메움 0칸, 다리 점 부풀림 0칸
+[bridge-2] [INFO] [1793072073.357432981] [warehouse_bridge]: 서버 연결됨: ws://localhost:8000/ws/robot/tb3/
+[bridge-2] [INFO] [1793072073.357551750] [warehouse_bridge]: 브리지 시작 (A* + Frenet 로컬 플래너)
+[bridge-2] [INFO] [1793072073.359346517] [warehouse_bridge]: 맵 수신 109x76
+[bridge-2] [INFO] [1793072073.403096366] [warehouse_bridge]: 금지 구역 1개 → A* 플래너
+[astar_planner-1] [INFO] [1793072073.403400907] [astar_planner]: 금지 구역 1개 받음
+[yolo-3] [start_yolo] 도메인 44, python /usr/bin/python3
+[yolo-3] [INFO] [1793072074.928004810] [component_detector_switch]: 모델: /home/abc/webserver/yolo/yolo_training/best_components7_finetuned.pt
+[yolo-3] [INFO] [1793072074.928313722] [component_detector_switch]: 입력: csi/image_raw (compressed)
+[yolo-3] [INFO] [1793072074.928809361] [component_detector_switch]: 검출 결과 영상: /yolo/image_raw (CPU)
+[bridge-2] [INFO] [1793072091.403139695] [warehouse_bridge]: 초기 위치 지정 (-1.17, 2.05, -179°) - 스캔 매칭 결과
+[bridge-2] [INFO] [1793072100.002832886] [warehouse_bridge]: 목표 step-2746: (-2.52, -0.02, 90°)
+[bridge-2] [INFO] [1793072100.003872578] [warehouse_bridge]: 주행 기록: /home/abc/webserver/logs/records/20261027_123500_frenet/123500_step-2746/record.jsonl.gz
+[astar_planner-1] [INFO] [1793072100.030436065] [astar_planner]: 경로 계획 완료: 63개 점
+[bridge-2] [INFO] [1793072130.403796357] [warehouse_bridge]: 목표 step-2746: succeeded 
+[bridge-2] [INFO] [1793072143.553018240] [warehouse_bridge]: 목표 step-2748: (-1.14, 2.02, -180°)
+[bridge-2] [INFO] [1793072143.554219106] [warehouse_bridge]: 주행 기록: /home/abc/webserver/logs/records/20261027_123500_frenet/123543_step-2748/record.jsonl.gz
+[astar_planner-1] [INFO] [1793072143.562251354] [astar_planner]: 맵에 없는 장애물 2칸을 피해서 계획
+[astar_planner-1] [INFO] [1793072143.566541197] [astar_planner]: 경로 계획 완료: 63개 점
+[bridge-2] [WARN] [1793072157.333134723] [warehouse_bridge]: Frenet: 안전한 궤적 없음, 정지 후 대기
+[bridge-2] [INFO] [1793072179.105055788] [warehouse_bridge]: 목표 step-2748: succeeded 
+[bridge-2] [INFO] [1793072212.502809955] [warehouse_bridge]: 목표 step-2750: (-2.52, -0.02, 90°)
+[bridge-2] [INFO] [1793072212.504084253] [warehouse_bridge]: 주행 기록: /home/abc/webserver/logs/records/20261027_123500_frenet/123652_step-2750/record.jsonl.gz
+[astar_planner-1] [INFO] [1793072212.520571653] [astar_planner]: 경로 계획 완료: 63개 점
+[bridge-2] [WARN] [1793072216.478746365] [warehouse_bridge]: Frenet: 안전한 궤적 없음, 정지 후 대기
+[bridge-2] [WARN] [1793072217.779517213] [warehouse_bridge]: Frenet: 안전한 궤적 없음, 정지 후 대기
+[bridge-2] [WARN] [1793072223.733396575] [warehouse_bridge]: Frenet: 안전한 궤적 없음, 정지 후 대기
+[bridge-2] [WARN] [1793072239.533469583] [warehouse_bridge]: Frenet: 안전한 궤적 없음, 정지 후 대기
+[bridge-2] [WARN] [1793072240.481652150] [warehouse_bridge]: Frenet: 안전한 궤적 없음, 정지 후 대기
+[bridge-2] [WARN] [1793072240.979777328] [warehouse_bridge]: Frenet: 안전한 궤적 없음, 정지 후 대기
+[bridge-2] [WARN] [1793072241.833293632] [warehouse_bridge]: Frenet: 안전한 궤적 없음, 정지 후 대기
+[bridge-2] [INFO] [1793072253.603602286] [warehouse_bridge]: 목표 step-2750: succeeded 
+[bridge-2] [INFO] [1793072262.902800131] [warehouse_bridge]: 목표 step-2752: (-1.14, 2.02, -180°)
+[bridge-2] [INFO] [1793072262.903825160] [warehouse_bridge]: 주행 기록: /home/abc/webserver/logs/records/20261027_123500_frenet/123742_step-2752/record.jsonl.gz
+[astar_planner-1] [INFO] [1793072262.910324354] [astar_planner]: 맵에 없는 장애물 8칸을 피해서 계획
+[astar_planner-1] [INFO] [1793072262.913399582] [astar_planner]: 경로 계획 완료: 63개 점
+[bridge-2] [WARN] [1793072276.529884880] [warehouse_bridge]: Frenet: 안전한 궤적 없음, 정지 후 대기
+[bridge-2] [WARN] [1793072277.334428941] [warehouse_bridge]: Frenet: 안전한 궤적 없음, 정지 후 대기
+[bridge-2] [WARN] [1793072278.976721835] [warehouse_bridge]: Frenet: 안전한 궤적 없음, 정지 후 대기
+[bridge-2] [WARN] [1793072279.627514695] [warehouse_bridge]: Frenet: 안전한 궤적 없음, 정지 후 대기
+[bridge-2] [WARN] [1793072280.830624354] [warehouse_bridge]: Frenet: 안전한 궤적 없음, 정지 후 대기
+[bridge-2] [INFO] [1793072303.305240556] [warehouse_bridge]: 목표 step-2752: succeeded 
+[bridge-2] [INFO] [1793072320.952987791] [warehouse_bridge]: 금지 구역 0개 → A* 플래너
+[astar_planner-1] [INFO] [1793072320.953547239] [astar_planner]: 금지 구역 0개 받음
+[bridge-2] [INFO] [1793072339.103149056] [warehouse_bridge]: 초기 위치 지정 (-1.17, 2.05, -3°) - 스캔 매칭 결과
+[bridge-2] [INFO] [1793072386.203081586] [warehouse_bridge]: 초기 위치 지정 (-0.90, 1.63, -103°) - 스캔 매칭 결과
+[bridge-2] [INFO] [1793072395.652840598] [warehouse_bridge]: 목표 step-2754: (-2.52, -0.02, 90°)
+[bridge-2] [INFO] [1793072395.653766152] [warehouse_bridge]: 주행 기록: /home/abc/webserver/logs/records/20261027_123500_frenet/123955_step-2754/record.jsonl.gz
+[astar_planner-1] [INFO] [1793072395.664685344] [astar_planner]: 맵에 없는 장애물 62칸을 피해서 계획
+[astar_planner-1] [INFO] [1793072395.666528743] [astar_planner]: 경로 계획 완료: 57개 점
+[bridge-2] [INFO] [1793072419.057251974] [warehouse_bridge]: 목표 step-2754: succeeded 
+[bridge-2] [WARN] [1793072458.247390292] [warehouse_bridge]: 서버 연결 끊김, 재연결 시도
+[bridge-2] Exception ignored in: <function TransformListener.__del__ at 0x743d4bb372e0>
+[bridge-2] Traceback (most recent call last):
+[bridge-2]   File "/opt/ros/humble/lib/python3.10/site-packages/tf2_ros/transform_listener.py", line 119, in __del__
+[bridge-2]     self.executor.shutdown()
+[bridge-2]   File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/executors.py", line 264, in shutdown
+[bridge-2]     self._sigint_gc.destroy()
+[bridge-2]   File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/signals.py", line 65, in destroy
+[bridge-2]     with self.handle:
+[bridge-2] rclpy._rclpy_pybind11.InvalidHandle: cannot use Destroyable because destruction was requested
+[bridge-2] Traceback (most recent call last):
+[bridge-2]   File "/home/abc/webserver/ros2_ws/install/warehouse_robot/lib/warehouse_robot/bridge", line 33, in <module>
+[bridge-2]     sys.exit(load_entry_point('warehouse-robot', 'console_scripts', 'bridge')())
+[bridge-2]   File "/home/abc/webserver/ros2_ws/build/warehouse_robot/warehouse_robot/bridge_node.py", line 1658, in main
+[bridge-2]     rclpy.spin(node)
+[bridge-2]   File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/__init__.py", line 229, in spin
+[bridge-2]     executor.spin_once()
+[bridge-2]   File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/executors.py", line 812, in spin_once
+[bridge-2]     self._spin_once_impl(timeout_sec)
+[bridge-2]   File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/executors.py", line 801, in _spin_once_impl
+[bridge-2]     handler, entity, node = self.wait_for_ready_callbacks(timeout_sec=timeout_sec)
+[bridge-2]   File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/executors.py", line 784, in wait_for_ready_callbacks
+[bridge-2]     return next(self._cb_iter)
+[bridge-2]   File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/executors.py", line 685, in _wait_for_ready_callbacks
+[bridge-2]     raise ExternalShutdownException()
+[bridge-2] rclpy.executors.ExternalShutdownException
+[astar_planner-1] Traceback (most recent call last):
+[astar_planner-1]   File "/home/abc/webserver/ros2_ws/install/warehouse_robot/lib/warehouse_robot/astar_planner", line 33, in <module>
+[astar_planner-1]     sys.exit(load_entry_point('warehouse-robot', 'console_scripts', 'astar_planner')())
+[astar_planner-1]   File "/home/abc/webserver/ros2_ws/build/warehouse_robot/warehouse_robot/astar_planner_node.py", line 389, in main
+[astar_planner-1]     rclpy.spin(node)
+[astar_planner-1]   File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/__init__.py", line 229, in spin
+[astar_planner-1]     executor.spin_once()
+[astar_planner-1]   File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/executors.py", line 812, in spin_once
+[astar_planner-1]     self._spin_once_impl(timeout_sec)
+[astar_planner-1]   File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/executors.py", line 801, in _spin_once_impl
+[astar_planner-1]     handler, entity, node = self.wait_for_ready_callbacks(timeout_sec=timeout_sec)
+[astar_planner-1]   File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/executors.py", line 784, in wait_for_ready_callbacks
+[astar_planner-1]     return next(self._cb_iter)
+[astar_planner-1]   File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/executors.py", line 685, in _wait_for_ready_callbacks
+[astar_planner-1]     raise ExternalShutdownException()
+[astar_planner-1] rclpy.executors.ExternalShutdownException
+[ERROR] [astar_planner-1]: process has died [pid 46690, exit code 1, cmd '/home/abc/webserver/ros2_ws/install/warehouse_robot/lib/warehouse_robot/astar_planner --ros-args -r __node:=astar_planner -r __ns:=/ --params-file /home/abc/webserver/ros2_ws/install/warehouse_robot/share/warehouse_robot/config/params.yaml --params-file /tmp/launch_params_v8zmn7cd'].
+[ERROR] [bridge-2]: process has died [pid 46692, exit code 1, cmd '/home/abc/webserver/ros2_ws/install/warehouse_robot/lib/warehouse_robot/bridge --ros-args -r __node:=warehouse_bridge -r __ns:=/ --params-file /home/abc/webserver/ros2_ws/install/warehouse_robot/share/warehouse_robot/config/params.yaml --params-file /tmp/launch_params_3fxaks18'].
+[INFO] [yolo-3]: process has finished cleanly [pid 46694]

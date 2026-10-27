@@ -1,0 +1,19 @@
+[0.785s] Invoking command in '/home/abc/webserver/ros2_ws/build/warehouse_robot': PYTHONPATH=/home/abc/webserver/ros2_ws/build/warehouse_robot/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/abc/webserver/ros2_ws/install/warehouse_robot/lib/python3.10/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py develop --editable --build-directory /home/abc/webserver/ros2_ws/build/warehouse_robot/build --no-deps symlink_data
+[1.019s] running develop
+[1.175s] running egg_info
+[1.175s] writing warehouse_robot.egg-info/PKG-INFO
+[1.176s] writing dependency_links to warehouse_robot.egg-info/dependency_links.txt
+[1.176s] writing entry points to warehouse_robot.egg-info/entry_points.txt
+[1.176s] writing requirements to warehouse_robot.egg-info/requires.txt
+[1.176s] writing top-level names to warehouse_robot.egg-info/top_level.txt
+[1.178s] reading manifest file 'warehouse_robot.egg-info/SOURCES.txt'
+[1.179s] writing manifest file 'warehouse_robot.egg-info/SOURCES.txt'
+[1.180s] running build_ext
+[1.180s] Creating /home/abc/webserver/ros2_ws/install/warehouse_robot/lib/python3.10/site-packages/warehouse-robot.egg-link (link to .)
+[1.181s] Installing astar_planner script to /home/abc/webserver/ros2_ws/install/warehouse_robot/lib/warehouse_robot
+[1.181s] Installing bridge script to /home/abc/webserver/ros2_ws/install/warehouse_robot/lib/warehouse_robot
+[1.182s] Installing cargo_detector script to /home/abc/webserver/ros2_ws/install/warehouse_robot/lib/warehouse_robot
+[1.182s] 
+[1.182s] Installed /home/abc/webserver/ros2_ws/build/warehouse_robot
+[1.182s] running symlink_data
+[1.202s] Invoked command in '/home/abc/webserver/ros2_ws/build/warehouse_robot' returned '0': PYTHONPATH=/home/abc/webserver/ros2_ws/build/warehouse_robot/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/abc/webserver/ros2_ws/install/warehouse_robot/lib/python3.10/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py develop --editable --build-directory /home/abc/webserver/ros2_ws/build/warehouse_robot/build --no-deps symlink_data

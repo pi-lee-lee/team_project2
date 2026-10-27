@@ -1,0 +1,92 @@
+[0.000000] (-) TimerEvent: {}
+[0.000074] (warehouse_robot) JobQueued: {'identifier': 'warehouse_robot', 'dependencies': OrderedDict()}
+[0.000563] (warehouse_robot) JobStarted: {'identifier': 'warehouse_robot'}
+[0.099886] (-) TimerEvent: {}
+[0.200026] (-) TimerEvent: {}
+[0.300181] (-) TimerEvent: {}
+[0.400320] (-) TimerEvent: {}
+[0.500437] (-) TimerEvent: {}
+[0.520419] (warehouse_robot) Command: {'cmd': ['/usr/bin/python3', '-W', 'ignore:setup.py install is deprecated', '-W', 'ignore:easy_install command is deprecated', 'setup.py', 'develop', '--uninstall', '--editable', '--build-directory', '/home/abc/webserver/ros2_ws/build/warehouse_robot/build'], 'cwd': '/home/abc/webserver/ros2_ws/build/warehouse_robot', 'env': OrderedDict([('USER', 'abc'), ('SSH_CLIENT', '192.168.0.107 51362 22'), ('LC_TIME', 'ko_KR.UTF-8'), ('XDG_SESSION_TYPE', 'tty'), ('SHLVL', '0'), ('LD_LIBRARY_PATH', '/usr/lib/x86_64-linux-gnu/gazebo-11/plugins:/opt/ros/humble/opt/rviz_ogre_vendor/lib:/opt/ros/humble/lib/x86_64-linux-gnu:/opt/ros/humble/lib'), ('MOTD_SHOWN', 'pam'), ('HOME', '/home/abc'), ('OLDPWD', '/home/abc/webserver'), ('ROS_PYTHON_VERSION', '3'), ('LC_MONETARY', 'ko_KR.UTF-8'), ('DBUS_SESSION_BUS_ADDRESS', 'unix:path=/run/user/1000/bus'), ('ROS_DISTRO', 'humble'), ('LOGNAME', 'abc'), ('_', '/usr/bin/colcon'), ('ROS_VERSION', '2'), ('XDG_SESSION_CLASS', 'user'), ('XDG_SESSION_ID', '15'), ('ROS_LOCALHOST_ONLY', '0'), ('PATH', '/opt/ros/humble/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin'), ('LC_ADDRESS', 'ko_KR.UTF-8'), ('XDG_RUNTIME_DIR', '/run/user/1000'), ('LANG', 'en_US.UTF-8'), ('LC_TELEPHONE', 'ko_KR.UTF-8'), ('AMENT_PREFIX_PATH', '/opt/ros/humble'), ('SHELL', '/bin/bash'), ('LC_NAME', 'ko_KR.UTF-8'), ('LC_MEASUREMENT', 'ko_KR.UTF-8'), ('LC_IDENTIFICATION', 'ko_KR.UTF-8'), ('PWD', '/home/abc/webserver/ros2_ws/build/warehouse_robot'), ('LC_ALL', 'en_US.UTF-8'), ('SSH_CONNECTION', '192.168.0.107 51362 192.168.0.188 22'), ('PYTHONPATH', '/home/abc/webserver/ros2_ws/build/warehouse_robot/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/abc/webserver/ros2_ws/install/warehouse_robot/lib/python3.10/site-packages:/opt/ros/humble/lib/python3.10/site-packages:/opt/ros/humble/local/lib/python3.10/dist-packages'), ('LC_NUMERIC', 'ko_KR.UTF-8'), ('LC_PAPER', 'ko_KR.UTF-8'), ('COLCON', '1')]), 'shell': False}
+[0.600541] (-) TimerEvent: {}
+[0.700681] (-) TimerEvent: {}
+[0.727320] (warehouse_robot) StdoutLine: {'line': b'running develop\n'}
+[0.800767] (-) TimerEvent: {}
+[0.875674] (warehouse_robot) StdoutLine: {'line': b'Removing /home/abc/webserver/ros2_ws/install/warehouse_robot/lib/python3.10/site-packages/warehouse-robot.egg-link (link to .)\n'}
+[0.891295] (warehouse_robot) CommandEnded: {'returncode': 0}
+[0.892150] (warehouse_robot) Command: {'cmd': ['/usr/bin/python3', '-W', 'ignore:setup.py install is deprecated', '-W', 'ignore:easy_install command is deprecated', 'setup.py', 'egg_info', '--egg-base', '../../build/warehouse_robot', 'build', '--build-base', '/home/abc/webserver/ros2_ws/build/warehouse_robot/build', 'install', '--record', '/home/abc/webserver/ros2_ws/build/warehouse_robot/install.log', '--install-scripts', '$base/lib/warehouse_robot', '--single-version-externally-managed', 'install_data', '--force'], 'cwd': '/home/abc/webserver/ros2_ws/src/warehouse_robot', 'env': OrderedDict([('USER', 'abc'), ('SSH_CLIENT', '192.168.0.107 51362 22'), ('LC_TIME', 'ko_KR.UTF-8'), ('XDG_SESSION_TYPE', 'tty'), ('SHLVL', '0'), ('LD_LIBRARY_PATH', '/usr/lib/x86_64-linux-gnu/gazebo-11/plugins:/opt/ros/humble/opt/rviz_ogre_vendor/lib:/opt/ros/humble/lib/x86_64-linux-gnu:/opt/ros/humble/lib'), ('MOTD_SHOWN', 'pam'), ('HOME', '/home/abc'), ('OLDPWD', '/home/abc/webserver'), ('ROS_PYTHON_VERSION', '3'), ('LC_MONETARY', 'ko_KR.UTF-8'), ('DBUS_SESSION_BUS_ADDRESS', 'unix:path=/run/user/1000/bus'), ('ROS_DISTRO', 'humble'), ('LOGNAME', 'abc'), ('_', '/usr/bin/colcon'), ('ROS_VERSION', '2'), ('XDG_SESSION_CLASS', 'user'), ('XDG_SESSION_ID', '15'), ('ROS_LOCALHOST_ONLY', '0'), ('PATH', '/opt/ros/humble/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin'), ('LC_ADDRESS', 'ko_KR.UTF-8'), ('XDG_RUNTIME_DIR', '/run/user/1000'), ('LANG', 'en_US.UTF-8'), ('LC_TELEPHONE', 'ko_KR.UTF-8'), ('AMENT_PREFIX_PATH', '/opt/ros/humble'), ('SHELL', '/bin/bash'), ('LC_NAME', 'ko_KR.UTF-8'), ('LC_MEASUREMENT', 'ko_KR.UTF-8'), ('LC_IDENTIFICATION', 'ko_KR.UTF-8'), ('PWD', '/home/abc/webserver/ros2_ws/build/warehouse_robot'), ('LC_ALL', 'en_US.UTF-8'), ('SSH_CONNECTION', '192.168.0.107 51362 192.168.0.188 22'), ('PYTHONPATH', '/home/abc/webserver/ros2_ws/build/warehouse_robot/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/abc/webserver/ros2_ws/install/warehouse_robot/lib/python3.10/site-packages:/opt/ros/humble/lib/python3.10/site-packages:/opt/ros/humble/local/lib/python3.10/dist-packages'), ('LC_NUMERIC', 'ko_KR.UTF-8'), ('LC_PAPER', 'ko_KR.UTF-8'), ('COLCON', '1')]), 'shell': False}
+[0.900852] (-) TimerEvent: {}
+[1.000988] (-) TimerEvent: {}
+[1.084730] (warehouse_robot) StdoutLine: {'line': b'running egg_info\n'}
+[1.085294] (warehouse_robot) StdoutLine: {'line': b'writing ../../build/warehouse_robot/warehouse_robot.egg-info/PKG-INFO\n'}
+[1.085473] (warehouse_robot) StdoutLine: {'line': b'writing dependency_links to ../../build/warehouse_robot/warehouse_robot.egg-info/dependency_links.txt\n'}
+[1.085723] (warehouse_robot) StdoutLine: {'line': b'writing entry points to ../../build/warehouse_robot/warehouse_robot.egg-info/entry_points.txt\n'}
+[1.085974] (warehouse_robot) StdoutLine: {'line': b'writing requirements to ../../build/warehouse_robot/warehouse_robot.egg-info/requires.txt\n'}
+[1.086066] (warehouse_robot) StdoutLine: {'line': b'writing top-level names to ../../build/warehouse_robot/warehouse_robot.egg-info/top_level.txt\n'}
+[1.087454] (warehouse_robot) StdoutLine: {'line': b"reading manifest file '../../build/warehouse_robot/warehouse_robot.egg-info/SOURCES.txt'\n"}
+[1.088344] (warehouse_robot) StdoutLine: {'line': b"writing manifest file '../../build/warehouse_robot/warehouse_robot.egg-info/SOURCES.txt'\n"}
+[1.088427] (warehouse_robot) StdoutLine: {'line': b'running build\n'}
+[1.088471] (warehouse_robot) StdoutLine: {'line': b'running build_py\n'}
+[1.088666] (warehouse_robot) StdoutLine: {'line': b'creating /home/abc/webserver/ros2_ws/build/warehouse_robot/build\n'}
+[1.088804] (warehouse_robot) StdoutLine: {'line': b'creating /home/abc/webserver/ros2_ws/build/warehouse_robot/build/lib\n'}
+[1.088895] (warehouse_robot) StdoutLine: {'line': b'creating /home/abc/webserver/ros2_ws/build/warehouse_robot/build/lib/warehouse_robot\n'}
+[1.089075] (warehouse_robot) StdoutLine: {'line': b'copying warehouse_robot/astar_planner_node.py -> /home/abc/webserver/ros2_ws/build/warehouse_robot/build/lib/warehouse_robot\n'}
+[1.089124] (warehouse_robot) StdoutLine: {'line': b'copying warehouse_robot/dwa.py -> /home/abc/webserver/ros2_ws/build/warehouse_robot/build/lib/warehouse_robot\n'}
+[1.089270] (warehouse_robot) StdoutLine: {'line': b'copying warehouse_robot/__init__.py -> /home/abc/webserver/ros2_ws/build/warehouse_robot/build/lib/warehouse_robot\n'}
+[1.089344] (warehouse_robot) StdoutLine: {'line': b'copying warehouse_robot/cmd_mux.py -> /home/abc/webserver/ros2_ws/build/warehouse_robot/build/lib/warehouse_robot\n'}
+[1.089467] (warehouse_robot) StdoutLine: {'line': b'copying warehouse_robot/plan_map.py -> /home/abc/webserver/ros2_ws/build/warehouse_robot/build/lib/warehouse_robot\n'}
+[1.089705] (warehouse_robot) StdoutLine: {'line': b'copying warehouse_robot/dwa_backup_20261022.py -> /home/abc/webserver/ros2_ws/build/warehouse_robot/build/lib/warehouse_robot\n'}
+[1.090032] (warehouse_robot) StdoutLine: {'line': b'copying warehouse_robot/rl_follower.py -> /home/abc/webserver/ros2_ws/build/warehouse_robot/build/lib/warehouse_robot\n'}
+[1.090139] (warehouse_robot) StdoutLine: {'line': b'copying warehouse_robot/bridge_node.py -> /home/abc/webserver/ros2_ws/build/warehouse_robot/build/lib/warehouse_robot\n'}
+[1.090405] (warehouse_robot) StdoutLine: {'line': b'copying warehouse_robot/scan_noise.py -> /home/abc/webserver/ros2_ws/build/warehouse_robot/build/lib/warehouse_robot\n'}
+[1.090705] (warehouse_robot) StdoutLine: {'line': b'copying warehouse_robot/cargo_detect.py -> /home/abc/webserver/ros2_ws/build/warehouse_robot/build/lib/warehouse_robot\n'}
+[1.090898] (warehouse_robot) StdoutLine: {'line': b'copying warehouse_robot/astar.py -> /home/abc/webserver/ros2_ws/build/warehouse_robot/build/lib/warehouse_robot\n'}
+[1.091104] (warehouse_robot) StdoutLine: {'line': b'copying warehouse_robot/follower.py -> /home/abc/webserver/ros2_ws/build/warehouse_robot/build/lib/warehouse_robot\n'}
+[1.091415] (warehouse_robot) StdoutLine: {'line': b'copying warehouse_robot/tracker.py -> /home/abc/webserver/ros2_ws/build/warehouse_robot/build/lib/warehouse_robot\n'}
+[1.091647] (warehouse_robot) StdoutLine: {'line': b'copying warehouse_robot/cargo_detector_node.py -> /home/abc/webserver/ros2_ws/build/warehouse_robot/build/lib/warehouse_robot\n'}
+[1.092045] (warehouse_robot) StdoutLine: {'line': b'running install\n'}
+[1.092348] (warehouse_robot) StdoutLine: {'line': b'running install_lib\n'}
+[1.092927] (warehouse_robot) StdoutLine: {'line': b'creating /home/abc/webserver/ros2_ws/install/warehouse_robot/lib/python3.10/site-packages/warehouse_robot\n'}
+[1.093125] (warehouse_robot) StdoutLine: {'line': b'copying /home/abc/webserver/ros2_ws/build/warehouse_robot/build/lib/warehouse_robot/astar_planner_node.py -> /home/abc/webserver/ros2_ws/install/warehouse_robot/lib/python3.10/site-packages/warehouse_robot\n'}
+[1.093336] (warehouse_robot) StdoutLine: {'line': b'copying /home/abc/webserver/ros2_ws/build/warehouse_robot/build/lib/warehouse_robot/dwa.py -> /home/abc/webserver/ros2_ws/install/warehouse_robot/lib/python3.10/site-packages/warehouse_robot\n'}
+[1.093474] (warehouse_robot) StdoutLine: {'line': b'copying /home/abc/webserver/ros2_ws/build/warehouse_robot/build/lib/warehouse_robot/__init__.py -> /home/abc/webserver/ros2_ws/install/warehouse_robot/lib/python3.10/site-packages/warehouse_robot\n'}
+[1.093525] (warehouse_robot) StdoutLine: {'line': b'copying /home/abc/webserver/ros2_ws/build/warehouse_robot/build/lib/warehouse_robot/cmd_mux.py -> /home/abc/webserver/ros2_ws/install/warehouse_robot/lib/python3.10/site-packages/warehouse_robot\n'}
+[1.093571] (warehouse_robot) StdoutLine: {'line': b'copying /home/abc/webserver/ros2_ws/build/warehouse_robot/build/lib/warehouse_robot/plan_map.py -> /home/abc/webserver/ros2_ws/install/warehouse_robot/lib/python3.10/site-packages/warehouse_robot\n'}
+[1.093681] (warehouse_robot) StdoutLine: {'line': b'copying /home/abc/webserver/ros2_ws/build/warehouse_robot/build/lib/warehouse_robot/dwa_backup_20261022.py -> /home/abc/webserver/ros2_ws/install/warehouse_robot/lib/python3.10/site-packages/warehouse_robot\n'}
+[1.093725] (warehouse_robot) StdoutLine: {'line': b'copying /home/abc/webserver/ros2_ws/build/warehouse_robot/build/lib/warehouse_robot/rl_follower.py -> /home/abc/webserver/ros2_ws/install/warehouse_robot/lib/python3.10/site-packages/warehouse_robot\n'}
+[1.093806] (warehouse_robot) StdoutLine: {'line': b'copying /home/abc/webserver/ros2_ws/build/warehouse_robot/build/lib/warehouse_robot/bridge_node.py -> /home/abc/webserver/ros2_ws/install/warehouse_robot/lib/python3.10/site-packages/warehouse_robot\n'}
+[1.093851] (warehouse_robot) StdoutLine: {'line': b'copying /home/abc/webserver/ros2_ws/build/warehouse_robot/build/lib/warehouse_robot/scan_noise.py -> /home/abc/webserver/ros2_ws/install/warehouse_robot/lib/python3.10/site-packages/warehouse_robot\n'}
+[1.093936] (warehouse_robot) StdoutLine: {'line': b'copying /home/abc/webserver/ros2_ws/build/warehouse_robot/build/lib/warehouse_robot/cargo_detect.py -> /home/abc/webserver/ros2_ws/install/warehouse_robot/lib/python3.10/site-packages/warehouse_robot\n'}
+[1.093979] (warehouse_robot) StdoutLine: {'line': b'copying /home/abc/webserver/ros2_ws/build/warehouse_robot/build/lib/warehouse_robot/astar.py -> /home/abc/webserver/ros2_ws/install/warehouse_robot/lib/python3.10/site-packages/warehouse_robot\n'}
+[1.094055] (warehouse_robot) StdoutLine: {'line': b'copying /home/abc/webserver/ros2_ws/build/warehouse_robot/build/lib/warehouse_robot/follower.py -> /home/abc/webserver/ros2_ws/install/warehouse_robot/lib/python3.10/site-packages/warehouse_robot\n'}
+[1.094166] (warehouse_robot) StdoutLine: {'line': b'copying /home/abc/webserver/ros2_ws/build/warehouse_robot/build/lib/warehouse_robot/tracker.py -> /home/abc/webserver/ros2_ws/install/warehouse_robot/lib/python3.10/site-packages/warehouse_robot\n'}
+[1.094215] (warehouse_robot) StdoutLine: {'line': b'copying /home/abc/webserver/ros2_ws/build/warehouse_robot/build/lib/warehouse_robot/cargo_detector_node.py -> /home/abc/webserver/ros2_ws/install/warehouse_robot/lib/python3.10/site-packages/warehouse_robot\n'}
+[1.094503] (warehouse_robot) StdoutLine: {'line': b'byte-compiling /home/abc/webserver/ros2_ws/install/warehouse_robot/lib/python3.10/site-packages/warehouse_robot/astar_planner_node.py to astar_planner_node.cpython-310.pyc\n'}
+[1.097780] (warehouse_robot) StdoutLine: {'line': b'byte-compiling /home/abc/webserver/ros2_ws/install/warehouse_robot/lib/python3.10/site-packages/warehouse_robot/dwa.py to dwa.cpython-310.pyc\n'}
+[1.101071] (-) TimerEvent: {}
+[1.101418] (warehouse_robot) StdoutLine: {'line': b'byte-compiling /home/abc/webserver/ros2_ws/install/warehouse_robot/lib/python3.10/site-packages/warehouse_robot/__init__.py to __init__.cpython-310.pyc\n'}
+[1.101632] (warehouse_robot) StdoutLine: {'line': b'byte-compiling /home/abc/webserver/ros2_ws/install/warehouse_robot/lib/python3.10/site-packages/warehouse_robot/cmd_mux.py to cmd_mux.cpython-310.pyc\n'}
+[1.102156] (warehouse_robot) StdoutLine: {'line': b'byte-compiling /home/abc/webserver/ros2_ws/install/warehouse_robot/lib/python3.10/site-packages/warehouse_robot/plan_map.py to plan_map.cpython-310.pyc\n'}
+[1.103444] (warehouse_robot) StdoutLine: {'line': b'byte-compiling /home/abc/webserver/ros2_ws/install/warehouse_robot/lib/python3.10/site-packages/warehouse_robot/dwa_backup_20261022.py to dwa_backup_20261022.cpython-310.pyc\n'}
+[1.106228] (warehouse_robot) StdoutLine: {'line': b'byte-compiling /home/abc/webserver/ros2_ws/install/warehouse_robot/lib/python3.10/site-packages/warehouse_robot/rl_follower.py to rl_follower.cpython-310.pyc\n'}
+[1.107878] (warehouse_robot) StdoutLine: {'line': b'byte-compiling /home/abc/webserver/ros2_ws/install/warehouse_robot/lib/python3.10/site-packages/warehouse_robot/bridge_node.py to bridge_node.cpython-310.pyc\n'}
+[1.119459] (warehouse_robot) StdoutLine: {'line': b'byte-compiling /home/abc/webserver/ros2_ws/install/warehouse_robot/lib/python3.10/site-packages/warehouse_robot/scan_noise.py to scan_noise.cpython-310.pyc\n'}
+[1.119841] (warehouse_robot) StdoutLine: {'line': b'byte-compiling /home/abc/webserver/ros2_ws/install/warehouse_robot/lib/python3.10/site-packages/warehouse_robot/cargo_detect.py to cargo_detect.cpython-310.pyc\n'}
+[1.120359] (warehouse_robot) StdoutLine: {'line': b'byte-compiling /home/abc/webserver/ros2_ws/install/warehouse_robot/lib/python3.10/site-packages/warehouse_robot/astar.py to astar.cpython-310.pyc\n'}
+[1.121778] (warehouse_robot) StdoutLine: {'line': b'byte-compiling /home/abc/webserver/ros2_ws/install/warehouse_robot/lib/python3.10/site-packages/warehouse_robot/follower.py to follower.cpython-310.pyc\n'}
+[1.122611] (warehouse_robot) StdoutLine: {'line': b'byte-compiling /home/abc/webserver/ros2_ws/install/warehouse_robot/lib/python3.10/site-packages/warehouse_robot/tracker.py to tracker.cpython-310.pyc\n'}
+[1.123549] (warehouse_robot) StdoutLine: {'line': b'byte-compiling /home/abc/webserver/ros2_ws/install/warehouse_robot/lib/python3.10/site-packages/warehouse_robot/cargo_detector_node.py to cargo_detector_node.cpython-310.pyc\n'}
+[1.124257] (warehouse_robot) StdoutLine: {'line': b'running install_data\n'}
+[1.124527] (warehouse_robot) StdoutLine: {'line': b'copying resource/warehouse_robot -> /home/abc/webserver/ros2_ws/install/warehouse_robot/share/ament_index/resource_index/packages\n'}
+[1.124625] (warehouse_robot) StdoutLine: {'line': b'copying package.xml -> /home/abc/webserver/ros2_ws/install/warehouse_robot/share/warehouse_robot\n'}
+[1.124898] (warehouse_robot) StdoutLine: {'line': b'copying launch/warehouse.launch.py -> /home/abc/webserver/ros2_ws/install/warehouse_robot/share/warehouse_robot/launch\n'}
+[1.124965] (warehouse_robot) StdoutLine: {'line': b'copying config/params.yaml -> /home/abc/webserver/ros2_ws/install/warehouse_robot/share/warehouse_robot/config\n'}
+[1.125019] (warehouse_robot) StdoutLine: {'line': b'running install_egg_info\n'}
+[1.126145] (warehouse_robot) StdoutLine: {'line': b'Copying ../../build/warehouse_robot/warehouse_robot.egg-info to /home/abc/webserver/ros2_ws/install/warehouse_robot/lib/python3.10/site-packages/warehouse_robot-0.1.0-py3.10.egg-info\n'}
+[1.126967] (warehouse_robot) StdoutLine: {'line': b'running install_scripts\n'}
+[1.141629] (warehouse_robot) StdoutLine: {'line': b'Installing astar_planner script to /home/abc/webserver/ros2_ws/install/warehouse_robot/lib/warehouse_robot\n'}
+[1.142018] (warehouse_robot) StdoutLine: {'line': b'Installing bridge script to /home/abc/webserver/ros2_ws/install/warehouse_robot/lib/warehouse_robot\n'}
+[1.142087] (warehouse_robot) StdoutLine: {'line': b'Installing cargo_detector script to /home/abc/webserver/ros2_ws/install/warehouse_robot/lib/warehouse_robot\n'}
+[1.142422] (warehouse_robot) StdoutLine: {'line': b"writing list of installed files to '/home/abc/webserver/ros2_ws/build/warehouse_robot/install.log'\n"}
+[1.157030] (warehouse_robot) CommandEnded: {'returncode': 0}
+[1.168498] (warehouse_robot) JobEnded: {'identifier': 'warehouse_robot', 'rc': 0}
+[1.168923] (-) EventReactorShutdown: {}

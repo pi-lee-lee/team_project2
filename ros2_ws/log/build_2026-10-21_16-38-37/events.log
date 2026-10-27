@@ -1,0 +1,35 @@
+[0.000000] (-) TimerEvent: {}
+[0.000220] (warehouse_robot) JobQueued: {'identifier': 'warehouse_robot', 'dependencies': OrderedDict()}
+[0.000713] (warehouse_robot) JobStarted: {'identifier': 'warehouse_robot'}
+[0.100021] (-) TimerEvent: {}
+[0.200185] (-) TimerEvent: {}
+[0.300347] (-) TimerEvent: {}
+[0.400508] (-) TimerEvent: {}
+[0.500641] (-) TimerEvent: {}
+[0.600796] (-) TimerEvent: {}
+[0.700961] (-) TimerEvent: {}
+[0.784674] (warehouse_robot) Command: {'cmd': ['/usr/bin/python3', '-W', 'ignore:setup.py install is deprecated', '-W', 'ignore:easy_install command is deprecated', 'setup.py', 'develop', '--editable', '--build-directory', '/home/abc/webserver/ros2_ws/build/warehouse_robot/build', '--no-deps', 'symlink_data'], 'cwd': '/home/abc/webserver/ros2_ws/build/warehouse_robot', 'env': OrderedDict([('USER', 'abc'), ('SSH_CLIENT', '192.168.0.29 55463 22'), ('LC_TIME', 'ko_KR.UTF-8'), ('XDG_SESSION_TYPE', 'tty'), ('SHLVL', '0'), ('LD_LIBRARY_PATH', '/usr/lib/x86_64-linux-gnu/gazebo-11/plugins:/opt/ros/humble/opt/rviz_ogre_vendor/lib:/opt/ros/humble/lib/x86_64-linux-gnu:/opt/ros/humble/lib'), ('MOTD_SHOWN', 'pam'), ('HOME', '/home/abc'), ('OLDPWD', '/home/abc/webserver'), ('ROS_PYTHON_VERSION', '3'), ('LC_MONETARY', 'ko_KR.UTF-8'), ('DBUS_SESSION_BUS_ADDRESS', 'unix:path=/run/user/1000/bus'), ('ROS_DISTRO', 'humble'), ('LOGNAME', 'abc'), ('_', '/usr/bin/colcon'), ('ROS_VERSION', '2'), ('XDG_SESSION_CLASS', 'user'), ('XDG_SESSION_ID', '81'), ('ROS_LOCALHOST_ONLY', '0'), ('PATH', '/opt/ros/humble/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin'), ('LC_ADDRESS', 'ko_KR.UTF-8'), ('XDG_RUNTIME_DIR', '/run/user/1000'), ('LANG', 'en_US.UTF-8'), ('LC_TELEPHONE', 'ko_KR.UTF-8'), ('AMENT_PREFIX_PATH', '/opt/ros/humble'), ('SHELL', '/bin/bash'), ('LC_NAME', 'ko_KR.UTF-8'), ('LC_MEASUREMENT', 'ko_KR.UTF-8'), ('LC_IDENTIFICATION', 'ko_KR.UTF-8'), ('PWD', '/home/abc/webserver/ros2_ws/build/warehouse_robot'), ('LC_ALL', 'en_US.UTF-8'), ('SSH_CONNECTION', '192.168.0.29 55463 192.168.0.188 22'), ('PYTHONPATH', '/home/abc/webserver/ros2_ws/build/warehouse_robot/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/abc/webserver/ros2_ws/install/warehouse_robot/lib/python3.10/site-packages:/opt/ros/humble/lib/python3.10/site-packages:/opt/ros/humble/local/lib/python3.10/dist-packages'), ('LC_NUMERIC', 'ko_KR.UTF-8'), ('LC_PAPER', 'ko_KR.UTF-8'), ('COLCON', '1')]), 'shell': False}
+[0.801072] (-) TimerEvent: {}
+[0.901263] (-) TimerEvent: {}
+[1.001447] (-) TimerEvent: {}
+[1.007199] (warehouse_robot) StdoutLine: {'line': b'running develop\n'}
+[1.101537] (-) TimerEvent: {}
+[1.157292] (warehouse_robot) StdoutLine: {'line': b'running egg_info\n'}
+[1.157527] (warehouse_robot) StdoutLine: {'line': b'writing warehouse_robot.egg-info/PKG-INFO\n'}
+[1.157683] (warehouse_robot) StdoutLine: {'line': b'writing dependency_links to warehouse_robot.egg-info/dependency_links.txt\n'}
+[1.157803] (warehouse_robot) StdoutLine: {'line': b'writing entry points to warehouse_robot.egg-info/entry_points.txt\n'}
+[1.157958] (warehouse_robot) StdoutLine: {'line': b'writing requirements to warehouse_robot.egg-info/requires.txt\n'}
+[1.158043] (warehouse_robot) StdoutLine: {'line': b'writing top-level names to warehouse_robot.egg-info/top_level.txt\n'}
+[1.160222] (warehouse_robot) StdoutLine: {'line': b"reading manifest file 'warehouse_robot.egg-info/SOURCES.txt'\n"}
+[1.160967] (warehouse_robot) StdoutLine: {'line': b"writing manifest file 'warehouse_robot.egg-info/SOURCES.txt'\n"}
+[1.161930] (warehouse_robot) StdoutLine: {'line': b'running build_ext\n'}
+[1.162105] (warehouse_robot) StdoutLine: {'line': b'Creating /home/abc/webserver/ros2_ws/install/warehouse_robot/lib/python3.10/site-packages/warehouse-robot.egg-link (link to .)\n'}
+[1.162713] (warehouse_robot) StdoutLine: {'line': b'Installing astar_planner script to /home/abc/webserver/ros2_ws/install/warehouse_robot/lib/warehouse_robot\n'}
+[1.162942] (warehouse_robot) StdoutLine: {'line': b'Installing bridge script to /home/abc/webserver/ros2_ws/install/warehouse_robot/lib/warehouse_robot\n'}
+[1.163151] (warehouse_robot) StdoutLine: {'line': b'Installing cargo_detector script to /home/abc/webserver/ros2_ws/install/warehouse_robot/lib/warehouse_robot\n'}
+[1.163320] (warehouse_robot) StdoutLine: {'line': b'\n'}
+[1.163412] (warehouse_robot) StdoutLine: {'line': b'Installed /home/abc/webserver/ros2_ws/build/warehouse_robot\n'}
+[1.163531] (warehouse_robot) StdoutLine: {'line': b'running symlink_data\n'}
+[1.184210] (warehouse_robot) CommandEnded: {'returncode': 0}
+[1.194290] (warehouse_robot) JobEnded: {'identifier': 'warehouse_robot', 'rc': 0}
+[1.194749] (-) EventReactorShutdown: {}

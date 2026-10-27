@@ -1,0 +1,18 @@
+기록 record.jsonl.gz  (2026-10-27 10:52:22, 맵 map2)
+목표 step-2710: (0.00, 0.00, 0°)   결과: canceled 
+Frenet: target_speed=0.15, safety_margin=0.06, clear_pref=0.15, max_offset=0.3, offset_step=0.025, check_dist=1.0, w_offset=1.0, w_change=1.0, w_turn=0.5, w_speed=1.0, w_clear=1.0, rotate_speed=1.0
+
+[사건]
+     0.03s  A* 경로 90점 (재시도 0)
+     2.55s  끝: canceled 
+
+[1초 간격]  t  모드  명령 v/w  실제 v  차체~장애물  앞(LiDAR)  track(가장 가까운)  Frenet
+     0.0  -        -                  -0.001   0.278   0.447  0.28m 0.01m/s    
+     1.1  frenet   v=0.094 w=0.36     +0.063   0.231   1.178  0.23m 0.01m/s    오프셋 +0.000 속도 0.15 통과 249/450
+     2.2  frenet   v=0.131 w=1.22     +0.102   0.121   1.280  0.13m 0.07m/s    오프셋 +0.000 속도 0.15 통과 258/450
+
+[느리게(<0.03 m/s) 1초 넘게 간 구간 (제자리 회전 제외)]
+  없음
+
+[그림 자동 저장]
+그림: logs/records/20261027_104728_frenet/105222_step-2710/plot_2.5_closest.png

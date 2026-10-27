@@ -1,0 +1,9 @@
+[start_yolo] 도메인 44, python /usr/bin/python3
+[INFO] [1792995952.041541483] [component_detector_switch]: 모델: /home/abc/webserver/yolo/yolo_training/best_components7_finetuned.pt
+[INFO] [1792995952.041920208] [component_detector_switch]: 입력: csi/image_raw (compressed)
+[INFO] [1792995952.042217248] [component_detector_switch]: 검출 결과 영상: /yolo/image_raw (CPU)
+[WARN] [1792995982.043512323] [component_detector_switch]: 카메라 영상 대기 중: 로봇 카메라와 토픽/도메인을 확인하세요.
+[WARN] [1792995987.043351104] [component_detector_switch]: 카메라 영상 대기 중: 로봇 카메라와 토픽/도메인을 확인하세요.
+[WARN] [1792995992.043340111] [component_detector_switch]: 카메라 영상 대기 중: 로봇 카메라와 토픽/도메인을 확인하세요.
+[WARN] [1792995997.043437489] [component_detector_switch]: 카메라 영상 대기 중: 로봇 카메라와 토픽/도메인을 확인하세요.
+[WARN] [1792996002.042158761] [component_detector_switch]: 카메라 영상 대기 중: 로봇 카메라와 토픽/도메인을 확인하세요.

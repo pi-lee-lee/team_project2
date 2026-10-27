@@ -1,0 +1,72 @@
+running develop
+Removing /home/abc/webserver/ros2_ws/install/warehouse_robot/lib/python3.10/site-packages/warehouse-robot.egg-link (link to .)
+running egg_info
+writing ../../build/warehouse_robot/warehouse_robot.egg-info/PKG-INFO
+writing dependency_links to ../../build/warehouse_robot/warehouse_robot.egg-info/dependency_links.txt
+writing entry points to ../../build/warehouse_robot/warehouse_robot.egg-info/entry_points.txt
+writing requirements to ../../build/warehouse_robot/warehouse_robot.egg-info/requires.txt
+writing top-level names to ../../build/warehouse_robot/warehouse_robot.egg-info/top_level.txt
+reading manifest file '../../build/warehouse_robot/warehouse_robot.egg-info/SOURCES.txt'
+writing manifest file '../../build/warehouse_robot/warehouse_robot.egg-info/SOURCES.txt'
+running build
+running build_py
+creating /home/abc/webserver/ros2_ws/build/warehouse_robot/build
+creating /home/abc/webserver/ros2_ws/build/warehouse_robot/build/lib
+creating /home/abc/webserver/ros2_ws/build/warehouse_robot/build/lib/warehouse_robot
+copying warehouse_robot/astar_planner_node.py -> /home/abc/webserver/ros2_ws/build/warehouse_robot/build/lib/warehouse_robot
+copying warehouse_robot/dwa.py -> /home/abc/webserver/ros2_ws/build/warehouse_robot/build/lib/warehouse_robot
+copying warehouse_robot/__init__.py -> /home/abc/webserver/ros2_ws/build/warehouse_robot/build/lib/warehouse_robot
+copying warehouse_robot/cmd_mux.py -> /home/abc/webserver/ros2_ws/build/warehouse_robot/build/lib/warehouse_robot
+copying warehouse_robot/plan_map.py -> /home/abc/webserver/ros2_ws/build/warehouse_robot/build/lib/warehouse_robot
+copying warehouse_robot/dwa_backup_20261022.py -> /home/abc/webserver/ros2_ws/build/warehouse_robot/build/lib/warehouse_robot
+copying warehouse_robot/rl_follower.py -> /home/abc/webserver/ros2_ws/build/warehouse_robot/build/lib/warehouse_robot
+copying warehouse_robot/bridge_node.py -> /home/abc/webserver/ros2_ws/build/warehouse_robot/build/lib/warehouse_robot
+copying warehouse_robot/scan_noise.py -> /home/abc/webserver/ros2_ws/build/warehouse_robot/build/lib/warehouse_robot
+copying warehouse_robot/cargo_detect.py -> /home/abc/webserver/ros2_ws/build/warehouse_robot/build/lib/warehouse_robot
+copying warehouse_robot/astar.py -> /home/abc/webserver/ros2_ws/build/warehouse_robot/build/lib/warehouse_robot
+copying warehouse_robot/follower.py -> /home/abc/webserver/ros2_ws/build/warehouse_robot/build/lib/warehouse_robot
+copying warehouse_robot/tracker.py -> /home/abc/webserver/ros2_ws/build/warehouse_robot/build/lib/warehouse_robot
+copying warehouse_robot/cargo_detector_node.py -> /home/abc/webserver/ros2_ws/build/warehouse_robot/build/lib/warehouse_robot
+running install
+running install_lib
+creating /home/abc/webserver/ros2_ws/install/warehouse_robot/lib/python3.10/site-packages/warehouse_robot
+copying /home/abc/webserver/ros2_ws/build/warehouse_robot/build/lib/warehouse_robot/astar_planner_node.py -> /home/abc/webserver/ros2_ws/install/warehouse_robot/lib/python3.10/site-packages/warehouse_robot
+copying /home/abc/webserver/ros2_ws/build/warehouse_robot/build/lib/warehouse_robot/dwa.py -> /home/abc/webserver/ros2_ws/install/warehouse_robot/lib/python3.10/site-packages/warehouse_robot
+copying /home/abc/webserver/ros2_ws/build/warehouse_robot/build/lib/warehouse_robot/__init__.py -> /home/abc/webserver/ros2_ws/install/warehouse_robot/lib/python3.10/site-packages/warehouse_robot
+copying /home/abc/webserver/ros2_ws/build/warehouse_robot/build/lib/warehouse_robot/cmd_mux.py -> /home/abc/webserver/ros2_ws/install/warehouse_robot/lib/python3.10/site-packages/warehouse_robot
+copying /home/abc/webserver/ros2_ws/build/warehouse_robot/build/lib/warehouse_robot/plan_map.py -> /home/abc/webserver/ros2_ws/install/warehouse_robot/lib/python3.10/site-packages/warehouse_robot
+copying /home/abc/webserver/ros2_ws/build/warehouse_robot/build/lib/warehouse_robot/dwa_backup_20261022.py -> /home/abc/webserver/ros2_ws/install/warehouse_robot/lib/python3.10/site-packages/warehouse_robot
+copying /home/abc/webserver/ros2_ws/build/warehouse_robot/build/lib/warehouse_robot/rl_follower.py -> /home/abc/webserver/ros2_ws/install/warehouse_robot/lib/python3.10/site-packages/warehouse_robot
+copying /home/abc/webserver/ros2_ws/build/warehouse_robot/build/lib/warehouse_robot/bridge_node.py -> /home/abc/webserver/ros2_ws/install/warehouse_robot/lib/python3.10/site-packages/warehouse_robot
+copying /home/abc/webserver/ros2_ws/build/warehouse_robot/build/lib/warehouse_robot/scan_noise.py -> /home/abc/webserver/ros2_ws/install/warehouse_robot/lib/python3.10/site-packages/warehouse_robot
+copying /home/abc/webserver/ros2_ws/build/warehouse_robot/build/lib/warehouse_robot/cargo_detect.py -> /home/abc/webserver/ros2_ws/install/warehouse_robot/lib/python3.10/site-packages/warehouse_robot
+copying /home/abc/webserver/ros2_ws/build/warehouse_robot/build/lib/warehouse_robot/astar.py -> /home/abc/webserver/ros2_ws/install/warehouse_robot/lib/python3.10/site-packages/warehouse_robot
+copying /home/abc/webserver/ros2_ws/build/warehouse_robot/build/lib/warehouse_robot/follower.py -> /home/abc/webserver/ros2_ws/install/warehouse_robot/lib/python3.10/site-packages/warehouse_robot
+copying /home/abc/webserver/ros2_ws/build/warehouse_robot/build/lib/warehouse_robot/tracker.py -> /home/abc/webserver/ros2_ws/install/warehouse_robot/lib/python3.10/site-packages/warehouse_robot
+copying /home/abc/webserver/ros2_ws/build/warehouse_robot/build/lib/warehouse_robot/cargo_detector_node.py -> /home/abc/webserver/ros2_ws/install/warehouse_robot/lib/python3.10/site-packages/warehouse_robot
+byte-compiling /home/abc/webserver/ros2_ws/install/warehouse_robot/lib/python3.10/site-packages/warehouse_robot/astar_planner_node.py to astar_planner_node.cpython-310.pyc
+byte-compiling /home/abc/webserver/ros2_ws/install/warehouse_robot/lib/python3.10/site-packages/warehouse_robot/dwa.py to dwa.cpython-310.pyc
+byte-compiling /home/abc/webserver/ros2_ws/install/warehouse_robot/lib/python3.10/site-packages/warehouse_robot/__init__.py to __init__.cpython-310.pyc
+byte-compiling /home/abc/webserver/ros2_ws/install/warehouse_robot/lib/python3.10/site-packages/warehouse_robot/cmd_mux.py to cmd_mux.cpython-310.pyc
+byte-compiling /home/abc/webserver/ros2_ws/install/warehouse_robot/lib/python3.10/site-packages/warehouse_robot/plan_map.py to plan_map.cpython-310.pyc
+byte-compiling /home/abc/webserver/ros2_ws/install/warehouse_robot/lib/python3.10/site-packages/warehouse_robot/dwa_backup_20261022.py to dwa_backup_20261022.cpython-310.pyc
+byte-compiling /home/abc/webserver/ros2_ws/install/warehouse_robot/lib/python3.10/site-packages/warehouse_robot/rl_follower.py to rl_follower.cpython-310.pyc
+byte-compiling /home/abc/webserver/ros2_ws/install/warehouse_robot/lib/python3.10/site-packages/warehouse_robot/bridge_node.py to bridge_node.cpython-310.pyc
+byte-compiling /home/abc/webserver/ros2_ws/install/warehouse_robot/lib/python3.10/site-packages/warehouse_robot/scan_noise.py to scan_noise.cpython-310.pyc
+byte-compiling /home/abc/webserver/ros2_ws/install/warehouse_robot/lib/python3.10/site-packages/warehouse_robot/cargo_detect.py to cargo_detect.cpython-310.pyc
+byte-compiling /home/abc/webserver/ros2_ws/install/warehouse_robot/lib/python3.10/site-packages/warehouse_robot/astar.py to astar.cpython-310.pyc
+byte-compiling /home/abc/webserver/ros2_ws/install/warehouse_robot/lib/python3.10/site-packages/warehouse_robot/follower.py to follower.cpython-310.pyc
+byte-compiling /home/abc/webserver/ros2_ws/install/warehouse_robot/lib/python3.10/site-packages/warehouse_robot/tracker.py to tracker.cpython-310.pyc
+byte-compiling /home/abc/webserver/ros2_ws/install/warehouse_robot/lib/python3.10/site-packages/warehouse_robot/cargo_detector_node.py to cargo_detector_node.cpython-310.pyc
+running install_data
+copying resource/warehouse_robot -> /home/abc/webserver/ros2_ws/install/warehouse_robot/share/ament_index/resource_index/packages
+copying package.xml -> /home/abc/webserver/ros2_ws/install/warehouse_robot/share/warehouse_robot
+copying launch/warehouse.launch.py -> /home/abc/webserver/ros2_ws/install/warehouse_robot/share/warehouse_robot/launch
+copying config/params.yaml -> /home/abc/webserver/ros2_ws/install/warehouse_robot/share/warehouse_robot/config
+running install_egg_info
+Copying ../../build/warehouse_robot/warehouse_robot.egg-info to /home/abc/webserver/ros2_ws/install/warehouse_robot/lib/python3.10/site-packages/warehouse_robot-0.1.0-py3.10.egg-info
+running install_scripts
+Installing astar_planner script to /home/abc/webserver/ros2_ws/install/warehouse_robot/lib/warehouse_robot
+Installing bridge script to /home/abc/webserver/ros2_ws/install/warehouse_robot/lib/warehouse_robot
+Installing cargo_detector script to /home/abc/webserver/ros2_ws/install/warehouse_robot/lib/warehouse_robot
+writing list of installed files to '/home/abc/webserver/ros2_ws/build/warehouse_robot/install.log'

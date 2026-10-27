@@ -1,0 +1,333 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>창고 로봇 시스템 구성도</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #f4f6fb; }
+  body { display: flex; align-items: center; justify-content: center; }
+  svg { width: min(100vw, calc(100vh * 16 / 9)); height: auto; display: block; }
+</style>
+</head>
+<body>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" >
+  <defs>
+    <style>
+      text { font-family: "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", sans-serif; fill: #1f2937; }
+      .title { font-size: 34px; font-weight: 800; fill: #111827; }
+      .subtitle { font-size: 16px; fill: #4b5563; }
+      .colhead { font-size: 15px; font-weight: 700; fill: #ffffff; }
+      .cardtitle { font-size: 18px; font-weight: 800; }
+      .cardsub { font-size: 12.5px; fill: #6b7280; }
+      .boxtitle { font-size: 14px; font-weight: 700; }
+      .item { font-size: 12.5px; fill: #374151; }
+      .small { font-size: 11.5px; fill: #4b5563; }
+      .mono { font-family: Menlo, Consolas, monospace; font-size: 11px; }
+      .lbl { font-family: Menlo, Consolas, monospace; font-size: 10.5px; font-weight: 700; }
+      .step { font-size: 13px; font-weight: 700; fill: #111827; }
+      .stepsub { font-size: 11.5px; fill: #4b5563; }
+      .card { fill: #ffffff; stroke-width: 2; }
+      .inner { stroke-width: 1.2; }
+    </style>
+    <marker id="aWs" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#2563eb"/></marker>
+    <marker id="aRos" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#059669"/></marker>
+    <marker id="aRun" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#6b7280"/></marker>
+    <marker id="aDb" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#7c3aed"/></marker>
+    <marker id="aStep" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#9ca3af"/></marker>
+  </defs>
+
+  <!-- 배경 -->
+  <rect width="1600" height="900" fill="#f4f6fb"/>
+
+  <!-- 제목 -->
+  <rect x="30" y="28" width="8" height="56" rx="3" fill="#2563eb"/>
+  <text x="52" y="62" class="title">창고 로봇 시스템 전체 구성도</text>
+  <text x="54" y="86" class="subtitle">TurtleBot3 Waffle Pi · ROS 2 Humble · Django 4.2 + Channels · MySQL — 웹 지도에서 지점을 고르면 A* + 경로 추종기로 주행</text>
+
+  <!-- 범례 -->
+  <g transform="translate(1230,38)">
+    <rect x="0" y="0" width="340" height="56" rx="8" fill="#ffffff" stroke="#e5e7eb"/>
+    <line x1="14" y1="18" x2="44" y2="18" stroke="#2563eb" stroke-width="2.5" marker-end="url(#aWs)"/>
+    <text x="50" y="22" class="small">WebSocket (JSON)</text>
+    <line x1="180" y1="18" x2="210" y2="18" stroke="#059669" stroke-width="2.5" marker-end="url(#aRos)"/>
+    <text x="216" y="22" class="small">ROS 2 토픽/서비스</text>
+    <line x1="14" y1="40" x2="44" y2="40" stroke="#6b7280" stroke-width="2" stroke-dasharray="5 4" marker-end="url(#aRun)"/>
+    <text x="50" y="44" class="small">프로세스 실행</text>
+    <line x1="180" y1="40" x2="210" y2="40" stroke="#7c3aed" stroke-width="2.5" marker-end="url(#aDb)"/>
+    <text x="216" y="44" class="small">DB 읽기/쓰기</text>
+  </g>
+
+  <!-- 열 머리표 -->
+  <rect x="30" y="110" width="220" height="28" rx="14" fill="#2563eb"/>
+  <text x="140" y="129" class="colhead" text-anchor="middle">① 사용자 (웹 브라우저)</text>
+  <rect x="300" y="110" width="310" height="28" rx="14" fill="#7c3aed"/>
+  <text x="455" y="129" class="colhead" text-anchor="middle">② 웹 서버 (PC)</text>
+  <rect x="720" y="110" width="500" height="28" rx="14" fill="#059669"/>
+  <text x="970" y="129" class="colhead" text-anchor="middle">③ 주행 소프트웨어 · ROS 2 (PC)</text>
+  <rect x="1310" y="110" width="260" height="28" rx="14" fill="#ea580c"/>
+  <text x="1440" y="129" class="colhead" text-anchor="middle">④ 로봇 (또는 시뮬레이션)</text>
+
+  <!-- ① 웹 관제 UI -->
+  <rect x="30" y="150" width="220" height="320" rx="12" class="card" stroke="#2563eb"/>
+  <text x="46" y="178" class="cardtitle">웹 관제 UI</text>
+  <text x="46" y="196" class="cardsub">index.html + app.js · :8000</text>
+  <line x1="46" y1="208" x2="234" y2="208" stroke="#dbeafe"/>
+  <g class="item">
+    <text x="46" y="234">• 지도 · 로봇 위치/경로 표시</text>
+    <text x="46" y="262">• 지점 클릭 → 이동 · 홈 복귀</text>
+    <text x="46" y="290">• LED 배송: 적재→하역→홈</text>
+    <text x="46" y="318">• 실행 모드 (실물/시뮬, SLAM)</text>
+    <text x="46" y="346">• 주행 파라미터 실시간 조정</text>
+    <text x="46" y="374">• YOLO 검출 켜기/끄기</text>
+    <text x="46" y="402">• 맵 저장 · 위치 자동 찾기</text>
+  </g>
+  <rect x="46" y="420" width="188" height="36" rx="6" fill="#eff6ff"/>
+  <text x="140" y="436" class="small" text-anchor="middle">캔버스 지도 (방 크기에 맞춤)</text>
+  <text x="140" y="450" class="small" text-anchor="middle">?robot= 으로 로봇 선택</text>
+
+  <!-- ① 로봇 태블릿 -->
+  <rect x="30" y="490" width="220" height="100" rx="12" class="card" stroke="#2563eb"/>
+  <text x="46" y="518" class="cardtitle">로봇 태블릿</text>
+  <text x="46" y="536" class="cardsub">/robot · robot.html + robot.js</text>
+  <text x="46" y="560" class="item">• 적재/하역 확인 버튼</text>
+  <text x="46" y="580" class="item">• 로봇에 달린 화면용</text>
+
+  <!-- ② Django 서버 -->
+  <rect x="300" y="150" width="310" height="362" rx="12" class="card" stroke="#7c3aed"/>
+  <text x="316" y="178" class="cardtitle">Django 서버</text>
+  <text x="316" y="196" class="cardsub">daphne :8000 · Channels (서버 프로세스 1개)</text>
+
+  <rect x="314" y="210" width="282" height="44" rx="7" fill="#f5f3ff" stroke="#c4b5fd" class="inner"/>
+  <text x="326" y="229" class="boxtitle">UIConsumer</text>
+  <text x="420" y="229" class="mono" fill="#6d28d9">/ws/ui/</text>
+  <text x="326" y="246" class="small">브라우저 연결 · 선택 로봇 것만 전달</text>
+
+  <rect x="314" y="262" width="282" height="44" rx="7" fill="#f5f3ff" stroke="#c4b5fd" class="inner"/>
+  <text x="326" y="281" class="boxtitle">RobotConsumer</text>
+  <text x="440" y="281" class="mono" fill="#6d28d9">/ws/robot/&lt;name&gt;/</text>
+  <text x="326" y="298" class="small">브리지 1개 = 로봇 1대</text>
+
+  <rect x="314" y="314" width="282" height="72" rx="7" fill="#ede9fe" stroke="#a78bfa" class="inner"/>
+  <text x="326" y="333" class="boxtitle">services.py · 작업 상태 머신</text>
+  <text x="326" y="351" class="small">IDLE → MOVING → WAITING_LOAD</text>
+  <text x="326" y="366" class="small">→ WAITING_UNLOAD → 홈 복귀 (Task + TaskStep)</text>
+  <text x="326" y="380" class="small">결과 = Outbox (to_robot / to_ui)</text>
+
+  <rect x="314" y="394" width="282" height="44" rx="7" fill="#f5f3ff" stroke="#c4b5fd" class="inner"/>
+  <text x="326" y="413" class="boxtitle">LIVE 메모리</text>
+  <text x="326" y="430" class="small">pose · path · health 중계만 (DB 저장 안 함)</text>
+
+  <rect x="314" y="446" width="282" height="52" rx="7" fill="#f9fafb" stroke="#d1d5db" class="inner"/>
+  <text x="326" y="465" class="boxtitle">runner.py · 실행 모드</text>
+  <text x="326" y="483" class="mono" fill="#4b5563">run.sh · stop_ros.sh · localize.py</text>
+
+  <!-- ② MySQL -->
+  <rect x="300" y="550" width="310" height="140" rx="12" class="card" stroke="#7c3aed"/>
+  <ellipse cx="335" cy="584" rx="16" ry="6" fill="#ede9fe" stroke="#7c3aed"/>
+  <path d="M319,584 v22 a16,6 0 0 0 32,0 v-22" fill="#ede9fe" stroke="#7c3aed"/>
+  <text x="362" y="590" class="cardtitle">MySQL</text>
+  <text x="362" y="607" class="cardsub">(DB_ENGINE=sqlite 로 대체 가능)</text>
+  <text x="316" y="636" class="item">Map · Location(홈 포함) · Zone</text>
+  <text x="316" y="656" class="item">Robot · Task · TaskStep · EventLog</text>
+  <text x="316" y="676" class="small">맵 이름별 저장 · SLAM 중엔 slam_live</text>
+
+  <!-- ③ ROS 2 묶음 -->
+  <rect x="720" y="150" width="500" height="540" rx="14" fill="#ecfdf5" stroke="#059669" stroke-width="2" stroke-dasharray="7 5"/>
+  <text x="736" y="174" class="boxtitle" fill="#065f46">PC · ROS 2 Humble · Cyclone DDS</text>
+  <text x="1204" y="174" class="small" text-anchor="end">도메인 44 실물 / 77 시뮬</text>
+
+  <!-- bridge_node -->
+  <rect x="735" y="188" width="470" height="222" rx="10" class="card" stroke="#059669"/>
+  <text x="751" y="214" class="cardtitle">bridge_node</text>
+  <text x="866" y="214" class="mono" fill="#047857">/warehouse_bridge</text>
+  <text x="751" y="232" class="cardsub">서버와 WebSocket 연결 · 목표 실행 · 안전 감시 (주행의 중심)</text>
+
+  <rect x="747" y="244" width="146" height="154" rx="7" fill="#f0fdf4" stroke="#86efac" class="inner"/>
+  <text x="757" y="264" class="boxtitle">경로 추종기</text>
+  <text x="757" y="286" class="small">Frenet 로컬 플래너</text>
+  <text x="757" y="302" class="small">  A* 경로를 기준선으로</text>
+  <text x="757" y="322" class="small">  옆 오프셋 x 속도 후보</text>
+  <text x="757" y="342" class="small">  0.1 s 마다 다시 계획</text>
+  <text x="757" y="362" class="small">  v, w = v·κ 실행</text>
+  <text x="757" y="386" class="small" fill="#047857">도착 오차 0.3 m 검사</text>
+
+  <rect x="903" y="244" width="146" height="154" rx="7" fill="#f0fdf4" stroke="#86efac" class="inner"/>
+  <text x="913" y="264" class="boxtitle">안전 감시</text>
+  <text x="913" y="286" class="small">안전 후보 없음 → 정지</text>
+  <text x="913" y="302" class="small">  (정적 1 s / 그 외 5 s → 재계획)</text>
+  <text x="913" y="324" class="small">비상: 앞 ±25° 0.2 m 이내</text>
+  <text x="913" y="344" class="small">TF 0.5 s 끊김 → 정지</text>
+  <text x="913" y="364" class="small">기울기 6° · 2.5 s 못 감</text>
+  <text x="913" y="386" class="small" fill="#047857">→ 물러남 + astar/obstacle</text>
+
+  <rect x="1059" y="244" width="136" height="154" rx="7" fill="#f0fdf4" stroke="#86efac" class="inner"/>
+  <text x="1069" y="264" class="boxtitle">명령 출력</text>
+  <text x="1069" y="286" class="small">cmd_mux 우선순위</text>
+  <text x="1069" y="302" class="small">정지 &gt; 수동 &gt; 자동</text>
+  <text x="1069" y="326" class="small">기울지 않을 때만</text>
+  <text x="1069" y="342" class="small">/scan → scan_level</text>
+  <text x="1069" y="366" class="small">런타임 파라미터</text>
+  <text x="1069" y="386" class="small" fill="#047857">(웹에서 변경)</text>
+
+  <!-- 2행: A* / 위치 추정 / 물건 인식 -->
+  <rect x="735" y="450" width="146" height="96" rx="10" class="card" stroke="#059669"/>
+  <text x="747" y="472" class="boxtitle">A* 플래너</text>
+  <text x="747" y="489" class="mono" fill="#047857">astar/get_plan</text>
+  <text x="747" y="508" class="small">점유 ≥65 · 미탐색 = 벽</text>
+  <text x="747" y="524" class="small">LiDAR 장애물 20 s 기억</text>
+  <text x="747" y="539" class="small">충돌 지점 120 s 기억</text>
+
+  <rect x="897" y="450" width="146" height="96" rx="10" class="card" stroke="#059669"/>
+  <text x="909" y="472" class="boxtitle">위치 추정 · 지도</text>
+  <text x="909" y="492" class="small">지도 모드:</text>
+  <text x="909" y="507" class="small">  map_server + AMCL</text>
+  <text x="909" y="525" class="small">SLAM 모드:</text>
+  <text x="909" y="540" class="small">  slam_toolbox</text>
+
+  <rect x="1059" y="450" width="146" height="96" rx="10" class="card" stroke="#059669"/>
+  <text x="1071" y="472" class="boxtitle">부품 검출 (YOLO)</text>
+  <text x="1071" y="489" class="mono" fill="#047857" style="font-size:10px">component_detector</text>
+  <text x="1071" y="508" class="small">부품 개수 → /yolo/counts</text>
+  <text x="1071" y="524" class="small">웹에서 켜기/끄기</text>
+  <text x="1071" y="539" class="small">기본 꺼짐</text>
+
+  <!-- 3행: Nav2 선택 -->
+  <rect x="735" y="566" width="470" height="50" rx="10" fill="#ffffff" stroke="#059669" stroke-width="1.5" stroke-dasharray="5 4"/>
+  <text x="751" y="587" class="boxtitle">Nav2 (선택)</text>
+  <text x="845" y="587" class="small">NavigateToPose · controller_server — --planner nav2 / --controller nav2</text>
+  <text x="751" y="605" class="small">tf2 ≥ 0.25.24 필요 (0.25.23 TF 교착 버그)</text>
+
+  <!-- 실행 순서 -->
+  <rect x="735" y="628" width="470" height="50" rx="10" fill="#f9fafb" stroke="#d1d5db"/>
+  <text x="751" y="648" class="boxtitle" fill="#374151">실행 순서 (scripts/run.sh)</text>
+  <text x="751" y="667" class="mono" fill="#4b5563">server → Pi bringup/Gazebo → slam|nav2 → bridge</text>
+
+  <!-- ④ TurtleBot3 -->
+  <rect x="1310" y="150" width="260" height="392" rx="12" class="card" stroke="#ea580c"/>
+  <text x="1326" y="178" class="cardtitle">TurtleBot3 Waffle Pi</text>
+  <text x="1326" y="196" class="cardsub">Raspberry Pi · Fast DDS · 192.168.0.181</text>
+
+  <rect x="1322" y="208" width="236" height="222" rx="8" fill="#fff7ed" stroke="#fdba74" class="inner"/>
+  <text x="1334" y="228" class="boxtitle">turtlebot3_bringup</text>
+  <text x="1334" y="246" class="small">PC 에서 SSH 로 실행</text>
+  <text x="1334" y="272" class="item">OpenCR 모터 · 엔코더</text>
+  <text x="1346" y="289" class="mono" fill="#c2410c">→ /odom, /tf (odom→base)</text>
+  <text x="1334" y="315" class="item">LDS LiDAR</text>
+  <text x="1346" y="332" class="mono" fill="#c2410c">→ /scan</text>
+  <text x="1334" y="356" class="item">IMU · 배터리</text>
+  <text x="1346" y="373" class="mono" fill="#c2410c">→ /imu, /battery_state</text>
+  <text x="1334" y="399" class="item">바퀴 구동</text>
+  <text x="1346" y="416" class="mono" fill="#c2410c">← /cmd_vel</text>
+
+  <rect x="1322" y="442" width="236" height="88" rx="8" fill="#fff7ed" stroke="#fdba74" class="inner"/>
+  <text x="1334" y="463" class="boxtitle">CSI 카메라</text>
+  <text x="1334" y="481" class="small">yolo/camera.sh</text>
+  <text x="1346" y="500" class="mono" fill="#c2410c">→ /csi/image_raw</text>
+  <text x="1334" y="520" class="small">YOLO 입력 영상 (따로 실행)</text>
+
+  <!-- ④ Gazebo -->
+  <rect x="1310" y="562" width="260" height="128" rx="12" fill="#ffffff" stroke="#ea580c" stroke-width="2" stroke-dasharray="7 5"/>
+  <text x="1326" y="590" class="cardtitle">또는 Gazebo 시뮬레이션</text>
+  <text x="1326" y="608" class="cardsub">start_sim.sh · --robot sim</text>
+  <text x="1326" y="634" class="item">• 같은 토픽을 그대로 제공</text>
+  <text x="1326" y="656" class="item">• worlds/*.world (미로, 강당)</text>
+  <text x="1326" y="678" class="item">• 도메인 77 로 실물과 분리</text>
+
+  <!-- ===== 연결선 ===== -->
+  <!-- 브라우저 ⇄ UIConsumer -->
+  <line x1="252" y1="232" x2="312" y2="232" stroke="#2563eb" stroke-width="2.5" marker-start="url(#aWs)" marker-end="url(#aWs)"/>
+  <text x="276" y="222" class="lbl" fill="#2563eb" text-anchor="middle">WS</text>
+  <!-- 태블릿 → 서버 -->
+  <path d="M252,530 H276 V246 H312" fill="none" stroke="#2563eb" stroke-width="2" stroke-dasharray="1 0" marker-end="url(#aWs)" opacity="0.55"/>
+
+  <!-- RobotConsumer ⇄ bridge -->
+  <line x1="598" y1="284" x2="733" y2="284" stroke="#2563eb" stroke-width="2.5" marker-start="url(#aWs)" marker-end="url(#aWs)"/>
+  <text x="665" y="240" class="lbl" fill="#2563eb" text-anchor="middle">goto ▶</text>
+  <text x="665" y="254" class="lbl" fill="#2563eb" text-anchor="middle">cancel · stop</text>
+  <text x="665" y="268" class="lbl" fill="#2563eb" text-anchor="middle">initial_pose</text>
+  <text x="665" y="304" class="lbl" fill="#2563eb" text-anchor="middle">◀ pose · path</text>
+  <text x="665" y="318" class="lbl" fill="#2563eb" text-anchor="middle">nav_status</text>
+  <text x="665" y="332" class="lbl" fill="#2563eb" text-anchor="middle">cargo · health</text>
+  <text x="665" y="354" class="small" text-anchor="middle">/ws/robot/tb3/</text>
+
+  <!-- runner → ROS 실행 -->
+  <path d="M598,472 H660 V653 H733" fill="none" stroke="#6b7280" stroke-width="2" stroke-dasharray="6 4" marker-end="url(#aRun)"/>
+  <text x="668" y="560" class="small" fill="#4b5563">시작/정지</text>
+
+  <!-- 서버 ⇄ DB -->
+  <line x1="455" y1="514" x2="455" y2="548" stroke="#7c3aed" stroke-width="2.5" marker-start="url(#aDb)" marker-end="url(#aDb)"/>
+  <text x="468" y="536" class="small" fill="#6d28d9">ORM</text>
+
+  <!-- bridge ⇄ A* -->
+  <line x1="808" y1="412" x2="808" y2="448" stroke="#059669" stroke-width="2.5" marker-start="url(#aRos)" marker-end="url(#aRos)"/>
+  <text x="816" y="435" class="lbl" fill="#047857">GetPlan</text>
+  <!-- bridge → 위치 추정 (scan_level), 위치 추정 → bridge (TF) -->
+  <line x1="950" y1="412" x2="950" y2="448" stroke="#059669" stroke-width="2.5" marker-end="url(#aRos)"/>
+  <line x1="990" y1="448" x2="990" y2="412" stroke="#059669" stroke-width="2.5" marker-end="url(#aRos)"/>
+  <text x="942" y="435" class="lbl" fill="#047857" text-anchor="end">scan_level</text>
+  <text x="998" y="435" class="lbl" fill="#047857">TF map→odom</text>
+  <!-- YOLO → bridge -->
+  <line x1="1132" y1="448" x2="1132" y2="412" stroke="#059669" stroke-width="2.5" marker-end="url(#aRos)"/>
+  <text x="1140" y="428" class="lbl" fill="#047857">yolo/</text>
+  <text x="1140" y="442" class="lbl" fill="#047857">counts</text>
+
+  <!-- Pi → PC 센서 -->
+  <line x1="1320" y1="276" x2="1207" y2="276" stroke="#059669" stroke-width="2.5" marker-end="url(#aRos)"/>
+  <text x="1264" y="252" class="lbl" fill="#047857" text-anchor="middle">/scan /odom</text>
+  <text x="1264" y="266" class="lbl" fill="#047857" text-anchor="middle">/tf /imu</text>
+  <!-- PC → Pi cmd_vel -->
+  <line x1="1207" y1="360" x2="1320" y2="360" stroke="#059669" stroke-width="2.5" marker-end="url(#aRos)"/>
+  <text x="1264" y="350" class="lbl" fill="#047857" text-anchor="middle">/cmd_vel</text>
+  <!-- 카메라 → YOLO -->
+  <line x1="1320" y1="498" x2="1207" y2="498" stroke="#059669" stroke-width="2.5" marker-end="url(#aRos)"/>
+  <text x="1264" y="488" class="lbl" fill="#047857" text-anchor="middle">image_raw</text>
+
+  <!-- ===== 하단: 목표 한 번의 흐름 ===== -->
+  <rect x="30" y="712" width="1540" height="164" rx="14" fill="#ffffff" stroke="#e5e7eb" stroke-width="1.5"/>
+  <text x="50" y="742" class="cardtitle">이동 명령 한 번의 흐름</text>
+  <text x="250" y="742" class="cardsub">웹 클릭부터 도착 보고까지 (배송은 적재 → 하역 → 홈 단계를 차례로 반복)</text>
+
+  <g>
+    <rect x="50" y="760" width="268" height="96" rx="10" fill="#eff6ff" stroke="#93c5fd"/>
+    <circle cx="76" cy="786" r="14" fill="#2563eb"/><text x="76" y="791" class="colhead" text-anchor="middle">1</text>
+    <text x="98" y="791" class="step">웹에서 지점 클릭</text>
+    <text x="66" y="818" class="stepsub">지도 위 좌표 또는 저장 위치 선택</text>
+    <text x="66" y="838" class="stepsub mono">/ws/ui/ 로 요청</text>
+
+    <line x1="322" y1="808" x2="352" y2="808" stroke="#9ca3af" stroke-width="2.5" marker-end="url(#aStep)"/>
+
+    <rect x="356" y="760" width="268" height="96" rx="10" fill="#f5f3ff" stroke="#c4b5fd"/>
+    <circle cx="382" cy="786" r="14" fill="#7c3aed"/><text x="382" y="791" class="colhead" text-anchor="middle">2</text>
+    <text x="404" y="791" class="step">서버가 작업 생성</text>
+    <text x="372" y="818" class="stepsub">Task + TaskStep 저장, 상태 MOVING</text>
+    <text x="372" y="838" class="stepsub mono">goto(goal_id, x, y, yaw) → 브리지</text>
+
+    <line x1="628" y1="808" x2="658" y2="808" stroke="#9ca3af" stroke-width="2.5" marker-end="url(#aStep)"/>
+
+    <rect x="662" y="760" width="268" height="96" rx="10" fill="#ecfdf5" stroke="#86efac"/>
+    <circle cx="688" cy="786" r="14" fill="#059669"/><text x="688" y="791" class="colhead" text-anchor="middle">3</text>
+    <text x="710" y="791" class="step">A* 로 경로 계산</text>
+    <text x="678" y="818" class="stepsub">지도 + 기억한 장애물로 격자 탐색</text>
+    <text x="678" y="838" class="stepsub mono">astar/get_plan → path 를 웹에 표시</text>
+
+    <line x1="934" y1="808" x2="964" y2="808" stroke="#9ca3af" stroke-width="2.5" marker-end="url(#aStep)"/>
+
+    <rect x="968" y="760" width="268" height="96" rx="10" fill="#ecfdf5" stroke="#86efac"/>
+    <circle cx="994" cy="786" r="14" fill="#059669"/><text x="994" y="791" class="colhead" text-anchor="middle">4</text>
+    <text x="1016" y="791" class="step">추종기가 로봇을 주행</text>
+    <text x="984" y="818" class="stepsub">Frenet 로컬 플래너가 속도 계산, 안전 감시</text>
+    <text x="984" y="838" class="stepsub mono">/cmd_vel → Pi 바퀴, pose 실시간 표시</text>
+
+    <line x1="1240" y1="808" x2="1270" y2="808" stroke="#9ca3af" stroke-width="2.5" marker-end="url(#aStep)"/>
+
+    <rect x="1274" y="760" width="276" height="96" rx="10" fill="#fff7ed" stroke="#fdba74"/>
+    <circle cx="1300" cy="786" r="14" fill="#ea580c"/><text x="1300" y="791" class="colhead" text-anchor="middle">5</text>
+    <text x="1322" y="791" class="step">도착 보고 → 다음 단계</text>
+    <text x="1290" y="818" class="stepsub">nav_status(goal_id) 로 단계 완료 처리</text>
+    <text x="1290" y="838" class="stepsub">적재/하역 확인 → 다음 위치 → 홈 · IDLE</text>
+  </g>
+</svg>
+
+</body>
+</html>

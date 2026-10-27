@@ -1,0 +1,326 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" width="1600" height="900">
+  <defs>
+    <style>
+      text { font-family: "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", sans-serif; fill: #1f2937; }
+      .title { font-size: 34px; font-weight: 800; fill: #111827; }
+      .subtitle { font-size: 16px; fill: #4b5563; }
+      .colhead { font-size: 15px; font-weight: 700; fill: #ffffff; }
+      .cardtitle { font-size: 18px; font-weight: 800; }
+      .cardsub { font-size: 12.5px; fill: #6b7280; }
+      .boxtitle { font-size: 14px; font-weight: 700; }
+      .item { font-size: 12.5px; fill: #374151; }
+      .small { font-size: 11.5px; fill: #4b5563; }
+      .mono { font-family: Menlo, Consolas, monospace; font-size: 11px; }
+      .f { font-family: Menlo, Consolas, monospace; font-size: 11px; fill: #111827; }
+      .fs { font-family: Menlo, Consolas, monospace; font-size: 10px; fill: #111827; }
+      .dir { font-family: Menlo, Consolas, monospace; font-size: 11px; font-weight: 700; }
+      .dirs { font-family: Menlo, Consolas, monospace; font-size: 10px; font-weight: 700; }
+      .lbl { font-family: Menlo, Consolas, monospace; font-size: 10.5px; font-weight: 700; }
+      .step { font-size: 13px; font-weight: 700; fill: #111827; }
+      .stepsub { font-size: 11.5px; fill: #4b5563; }
+      .card { fill: #ffffff; stroke-width: 2; }
+      .inner { stroke-width: 1.2; }
+    </style>
+    <marker id="aWs" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#2563eb"/></marker>
+    <marker id="aRos" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#059669"/></marker>
+    <marker id="aRun" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#6b7280"/></marker>
+    <marker id="aDb" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#7c3aed"/></marker>
+    <marker id="aStep" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#9ca3af"/></marker>
+  </defs>
+
+  <!-- 배경 -->
+  <rect width="1600" height="900" fill="#f4f6fb"/>
+
+  <!-- 제목 -->
+  <rect x="30" y="28" width="8" height="56" rx="3" fill="#2563eb"/>
+  <text x="52" y="62" class="title">창고 로봇 시스템 구성도 — 파일 기준</text>
+  <text x="54" y="86" class="subtitle">구성 요소별 담당 폴더·파일 — 맨 앞 / = 저장소 루트 team_project2/, / 없는 경로는 그 칸의 폴더 기준 (hybrid-predict-box)</text>
+
+  <!-- 범례 -->
+  <g transform="translate(1230,38)">
+    <rect x="0" y="0" width="340" height="56" rx="8" fill="#ffffff" stroke="#e5e7eb"/>
+    <line x1="14" y1="18" x2="44" y2="18" stroke="#2563eb" stroke-width="2.5" marker-end="url(#aWs)"/>
+    <text x="50" y="22" class="small">WebSocket (JSON)</text>
+    <line x1="180" y1="18" x2="210" y2="18" stroke="#059669" stroke-width="2.5" marker-end="url(#aRos)"/>
+    <text x="216" y="22" class="small">ROS 2 토픽/서비스</text>
+    <line x1="14" y1="40" x2="44" y2="40" stroke="#6b7280" stroke-width="2" stroke-dasharray="5 4" marker-end="url(#aRun)"/>
+    <text x="50" y="44" class="small">프로세스 실행</text>
+    <line x1="180" y1="40" x2="210" y2="40" stroke="#7c3aed" stroke-width="2.5" marker-end="url(#aDb)"/>
+    <text x="216" y="44" class="small">DB 읽기/쓰기</text>
+  </g>
+
+  <!-- 열 머리표 -->
+  <rect x="30" y="110" width="220" height="28" rx="14" fill="#2563eb"/>
+  <text x="140" y="129" class="colhead" text-anchor="middle">① 사용자 (웹 브라우저)</text>
+  <rect x="300" y="110" width="310" height="28" rx="14" fill="#7c3aed"/>
+  <text x="455" y="129" class="colhead" text-anchor="middle">② 웹 서버 · /server/</text>
+  <rect x="720" y="110" width="500" height="28" rx="14" fill="#059669"/>
+  <text x="970" y="129" class="colhead" text-anchor="middle">③ 주행 소프트웨어 · /ros2_ws/ · /scripts/ · /yolo/</text>
+  <rect x="1310" y="110" width="260" height="28" rx="14" fill="#ea580c"/>
+  <text x="1440" y="129" class="colhead" text-anchor="middle">④ 로봇 (또는 시뮬레이션)</text>
+
+  <!-- ① 웹 관제 UI -->
+  <rect x="30" y="150" width="220" height="320" rx="12" class="card" stroke="#2563eb"/>
+  <text x="46" y="178" class="cardtitle">웹 관제 UI</text>
+  <text x="46" y="196" class="cardsub">브라우저가 받아 실행하는 파일</text>
+  <line x1="46" y1="208" x2="234" y2="208" stroke="#dbeafe"/>
+  <text x="46" y="232" class="dir" fill="#1d4ed8">/server/warehouse/</text>
+  <text x="46" y="256" class="f">├ templates/warehouse/</text>
+  <text x="46" y="276" class="f">│ └ index.html</text>
+  <text x="160" y="276" class="small">화면 뼈대</text>
+  <text x="46" y="300" class="f">└ static/warehouse/</text>
+  <text x="46" y="320" class="f">  ├ app.js</text>
+  <text x="160" y="320" class="small">지도·버튼·WS</text>
+  <text x="46" y="340" class="f">  └ style.css</text>
+  <text x="160" y="340" class="small">스타일</text>
+  <text x="46" y="368" class="small">app.js 하나가 지도 캔버스, 작업 요청,</text>
+  <text x="46" y="386" class="small">실행 모드, 주행 파라미터, YOLO 카드를</text>
+  <text x="46" y="404" class="small">모두 그림 (프레임워크 없음)</text>
+  <rect x="46" y="420" width="188" height="36" rx="6" fill="#eff6ff"/>
+  <text x="140" y="436" class="small" text-anchor="middle">접속 http://PC:8000/</text>
+  <text x="140" y="450" class="small" text-anchor="middle">views.py → index.html 렌더링</text>
+
+  <!-- ① 로봇 태블릿 -->
+  <rect x="30" y="490" width="220" height="100" rx="12" class="card" stroke="#2563eb"/>
+  <text x="46" y="518" class="cardtitle">로봇 태블릿</text>
+  <text x="46" y="537" class="dir" fill="#1d4ed8">/server/warehouse/</text>
+  <text x="46" y="557" class="fs">├ templates/warehouse/robot.html</text>
+  <text x="46" y="577" class="fs">└ static/warehouse/robot.js·.css</text>
+
+  <!-- ② Django 서버 -->
+  <rect x="300" y="150" width="310" height="362" rx="12" class="card" stroke="#7c3aed"/>
+  <text x="316" y="178" class="cardtitle">Django 서버</text>
+  <text x="316" y="196" class="dir" fill="#6d28d9">/server/</text>
+  <text x="384" y="196" class="cardsub">manage.py · requirements.txt</text>
+
+  <rect x="314" y="210" width="282" height="44" rx="7" fill="#f5f3ff" stroke="#c4b5fd" class="inner"/>
+  <text x="326" y="228" class="f">config/  warehouse/urls.py · views.py</text>
+  <text x="326" y="246" class="small">설정(settings) · daphne 진입점(asgi) · 페이지 URL</text>
+
+  <rect x="314" y="262" width="282" height="44" rx="7" fill="#f5f3ff" stroke="#c4b5fd" class="inner"/>
+  <text x="326" y="280" class="f">warehouse/routing.py · consumers.py</text>
+  <text x="326" y="298" class="small">URL 연결 · UIConsumer · RobotConsumer 클래스</text>
+
+  <rect x="314" y="314" width="282" height="72" rx="7" fill="#ede9fe" stroke="#a78bfa" class="inner"/>
+  <text x="326" y="332" class="f">warehouse/services.py</text>
+  <text x="326" y="348" class="small">작업 상태 머신 · Outbox(to_robot / to_ui)</text>
+  <text x="326" y="366" class="f">warehouse/planning.py</text>
+  <text x="326" y="380" class="small">이동 시간 예측 · 방문 순서 (astar.py 재사용)</text>
+
+  <rect x="314" y="394" width="282" height="44" rx="7" fill="#f5f3ff" stroke="#c4b5fd" class="inner"/>
+  <text x="326" y="412" class="f">warehouse/live.py · mapimage.py</text>
+  <text x="326" y="430" class="small">LIVE 메모리(pose·path·health) · 맵 → PNG</text>
+
+  <rect x="314" y="446" width="282" height="52" rx="7" fill="#f9fafb" stroke="#d1d5db" class="inner"/>
+  <text x="326" y="465" class="f">warehouse/runner.py</text>
+  <text x="326" y="483" class="small">웹 "실행 모드" → run.sh · stop_ros.sh · localize.py</text>
+
+  <!-- ② MySQL -->
+  <rect x="300" y="550" width="310" height="140" rx="12" class="card" stroke="#7c3aed"/>
+  <ellipse cx="335" cy="584" rx="16" ry="6" fill="#ede9fe" stroke="#7c3aed"/>
+  <path d="M319,584 v22 a16,6 0 0 0 32,0 v-22" fill="#ede9fe" stroke="#7c3aed"/>
+  <text x="362" y="590" class="cardtitle">MySQL</text>
+  <text x="362" y="607" class="cardsub">/server/.env (계정) · /server/db.sqlite3</text>
+  <text x="316" y="630" class="f">warehouse/models.py</text>
+  <text x="316" y="646" class="small">Map · Location · Zone · Robot · Task · TaskStep · EventLog</text>
+  <text x="316" y="664" class="f">warehouse/migrations/</text>
+  <text x="316" y="681" class="f">warehouse/management/commands/</text>
+
+  <!-- ③ ROS 2 묶음 -->
+  <rect x="720" y="150" width="500" height="540" rx="14" fill="#ecfdf5" stroke="#059669" stroke-width="2" stroke-dasharray="7 5"/>
+  <text x="736" y="174" class="dir" fill="#065f46">/ros2_ws/src/warehouse_robot/</text>
+  <text x="1204" y="174" class="small" text-anchor="end">ROS 2 패키지</text>
+
+  <!-- bridge_node -->
+  <rect x="735" y="188" width="470" height="222" rx="10" class="card" stroke="#059669"/>
+  <text x="751" y="214" class="cardtitle">bridge_node.py</text>
+  <text x="900" y="214" class="mono" fill="#047857">warehouse_robot/</text>
+  <text x="751" y="232" class="cardsub">서버 WS 연결 · 목표 실행 · hybrid 전환 · 안전 감시 · 주행 기록</text>
+
+  <rect x="747" y="244" width="146" height="154" rx="7" fill="#f0fdf4" stroke="#86efac" class="inner"/>
+  <text x="757" y="264" class="boxtitle">경로 추종</text>
+  <text x="757" y="286" class="f">follower.py</text>
+  <text x="757" y="301" class="small">pure pursuit (평소)</text>
+  <text x="757" y="322" class="f">dwa.py</text>
+  <text x="757" y="337" class="small">DWA (장애물 근처)</text>
+  <text x="757" y="358" class="f">tracker.py</text>
+  <text x="757" y="373" class="small">움직이는 물체 추적</text>
+  <text x="757" y="391" class="small" fill="#047857">전환: bridge_node.py</text>
+
+  <rect x="903" y="244" width="146" height="154" rx="7" fill="#f0fdf4" stroke="#86efac" class="inner"/>
+  <text x="913" y="264" class="boxtitle">안전 · 기록</text>
+  <text x="913" y="286" class="small">bridge_node.py 안에서</text>
+  <text x="913" y="301" class="small">TF·기울기·막힘 감시</text>
+  <text x="913" y="322" class="small">목표마다 주행 기록</text>
+  <text x="913" y="337" class="f">→ /logs/records/</text>
+  <text x="913" y="358" class="small">기록 분석·재계산</text>
+  <text x="913" y="373" class="fs">/tools/dwa_replay.py</text>
+  <text x="913" y="391" class="small" fill="#047857">*.jsonl.gz</text>
+
+  <rect x="1059" y="244" width="136" height="154" rx="7" fill="#f0fdf4" stroke="#86efac" class="inner"/>
+  <text x="1069" y="264" class="boxtitle">명령 · 설정</text>
+  <text x="1069" y="286" class="f">cmd_mux.py</text>
+  <text x="1069" y="301" class="small">정지 &gt; 수동 &gt; 자동</text>
+  <text x="1069" y="322" class="fs">config/params.yaml</text>
+  <text x="1069" y="337" class="small">주행·안전 파라미터</text>
+  <text x="1069" y="358" class="fs">launch/</text>
+  <text x="1069" y="373" class="fs">warehouse.launch.py</text>
+  <text x="1069" y="391" class="small" fill="#047857">브리지+A*+YOLO 실행</text>
+
+  <!-- 2행: A* / 위치 추정 / YOLO -->
+  <rect x="735" y="450" width="146" height="118" rx="10" class="card" stroke="#059669"/>
+  <text x="747" y="470" class="boxtitle">A* 플래너</text>
+  <text x="747" y="487" class="dirs" fill="#047857">warehouse_robot/</text>
+  <text x="747" y="502" class="fs">astar_planner_node.py</text>
+  <text x="747" y="516" class="small">GetPlan 서비스</text>
+  <text x="747" y="532" class="fs">astar.py·plan_map.py</text>
+  <text x="747" y="546" class="small">격자 A* · 맵 가공</text>
+  <text x="747" y="561" class="fs">/logs/astar_fail.npz</text>
+
+  <rect x="897" y="450" width="146" height="118" rx="10" class="card" stroke="#059669"/>
+  <text x="909" y="470" class="boxtitle">위치 추정 · 지도</text>
+  <text x="909" y="487" class="dirs" fill="#047857">/scripts/</text>
+  <text x="909" y="501" class="fs">  start_nav2.sh  AMCL</text>
+  <text x="909" y="515" class="fs">  start_slam.sh  SLAM</text>
+  <text x="909" y="532" class="dirs" fill="#047857">/config/ (루트)</text>
+  <text x="909" y="546" class="fs">  amcl_waffle_pi.yaml</text>
+  <text x="909" y="560" class="fs">  amcl_hall · slam_*</text>
+
+  <rect x="1059" y="450" width="146" height="118" rx="10" class="card" stroke="#059669"/>
+  <text x="1071" y="470" class="boxtitle">부품 검출 (YOLO)</text>
+  <text x="1071" y="487" class="dirs" fill="#047857">/yolo/yolo_training/</text>
+  <text x="1071" y="501" class="fs">  infer_ros_switch.py</text>
+  <text x="1071" y="515" class="fs">  best_components7*.pt</text>
+  <text x="1071" y="532" class="dirs" fill="#047857">/scripts/</text>
+  <text x="1071" y="546" class="fs">  start_yolo.sh</text>
+  <text x="1071" y="561" class="small">학습: /yolo/colab/</text>
+
+  <!-- 3행: 테스트 -->
+  <rect x="735" y="576" width="470" height="34" rx="10" fill="#ffffff" stroke="#059669" stroke-width="1.5" stroke-dasharray="5 4"/>
+  <text x="751" y="598" class="dir" fill="#047857">test/</text>
+  <text x="796" y="598" class="small">test_*.py 7개 — A* · 추종기 · DWA · cmd_mux · 추적 · 맵 가공 · LED (pytest)</text>
+
+  <!-- 4행: 실행 스크립트 -->
+  <rect x="735" y="618" width="470" height="66" rx="10" fill="#f9fafb" stroke="#d1d5db"/>
+  <text x="751" y="637" class="dir" fill="#374151">/scripts/</text>
+  <text x="826" y="637" class="boxtitle" fill="#374151">실행 순서</text>
+  <text x="751" y="652" class="fs">run.sh → start_server.sh → start_sim.sh | Pi SSH</text>
+  <text x="751" y="665" class="fs">       → start_slam.sh | start_nav2.sh → start_bridge.sh</text>
+  <text x="751" y="679" class="small" style="font-size:10px">정지 stop_ros.sh · 맵 save_map.sh · 초기화 reset_robot.sh · env.sh 도메인/DDS</text>
+
+  <!-- ④ TurtleBot3 -->
+  <rect x="1310" y="150" width="260" height="392" rx="12" class="card" stroke="#ea580c"/>
+  <text x="1326" y="178" class="cardtitle">TurtleBot3 Waffle Pi</text>
+  <text x="1326" y="196" class="cardsub">Pi 쪽 파일은 저장소 밖 (~/turtlebot3_ws)</text>
+
+  <rect x="1322" y="208" width="236" height="222" rx="8" fill="#fff7ed" stroke="#fdba74" class="inner"/>
+  <text x="1334" y="228" class="boxtitle">turtlebot3_bringup</text>
+  <text x="1334" y="246" class="small">TB3 공식 패키지</text>
+  <text x="1334" y="272" class="item">실행 파일</text>
+  <text x="1346" y="289" class="mono" fill="#c2410c">robot.launch.py</text>
+  <text x="1334" y="315" class="item">PC 에서 실행</text>
+  <text x="1346" y="332" class="mono" fill="#c2410c">/scripts/run.sh → ssh</text>
+  <text x="1334" y="356" class="item">Pi 로그</text>
+  <text x="1346" y="373" class="mono" fill="#c2410c">~/warehouse_bringup.log</text>
+  <text x="1334" y="399" class="item">발행 / 구독</text>
+  <text x="1346" y="416" class="mono" fill="#c2410c">/scan /odom /imu ← /cmd_vel</text>
+
+  <rect x="1322" y="442" width="236" height="88" rx="8" fill="#fff7ed" stroke="#fdba74" class="inner"/>
+  <text x="1334" y="463" class="boxtitle">CSI 카메라</text>
+  <text x="1334" y="481" class="mono" fill="#c2410c">/yolo/camera.sh (Pi 로 복사)</text>
+  <text x="1346" y="500" class="small">Pi 에서 직접 실행 (v4l2_camera)</text>
+  <text x="1346" y="520" class="mono" fill="#c2410c">→ /csi/image_raw</text>
+
+  <!-- ④ Gazebo -->
+  <rect x="1310" y="562" width="260" height="128" rx="12" fill="#ffffff" stroke="#ea580c" stroke-width="2" stroke-dasharray="7 5"/>
+  <text x="1326" y="590" class="cardtitle">또는 Gazebo 시뮬레이션</text>
+  <text x="1326" y="608" class="cardsub">--robot sim 일 때 bringup 대신</text>
+  <text x="1326" y="632" class="f">/scripts/start_sim.sh</text>
+  <text x="1326" y="652" class="f">/worlds/*.world</text>
+  <text x="1440" y="652" class="small">미로 · 강당</text>
+  <text x="1326" y="672" class="f">/tools/make_hall_world.py</text>
+  <text x="1326" y="686" class="small" style="font-size:10px">map_to_world.py (맵 → 월드)</text>
+
+  <!-- ===== 연결선 ===== -->
+  <line x1="252" y1="232" x2="312" y2="232" stroke="#2563eb" stroke-width="2.5" marker-start="url(#aWs)" marker-end="url(#aWs)"/>
+  <text x="276" y="222" class="lbl" fill="#2563eb" text-anchor="middle">WS</text>
+  <path d="M252,530 H276 V246 H312" fill="none" stroke="#2563eb" stroke-width="2" marker-end="url(#aWs)" opacity="0.55"/>
+
+  <line x1="598" y1="284" x2="733" y2="284" stroke="#2563eb" stroke-width="2.5" marker-start="url(#aWs)" marker-end="url(#aWs)"/>
+  <text x="665" y="240" class="lbl" fill="#2563eb" text-anchor="middle">goto ▶</text>
+  <text x="665" y="254" class="lbl" fill="#2563eb" text-anchor="middle">cancel · stop</text>
+  <text x="665" y="268" class="lbl" fill="#2563eb" text-anchor="middle">initial_pose</text>
+  <text x="665" y="304" class="lbl" fill="#2563eb" text-anchor="middle">◀ pose · path</text>
+  <text x="665" y="318" class="lbl" fill="#2563eb" text-anchor="middle">nav_status</text>
+  <text x="665" y="332" class="lbl" fill="#2563eb" text-anchor="middle">cargo · health</text>
+  <text x="665" y="354" class="small" text-anchor="middle">/ws/robot/tb3/</text>
+
+  <path d="M598,472 H660 V650 H733" fill="none" stroke="#6b7280" stroke-width="2" stroke-dasharray="6 4" marker-end="url(#aRun)"/>
+  <text x="668" y="560" class="small" fill="#4b5563">시작/정지</text>
+
+  <line x1="455" y1="514" x2="455" y2="548" stroke="#7c3aed" stroke-width="2.5" marker-start="url(#aDb)" marker-end="url(#aDb)"/>
+  <text x="468" y="536" class="small" fill="#6d28d9">ORM</text>
+
+  <line x1="808" y1="412" x2="808" y2="448" stroke="#059669" stroke-width="2.5" marker-start="url(#aRos)" marker-end="url(#aRos)"/>
+  <text x="816" y="435" class="lbl" fill="#047857">GetPlan</text>
+  <line x1="950" y1="412" x2="950" y2="448" stroke="#059669" stroke-width="2.5" marker-end="url(#aRos)"/>
+  <line x1="990" y1="448" x2="990" y2="412" stroke="#059669" stroke-width="2.5" marker-end="url(#aRos)"/>
+  <text x="942" y="435" class="lbl" fill="#047857" text-anchor="end">scan_level</text>
+  <text x="998" y="435" class="lbl" fill="#047857">TF map→odom</text>
+  <line x1="1132" y1="448" x2="1132" y2="412" stroke="#059669" stroke-width="2.5" marker-end="url(#aRos)"/>
+  <text x="1140" y="428" class="lbl" fill="#047857">yolo/</text>
+  <text x="1140" y="442" class="lbl" fill="#047857">counts</text>
+
+  <line x1="1320" y1="276" x2="1207" y2="276" stroke="#059669" stroke-width="2.5" marker-end="url(#aRos)"/>
+  <text x="1264" y="252" class="lbl" fill="#047857" text-anchor="middle">/scan /odom</text>
+  <text x="1264" y="266" class="lbl" fill="#047857" text-anchor="middle">/tf /imu</text>
+  <line x1="1207" y1="360" x2="1320" y2="360" stroke="#059669" stroke-width="2.5" marker-end="url(#aRos)"/>
+  <text x="1264" y="350" class="lbl" fill="#047857" text-anchor="middle">/cmd_vel</text>
+  <line x1="1320" y1="498" x2="1207" y2="498" stroke="#059669" stroke-width="2.5" marker-end="url(#aRos)"/>
+  <text x="1264" y="488" class="lbl" fill="#047857" text-anchor="middle">image_raw</text>
+
+  <!-- ===== 하단: 흐름별 파일 ===== -->
+  <rect x="30" y="712" width="1540" height="164" rx="14" fill="#ffffff" stroke="#e5e7eb" stroke-width="1.5"/>
+  <text x="50" y="742" class="cardtitle">이동 명령 한 번의 흐름 — 거치는 파일</text>
+  <text x="380" y="742" class="cardsub">웹 클릭부터 도착 보고까지 단계별로 실행되는 코드</text>
+
+  <g>
+    <rect x="50" y="760" width="268" height="96" rx="10" fill="#eff6ff" stroke="#93c5fd"/>
+    <circle cx="76" cy="786" r="14" fill="#2563eb"/><text x="76" y="791" class="colhead" text-anchor="middle">1</text>
+    <text x="98" y="791" class="step">웹에서 지점 클릭</text>
+    <text x="66" y="818" class="f">static/warehouse/app.js</text>
+    <text x="66" y="838" class="stepsub">지도 클릭 → /ws/ui/ 로 요청</text>
+
+    <line x1="322" y1="808" x2="352" y2="808" stroke="#9ca3af" stroke-width="2.5" marker-end="url(#aStep)"/>
+
+    <rect x="356" y="760" width="268" height="96" rx="10" fill="#f5f3ff" stroke="#c4b5fd"/>
+    <circle cx="382" cy="786" r="14" fill="#7c3aed"/><text x="382" y="791" class="colhead" text-anchor="middle">2</text>
+    <text x="404" y="791" class="step">서버가 작업 생성</text>
+    <text x="372" y="818" class="f">consumers.py → services.py</text>
+    <text x="372" y="838" class="stepsub">models.py 에 Task/TaskStep, goto 전송</text>
+
+    <line x1="628" y1="808" x2="658" y2="808" stroke="#9ca3af" stroke-width="2.5" marker-end="url(#aStep)"/>
+
+    <rect x="662" y="760" width="268" height="96" rx="10" fill="#ecfdf5" stroke="#86efac"/>
+    <circle cx="688" cy="786" r="14" fill="#059669"/><text x="688" y="791" class="colhead" text-anchor="middle">3</text>
+    <text x="710" y="791" class="step">A* 로 경로 계산</text>
+    <text x="678" y="818" class="fs">bridge_node.py → astar_planner_node.py</text>
+    <text x="678" y="838" class="stepsub">astar.py · plan_map.py 로 격자 탐색</text>
+
+    <line x1="934" y1="808" x2="964" y2="808" stroke="#9ca3af" stroke-width="2.5" marker-end="url(#aStep)"/>
+
+    <rect x="968" y="760" width="268" height="96" rx="10" fill="#ecfdf5" stroke="#86efac"/>
+    <circle cx="994" cy="786" r="14" fill="#059669"/><text x="994" y="791" class="colhead" text-anchor="middle">4</text>
+    <text x="1016" y="791" class="step">추종기가 로봇을 주행</text>
+    <text x="984" y="818" class="f">follower.py · dwa.py · cmd_mux.py</text>
+    <text x="984" y="838" class="stepsub">→ /cmd_vel → Pi bringup 이 바퀴 구동</text>
+
+    <line x1="1240" y1="808" x2="1270" y2="808" stroke="#9ca3af" stroke-width="2.5" marker-end="url(#aStep)"/>
+
+    <rect x="1274" y="760" width="276" height="96" rx="10" fill="#fff7ed" stroke="#fdba74"/>
+    <circle cx="1300" cy="786" r="14" fill="#ea580c"/><text x="1300" y="791" class="colhead" text-anchor="middle">5</text>
+    <text x="1322" y="791" class="step">도착 보고 → 다음 단계</text>
+    <text x="1290" y="818" class="f">bridge_node.py → services.py</text>
+    <text x="1290" y="838" class="stepsub">nav_status 로 단계 완료 → 다음 위치 · 홈</text>
+  </g>
+</svg>

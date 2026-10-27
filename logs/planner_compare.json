@@ -1,0 +1,277 @@
+{
+ "A": {
+  "box_center": {
+   "outcome": "도착",
+   "time": 56.3,
+   "gap": 0.033,
+   "pos": [
+    3.92,
+    0.01
+   ],
+   "speed": 0.079,
+   "replans": 1,
+   "switches": 2,
+   "cpu": 12.8
+  },
+  "box_offset": {
+   "outcome": "도착",
+   "time": 54.0,
+   "gap": 0.065,
+   "pos": [
+    3.93,
+    -0.03
+   ],
+   "speed": 0.081,
+   "replans": 1,
+   "switches": 2,
+   "cpu": 11.5
+  },
+  "room_bigbox": {
+   "outcome": "도착",
+   "time": 59.0,
+   "gap": 0.033,
+   "pos": [
+    3.92,
+    0.01
+   ],
+   "speed": 0.087,
+   "replans": 1,
+   "switches": 3,
+   "cpu": 9.4
+  },
+  "corner_box": {
+   "outcome": "도착",
+   "time": 69.3,
+   "gap": 0.028,
+   "pos": [
+    2.99,
+    3.42
+   ],
+   "speed": 0.094,
+   "replans": 1,
+   "switches": 2,
+   "cpu": 13.6
+  },
+  "blocked_route": {
+   "outcome": "도착",
+   "time": 73.5,
+   "gap": 0.199,
+   "pos": [
+    4.44,
+    -0.04
+   ],
+   "speed": 0.138,
+   "replans": 1,
+   "switches": 2,
+   "cpu": 8.4
+  },
+  "person_cross": {
+   "outcome": "도착",
+   "time": 25.0,
+   "gap": 0.102,
+   "pos": [
+    3.92,
+    0.01
+   ],
+   "speed": 0.157,
+   "replans": 0,
+   "switches": 2,
+   "cpu": 3.9
+  },
+  "person_headon": {
+   "outcome": "도착",
+   "time": 44.8,
+   "gap": 0.033,
+   "pos": [
+    3.92,
+    0.01
+   ],
+   "speed": 0.144,
+   "replans": 0,
+   "switches": 1,
+   "cpu": 8.0
+  },
+  "person_stops": {
+   "outcome": "도착",
+   "time": 51.6,
+   "gap": 0.105,
+   "pos": [
+    3.93,
+    0.03
+   ],
+   "speed": 0.087,
+   "replans": 1,
+   "switches": 3,
+   "cpu": 9.9
+  },
+  "s_corridor": {
+   "outcome": "도착",
+   "time": 28.6,
+   "gap": 0.135,
+   "pos": [
+    0.08,
+    2.54
+   ],
+   "speed": 0.213,
+   "replans": 0,
+   "switches": 0,
+   "cpu": 0.9
+  },
+  "x_slalom": {
+   "outcome": "도착",
+   "time": 91.0,
+   "gap": 0.03,
+   "pos": [
+    4.12,
+    -0.01
+   ],
+   "speed": 0.061,
+   "replans": 2,
+   "switches": 6,
+   "cpu": 22.0
+  },
+  "x_tight_gap": {
+   "outcome": "실패",
+   "time": 84.2,
+   "gap": 0.293,
+   "pos": [
+    1.29,
+    0.02
+   ],
+   "speed": 0.026,
+   "replans": 2,
+   "switches": 3,
+   "cpu": 20.3
+  },
+  "x_trap": {
+   "outcome": "도착",
+   "time": 60.0,
+   "gap": 0.145,
+   "pos": [
+    3.93,
+    0.03
+   ],
+   "speed": 0.113,
+   "replans": 1,
+   "switches": 2,
+   "cpu": 8.6
+  },
+  "x_sudden": {
+   "outcome": "도착",
+   "time": 53.2,
+   "gap": 0.08,
+   "pos": [
+    3.93,
+    0.03
+   ],
+   "speed": 0.084,
+   "replans": 1,
+   "switches": 3,
+   "cpu": 11.0
+  },
+  "x_crowd": {
+   "outcome": "도착",
+   "time": 45.3,
+   "gap": 0.065,
+   "pos": [
+    4.1,
+    -0.02
+   ],
+   "speed": 0.1,
+   "replans": 0,
+   "switches": 3,
+   "cpu": 9.1
+  },
+  "x_headon_box": {
+   "outcome": "실패",
+   "time": 108.1,
+   "gap": 0.015,
+   "pos": [
+    2.24,
+    -0.02
+   ],
+   "speed": 0.049,
+   "replans": 2,
+   "switches": 4,
+   "cpu": 18.7
+  },
+  "map2_0": {
+   "outcome": "도착",
+   "time": 57.4,
+   "gap": 0.036,
+   "pos": [
+    -2.45,
+    -0.05
+   ],
+   "speed": 0.091,
+   "replans": 1,
+   "switches": 3,
+   "cpu": 9.7
+  },
+  "map2_1": {
+   "outcome": "도착",
+   "time": 46.1,
+   "gap": 0.02,
+   "pos": [
+    -2.35,
+    1.95
+   ],
+   "speed": 0.068,
+   "replans": 1,
+   "switches": 2,
+   "cpu": 8.2
+  },
+  "map2_2": {
+   "outcome": "도착",
+   "time": 65.6,
+   "gap": 0.045,
+   "pos": [
+    -0.34,
+    1.88
+   ],
+   "speed": 0.105,
+   "replans": 1,
+   "switches": 3,
+   "cpu": 8.9
+  },
+  "map2_3": {
+   "outcome": "실패",
+   "time": 76.4,
+   "gap": 0.212,
+   "pos": [
+    -1.7,
+    0.3
+   ],
+   "speed": 0.019,
+   "replans": 2,
+   "switches": 3,
+   "cpu": 13.0
+  },
+  "map2_4": {
+   "outcome": "도착",
+   "time": 58.6,
+   "gap": 0.042,
+   "pos": [
+    -2.51,
+    0.58
+   ],
+   "speed": 0.077,
+   "replans": 1,
+   "switches": 3,
+   "cpu": 10.0
+  },
+  "map2_5": {
+   "outcome": "도착",
+   "time": 50.5,
+   "gap": 0.057,
+   "pos": [
+    0.2,
+    1.9
+   ],
+   "speed": 0.068,
+   "replans": 1,
+   "switches": 2,
+   "cpu": 7.0
+  }
+ }
+}

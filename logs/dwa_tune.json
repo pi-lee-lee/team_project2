@@ -1,0 +1,1782 @@
+[
+ {
+  "score": 241.8,
+  "cfg": {
+   "w_heading": 1.23,
+   "w_path": 2.66,
+   "w_goal": 1.98,
+   "w_obstacle": 0.78,
+   "w_speed": 1.1,
+   "w_collision": 7.31,
+   "obstacle_influence": 0.76,
+   "dynamic_margin": 0.09,
+   "dynamic_growth": 0.0,
+   "predict_time": 2.51
+  },
+  "results": [
+   {
+    "name": "cross_0.5s_0.1",
+    "reached": true,
+    "time": 19.9,
+    "gap": 0.162
+   },
+   {
+    "name": "cross_0.5s_0.2",
+    "reached": true,
+    "time": 14.8,
+    "gap": 0.158
+   },
+   {
+    "name": "cross_1.5s_0.1",
+    "reached": true,
+    "time": 20.9,
+    "gap": 0.161
+   },
+   {
+    "name": "cross_1.5s_0.2",
+    "reached": true,
+    "time": 15.8,
+    "gap": 0.158
+   },
+   {
+    "name": "cross_2.5s_0.1",
+    "reached": true,
+    "time": 21.9,
+    "gap": 0.162
+   },
+   {
+    "name": "cross_2.5s_0.2",
+    "reached": true,
+    "time": 16.9,
+    "gap": 0.158
+   },
+   {
+    "name": "cross_3.5s_0.1",
+    "reached": true,
+    "time": 23.0,
+    "gap": 0.161
+   },
+   {
+    "name": "cross_3.5s_0.2",
+    "reached": true,
+    "time": 17.8,
+    "gap": 0.157
+   },
+   {
+    "name": "headon",
+    "reached": true,
+    "time": 25.8,
+    "gap": 0.176
+   },
+   {
+    "name": "detour",
+    "reached": true,
+    "time": 17.1,
+    "gap": 0.173
+   },
+   {
+    "name": "corridor",
+    "reached": true,
+    "time": 14.5,
+    "gap": 0.157
+   },
+   {
+    "name": "parked",
+    "reached": true,
+    "time": 11.2,
+    "gap": 0.041
+   }
+  ]
+ },
+ {
+  "score": 239.0,
+  "cfg": {
+   "w_heading": 1.18,
+   "w_path": 1.92,
+   "w_goal": 1.44,
+   "w_obstacle": 0.42,
+   "w_speed": 1.16,
+   "w_collision": 3.94,
+   "obstacle_influence": 0.6,
+   "dynamic_margin": 0.08,
+   "dynamic_growth": 0.01,
+   "predict_time": 2.22
+  },
+  "results": [
+   {
+    "name": "cross_0.5s_0.1",
+    "reached": true,
+    "time": 19.6,
+    "gap": 0.152
+   },
+   {
+    "name": "cross_0.5s_0.2",
+    "reached": true,
+    "time": 14.4,
+    "gap": 0.153
+   },
+   {
+    "name": "cross_1.5s_0.1",
+    "reached": true,
+    "time": 20.5,
+    "gap": 0.152
+   },
+   {
+    "name": "cross_1.5s_0.2",
+    "reached": true,
+    "time": 15.3,
+    "gap": 0.149
+   },
+   {
+    "name": "cross_2.5s_0.1",
+    "reached": true,
+    "time": 21.5,
+    "gap": 0.152
+   },
+   {
+    "name": "cross_2.5s_0.2",
+    "reached": true,
+    "time": 16.4,
+    "gap": 0.148
+   },
+   {
+    "name": "cross_3.5s_0.1",
+    "reached": true,
+    "time": 22.7,
+    "gap": 0.152
+   },
+   {
+    "name": "cross_3.5s_0.2",
+    "reached": true,
+    "time": 17.4,
+    "gap": 0.148
+   },
+   {
+    "name": "headon",
+    "reached": true,
+    "time": 38.9,
+    "gap": 0.155
+   },
+   {
+    "name": "detour",
+    "reached": true,
+    "time": 16.7,
+    "gap": 0.172
+   },
+   {
+    "name": "corridor",
+    "reached": true,
+    "time": 14.1,
+    "gap": 0.157
+   },
+   {
+    "name": "parked",
+    "reached": true,
+    "time": 10.7,
+    "gap": 0.041
+   }
+  ]
+ },
+ {
+  "score": 238.3,
+  "cfg": {
+   "w_heading": 0.75,
+   "w_path": 1.65,
+   "w_goal": 2.67,
+   "w_obstacle": 1.38,
+   "w_speed": 0.68,
+   "w_collision": 4.61,
+   "obstacle_influence": 0.35,
+   "dynamic_margin": 0.12,
+   "dynamic_growth": 0.04,
+   "predict_time": 2.1
+  },
+  "results": [
+   {
+    "name": "cross_0.5s_0.1",
+    "reached": true,
+    "time": 21.0,
+    "gap": 0.243
+   },
+   {
+    "name": "cross_0.5s_0.2",
+    "reached": true,
+    "time": 14.8,
+    "gap": 0.219
+   },
+   {
+    "name": "cross_1.5s_0.1",
+    "reached": true,
+    "time": 21.8,
+    "gap": 0.225
+   },
+   {
+    "name": "cross_1.5s_0.2",
+    "reached": true,
+    "time": 15.7,
+    "gap": 0.206
+   },
+   {
+    "name": "cross_2.5s_0.1",
+    "reached": true,
+    "time": 22.6,
+    "gap": 0.223
+   },
+   {
+    "name": "cross_2.5s_0.2",
+    "reached": true,
+    "time": 16.7,
+    "gap": 0.199
+   },
+   {
+    "name": "cross_3.5s_0.1",
+    "reached": true,
+    "time": 23.7,
+    "gap": 0.223
+   },
+   {
+    "name": "cross_3.5s_0.2",
+    "reached": true,
+    "time": 17.7,
+    "gap": 0.195
+   },
+   {
+    "name": "headon",
+    "reached": true,
+    "time": 35.8,
+    "gap": 0.209
+   },
+   {
+    "name": "detour",
+    "reached": true,
+    "time": 16.8,
+    "gap": 0.218
+   },
+   {
+    "name": "corridor",
+    "reached": true,
+    "time": 13.9,
+    "gap": 0.157
+   },
+   {
+    "name": "parked",
+    "reached": true,
+    "time": 10.6,
+    "gap": 0.041
+   }
+  ]
+ },
+ {
+  "score": 237.7,
+  "cfg": {
+   "w_heading": 1.08,
+   "w_path": 0.35,
+   "w_goal": 0.98,
+   "w_obstacle": 1.71,
+   "w_speed": 0.99,
+   "w_collision": 9.56,
+   "obstacle_influence": 0.69,
+   "dynamic_margin": 0.09,
+   "dynamic_growth": 0.05,
+   "predict_time": 2.15
+  },
+  "results": [
+   {
+    "name": "cross_0.5s_0.1",
+    "reached": true,
+    "time": 19.9,
+    "gap": 0.186
+   },
+   {
+    "name": "cross_0.5s_0.2",
+    "reached": true,
+    "time": 14.7,
+    "gap": 0.206
+   },
+   {
+    "name": "cross_1.5s_0.1",
+    "reached": true,
+    "time": 21.0,
+    "gap": 0.185
+   },
+   {
+    "name": "cross_1.5s_0.2",
+    "reached": true,
+    "time": 15.6,
+    "gap": 0.187
+   },
+   {
+    "name": "cross_2.5s_0.1",
+    "reached": true,
+    "time": 21.9,
+    "gap": 0.185
+   },
+   {
+    "name": "cross_2.5s_0.2",
+    "reached": true,
+    "time": 16.5,
+    "gap": 0.178
+   },
+   {
+    "name": "cross_3.5s_0.1",
+    "reached": true,
+    "time": 23.0,
+    "gap": 0.185
+   },
+   {
+    "name": "cross_3.5s_0.2",
+    "reached": true,
+    "time": 17.5,
+    "gap": 0.171
+   },
+   {
+    "name": "headon",
+    "reached": true,
+    "time": 42.0,
+    "gap": 0.179
+   },
+   {
+    "name": "detour",
+    "reached": true,
+    "time": 16.5,
+    "gap": 0.171
+   },
+   {
+    "name": "corridor",
+    "reached": true,
+    "time": 13.9,
+    "gap": 0.157
+   },
+   {
+    "name": "parked",
+    "reached": true,
+    "time": 10.6,
+    "gap": 0.041
+   }
+  ]
+ },
+ {
+  "score": 237.2,
+  "cfg": {
+   "w_heading": 0.52,
+   "w_path": 1.81,
+   "w_goal": 1.82,
+   "w_obstacle": 2.12,
+   "w_speed": 1.37,
+   "w_collision": 3.71,
+   "obstacle_influence": 0.58,
+   "dynamic_margin": 0.08,
+   "dynamic_growth": 0.03,
+   "predict_time": 2.14
+  },
+  "results": [
+   {
+    "name": "cross_0.5s_0.1",
+    "reached": true,
+    "time": 21.4,
+    "gap": 0.159
+   },
+   {
+    "name": "cross_0.5s_0.2",
+    "reached": true,
+    "time": 14.4,
+    "gap": 0.168
+   },
+   {
+    "name": "cross_1.5s_0.1",
+    "reached": true,
+    "time": 21.9,
+    "gap": 0.157
+   },
+   {
+    "name": "cross_1.5s_0.2",
+    "reached": true,
+    "time": 15.5,
+    "gap": 0.151
+   },
+   {
+    "name": "cross_2.5s_0.1",
+    "reached": true,
+    "time": 23.6,
+    "gap": 0.157
+   },
+   {
+    "name": "cross_2.5s_0.2",
+    "reached": true,
+    "time": 16.4,
+    "gap": 0.149
+   },
+   {
+    "name": "cross_3.5s_0.1",
+    "reached": true,
+    "time": 24.3,
+    "gap": 0.157
+   },
+   {
+    "name": "cross_3.5s_0.2",
+    "reached": true,
+    "time": 17.3,
+    "gap": 0.148
+   },
+   {
+    "name": "headon",
+    "reached": true,
+    "time": 38.1,
+    "gap": 0.155
+   },
+   {
+    "name": "detour",
+    "reached": true,
+    "time": 16.9,
+    "gap": 0.235
+   },
+   {
+    "name": "corridor",
+    "reached": true,
+    "time": 13.9,
+    "gap": 0.157
+   },
+   {
+    "name": "parked",
+    "reached": true,
+    "time": 10.6,
+    "gap": 0.041
+   }
+  ]
+ },
+ {
+  "score": 237.1,
+  "cfg": {
+   "w_heading": 1.21,
+   "w_path": 0.85,
+   "w_goal": 2.38,
+   "w_obstacle": 0.13,
+   "w_speed": 0.97,
+   "w_collision": 7.91,
+   "obstacle_influence": 0.63,
+   "dynamic_margin": 0.12,
+   "dynamic_growth": 0.04,
+   "predict_time": 2.27
+  },
+  "results": [
+   {
+    "name": "cross_0.5s_0.1",
+    "reached": true,
+    "time": 20.4,
+    "gap": 0.209
+   },
+   {
+    "name": "cross_0.5s_0.2",
+    "reached": true,
+    "time": 15.1,
+    "gap": 0.222
+   },
+   {
+    "name": "cross_1.5s_0.1",
+    "reached": true,
+    "time": 21.4,
+    "gap": 0.209
+   },
+   {
+    "name": "cross_1.5s_0.2",
+    "reached": true,
+    "time": 16.0,
+    "gap": 0.208
+   },
+   {
+    "name": "cross_2.5s_0.1",
+    "reached": true,
+    "time": 22.3,
+    "gap": 0.208
+   },
+   {
+    "name": "cross_2.5s_0.2",
+    "reached": true,
+    "time": 17.0,
+    "gap": 0.2
+   },
+   {
+    "name": "cross_3.5s_0.1",
+    "reached": true,
+    "time": 23.4,
+    "gap": 0.208
+   },
+   {
+    "name": "cross_3.5s_0.2",
+    "reached": true,
+    "time": 17.9,
+    "gap": 0.196
+   },
+   {
+    "name": "headon",
+    "reached": true,
+    "time": 39.6,
+    "gap": 0.203
+   },
+   {
+    "name": "detour",
+    "reached": true,
+    "time": 16.8,
+    "gap": 0.171
+   },
+   {
+    "name": "corridor",
+    "reached": true,
+    "time": 14.2,
+    "gap": 0.157
+   },
+   {
+    "name": "parked",
+    "reached": true,
+    "time": 10.9,
+    "gap": 0.041
+   }
+  ]
+ },
+ {
+  "score": 236.9,
+  "cfg": {
+   "w_heading": 1.1,
+   "w_path": 2.83,
+   "w_goal": 1.59,
+   "w_obstacle": 0.12,
+   "w_speed": 0.46,
+   "w_collision": 7.33,
+   "obstacle_influence": 0.44,
+   "dynamic_margin": 0.08,
+   "dynamic_growth": 0.04,
+   "predict_time": 2.7
+  },
+  "results": [
+   {
+    "name": "cross_0.5s_0.1",
+    "reached": true,
+    "time": 20.4,
+    "gap": 0.177
+   },
+   {
+    "name": "cross_0.5s_0.2",
+    "reached": true,
+    "time": 15.7,
+    "gap": 0.199
+   },
+   {
+    "name": "cross_1.5s_0.1",
+    "reached": true,
+    "time": 21.4,
+    "gap": 0.176
+   },
+   {
+    "name": "cross_1.5s_0.2",
+    "reached": true,
+    "time": 16.5,
+    "gap": 0.178
+   },
+   {
+    "name": "cross_2.5s_0.1",
+    "reached": true,
+    "time": 22.3,
+    "gap": 0.175
+   },
+   {
+    "name": "cross_2.5s_0.2",
+    "reached": true,
+    "time": 17.4,
+    "gap": 0.166
+   },
+   {
+    "name": "cross_3.5s_0.1",
+    "reached": true,
+    "time": 23.2,
+    "gap": 0.173
+   },
+   {
+    "name": "cross_3.5s_0.2",
+    "reached": true,
+    "time": 18.4,
+    "gap": 0.159
+   },
+   {
+    "name": "headon",
+    "reached": true,
+    "time": 36.7,
+    "gap": 0.164
+   },
+   {
+    "name": "detour",
+    "reached": true,
+    "time": 17.5,
+    "gap": 0.171
+   },
+   {
+    "name": "corridor",
+    "reached": true,
+    "time": 14.9,
+    "gap": 0.157
+   },
+   {
+    "name": "parked",
+    "reached": true,
+    "time": 11.5,
+    "gap": 0.041
+   }
+  ]
+ },
+ {
+  "score": 236.7,
+  "cfg": {
+   "w_heading": 0.07,
+   "w_path": 1.82,
+   "w_goal": 2.05,
+   "w_obstacle": 0.78,
+   "w_speed": 0.14,
+   "w_collision": 6.25,
+   "obstacle_influence": 0.36,
+   "dynamic_margin": 0.09,
+   "dynamic_growth": 0.02,
+   "predict_time": 2.86
+  },
+  "results": [
+   {
+    "name": "cross_0.5s_0.1",
+    "reached": true,
+    "time": 20.6,
+    "gap": 0.17
+   },
+   {
+    "name": "cross_0.5s_0.2",
+    "reached": true,
+    "time": 15.5,
+    "gap": 0.182
+   },
+   {
+    "name": "cross_1.5s_0.1",
+    "reached": true,
+    "time": 21.6,
+    "gap": 0.168
+   },
+   {
+    "name": "cross_1.5s_0.2",
+    "reached": true,
+    "time": 16.4,
+    "gap": 0.166
+   },
+   {
+    "name": "cross_2.5s_0.1",
+    "reached": true,
+    "time": 22.6,
+    "gap": 0.166
+   },
+   {
+    "name": "cross_2.5s_0.2",
+    "reached": true,
+    "time": 17.4,
+    "gap": 0.161
+   },
+   {
+    "name": "cross_3.5s_0.1",
+    "reached": true,
+    "time": 23.9,
+    "gap": 0.168
+   },
+   {
+    "name": "cross_3.5s_0.2",
+    "reached": true,
+    "time": 18.4,
+    "gap": 0.158
+   },
+   {
+    "name": "headon",
+    "reached": true,
+    "time": 35.7,
+    "gap": 0.165
+   },
+   {
+    "name": "detour",
+    "reached": true,
+    "time": 17.7,
+    "gap": 0.189
+   },
+   {
+    "name": "corridor",
+    "reached": true,
+    "time": 15.1,
+    "gap": 0.157
+   },
+   {
+    "name": "parked",
+    "reached": true,
+    "time": 11.7,
+    "gap": 0.041
+   }
+  ]
+ },
+ {
+  "score": 236.4,
+  "cfg": {
+   "w_heading": 0.88,
+   "w_path": 1.87,
+   "w_goal": 1.71,
+   "w_obstacle": 2.43,
+   "w_speed": 1.48,
+   "w_collision": 3.68,
+   "obstacle_influence": 0.45,
+   "dynamic_margin": 0.15,
+   "dynamic_growth": 0.01,
+   "predict_time": 2.24
+  },
+  "results": [
+   {
+    "name": "cross_0.5s_0.1",
+    "reached": true,
+    "time": 21.3,
+    "gap": 0.222
+   },
+   {
+    "name": "cross_0.5s_0.2",
+    "reached": true,
+    "time": 15.0,
+    "gap": 0.219
+   },
+   {
+    "name": "cross_1.5s_0.1",
+    "reached": true,
+    "time": 22.2,
+    "gap": 0.222
+   },
+   {
+    "name": "cross_1.5s_0.2",
+    "reached": true,
+    "time": 16.1,
+    "gap": 0.216
+   },
+   {
+    "name": "cross_2.5s_0.1",
+    "reached": true,
+    "time": 23.6,
+    "gap": 0.222
+   },
+   {
+    "name": "cross_2.5s_0.2",
+    "reached": true,
+    "time": 17.0,
+    "gap": 0.216
+   },
+   {
+    "name": "cross_3.5s_0.1",
+    "reached": true,
+    "time": 24.3,
+    "gap": 0.222
+   },
+   {
+    "name": "cross_3.5s_0.2",
+    "reached": true,
+    "time": 17.9,
+    "gap": 0.216
+   },
+   {
+    "name": "headon",
+    "reached": true,
+    "time": 38.3,
+    "gap": 0.222
+   },
+   {
+    "name": "detour",
+    "reached": true,
+    "time": 17.0,
+    "gap": 0.235
+   },
+   {
+    "name": "corridor",
+    "reached": true,
+    "time": 14.1,
+    "gap": 0.157
+   },
+   {
+    "name": "parked",
+    "reached": true,
+    "time": 10.7,
+    "gap": 0.041
+   }
+  ]
+ },
+ {
+  "score": 236.1,
+  "cfg": {
+   "w_heading": 0.37,
+   "w_path": 2.91,
+   "w_goal": 1.3,
+   "w_obstacle": 0.73,
+   "w_speed": 0.66,
+   "w_collision": 7.46,
+   "obstacle_influence": 0.37,
+   "dynamic_margin": 0.07,
+   "dynamic_growth": 0.08,
+   "predict_time": 2.14
+  },
+  "results": [
+   {
+    "name": "cross_0.5s_0.1",
+    "reached": true,
+    "time": 22.3,
+    "gap": 0.313
+   },
+   {
+    "name": "cross_0.5s_0.2",
+    "reached": true,
+    "time": 14.9,
+    "gap": 0.234
+   },
+   {
+    "name": "cross_1.5s_0.1",
+    "reached": true,
+    "time": 23.4,
+    "gap": 0.307
+   },
+   {
+    "name": "cross_1.5s_0.2",
+    "reached": true,
+    "time": 15.7,
+    "gap": 0.214
+   },
+   {
+    "name": "cross_2.5s_0.1",
+    "reached": true,
+    "time": 24.2,
+    "gap": 0.301
+   },
+   {
+    "name": "cross_2.5s_0.2",
+    "reached": true,
+    "time": 16.6,
+    "gap": 0.197
+   },
+   {
+    "name": "cross_3.5s_0.1",
+    "reached": true,
+    "time": 25.3,
+    "gap": 0.301
+   },
+   {
+    "name": "cross_3.5s_0.2",
+    "reached": true,
+    "time": 17.5,
+    "gap": 0.183
+   },
+   {
+    "name": "headon",
+    "reached": true,
+    "time": 37.2,
+    "gap": 0.2
+   },
+   {
+    "name": "detour",
+    "reached": true,
+    "time": 16.8,
+    "gap": 0.221
+   },
+   {
+    "name": "corridor",
+    "reached": true,
+    "time": 13.9,
+    "gap": 0.157
+   },
+   {
+    "name": "parked",
+    "reached": true,
+    "time": 10.6,
+    "gap": 0.041
+   }
+  ]
+ },
+ {
+  "score": 236.1,
+  "cfg": {
+   "w_heading": 1.24,
+   "w_path": 0.3,
+   "w_goal": 1.58,
+   "w_obstacle": 0.77,
+   "w_speed": 1.16,
+   "w_collision": 7.82,
+   "obstacle_influence": 0.28,
+   "dynamic_margin": 0.06,
+   "dynamic_growth": 0.07,
+   "predict_time": 2.63
+  },
+  "results": [
+   {
+    "name": "cross_0.5s_0.1",
+    "reached": true,
+    "time": 20.4,
+    "gap": 0.186
+   },
+   {
+    "name": "cross_0.5s_0.2",
+    "reached": true,
+    "time": 15.6,
+    "gap": 0.228
+   },
+   {
+    "name": "cross_1.5s_0.1",
+    "reached": true,
+    "time": 21.4,
+    "gap": 0.186
+   },
+   {
+    "name": "cross_1.5s_0.2",
+    "reached": true,
+    "time": 16.5,
+    "gap": 0.204
+   },
+   {
+    "name": "cross_2.5s_0.1",
+    "reached": true,
+    "time": 22.3,
+    "gap": 0.184
+   },
+   {
+    "name": "cross_2.5s_0.2",
+    "reached": true,
+    "time": 17.3,
+    "gap": 0.182
+   },
+   {
+    "name": "cross_3.5s_0.1",
+    "reached": true,
+    "time": 23.4,
+    "gap": 0.182
+   },
+   {
+    "name": "cross_3.5s_0.2",
+    "reached": true,
+    "time": 18.2,
+    "gap": 0.165
+   },
+   {
+    "name": "headon",
+    "reached": true,
+    "time": 40.2,
+    "gap": 0.183
+   },
+   {
+    "name": "detour",
+    "reached": true,
+    "time": 17.3,
+    "gap": 0.17
+   },
+   {
+    "name": "corridor",
+    "reached": true,
+    "time": 14.6,
+    "gap": 0.157
+   },
+   {
+    "name": "parked",
+    "reached": true,
+    "time": 11.3,
+    "gap": 0.041
+   }
+  ]
+ },
+ {
+  "score": 236.0,
+  "cfg": {
+   "w_heading": 0.26,
+   "w_path": 0.47,
+   "w_goal": 2.99,
+   "w_obstacle": 0.1,
+   "w_speed": 0.01,
+   "w_collision": 8.74,
+   "obstacle_influence": 0.2,
+   "dynamic_margin": 0.21,
+   "dynamic_growth": 0.06,
+   "predict_time": 2.33
+  },
+  "results": [
+   {
+    "name": "cross_0.5s_0.1",
+    "reached": true,
+    "time": 21.8,
+    "gap": 0.316
+   },
+   {
+    "name": "cross_0.5s_0.2",
+    "reached": true,
+    "time": 16.1,
+    "gap": 0.324
+   },
+   {
+    "name": "cross_1.5s_0.1",
+    "reached": true,
+    "time": 22.8,
+    "gap": 0.315
+   },
+   {
+    "name": "cross_1.5s_0.2",
+    "reached": true,
+    "time": 17.0,
+    "gap": 0.314
+   },
+   {
+    "name": "cross_2.5s_0.1",
+    "reached": true,
+    "time": 23.8,
+    "gap": 0.315
+   },
+   {
+    "name": "cross_2.5s_0.2",
+    "reached": true,
+    "time": 17.9,
+    "gap": 0.305
+   },
+   {
+    "name": "cross_3.5s_0.1",
+    "reached": true,
+    "time": 24.8,
+    "gap": 0.315
+   },
+   {
+    "name": "cross_3.5s_0.2",
+    "reached": true,
+    "time": 18.8,
+    "gap": 0.299
+   },
+   {
+    "name": "headon",
+    "reached": true,
+    "time": 34.0,
+    "gap": 0.315
+   },
+   {
+    "name": "detour",
+    "reached": true,
+    "time": 16.8,
+    "gap": 0.172
+   },
+   {
+    "name": "corridor",
+    "reached": true,
+    "time": 14.2,
+    "gap": 0.157
+   },
+   {
+    "name": "parked",
+    "reached": true,
+    "time": 10.9,
+    "gap": 0.041
+   }
+  ]
+ },
+ {
+  "score": 236.0,
+  "cfg": {
+   "w_heading": 1.06,
+   "w_path": 2.01,
+   "w_goal": 0.37,
+   "w_obstacle": 1.62,
+   "w_speed": 1.39,
+   "w_collision": 5.79,
+   "obstacle_influence": 0.67,
+   "dynamic_margin": 0.07,
+   "dynamic_growth": 0.04,
+   "predict_time": 2.76
+  },
+  "results": [
+   {
+    "name": "cross_0.5s_0.1",
+    "reached": true,
+    "time": 20.3,
+    "gap": 0.166
+   },
+   {
+    "name": "cross_0.5s_0.2",
+    "reached": true,
+    "time": 15.6,
+    "gap": 0.193
+   },
+   {
+    "name": "cross_1.5s_0.1",
+    "reached": true,
+    "time": 21.2,
+    "gap": 0.165
+   },
+   {
+    "name": "cross_1.5s_0.2",
+    "reached": true,
+    "time": 16.5,
+    "gap": 0.17
+   },
+   {
+    "name": "cross_2.5s_0.1",
+    "reached": true,
+    "time": 22.5,
+    "gap": 0.162
+   },
+   {
+    "name": "cross_2.5s_0.2",
+    "reached": true,
+    "time": 17.3,
+    "gap": 0.156
+   },
+   {
+    "name": "cross_3.5s_0.1",
+    "reached": true,
+    "time": 23.4,
+    "gap": 0.162
+   },
+   {
+    "name": "cross_3.5s_0.2",
+    "reached": true,
+    "time": 18.3,
+    "gap": 0.148
+   },
+   {
+    "name": "headon",
+    "reached": true,
+    "time": 39.1,
+    "gap": 0.153
+   },
+   {
+    "name": "detour",
+    "reached": true,
+    "time": 17.6,
+    "gap": 0.171
+   },
+   {
+    "name": "corridor",
+    "reached": true,
+    "time": 15.0,
+    "gap": 0.157
+   },
+   {
+    "name": "parked",
+    "reached": true,
+    "time": 11.6,
+    "gap": 0.041
+   }
+  ]
+ },
+ {
+  "score": 235.9,
+  "cfg": {
+   "w_heading": 1.23,
+   "w_path": 1.97,
+   "w_goal": 2.42,
+   "w_obstacle": 2.0,
+   "w_speed": 1.17,
+   "w_collision": 1.72,
+   "obstacle_influence": 0.7,
+   "dynamic_margin": 0.18,
+   "dynamic_growth": 0.03,
+   "predict_time": 2.19
+  },
+  "results": [
+   {
+    "name": "cross_0.5s_0.1",
+    "reached": true,
+    "time": 20.8,
+    "gap": 0.26
+   },
+   {
+    "name": "cross_0.5s_0.2",
+    "reached": true,
+    "time": 15.3,
+    "gap": 0.261
+   },
+   {
+    "name": "cross_1.5s_0.1",
+    "reached": true,
+    "time": 21.9,
+    "gap": 0.26
+   },
+   {
+    "name": "cross_1.5s_0.2",
+    "reached": true,
+    "time": 16.3,
+    "gap": 0.256
+   },
+   {
+    "name": "cross_2.5s_0.1",
+    "reached": true,
+    "time": 22.8,
+    "gap": 0.261
+   },
+   {
+    "name": "cross_2.5s_0.2",
+    "reached": true,
+    "time": 17.3,
+    "gap": 0.253
+   },
+   {
+    "name": "cross_3.5s_0.1",
+    "reached": true,
+    "time": 23.9,
+    "gap": 0.261
+   },
+   {
+    "name": "cross_3.5s_0.2",
+    "reached": true,
+    "time": 18.3,
+    "gap": 0.252
+   },
+   {
+    "name": "headon",
+    "reached": true,
+    "time": 40.8,
+    "gap": 0.258
+   },
+   {
+    "name": "detour",
+    "reached": true,
+    "time": 16.8,
+    "gap": 0.19
+   },
+   {
+    "name": "corridor",
+    "reached": true,
+    "time": 14.1,
+    "gap": 0.157
+   },
+   {
+    "name": "parked",
+    "reached": true,
+    "time": 10.7,
+    "gap": 0.041
+   }
+  ]
+ },
+ {
+  "score": 235.8,
+  "cfg": {
+   "w_heading": 1.24,
+   "w_path": 2.37,
+   "w_goal": 1.03,
+   "w_obstacle": 1.02,
+   "w_speed": 1.42,
+   "w_collision": 4.89,
+   "obstacle_influence": 0.55,
+   "dynamic_margin": 0.06,
+   "dynamic_growth": 0.08,
+   "predict_time": 2.66
+  },
+  "results": [
+   {
+    "name": "cross_0.5s_0.1",
+    "reached": true,
+    "time": 20.5,
+    "gap": 0.212
+   },
+   {
+    "name": "cross_0.5s_0.2",
+    "reached": true,
+    "time": 15.9,
+    "gap": 0.251
+   },
+   {
+    "name": "cross_1.5s_0.1",
+    "reached": true,
+    "time": 21.6,
+    "gap": 0.212
+   },
+   {
+    "name": "cross_1.5s_0.2",
+    "reached": true,
+    "time": 16.7,
+    "gap": 0.225
+   },
+   {
+    "name": "cross_2.5s_0.1",
+    "reached": true,
+    "time": 22.6,
+    "gap": 0.209
+   },
+   {
+    "name": "cross_2.5s_0.2",
+    "reached": true,
+    "time": 17.5,
+    "gap": 0.201
+   },
+   {
+    "name": "cross_3.5s_0.1",
+    "reached": true,
+    "time": 23.6,
+    "gap": 0.207
+   },
+   {
+    "name": "cross_3.5s_0.2",
+    "reached": true,
+    "time": 18.4,
+    "gap": 0.179
+   },
+   {
+    "name": "headon",
+    "reached": true,
+    "time": 39.0,
+    "gap": 0.206
+   },
+   {
+    "name": "detour",
+    "reached": true,
+    "time": 17.4,
+    "gap": 0.171
+   },
+   {
+    "name": "corridor",
+    "reached": true,
+    "time": 14.8,
+    "gap": 0.157
+   },
+   {
+    "name": "parked",
+    "reached": true,
+    "time": 11.5,
+    "gap": 0.041
+   }
+  ]
+ },
+ {
+  "score": 235.7,
+  "cfg": {
+   "w_heading": 0.91,
+   "w_path": 1.68,
+   "w_goal": 2.96,
+   "w_obstacle": 1.06,
+   "w_speed": 0.12,
+   "w_collision": 7.28,
+   "obstacle_influence": 0.5,
+   "dynamic_margin": 0.19,
+   "dynamic_growth": 0.06,
+   "predict_time": 2.37
+  },
+  "results": [
+   {
+    "name": "cross_0.5s_0.1",
+    "reached": true,
+    "time": 21.4,
+    "gap": 0.316
+   },
+   {
+    "name": "cross_0.5s_0.2",
+    "reached": true,
+    "time": 16.1,
+    "gap": 0.318
+   },
+   {
+    "name": "cross_1.5s_0.1",
+    "reached": true,
+    "time": 22.5,
+    "gap": 0.315
+   },
+   {
+    "name": "cross_1.5s_0.2",
+    "reached": true,
+    "time": 17.0,
+    "gap": 0.304
+   },
+   {
+    "name": "cross_2.5s_0.1",
+    "reached": true,
+    "time": 23.4,
+    "gap": 0.312
+   },
+   {
+    "name": "cross_2.5s_0.2",
+    "reached": true,
+    "time": 17.9,
+    "gap": 0.292
+   },
+   {
+    "name": "cross_3.5s_0.1",
+    "reached": true,
+    "time": 24.5,
+    "gap": 0.312
+   },
+   {
+    "name": "cross_3.5s_0.2",
+    "reached": true,
+    "time": 18.8,
+    "gap": 0.283
+   },
+   {
+    "name": "headon",
+    "reached": true,
+    "time": 35.9,
+    "gap": 0.298
+   },
+   {
+    "name": "detour",
+    "reached": true,
+    "time": 17.0,
+    "gap": 0.182
+   },
+   {
+    "name": "corridor",
+    "reached": true,
+    "time": 14.3,
+    "gap": 0.157
+   },
+   {
+    "name": "parked",
+    "reached": true,
+    "time": 11.0,
+    "gap": 0.041
+   }
+  ]
+ },
+ {
+  "score": 235.7,
+  "cfg": {
+   "w_heading": 1.13,
+   "w_path": 1.34,
+   "w_goal": 1.96,
+   "w_obstacle": 2.53,
+   "w_speed": 0.48,
+   "w_collision": 6.39,
+   "obstacle_influence": 0.35,
+   "dynamic_margin": 0.18,
+   "dynamic_growth": 0.0,
+   "predict_time": 2.4
+  },
+  "results": [
+   {
+    "name": "cross_0.5s_0.1",
+    "reached": true,
+    "time": 22.3,
+    "gap": 0.376
+   },
+   {
+    "name": "cross_0.5s_0.2",
+    "reached": true,
+    "time": 16.9,
+    "gap": 0.411
+   },
+   {
+    "name": "cross_1.5s_0.1",
+    "reached": true,
+    "time": 23.1,
+    "gap": 0.362
+   },
+   {
+    "name": "cross_1.5s_0.2",
+    "reached": true,
+    "time": 17.6,
+    "gap": 0.382
+   },
+   {
+    "name": "cross_2.5s_0.1",
+    "reached": true,
+    "time": 23.0,
+    "gap": 0.268
+   },
+   {
+    "name": "cross_2.5s_0.2",
+    "reached": true,
+    "time": 17.7,
+    "gap": 0.267
+   },
+   {
+    "name": "cross_3.5s_0.1",
+    "reached": true,
+    "time": 23.8,
+    "gap": 0.252
+   },
+   {
+    "name": "cross_3.5s_0.2",
+    "reached": true,
+    "time": 18.4,
+    "gap": 0.248
+   },
+   {
+    "name": "headon",
+    "reached": true,
+    "time": 34.4,
+    "gap": 0.253
+   },
+   {
+    "name": "detour",
+    "reached": true,
+    "time": 17.2,
+    "gap": 0.213
+   },
+   {
+    "name": "corridor",
+    "reached": true,
+    "time": 14.3,
+    "gap": 0.157
+   },
+   {
+    "name": "parked",
+    "reached": true,
+    "time": 11.0,
+    "gap": 0.041
+   }
+  ]
+ },
+ {
+  "score": 235.7,
+  "cfg": {
+   "w_heading": 0.53,
+   "w_path": 1.45,
+   "w_goal": 0.58,
+   "w_obstacle": 0.09,
+   "w_speed": 1.18,
+   "w_collision": 7.46,
+   "obstacle_influence": 0.45,
+   "dynamic_margin": 0.08,
+   "dynamic_growth": 0.03,
+   "predict_time": 2.84
+  },
+  "results": [
+   {
+    "name": "cross_0.5s_0.1",
+    "reached": true,
+    "time": 20.5,
+    "gap": 0.161
+   },
+   {
+    "name": "cross_0.5s_0.2",
+    "reached": true,
+    "time": 15.5,
+    "gap": 0.182
+   },
+   {
+    "name": "cross_1.5s_0.1",
+    "reached": true,
+    "time": 21.5,
+    "gap": 0.16
+   },
+   {
+    "name": "cross_1.5s_0.2",
+    "reached": true,
+    "time": 16.3,
+    "gap": 0.163
+   },
+   {
+    "name": "cross_2.5s_0.1",
+    "reached": true,
+    "time": 23.1,
+    "gap": 0.159
+   },
+   {
+    "name": "cross_2.5s_0.2",
+    "reached": true,
+    "time": 17.4,
+    "gap": 0.155
+   },
+   {
+    "name": "cross_3.5s_0.1",
+    "reached": true,
+    "time": 23.8,
+    "gap": 0.159
+   },
+   {
+    "name": "cross_3.5s_0.2",
+    "reached": true,
+    "time": 18.4,
+    "gap": 0.151
+   },
+   {
+    "name": "headon",
+    "reached": true,
+    "time": 39.2,
+    "gap": 0.157
+   },
+   {
+    "name": "detour",
+    "reached": true,
+    "time": 17.6,
+    "gap": 0.171
+   },
+   {
+    "name": "corridor",
+    "reached": true,
+    "time": 15.0,
+    "gap": 0.157
+   },
+   {
+    "name": "parked",
+    "reached": true,
+    "time": 11.6,
+    "gap": 0.041
+   }
+  ]
+ },
+ {
+  "score": 235.7,
+  "cfg": {
+   "w_heading": 0.66,
+   "w_path": 2.44,
+   "w_goal": 0.59,
+   "w_obstacle": 0.13,
+   "w_speed": 0.27,
+   "w_collision": 3.21,
+   "obstacle_influence": 0.46,
+   "dynamic_margin": 0.13,
+   "dynamic_growth": 0.06,
+   "predict_time": 2.26
+  },
+  "results": [
+   {
+    "name": "cross_0.5s_0.1",
+    "reached": true,
+    "time": 21.0,
+    "gap": 0.264
+   },
+   {
+    "name": "cross_0.5s_0.2",
+    "reached": true,
+    "time": 15.8,
+    "gap": 0.268
+   },
+   {
+    "name": "cross_1.5s_0.1",
+    "reached": true,
+    "time": 22.0,
+    "gap": 0.263
+   },
+   {
+    "name": "cross_1.5s_0.2",
+    "reached": true,
+    "time": 16.7,
+    "gap": 0.252
+   },
+   {
+    "name": "cross_2.5s_0.1",
+    "reached": true,
+    "time": 22.9,
+    "gap": 0.261
+   },
+   {
+    "name": "cross_2.5s_0.2",
+    "reached": true,
+    "time": 17.6,
+    "gap": 0.239
+   },
+   {
+    "name": "cross_3.5s_0.1",
+    "reached": true,
+    "time": 23.7,
+    "gap": 0.259
+   },
+   {
+    "name": "cross_3.5s_0.2",
+    "reached": true,
+    "time": 18.2,
+    "gap": 0.226
+   },
+   {
+    "name": "headon",
+    "reached": true,
+    "time": 38.9,
+    "gap": 0.234
+   },
+   {
+    "name": "detour",
+    "reached": true,
+    "time": 17.2,
+    "gap": 0.188
+   },
+   {
+    "name": "corridor",
+    "reached": true,
+    "time": 14.5,
+    "gap": 0.157
+   },
+   {
+    "name": "parked",
+    "reached": true,
+    "time": 11.1,
+    "gap": 0.04
+   }
+  ]
+ },
+ {
+  "score": 235.6,
+  "cfg": {
+   "w_heading": 1.09,
+   "w_path": 1.75,
+   "w_goal": 1.61,
+   "w_obstacle": 0.46,
+   "w_speed": 1.27,
+   "w_collision": 5.1,
+   "obstacle_influence": 0.24,
+   "dynamic_margin": 0.09,
+   "dynamic_growth": 0.09,
+   "predict_time": 2.38
+  },
+  "results": [
+   {
+    "name": "cross_0.5s_0.1",
+    "reached": true,
+    "time": 20.9,
+    "gap": 0.25
+   },
+   {
+    "name": "cross_0.5s_0.2",
+    "reached": true,
+    "time": 15.7,
+    "gap": 0.278
+   },
+   {
+    "name": "cross_1.5s_0.1",
+    "reached": true,
+    "time": 21.9,
+    "gap": 0.248
+   },
+   {
+    "name": "cross_1.5s_0.2",
+    "reached": true,
+    "time": 16.6,
+    "gap": 0.257
+   },
+   {
+    "name": "cross_2.5s_0.1",
+    "reached": true,
+    "time": 22.9,
+    "gap": 0.248
+   },
+   {
+    "name": "cross_2.5s_0.2",
+    "reached": true,
+    "time": 17.4,
+    "gap": 0.236
+   },
+   {
+    "name": "cross_3.5s_0.1",
+    "reached": true,
+    "time": 23.8,
+    "gap": 0.247
+   },
+   {
+    "name": "cross_3.5s_0.2",
+    "reached": true,
+    "time": 18.3,
+    "gap": 0.219
+   },
+   {
+    "name": "headon",
+    "reached": true,
+    "time": 40.4,
+    "gap": 0.249
+   },
+   {
+    "name": "detour",
+    "reached": true,
+    "time": 17.0,
+    "gap": 0.173
+   },
+   {
+    "name": "corridor",
+    "reached": true,
+    "time": 14.3,
+    "gap": 0.157
+   },
+   {
+    "name": "parked",
+    "reached": true,
+    "time": 11.0,
+    "gap": 0.041
+   }
+  ]
+ }
+]
