@@ -108,6 +108,30 @@ export LDS_MODEL=LDS-02
 export TURTLEBOT3_MODEL=waffle_pi
 ```
 
+### Docker (시뮬레이션만, 컨테이너 하나)
+
+`Dockerfile` 이 이미지 하나에 모두 넣습니다: Django 서버, Gazebo(TurtleBot3 Waffle Pi), SLAM/AMCL, A*, 브리지. 컨테이너가 시작되면 `docker/entrypoint.sh` 가 다음 순서로 실행합니다.
+
+1. DB 준비 (`migrate`)
+2. 웹 서버 시작
+3. `scripts/run.sh --robot sim <인자>` 실행
+
+```bash
+docker build -t warehouse-sim .
+docker run --rm -it -p 8000:8000 -v warehouse-maps:/root/maps -v warehouse-data:/data warehouse-sim                 # 기본: --mode map (turtlebot3_world)
+docker run --rm -it -p 8000:8000 -v warehouse-maps:/root/maps -v warehouse-data:/data warehouse-sim --mode slam --world turtlebot3_house
+docker run --rm -it -p 8000:8000 -v warehouse-maps:/root/maps -v warehouse-data:/data warehouse-sim none            # 서버만 (웹 "실행 모드"에서 시작)
+docker exec -it <컨테이너> bash -c 'cd /app && source scripts/env.sh && ros2 topic hz /scan'                          # ROS 명령
+```
+
+- 웹 주소는 http://localhost:8000/ 입니다. 노드 로그는 컨테이너 안 `/app/logs/` 에 있습니다.
+- 저장 위치
+  - DB: SQLite (`DB_ENGINE=sqlite`) 파일 `/data/db.sqlite3`. 처음 실행할 때 저장소의 `server/db.sqlite3` 를 복사합니다.
+  - SLAM 으로 저장한 맵: `/root/maps`
+  - 두 경로 모두 볼륨으로 붙여 두면 컨테이너를 지워도 남습니다.
+- 이미지는 **amd64 고정**입니다. Gazebo classic 의 Humble 패키지가 amd64 만 있기 때문입니다. Apple Silicon Mac 에서도 에뮬레이션으로 동작하지만 느립니다.
+- 넣지 않은 것: 실물 로봇(Pi SSH), YOLO(`WAREHOUSE_YOLO=0`), Gazebo 화면(`--gui`), AWS 창고 월드.
+
 ## 4. 실행 (모드 선택)
 
 `scripts/run.sh` 하나로 로봇 종류와 모드를 골라 전부 띄웁니다 (백그라운드, 로그는 `logs/`).

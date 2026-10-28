@@ -1,0 +1,12 @@
+# docker build 에 넣지 않는 것: PC 에서 만든 빌드 결과/가상환경(컨테이너에서 새로 만듦), 로그, git 기록
+.git
+ros2_ws/build
+ros2_ws/install
+ros2_ws/log
+server/.venv
+yolo/yolo_training/.venv
+logs
+image
+**/__pycache__
+**/*.pyc
+.pytest_cache
