@@ -1,0 +1,357 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>창고 로봇 DB 구성도</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #f4f6fb; }
+  body { display: flex; align-items: center; justify-content: center; }
+  svg { width: min(100vw, calc(100vh * 16 / 9)); height: auto; display: block; }
+</style>
+</head>
+<body>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" >
+  <defs>
+    <style>
+      text { font-family: "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", sans-serif; fill: #1f2937; }
+      .title { font-size: 34px; font-weight: 800; fill: #111827; }
+      .subtitle { font-size: 16px; fill: #4b5563; }
+      .colhead { font-size: 15px; font-weight: 700; fill: #ffffff; }
+      .cardtitle { font-size: 18px; font-weight: 800; }
+      .cardsub { font-size: 12.5px; fill: #6b7280; }
+      .boxtitle { font-size: 14px; font-weight: 700; }
+      .item { font-size: 12.5px; fill: #374151; }
+      .small { font-size: 11.5px; fill: #4b5563; }
+      .mono { font-family: Menlo, Consolas, monospace; font-size: 11px; }
+      .ms { font-family: Menlo, Consolas, monospace; font-size: 10px; fill: #1f2937; }
+      .ty { font-family: Menlo, Consolas, monospace; font-size: 10px; fill: #6b7280; }
+      .lbl { font-family: Menlo, Consolas, monospace; font-size: 10.5px; font-weight: 700; }
+      .key { font-family: Menlo, Consolas, monospace; font-size: 9px; font-weight: 700; }
+      .card1 { font-family: Menlo, Consolas, monospace; font-size: 12px; font-weight: 800; fill: #111827; }
+      .th { font-size: 12.5px; font-weight: 700; fill: #ffffff; }
+      .td { font-size: 12px; fill: #1f2937; }
+      .tk { font-size: 12px; font-weight: 700; fill: #374151; }
+      .badge { font-family: Menlo, Consolas, monospace; font-size: 10.5px; font-weight: 700; fill: #ffffff; }
+      .step { font-size: 12px; fill: #1f2937; }
+      .card { fill: #ffffff; stroke-width: 2; }
+      .inner { stroke-width: 1.2; }
+      .pk { fill: #b45309; }
+      .fk { fill: #7c3aed; }
+      .uq { fill: #0369a1; }
+    </style>
+  </defs>
+
+  <!-- 배경 -->
+  <rect width="1600" height="900" fill="#f4f6fb"/>
+
+  <!-- 제목 -->
+  <rect x="30" y="28" width="8" height="56" rx="3" fill="#2563eb"/>
+  <text x="52" y="62" class="title">창고 로봇 DB 구성도 — 테이블과 관계</text>
+  <text x="54" y="86" class="subtitle">MySQL warehouse (127.0.0.1:3306) · Django ORM warehouse/models.py · 쓰기는 모두 services.py 를 거침</text>
+
+  <!-- 범례 -->
+  <g transform="translate(1110,26)">
+    <rect x="0" y="0" width="460" height="66" rx="8" fill="#ffffff" stroke="#e5e7eb"/>
+    <line x1="14" y1="20" x2="44" y2="20" stroke="#374151" stroke-width="2.5"/>
+    <text x="54" y="24" class="small">FK · CASCADE (부모 지우면 같이 삭제)</text>
+    <line x1="260" y1="20" x2="290" y2="20" stroke="#374151" stroke-width="2.5" stroke-dasharray="5 3"/>
+    <text x="300" y="24" class="small">FK · SET_NULL (비움)</text>
+    <text x="14" y="50" class="key pk">PK</text><text x="34" y="50" class="small">기본키</text>
+    <text x="80" y="50" class="key fk">FK</text><text x="100" y="50" class="small">외래키</text>
+    <text x="146" y="50" class="key uq">UQ</text><text x="166" y="50" class="small">유일</text>
+    <text x="210" y="50" class="card1" style="font-size:11px">1 ── N</text>
+    <text x="264" y="50" class="small">부모 1행에 자식 여러 행</text>
+  </g>
+
+  <!-- 열 머리 -->
+  <rect x="30" y="110" width="480" height="28" rx="14" fill="#2563eb"/>
+  <text x="270" y="129" class="colhead" text-anchor="middle">① 맵 · 지점 (맵 이름마다 따로)</text>
+  <rect x="550" y="110" width="530" height="28" rx="14" fill="#7c3aed"/>
+  <text x="815" y="129" class="colhead" text-anchor="middle">② 작업 (Task 1건 = 순서 있는 TaskStep 여러 개)</text>
+  <rect x="1120" y="110" width="450" height="28" rx="14" fill="#ea580c"/>
+  <text x="1345" y="129" class="colhead" text-anchor="middle">③ 로봇 · 로그</text>
+
+  <!-- ===== Map ===== -->
+  <rect x="30" y="150" width="220" height="410" rx="12" class="card" stroke="#2563eb"/>
+  <text x="44" y="176" class="cardtitle">Map</text>
+  <text x="236" y="176" class="ty" text-anchor="end">warehouse_map</text>
+  <text x="44" y="194" class="cardsub">맵 · 지도 이미지 한 장</text>
+  <rect x="40" y="202" width="200" height="142" rx="6" fill="#eff6ff"/>
+  <text x="48" y="218" class="key pk">PK</text><text x="70" y="218" class="ms">id</text><text x="232" y="218" class="ty" text-anchor="end">int</text>
+  <text x="48" y="233" class="key uq">UQ</text><text x="70" y="233" class="ms">name</text><text x="232" y="233" class="ty" text-anchor="end">varchar(100)</text>
+  <text x="70" y="248" class="ms">resolution</text><text x="232" y="248" class="ty" text-anchor="end">float m/px</text>
+  <text x="70" y="263" class="ms">origin_x · origin_y</text><text x="232" y="263" class="ty" text-anchor="end">float</text>
+  <text x="70" y="278" class="ms">width · height</text><text x="232" y="278" class="ty" text-anchor="end">int</text>
+  <text x="70" y="293" class="ms">png</text><text x="232" y="293" class="ty" text-anchor="end">longblob</text>
+  <text x="70" y="308" class="ms">is_active</text><text x="232" y="308" class="ty" text-anchor="end">bool</text>
+  <text x="70" y="323" class="ms">updated_at</text><text x="232" y="323" class="ty" text-anchor="end">datetime</text>
+  <text x="70" y="338" class="ms">session</text><text x="232" y="338" class="ty" text-anchor="end">varchar(40)</text>
+
+  <text x="44" y="370" class="small">• is_active: 한 장만 true</text>
+  <text x="44" y="386" class="small">   = 지금 쓰는 맵</text>
+  <text x="44" y="406" class="small">• 브리지 map 메시지 →</text>
+  <text x="44" y="422" class="small">   이름으로 덮어쓰기 + 활성화</text>
+  <text x="44" y="442" class="small">• slam_live: SLAM 전용 맵,</text>
+  <text x="44" y="458" class="small">   새 실행(session)이면 위치째 삭제</text>
+  <text x="44" y="478" class="small">• SLAM 맵 저장 → 새 이름으로</text>
+  <text x="44" y="494" class="small">   등록 + 위치 복사</text>
+  <text x="44" y="514" class="small">• import_map: ~/maps yaml 등록</text>
+  <text x="44" y="534" class="small">• 원본 파일은 ~/maps,</text>
+  <text x="44" y="550" class="small">   DB 에는 PNG 복사본</text>
+
+  <!-- ===== Location ===== -->
+  <rect x="290" y="150" width="220" height="200" rx="12" class="card" stroke="#2563eb"/>
+  <text x="304" y="176" class="cardtitle">Location</text>
+  <text x="496" y="176" class="ty" text-anchor="end">warehouse_location</text>
+  <text x="304" y="194" class="cardsub">지점 · 맵 위에 찍은 위치</text>
+  <rect x="300" y="202" width="200" height="97" rx="6" fill="#eff6ff"/>
+  <text x="308" y="218" class="key pk">PK</text><text x="330" y="218" class="ms">id</text><text x="492" y="218" class="ty" text-anchor="end">int</text>
+  <text x="308" y="233" class="key fk">FK</text><text x="330" y="233" class="ms">map_id</text><text x="492" y="233" class="ty" text-anchor="end">→ Map</text>
+  <text x="330" y="248" class="ms">name</text><text x="492" y="248" class="ty" text-anchor="end">varchar(100)</text>
+  <text x="330" y="263" class="ms">kind</text><text x="492" y="263" class="ty" text-anchor="end">pickup·home·dropoff</text>
+  <text x="330" y="278" class="ms">x · y · yaw</text><text x="492" y="278" class="ty" text-anchor="end">float (yaw rad)</text>
+  <text x="330" y="293" class="ms">cargo</text><text x="492" y="293" class="ty" text-anchor="end">varchar(200)</text>
+  <text x="304" y="318" class="small">• cargo 비면 name 을 라벨로</text>
+  <text x="304" y="336" class="small">• 주문 구역은 쉼표로 여러 라벨</text>
+
+  <!-- ===== Zone ===== -->
+  <rect x="290" y="370" width="220" height="190" rx="12" class="card" stroke="#2563eb"/>
+  <text x="304" y="396" class="cardtitle">Zone</text>
+  <text x="496" y="396" class="ty" text-anchor="end">warehouse_zone</text>
+  <text x="304" y="414" class="cardsub">금지 구역 · 웹에서 그림</text>
+  <rect x="300" y="422" width="200" height="82" rx="6" fill="#eff6ff"/>
+  <text x="308" y="438" class="key pk">PK</text><text x="330" y="438" class="ms">id</text><text x="492" y="438" class="ty" text-anchor="end">int</text>
+  <text x="308" y="453" class="key fk">FK</text><text x="330" y="453" class="ms">map_id</text><text x="492" y="453" class="ty" text-anchor="end">→ Map</text>
+  <text x="330" y="468" class="ms">name</text><text x="492" y="468" class="ty" text-anchor="end">varchar(100)</text>
+  <text x="330" y="483" class="ms">shape</text><text x="492" y="483" class="ty" text-anchor="end">rect·line</text>
+  <text x="330" y="498" class="ms">x1 · y1 · x2 · y2</text><text x="492" y="498" class="ty" text-anchor="end">float</text>
+  <text x="304" y="522" class="small">• A* 가 장애물로 보고 피함</text>
+  <text x="304" y="538" class="small">• line = 두께 0.1 m 가상 벽</text>
+  <text x="304" y="554" class="small">• 위치 추정에는 영향 없음</text>
+
+  <!-- ===== TaskStep ===== -->
+  <rect x="550" y="150" width="280" height="410" rx="12" class="card" stroke="#7c3aed"/>
+  <text x="564" y="176" class="cardtitle">TaskStep</text>
+  <text x="816" y="176" class="ty" text-anchor="end">warehouse_taskstep</text>
+  <text x="564" y="194" class="cardsub">단계 · 들를 곳 하나 (order 순서)</text>
+  <rect x="560" y="202" width="260" height="248" rx="6" fill="#f5f3ff"/>
+  <text x="568" y="218" class="key pk">PK</text><text x="590" y="218" class="ms">id</text><text x="812" y="218" class="ty" text-anchor="end">int</text>
+  <text x="568" y="233" class="key fk">FK</text><text x="590" y="233" class="ms">task_id</text><text x="812" y="233" class="ty" text-anchor="end">→ Task</text>
+  <text x="568" y="248" class="key fk">FK</text><text x="590" y="248" class="ms">location_id</text><text x="812" y="248" class="ty" text-anchor="end">→ Location (null)</text>
+  <text x="590" y="263" class="ms">order</text><text x="812" y="263" class="ty" text-anchor="end">int</text>
+  <text x="590" y="278" class="ms">action</text><text x="812" y="278" class="ty" text-anchor="end">load·unload·move</text>
+  <text x="590" y="293" class="ms">name · x · y · yaw</text><text x="812" y="293" class="ty" text-anchor="end">지점 복사본</text>
+  <text x="590" y="308" class="ms">status</text><text x="812" y="308" class="ty" text-anchor="end">pending·moving·arrived</text>
+  <text x="812" y="323" class="ty" text-anchor="end">done·failed·skipped</text>
+  <text x="590" y="338" class="ms">cargo</text><text x="812" y="338" class="ty" text-anchor="end">varchar(50) LED 배달</text>
+  <text x="590" y="353" class="ms">items</text><text x="812" y="353" class="ty" text-anchor="end">json {라벨: 개수}</text>
+  <line x1="568" y1="364" x2="812" y2="364" stroke="#c4b5fd"/>
+  <text x="568" y="379" class="small" style="font-weight:700;fill:#6d28d9">이동 기록 · 시간 예측 학습 (planning.py)</text>
+  <text x="590" y="395" class="ms">start_x · start_y · start_yaw</text><text x="812" y="395" class="ty" text-anchor="end">float</text>
+  <text x="590" y="410" class="ms">plan_length · plan_turn</text><text x="812" y="410" class="ty" text-anchor="end">m · rad</text>
+  <text x="590" y="425" class="ms">predicted_sec</text><text x="812" y="425" class="ty" text-anchor="end">float</text>
+  <text x="590" y="440" class="ms">started_at · finished_at</text><text x="812" y="440" class="ty" text-anchor="end">datetime</text>
+
+  <text x="564" y="470" class="small">• goal_id = step-&lt;id&gt; 로 브리지 nav_status 와 맞춤</text>
+  <text x="564" y="488" class="small">• 지점을 지워도 좌표 복사본이 남음</text>
+  <text x="564" y="506" class="small">• items 비면 주문 아님 (단순 이동 · 배달)</text>
+  <text x="564" y="524" class="small">• 끝난 단계 = done · skipped</text>
+  <text x="564" y="542" class="small">• 출발 때 start_*·plan_* · 도착 때 finished_at</text>
+
+  <!-- ===== Task ===== -->
+  <rect x="870" y="150" width="210" height="200" rx="12" class="card" stroke="#7c3aed"/>
+  <text x="884" y="176" class="cardtitle">Task</text>
+  <text x="1066" y="176" class="ty" text-anchor="end">warehouse_task</text>
+  <text x="884" y="194" class="cardsub">작업 · 이동/주문 한 건</text>
+  <rect x="880" y="202" width="190" height="97" rx="6" fill="#f5f3ff"/>
+  <text x="888" y="218" class="key pk">PK</text><text x="910" y="218" class="ms">id</text><text x="1062" y="218" class="ty" text-anchor="end">int</text>
+  <text x="888" y="233" class="key fk">FK</text><text x="910" y="233" class="ms">robot_id</text><text x="1062" y="233" class="ty" text-anchor="end">→ Robot</text>
+  <text x="910" y="248" class="ms">status</text><text x="1062" y="248" class="ty" text-anchor="end">running·done</text>
+  <text x="1062" y="263" class="ty" text-anchor="end">canceled·failed</text>
+  <text x="910" y="278" class="ms">created_at</text><text x="1062" y="278" class="ty" text-anchor="end">datetime</text>
+  <text x="910" y="293" class="ms">finished_at</text><text x="1062" y="293" class="ty" text-anchor="end">datetime</text>
+  <text x="884" y="318" class="small">• 로봇당 running 은 1건만</text>
+  <text x="884" y="336" class="small">• 남은 단계 없으면 done</text>
+
+  <!-- ===== Robot ===== -->
+  <rect x="1120" y="150" width="210" height="230" rx="12" class="card" stroke="#ea580c"/>
+  <text x="1134" y="176" class="cardtitle">Robot</text>
+  <text x="1316" y="176" class="ty" text-anchor="end">warehouse_robot</text>
+  <text x="1134" y="194" class="cardsub">로봇 · 브리지 1개 = 1대</text>
+  <rect x="1130" y="202" width="190" height="127" rx="6" fill="#fff7ed"/>
+  <text x="1138" y="218" class="key pk">PK</text><text x="1160" y="218" class="ms">id</text><text x="1312" y="218" class="ty" text-anchor="end">int</text>
+  <text x="1138" y="233" class="key uq">UQ</text><text x="1160" y="233" class="ms">name</text><text x="1312" y="233" class="ty" text-anchor="end">varchar(50) tb3</text>
+  <text x="1160" y="248" class="ms">state</text><text x="1312" y="248" class="ty" text-anchor="end">IDLE·MOVING·ERROR</text>
+  <text x="1312" y="263" class="ty" text-anchor="end">OFFLINE·WAITING_(UN)LOAD</text>
+  <text x="1160" y="278" class="ms">message</text><text x="1312" y="278" class="ty" text-anchor="end">varchar(255)</text>
+  <text x="1160" y="293" class="ms">battery_voltage</text><text x="1312" y="293" class="ty" text-anchor="end">float</text>
+  <text x="1160" y="308" class="ms">battery_percentage</text><text x="1312" y="308" class="ty" text-anchor="end">float</text>
+  <text x="1160" y="323" class="ms">last_seen</text><text x="1312" y="323" class="ty" text-anchor="end">datetime</text>
+  <text x="1134" y="348" class="small">• hello → IDLE, 끊기면 OFFLINE</text>
+  <text x="1134" y="366" class="small">• 위치(pose)는 DB 가 아닌 LIVE</text>
+
+  <!-- ===== EventLog ===== -->
+  <rect x="1370" y="150" width="200" height="230" rx="12" class="card" stroke="#ea580c"/>
+  <text x="1384" y="176" class="cardtitle">EventLog</text>
+  <text x="1556" y="194" class="ty" text-anchor="end">warehouse_eventlog</text>
+  <text x="1384" y="194" class="cardsub">로그</text>
+  <rect x="1380" y="202" width="180" height="67" rx="6" fill="#fff7ed"/>
+  <text x="1388" y="218" class="key pk">PK</text><text x="1410" y="218" class="ms">id</text><text x="1552" y="218" class="ty" text-anchor="end">int</text>
+  <text x="1388" y="233" class="key fk">FK</text><text x="1410" y="233" class="ms">robot_id</text><text x="1552" y="233" class="ty" text-anchor="end">→ Robot (null)</text>
+  <text x="1410" y="248" class="ms">message</text><text x="1552" y="248" class="ty" text-anchor="end">varchar(255)</text>
+  <text x="1410" y="263" class="ms">created_at</text><text x="1552" y="263" class="ty" text-anchor="end">datetime</text>
+  <text x="1384" y="290" class="small">• 웹 화면의 로그 카드</text>
+  <text x="1384" y="308" class="small">• 같은 문구는 10초에 1번만</text>
+  <text x="1384" y="326" class="small">• 화면 접속 때 최근 30개</text>
+  <text x="1384" y="344" class="small">• runner(실행 모드) 결과도</text>
+  <text x="1384" y="362" class="small">• 앱에서 지우지 않음 (계속 쌓임)</text>
+
+  <!-- ===== 관계선 ===== -->
+  <!-- Map 1─N Location -->
+  <line x1="250" y1="229" x2="290" y2="229" stroke="#374151" stroke-width="2.5"/>
+  <text x="256" y="222" class="card1">1</text><text x="278" y="222" class="card1">N</text>
+  <!-- Map 1─N Zone -->
+  <line x1="250" y1="449" x2="290" y2="449" stroke="#374151" stroke-width="2.5"/>
+  <text x="256" y="442" class="card1">1</text><text x="278" y="442" class="card1">N</text>
+  <!-- Location 1─N TaskStep (SET_NULL) -->
+  <line x1="510" y1="244" x2="550" y2="244" stroke="#374151" stroke-width="2.5" stroke-dasharray="5 3"/>
+  <text x="516" y="237" class="card1">1</text><text x="538" y="237" class="card1">N</text>
+  <!-- Task 1─N TaskStep -->
+  <line x1="830" y1="229" x2="870" y2="229" stroke="#374151" stroke-width="2.5"/>
+  <text x="836" y="222" class="card1">N</text><text x="858" y="222" class="card1">1</text>
+  <!-- Robot 1─N Task -->
+  <line x1="1080" y1="229" x2="1120" y2="229" stroke="#374151" stroke-width="2.5"/>
+  <text x="1086" y="222" class="card1">N</text><text x="1108" y="222" class="card1">1</text>
+  <!-- Robot 1─N EventLog -->
+  <line x1="1330" y1="229" x2="1370" y2="229" stroke="#374151" stroke-width="2.5"/>
+  <text x="1336" y="222" class="card1">1</text><text x="1358" y="222" class="card1">N</text>
+
+  <!-- ===== DB 에 넣지 않는 것 ===== -->
+  <rect x="870" y="398" width="700" height="162" rx="12" fill="#f9fafb" stroke="#9ca3af" stroke-width="2" stroke-dasharray="7 5"/>
+  <text x="884" y="421" class="boxtitle" fill="#374151">DB 에 넣지 않는 것 — 어디에 있나</text>
+
+  <rect x="882" y="432" width="163" height="118" rx="8" class="card" stroke="#7c3aed" style="stroke-width:1.5"/>
+  <text x="892" y="452" class="boxtitle" fill="#6d28d9">LIVE 메모리</text>
+  <text x="892" y="468" class="ms" style="fill:#6d28d9">consumers.py</text>
+  <text x="892" y="486" class="small">pose · path · health</text>
+  <text x="892" y="502" class="small">scan · yolo · cargo</text>
+  <text x="892" y="518" class="small">고빈도 → 중계만</text>
+  <text x="892" y="538" class="small">서버 재시작하면 사라짐</text>
+
+  <rect x="1054" y="432" width="163" height="118" rx="8" class="card" stroke="#2563eb" style="stroke-width:1.5"/>
+  <text x="1064" y="452" class="boxtitle" fill="#1d4ed8">맵 원본 파일</text>
+  <text x="1064" y="468" class="ms" style="fill:#1d4ed8">~/maps/*.yaml · pgm</text>
+  <text x="1064" y="486" class="small">map_server · AMCL 이 읽음</text>
+  <text x="1064" y="502" class="small">DB Map 은 PNG 복사본</text>
+  <text x="1064" y="518" class="small">(웹 표시 · A* 금지 구역용)</text>
+  <text x="1064" y="538" class="small">import_map 으로 등록</text>
+
+  <rect x="1226" y="432" width="163" height="118" rx="8" class="card" stroke="#059669" style="stroke-width:1.5"/>
+  <text x="1236" y="452" class="boxtitle" fill="#047857">주행 기록</text>
+  <text x="1236" y="468" class="ms" style="fill:#047857">logs/records/</text>
+  <text x="1236" y="486" class="small">목표마다 record.jsonl.gz</text>
+  <text x="1236" y="502" class="small">+ summary · plot_*.png</text>
+  <text x="1236" y="518" class="small">drive_replay.py 로 분석</text>
+  <text x="1236" y="538" class="small">git 에는 안 올림</text>
+
+  <rect x="1398" y="432" width="163" height="118" rx="8" class="card" stroke="#6b7280" style="stroke-width:1.5"/>
+  <text x="1408" y="452" class="boxtitle" fill="#374151">주행 파라미터</text>
+  <text x="1408" y="468" class="ms" style="fill:#374151">config/params.yaml</text>
+  <text x="1408" y="486" class="small">웹에서 바꾸면</text>
+  <text x="1408" y="502" class="small">브리지 메모리만 바뀜</text>
+  <text x="1408" y="518" class="small">재시작하면 yaml 값</text>
+  <text x="1408" y="538" class="small">작업 큐 · 실패 기록도 메모리</text>
+
+  <!-- ===== 하단 왼쪽: 언제 어느 테이블이 바뀌나 ===== -->
+  <rect x="30" y="576" width="900" height="304" rx="14" fill="#ffffff" stroke="#e5e7eb" stroke-width="1.5"/>
+  <text x="50" y="604" class="cardtitle">언제 어느 테이블이 바뀌나</text>
+  <text x="270" y="604" class="cardsub">services.py 함수 하나 = 트랜잭션 하나 → 결과는 Outbox 로 화면 · 브리지에 전송</text>
+
+  <rect x="46" y="616" width="868" height="26" rx="5" fill="#374151"/>
+  <text x="58" y="634" class="th">계기</text>
+  <text x="248" y="634" class="th">services 함수</text>
+  <text x="528" y="634" class="th">바뀌는 행</text>
+
+  <g>
+    <rect x="46" y="642" width="868" height="26" fill="#f9fafb"/>
+    <text x="58" y="659" class="tk">브리지 접속 (hello)</text>
+    <text x="248" y="659" class="td mono">robot_connected</text>
+    <text x="528" y="659" class="td">Robot last_seen · state, 배터리 비움 · EventLog</text>
+
+    <text x="58" y="685" class="tk">브리지 map 보고</text>
+    <text x="248" y="685" class="td mono">handle_map → save_map</text>
+    <text x="528" y="685" class="td">Map 덮어쓰기 · 활성화 (새 SLAM 실행이면 slam_live 삭제)</text>
+
+    <rect x="46" y="694" width="868" height="26" fill="#f9fafb"/>
+    <text x="58" y="711" class="tk">웹: 지점 · 홈 지정</text>
+    <text x="248" y="711" class="td mono">save/delete_location · set_home</text>
+    <text x="528" y="711" class="td">Location</text>
+
+    <text x="58" y="737" class="tk">웹: 금지 구역</text>
+    <text x="248" y="737" class="td mono">save_zone · delete_zone</text>
+    <text x="528" y="737" class="td">Zone (+ 브리지에 zones 전송)</text>
+
+    <rect x="46" y="746" width="868" height="26" fill="#f9fafb"/>
+    <text x="58" y="763" class="tk">웹: 이동 · 주문 · 홈</text>
+    <text x="248" y="763" class="td mono">goto_point · start_order · go_home</text>
+    <text x="528" y="763" class="td">Task 1 + TaskStep N 생성 → 첫 단계 출발</text>
+
+    <text x="58" y="789" class="tk">단계 출발</text>
+    <text x="248" y="789" class="td mono">send_goal</text>
+    <text x="528" y="789" class="td">TaskStep moving · start_* · plan_* · predicted_sec · Robot MOVING</text>
+
+    <rect x="46" y="798" width="868" height="26" fill="#f9fafb"/>
+    <text x="58" y="815" class="tk">브리지 nav_status</text>
+    <text x="248" y="815" class="td mono">handle_nav_status</text>
+    <text x="528" y="815" class="td">TaskStep arrived / done / failed · finished_at · Robot 상태</text>
+
+    <text x="58" y="841" class="tk">웹: 적재 · 수령 확인</text>
+    <text x="248" y="841" class="td mono">confirm_load/unload · force_next</text>
+    <text x="528" y="841" class="td">TaskStep done → 다음 단계, 끝나면 Task done · finished_at</text>
+
+    <rect x="46" y="850" width="868" height="26" fill="#f9fafb"/>
+    <text x="58" y="867" class="tk">배터리 · 연결 끊김</text>
+    <text x="248" y="867" class="td mono">handle_battery · robot_disconnected</text>
+    <text x="528" y="867" class="td">Robot battery_* · OFFLINE (진행 중 Task 는 그대로 둠)</text>
+  </g>
+  <line x1="236" y1="616" x2="236" y2="876" stroke="#e5e7eb"/>
+  <line x1="516" y1="616" x2="516" y2="876" stroke="#e5e7eb"/>
+
+  <!-- ===== 하단 오른쪽: 주문 한 번에 생기는 행 ===== -->
+  <rect x="950" y="576" width="620" height="304" rx="14" fill="#ffffff" stroke="#e5e7eb" stroke-width="1.5"/>
+  <text x="970" y="604" class="cardtitle">주문 한 번 — DB 에 생기는 행</text>
+  <text x="1236" y="604" class="cardsub">예: 하역장으로 led_red 2개 · led_green 1개</text>
+
+  <g>
+    <rect x="970" y="616" width="64" height="20" rx="10" fill="#7c3aed"/><text x="1002" y="630" class="badge" text-anchor="middle">Task</text>
+    <text x="1044" y="631" class="step">#N  robot=tb3  status=running</text>
+
+    <rect x="970" y="644" width="64" height="20" rx="10" fill="#a78bfa"/><text x="1002" y="658" class="badge" text-anchor="middle">order 0</text>
+    <text x="1044" y="659" class="step mono" style="font-weight:700">load</text><text x="1104" y="659" class="step">led_red</text><text x="1184" y="659" class="step">items {led_red: 2}</text>
+
+    <rect x="970" y="672" width="64" height="20" rx="10" fill="#a78bfa"/><text x="1002" y="686" class="badge" text-anchor="middle">order 1</text>
+    <text x="1044" y="687" class="step mono" style="font-weight:700">load</text><text x="1104" y="687" class="step">led_green</text><text x="1184" y="687" class="step">items {led_green: 1}</text>
+
+    <rect x="970" y="700" width="64" height="20" rx="10" fill="#a78bfa"/><text x="1002" y="714" class="badge" text-anchor="middle">order 2</text>
+    <text x="1044" y="715" class="step mono" style="font-weight:700">unload</text><text x="1104" y="715" class="step">하역장</text><text x="1184" y="715" class="step">items {led_red: 2, led_green: 1}  (주문 전체)</text>
+
+    <rect x="970" y="728" width="64" height="20" rx="10" fill="#a78bfa"/><text x="1002" y="742" class="badge" text-anchor="middle">order 3</text>
+    <text x="1044" y="743" class="step mono" style="font-weight:700">move</text><text x="1104" y="743" class="step">홈</text><text x="1184" y="743" class="step">items {}  → 도착하면 바로 done</text>
+
+    <text x="1044" y="766" class="small">적재 구역 순서는 planning.optimize 가 정함 · 하역장 다음은 항상 홈</text>
+    <line x1="970" y1="778" x2="1550" y2="778" stroke="#e5e7eb"/>
+
+    <rect x="970" y="788" width="64" height="20" rx="10" fill="#059669"/><text x="1002" y="802" class="badge" text-anchor="middle">출발</text>
+    <text x="1044" y="803" class="step">step moving → 브리지에 goto (goal_id = step-&lt;id&gt;) · Robot MOVING</text>
+
+    <rect x="970" y="816" width="64" height="20" rx="10" fill="#ea580c"/><text x="1002" y="830" class="badge" text-anchor="middle">도착</text>
+    <text x="1044" y="831" class="step">step arrived · Robot WAITING_LOAD → YOLO 개수 일치 / force_next → done</text>
+
+    <rect x="970" y="844" width="64" height="20" rx="10" fill="#7c3aed"/><text x="1002" y="858" class="badge" text-anchor="middle">끝</text>
+    <text x="1044" y="859" class="step">홈 도착 → Task done · finished_at, Robot IDLE · 단계마다 EventLog 몇 줄</text>
+  </g>
+</svg>
+
+</body>
+</html>
