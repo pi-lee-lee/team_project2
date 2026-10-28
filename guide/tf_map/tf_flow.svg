@@ -1,8 +1,9 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1130" width="1600" height="1130">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1478" width="1600" height="1478">
   <defs>
     <style>
       text { font-family: "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", sans-serif; fill: #1f2937; }
       .title { font-size: 34px; font-weight: 800; fill: #111827; }
+      .flow { font-size: 18px; font-weight: 800; fill: #ffffff; }
       .subtitle { font-size: 16px; fill: #4b5563; }
       .colhead { font-size: 16px; font-weight: 800; fill: #ffffff; }
       .colsub { font-family: Menlo, Consolas, monospace; font-size: 11.5px; fill: #ffffff; opacity: 0.9; }
@@ -23,10 +24,33 @@
       <rect width="8" height="8" fill="#eef0f4"/><line x1="0" y1="0" x2="0" y2="8" stroke="#d1d5db" stroke-width="3"/>
     </pattern>
   </defs>
-<rect width="1600" height="1130" fill="#f4f6fb"/>
+<rect width="1600" height="1478" fill="#f4f6fb"/>
 <rect x="30" y="28" width="8" height="56" rx="3" fill="#ea580c"/>
 <text x="52.0" y="62.0" class="title" >TF — 라이다·IMU·오도메트리로 위치를 추정하는 흐름</text>
-<text x="54.0" y="86.0" class="subtitle" >센서 노드가 각자 변환(간선)을 발행 → 쓰는 노드의 TF 버퍼에 시각별로 누적 → AMCL 이 보정량 map → odom 추가 → 필요한 시각으로 꺼내 위치 계산</text>
+<rect x="30.0" y="104" width="186.0" height="46" rx="23" fill="#475569"/>
+<circle cx="54.0" cy="127" r="15" fill="#ffffff"/>
+<text x="54.0" y="133" text-anchor="middle" class="num" style="fill:#475569;font-size:17px">0</text>
+<text x="76.0" y="133.0" class="flow" >용어와 핵심 식</text>
+<path d="M238.1,117 L282.2,127 L238.1,137 z" fill="#9ca3af"/>
+<rect x="304.2" y="104" width="125.5" height="46" rx="23" fill="#0e7490"/>
+<circle cx="328.2" cy="127" r="15" fill="#ffffff"/>
+<text x="328.2" y="133" text-anchor="middle" class="num" style="fill:#0e7490;font-size:17px">1</text>
+<text x="350.2" y="133.0" class="flow" >Pi 발행</text>
+<path d="M451.8,117 L495.9,127 L451.8,137 z" fill="#9ca3af"/>
+<rect x="518.0" y="104" width="267.0" height="46" rx="23" fill="#ea580c"/>
+<circle cx="542.0" cy="127" r="15" fill="#ffffff"/>
+<text x="542.0" y="133" text-anchor="middle" class="num" style="fill:#ea580c;font-size:17px">2</text>
+<text x="564.0" y="133.0" class="flow" >TF 버퍼에 시각별로 누적</text>
+<path d="M807.1,117 L851.2,127 L807.1,137 z" fill="#9ca3af"/>
+<rect x="873.2" y="104" width="281.0" height="46" rx="23" fill="#16a34a"/>
+<circle cx="897.2" cy="127" r="15" fill="#ffffff"/>
+<text x="897.2" y="133" text-anchor="middle" class="num" style="fill:#16a34a;font-size:17px">3</text>
+<text x="919.2" y="133.0" class="flow" >AMCL 이 odom 보정치 추가</text>
+<path d="M1176.3,117 L1220.4,127 L1176.3,137 z" fill="#9ca3af"/>
+<rect x="1242.5" y="104" width="327.5" height="46" rx="23" fill="#1f2937"/>
+<circle cx="1266.5" cy="127" r="15" fill="#ffffff"/>
+<text x="1266.5" y="133" text-anchor="middle" class="num" style="fill:#1f2937;font-size:17px">4</text>
+<text x="1288.5" y="133.0" class="flow" >필요한 시각으로 꺼내 위치 계산</text>
 <rect x="1130" y="22" width="440" height="70" rx="10" fill="#ffffff" stroke="#d1d5db"/>
 <line x1="1144" y1="44" x2="1162" y2="44" stroke="#0891b2" stroke-width="3"/>
 <text x="1168.0" y="49.0" class="small" >데이터 토픽</text>
@@ -38,6 +62,66 @@
 <text x="1168.0" y="77.0" class="small" >map → odom (AMCL)</text>
 <rect x="1290" y="65" width="18" height="14" fill="url(#hatch)" stroke="#9ca3af"/>
 <text x="1314.0" y="77.0" class="small" >Wi-Fi 구간</text>
+<g transform="translate(0,50)">
+<rect x="30" y="112" width="1540" height="270" rx="14" class="card" stroke="#475569"/>
+<rect x="30" y="112" width="1540" height="40" rx="14" fill="#475569"/>
+<rect x="30" y="138" width="1540" height="14" fill="#475569"/>
+<circle cx="54" cy="132" r="13" fill="#ffffff"/>
+<text x="54" y="137" text-anchor="middle" class="num" style="fill:#475569">0</text>
+<text x="76.0" y="138.0" class="colhead" >먼저 알아둘 것 — 용어와 핵심 식</text>
+<text x="1556.0" y="138.0" class="colsub" text-anchor="end">처음 보는 사람용</text>
+<rect x="46" y="164" width="96" height="40" rx="8" fill="#2563eb"/>
+<text x="94.0" y="189.0" class="box" text-anchor="middle" style="fill:#ffffff">프레임</text>
+<text x="152.0" y="181.0" class="item" >좌표계 = "어디를 기준으로 잰 값인가". 이름만 있고 값은 없음</text>
+<text x="152.0" y="197.0" class="small" >map(지도 원점), odom(출발 지점), base_footprint(로봇 바닥 중심), base_scan(LiDAR)</text>
+<rect x="46" y="212" width="96" height="40" rx="8" fill="#ea580c"/>
+<text x="94.0" y="237.0" class="box" text-anchor="middle" style="fill:#ffffff">변환 (TF)</text>
+<text x="152.0" y="229.0" class="item" >두 프레임 사이의 위치·방향 (x, y, yaw). "부모 → 자식" 으로 적음</text>
+<text x="152.0" y="245.0" class="small" >예: odom → base_footprint = odom 기준으로 본 base_footprint(로봇)의 위치</text>
+<rect x="46" y="260" width="96" height="40" rx="8" fill="#0891b2"/>
+<text x="94.0" y="285.0" class="box" text-anchor="middle" style="fill:#ffffff">토픽</text>
+<text x="152.0" y="277.0" class="item" >노드끼리 메시지를 주고받는 이름 붙은 통로</text>
+<text x="152.0" y="293.0" class="small" >예: /scan, /imu, /odom, 그리고 변환을 실어 나르는 /tf, /tf_static</text>
+<rect x="46" y="308" width="96" height="40" rx="8" fill="#475569"/>
+<text x="94.0" y="333.0" class="box" text-anchor="middle" style="fill:#ffffff">stamp</text>
+<text x="152.0" y="325.0" class="item" >메시지마다 붙는 측정 시각 (header.stamp)</text>
+<text x="152.0" y="341.0" class="small" >늦게 도착해도 "언제 잰 값인지" 알 수 있음 → 시각을 맞춰 계산</text>
+<line x1="590" y1="164" x2="590" y2="368" stroke="#e5e7eb" stroke-width="1.5"/>
+<text x="610.0" y="178.0" class="sub" >핵심: 지도 위 로봇 위치는 두 변환을 이어 붙여서 계산한다</text>
+<rect x="615" y="234" width="150" height="38" rx="19" fill="#dcfce7" stroke="#16a34a" stroke-width="2"/>
+<text x="690.0" y="251.0" class="monob" text-anchor="middle">map</text>
+<text x="690.0" y="265.0" class="cap" text-anchor="middle">지도 원점</text>
+<rect x="1015" y="234" width="150" height="38" rx="19" fill="#ffedd5" stroke="#ea580c" stroke-width="2"/>
+<text x="1090.0" y="251.0" class="monob" text-anchor="middle">odom</text>
+<text x="1090.0" y="265.0" class="cap" text-anchor="middle">출발 지점</text>
+<rect x="1395" y="234" width="150" height="38" rx="19" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
+<text x="1470.0" y="251.0" class="monob" text-anchor="middle">base_footprint</text>
+<text x="1470.0" y="265.0" class="cap" text-anchor="middle">로봇 바닥 중심</text>
+<path d="M767.0,253.0 L1013.0,253.0" fill="none" stroke="#16a34a" stroke-width="3" marker-end="url(#aA)"/>
+<rect x="978" y="170" width="224" height="52" rx="8" fill="#f0fdf4" stroke="#16a34a" stroke-width="1.5"/>
+<text x="1090.0" y="188.0" class="lbl" text-anchor="middle" style="fill:#15803d">① 보정치 = 쌓인 odom 오차를 상쇄</text>
+<text x="1090.0" y="203.0" class="small" text-anchor="middle">오차가 커질수록 보정치도 커짐</text>
+<text x="1090.0" y="217.0" class="cap" text-anchor="middle">(AMCL 이 갱신 때마다 새로 계산)</text>
+<line x1="1090" y1="222" x2="1090" y2="232" stroke="#16a34a" stroke-width="2" marker-end="url(#aA)"/>
+<path d="M1167.0,253.0 L1393.0,253.0" fill="none" stroke="#ea580c" stroke-width="3" marker-end="url(#aT)"/>
+<text x="890.0" y="212.0" class="sub" text-anchor="middle" style="fill:#15803d">odom 보정치</text>
+<text x="890.0" y="228.0" class="mono" text-anchor="middle">map → odom</text>
+<text x="1300.0" y="212.0" class="sub" text-anchor="middle" style="fill:#c2410c">odom 값 (오도메트리)</text>
+<text x="1300.0" y="228.0" class="mono" text-anchor="middle">odom → base_footprint</text>
+<text x="890.0" y="290.0" class="small" text-anchor="middle">AMCL(PC)이 LiDAR 스캔을 지도와 맞춰 계산</text>
+<text x="890.0" y="305.0" class="small" text-anchor="middle">② odom 원점(출발 지점)의 지도 위치</text>
+<text x="890.0" y="320.0" class="small" text-anchor="middle">+ ① 쌓인 odom 오차를 상쇄하는 값</text>
+<text x="890.0" y="335.0" class="small" text-anchor="middle">오차가 0 이어도 0 이 아닐 수 있음, 이동만으론 안 바뀜</text>
+<text x="1280.0" y="290.0" class="small" text-anchor="middle">Pi 가 바퀴 엔코더 + IMU 로 계산</text>
+<text x="1280.0" y="305.0" class="small" text-anchor="middle">base_footprint 의 odom 기준 위치</text>
+<text x="1280.0" y="320.0" class="small" text-anchor="middle">= 출발 지점부터 움직인 양, 오차 누적</text>
+<text x="1280.0" y="335.0" class="small" text-anchor="middle">같은 값이 /odom 토픽으로도 따로 나감</text>
+<line x1="615" y1="352" x2="615" y2="360" stroke="#2563eb" stroke-width="2"/>
+<line x1="1545" y1="352" x2="1545" y2="360" stroke="#2563eb" stroke-width="2"/>
+<line x1="615" y1="360" x2="1545" y2="360" stroke="#2563eb" stroke-width="2"/>
+<rect x="700" y="348" width="760" height="24" rx="12" fill="#2563eb"/>
+<text x="1080.0" y="365.0" class="box" text-anchor="middle" style="fill:#ffffff">map → base_footprint (지도 위 로봇 위치) = odom 보정치 × odom 값  — 저장되지 않고 조회할 때 tf2 가 계산</text>
+<g transform="translate(0,298)">
 <rect x="468" y="112" width="52" height="556" rx="8" fill="url(#hatch)" stroke="#d1d5db"/>
 <text x="494" y="590" class="lbl" style="fill:#6b7280" text-anchor="middle" transform="rotate(-90 494 590)">Wi-Fi (Pi → PC)</text>
 <rect x="30" y="112" width="430" height="556" rx="14" class="card" stroke="#0e7490"/>
@@ -71,28 +155,27 @@
 <text x="236.0" y="273.0" class="cap" >frame imu_link · best effort</text>
 <path d="M206.0,270.0 L224.0,260.0" fill="none" stroke="#0891b2" stroke-width="1.6" marker-end="url(#aD)"/>
 <rect x="226" y="290" width="226" height="40" rx="8" fill="#ffffff" stroke="#0891b2" stroke-width="2"/>
-<text x="236.0" y="307.0" class="monob" style="fill:#0891b2">/odom</text>
-<text x="236.0" y="323.0" class="cap" >위치 + 속도 · best effort</text>
+<text x="236.0" y="307.0" class="monob" style="fill:#0891b2">/odom  (토픽)</text>
+<text x="236.0" y="323.0" class="cap" >같은 odom 값 + 속도 · 직접 구독</text>
 <path d="M206.0,330.0 L224.0,310.0" fill="none" stroke="#0891b2" stroke-width="1.6" marker-end="url(#aD)"/>
 <rect x="226" y="340" width="226" height="40" rx="8" fill="#ffffff" stroke="#ea580c" stroke-width="2"/>
 <text x="236.0" y="357.0" class="monob" style="fill:#ea580c">/tf  odom → base_footprint</text>
-<text x="236.0" y="373.0" class="cap" >reliable · 20 Hz</text>
+<text x="236.0" y="373.0" class="cap" >odom 값 · TF 버퍼로 · reliable</text>
 <path d="M206.0,360.0 L224.0,360.0" fill="none" stroke="#ea580c" stroke-width="1.6" marker-end="url(#aT)"/>
 <rect x="226" y="446" width="226" height="40" rx="8" fill="#ffffff" stroke="#7c3aed" stroke-width="2"/>
 <text x="236.0" y="463.0" class="monob" style="fill:#7c3aed">/tf_static  고정 간선</text>
 <text x="236.0" y="479.0" class="cap" >시작할 때 한 번</text>
 <path d="M206.0,466.0 L224.0,466.0" fill="none" stroke="#7c3aed" stroke-width="1.6" marker-end="url(#aS)"/>
 <path d="M 452,318 C 466,318 466,352 452,352" fill="none" stroke="#ea580c" stroke-width="1.4" stroke-dasharray="3 2"/>
-<circle cx="50" cy="512" r="2.4" fill="#6b7280"/>
-<text x="59.0" y="516.0" class="item" >모든 메시지에 header.stamp(측정 시각) + frame_id</text>
-<circle cx="50" cy="530" r="2.4" fill="#6b7280"/>
-<text x="59.0" y="534.0" class="item" >/odom 과 /tf odom → base_footprint 는 같은 값, 같은 stamp</text>
-<text x="59.0" y="552.0" class="small" >(점선) 같은 순간 두 형식으로 보냄, /odom 은 속도도 포함</text>
-<text x="46.0" y="570.0" class="key" >TurtleBot3 오도메트리 = 바퀴 엔코더 + IMU</text>
-<text x="59.0" y="588.0" class="small" >노드 안에서 통합: 이동 거리는 엔코더, 회전량은 IMU 로 대체</text>
-<circle cx="50" cy="602" r="2.4" fill="#6b7280"/>
-<text x="59.0" y="606.0" class="item" >/scan, /imu, /odom 은 데이터 토픽: 버퍼에 들어가지 않음</text>
-<text x="59.0" y="624.0" class="small" >필요한 노드가 직접 구독해서 바로 처리</text>
+<circle cx="50" cy="502" r="2.4" fill="#6b7280"/>
+<text x="59.0" y="506.0" class="item" >모든 메시지에 header.stamp(측정 시각) + frame_id</text>
+<text x="46.0" y="524.0" class="key" >odom 값은 두 갈래로 따로 발행 (점선)</text>
+<text x="59.0" y="542.0" class="small" >/tf odom → base_footprint: TF 버퍼로 → 트리의 간선이 됨</text>
+<text x="59.0" y="560.0" class="small" >/odom 토픽: 별개 토픽, 같은 값·같은 stamp + 속도, 버퍼 밖</text>
+<text x="46.0" y="578.0" class="key" >TurtleBot3 오도메트리 = 바퀴 엔코더 + IMU</text>
+<text x="59.0" y="596.0" class="small" >노드 안에서 통합: 이동 거리는 엔코더, 회전량은 IMU 로 대체</text>
+<circle cx="50" cy="610" r="2.4" fill="#6b7280"/>
+<text x="59.0" y="614.0" class="item" >/scan, /imu, /odom 은 버퍼에 안 들어감: 노드가 직접 구독</text>
 <rect x="528" y="112" width="540" height="556" rx="14" class="card" stroke="#ea580c"/>
 <rect x="528" y="112" width="540" height="40" rx="14" fill="#ea580c"/>
 <rect x="528" y="138" width="540" height="14" fill="#ea580c"/>
@@ -118,9 +201,11 @@
 <line x1="620" y1="404" x2="590" y2="440" stroke="#7c3aed" stroke-width="3"/>
 <line x1="660" y1="404" x2="712" y2="440" stroke="#7c3aed" stroke-width="3"/>
 <text x="722.0" y="206.0" class="monob" style="fill:#16a34a">map → odom</text>
-<text x="722.0" y="230.0" class="cap" >AMCL (PC) · 보정량 · 움직일 때만 새로, stamp +1 s</text>
+<text x="820.0" y="206.0" class="key" style="fill:#15803d">= odom 보정치</text>
+<text x="722.0" y="230.0" class="cap" >odom 값 아님 · AMCL (PC) · 움직일 때만 새로, stamp +1 s</text>
 <text x="722.0" y="280.0" class="monob" style="fill:#ea580c">odom → base_footprint</text>
-<text x="722.0" y="296.0" class="cap" >Pi · 오도메트리 · 20 Hz</text>
+<text x="888.0" y="280.0" class="key" style="fill:#c2410c">= odom 값</text>
+<text x="722.0" y="296.0" class="cap" >base_footprint 의 odom 기준 위치 · Pi · 20 Hz</text>
 <text x="722.0" y="350.0" class="monob" style="fill:#7c3aed">base_footprint → base_link</text>
 <text x="722.0" y="366.0" class="cap" >URDF · 고정 · 시간에 따라 변하지 않음</text>
 <text x="776.0" y="452.0" class="monob" style="fill:#7c3aed">base_link → base_scan, imu_link</text>
@@ -194,42 +279,44 @@
 <rect x="1076" y="138" width="494" height="14" fill="#16a34a"/>
 <circle cx="1100" cy="132" r="13" fill="#ffffff"/>
 <text x="1100" y="137" text-anchor="middle" class="num" style="fill:#16a34a">3</text>
-<text x="1122.0" y="138.0" class="colhead" >AMCL — 보정량 map → odom 계산 (PC)</text>
+<text x="1122.0" y="138.0" class="colhead" >AMCL — odom 보정치 map → odom 계산 (PC)</text>
 <text x="1556.0" y="138.0" class="colsub" text-anchor="end">nav2_amcl</text>
 <path d="M1074.0,214.0 L646.0,214.0" fill="none" stroke="#16a34a" stroke-width="2.4" marker-end="url(#aA)"/>
-<text x="1092.0" y="178.0" class="key" style="fill:#16a34a">출력: /tf map → odom</text>
-<text x="1092.0" y="196.0" class="small" >← 버퍼에 들어가 트리의 맨 위 간선이 됨</text>
-<line x1="1092" y1="214" x2="1554" y2="214" stroke="#e5e7eb"/>
-<text x="1092.0" y="238.0" class="sub" >입력</text>
-<rect x="1092" y="250" width="134" height="26" rx="6" fill="#ffffff" stroke="#0891b2" stroke-width="1.8"/>
-<text x="1100.0" y="268.0" class="monob" style="fill:#0891b2">/scan_level</text>
-<text x="1236.0" y="268.0" class="small" >브리지가 /scan 을 기울지 않을 때만 재발행</text>
-<rect x="1092" y="284" width="134" height="26" rx="6" fill="#ffffff" stroke="#475569" stroke-width="1.8"/>
-<text x="1100.0" y="302.0" class="monob" style="fill:#475569">/map</text>
-<text x="1236.0" y="302.0" class="small" >저장된 지도 (map_server)</text>
-<rect x="1092" y="318" width="134" height="26" rx="6" fill="#ffffff" stroke="#ea580c" stroke-width="1.8"/>
-<text x="1100.0" y="336.0" class="monob" style="fill:#ea580c">odom → base_fp</text>
-<text x="1236.0" y="336.0" class="small" >버퍼에서 스캔 stamp 시각으로 조회</text>
-<text x="1092.0" y="372.0" class="sub" >계산 (파티클 필터, 500~2000개)</text>
-<circle cx="1098" cy="392" r="2.4" fill="#6b7280"/>
-<text x="1107.0" y="396.0" class="item" >이동 예측: 오도메트리 이동만큼 파티클을 옮기고 흩뜨림</text>
-<circle cx="1098" cy="411" r="2.4" fill="#6b7280"/>
-<text x="1107.0" y="415.0" class="item" >스캔 비교: 각 파티클 자리에서 지도와 스캔이 맞는 정도</text>
-<circle cx="1098" cy="430" r="2.4" fill="#6b7280"/>
-<text x="1107.0" y="434.0" class="item" >재샘플: 잘 맞는 파티클을 늘림 → 추정 map → base_footprint</text>
-<text x="1107.0" y="453.0" class="mono" >map→odom = 추정 위치 × (odom→base_fp)⁻¹</text>
-<circle cx="1098" cy="468" r="2.4" fill="#6b7280"/>
-<text x="1107.0" y="472.0" class="item" >0.05 m / 0.1 rad 넘게 움직였을 때만 새로 계산</text>
-<rect x="1092" y="520" width="462" height="132" rx="8" fill="#f0fdf4" stroke="#bbf7d0"/>
-<text x="1104.0" y="540.0" class="small" >예: 바퀴가 미끄러져 오도메트리가 10 cm 더 갔다고 함 (회전 오차 없음)</text>
-<line x1="1136" y1="592" x2="1416.0" y2="592" stroke="#9ca3af" stroke-width="1.5"/>
-<circle cx="1231.4" cy="592" r="7" fill="#2563eb"/>
-<circle cx="1256.2" cy="592" r="7" fill="none" stroke="#ea580c" stroke-width="2.5"/>
-<text x="1227.4" y="578.0" class="lbl" style="fill:#2563eb" text-anchor="end">실제 (2.0, 1.0)</text>
-<text x="1268.2" y="578.0" class="lbl" style="fill:#ea580c">오도메트리 (2.1, 1.0)</text>
-<path d="M1254.2,608.0 L1235.4,608.0" fill="none" stroke="#16a34a" stroke-width="2" marker-end="url(#aA)"/>
-<text x="1104.0" y="628.0" class="lbl" style="fill:#15803d">AMCL 출력 map → odom = (−0.1, 0, 0°): 보정된 위치가 아니라 보정량</text>
-<text x="1104.0" y="644.0" class="small" >로봇이 움직여도 그대로, 오차가 쌓여 AMCL 이 고칠 때만 바뀜</text>
+<rect x="1092" y="158" width="462" height="84" rx="8" fill="#f0fdf4" stroke="#16a34a" stroke-width="1.5"/>
+<text x="1104.0" y="178.0" class="key" style="fill:#15803d">출력: /tf map → odom = odom 보정치</text>
+<text x="1104.0" y="197.0" class="small" >odom 값(로봇 위치)이 아님. odom 원점을 지도 위 어디에 놓아야</text>
+<text x="1104.0" y="213.0" class="small" >오도메트리에 쌓인 오차가 상쇄되는지를 나타내는 값</text>
+<text x="1104.0" y="231.0" class="small" >← 버퍼에 들어가 트리 맨 위 간선이 됨</text>
+<text x="1092.0" y="266.0" class="sub" >입력</text>
+<rect x="1092" y="276" width="134" height="26" rx="6" fill="#ffffff" stroke="#0891b2" stroke-width="1.8"/>
+<text x="1100.0" y="294.0" class="monob" style="fill:#0891b2">/scan_level</text>
+<text x="1236.0" y="294.0" class="small" >브리지가 /scan 을 기울지 않을 때만 재발행</text>
+<rect x="1092" y="307" width="134" height="26" rx="6" fill="#ffffff" stroke="#475569" stroke-width="1.8"/>
+<text x="1100.0" y="325.0" class="monob" style="fill:#475569">/map</text>
+<text x="1236.0" y="325.0" class="small" >저장된 지도 (map_server)</text>
+<rect x="1092" y="338" width="134" height="26" rx="6" fill="#ffffff" stroke="#ea580c" stroke-width="1.8"/>
+<text x="1100.0" y="356.0" class="monob" style="fill:#ea580c">odom → base_fp</text>
+<text x="1236.0" y="356.0" class="small" >버퍼에서 스캔 stamp 시각으로 조회</text>
+<text x="1092.0" y="392.0" class="sub" >계산 (파티클 필터, 500~2000개)</text>
+<circle cx="1098" cy="408" r="2.4" fill="#6b7280"/>
+<text x="1107.0" y="412.0" class="item" >이동 예측: 오도메트리 이동만큼 파티클을 옮기고 흩뜨림</text>
+<circle cx="1098" cy="427" r="2.4" fill="#6b7280"/>
+<text x="1107.0" y="431.0" class="item" >스캔 비교: 각 파티클 자리에서 지도와 스캔이 맞는 정도</text>
+<circle cx="1098" cy="446" r="2.4" fill="#6b7280"/>
+<text x="1107.0" y="450.0" class="item" >재샘플: 잘 맞는 파티클을 늘림 → 추정 map → base_footprint</text>
+<text x="1107.0" y="469.0" class="mono" >보정치 map→odom = 추정 위치 × (odom 값)⁻¹</text>
+<circle cx="1098" cy="484" r="2.4" fill="#6b7280"/>
+<text x="1107.0" y="488.0" class="item" >0.05 m / 0.1 rad 넘게 움직였을 때만 새로 계산</text>
+<rect x="1092" y="512" width="462" height="140" rx="8" fill="#f0fdf4" stroke="#bbf7d0"/>
+<text x="1104.0" y="532.0" class="small" >예: 바퀴가 미끄러져 오도메트리가 10 cm 더 갔다고 함 (회전 오차 없음)</text>
+<line x1="1136" y1="584" x2="1416.0" y2="584" stroke="#9ca3af" stroke-width="1.5"/>
+<circle cx="1231.4" cy="584" r="7" fill="#2563eb"/>
+<circle cx="1256.2" cy="584" r="7" fill="none" stroke="#ea580c" stroke-width="2.5"/>
+<text x="1227.4" y="570.0" class="lbl" style="fill:#2563eb" text-anchor="end">실제 (2.0, 1.0)</text>
+<text x="1268.2" y="570.0" class="lbl" style="fill:#ea580c">오도메트리 (2.1, 1.0)</text>
+<path d="M1254.2,600.0 L1235.4,600.0" fill="none" stroke="#16a34a" stroke-width="2" marker-end="url(#aA)"/>
+<text x="1104.0" y="620.0" class="lbl" style="fill:#15803d">AMCL 출력 map → odom = (−0.1, 0, 0°): 위치가 아니라 보정치</text>
+<text x="1104.0" y="636.0" class="small" >로봇이 움직여도 그대로, 오차가 쌓여 AMCL 이 고칠 때만 바뀜</text>
 <path d="M798.0,668.0 L798.0,694.0" fill="none" stroke="#111827" stroke-width="2.5" marker-end="url(#aK)"/>
 <text x="808.0" y="687.0" class="mono" >lookup_transform(target, source, 시각) → 변환 하나</text>
 <path d="M506.0,186.0 L506.0,694.0" fill="none" stroke="#0891b2" stroke-width="2" stroke-dasharray="6 3" marker-end="url(#aD)"/>
@@ -262,8 +349,8 @@
 <text x="148.0" y="810.0" class="lbl" style="fill:#2563eb">로봇 (1.0, 2.5)</text>
 <text x="276.0" y="806.0" class="monob" >map→base_footprint</text>
 <text x="276.0" y="825.0" class="mono" >= (map→odom) × (odom→base_fp)</text>
-<text x="276.0" y="844.0" class="mono" >map→odom = (1.0, 2.0, 90°)</text>
-<text x="276.0" y="863.0" class="mono" >odom→base_fp = (0.5, 0, 0°)</text>
+<text x="276.0" y="844.0" class="mono" >map→odom = (1.0, 2.0, 90°)  보정치</text>
+<text x="276.0" y="863.0" class="mono" >odom→base_fp = (0.5, 0, 0°) odom 값</text>
 <text x="276.0" y="882.0" class="small" >회전: odom 축의 yaw 90° 로 돌림</text>
 <text x="276.0" y="901.0" class="mono" >x = 1.0 + cos·0.5 − sin·0 = 1.0</text>
 <text x="276.0" y="920.0" class="mono" >y = 2.0 + sin·0.5 + cos·0 = 2.5</text>
@@ -381,11 +468,13 @@
 <text x="1388.0" y="842.0" class="cap" style="fill:#0891b2">바로 최신</text>
 <text x="1532.0" y="914.0" class="cap" style="fill:#c2410c" text-anchor="end">밀린 것부터 재전송 → 최신이 늦게 옴 (최대 2.4 s)</text>
 <circle cx="1082" cy="982" r="2.4" fill="#6b7280"/>
-<text x="1091.0" y="986.0" class="item" >로봇 이동은 /odom (best effort) 에서, 보정량은 TF 최신 map→odom</text>
-<text x="1091.0" y="1005.0" class="small" >map→odom 은 이동이 아닌 보정량 → 오래돼도 이동이 겹치지 않음</text>
+<text x="1091.0" y="986.0" class="item" >로봇 이동은 /odom (best effort) 에서, 보정치은 TF 최신 map→odom</text>
+<text x="1091.0" y="1005.0" class="small" >map→odom 은 이동이 아닌 보정치 → 오래돼도 이동이 겹치지 않음</text>
 <circle cx="1082" cy="1020" r="2.4" fill="#6b7280"/>
 <text x="1091.0" y="1024.0" class="item" >위치 나이 &gt; 0.5 s 면 서서 기다림, 3 s 넘으면 목표 실패</text>
 <text x="1091.0" y="1043.0" class="small" >(pose_with_age, tf_timeout / pose_lost_timeout)</text>
 <circle cx="1082" cy="1058" r="2.4" fill="#6b7280"/>
 <text x="1091.0" y="1062.0" class="item" >/odom 의 속도는 Frenet 의 현재 속도(v0) 로도 씀</text>
+</g>
+</g>
 </svg>
