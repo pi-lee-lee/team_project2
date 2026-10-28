@@ -1,0 +1,24 @@
+# Docker 시뮬레이션 (컨테이너 하나: 서버 + Gazebo + SLAM/AMCL + A* + 브리지). 자세한 것은 DOCKER_GUIDE.md
+#   docker compose up --build          시작 (기본 --mode map). 끄기: Ctrl+C 또는 docker compose down
+#   WSIM_ARGS="--mode slam --world turtlebot3_house" docker compose up      run.sh 인자 바꾸기
+# 이 폴더(프로젝트)의 소스로 돌고, 로그는 wsim/logs 에 생긴다.
+services:
+  wsim:
+    build: .
+    image: warehouse-sim
+    container_name: wsim
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./:/app                      # 프로젝트 소스 (고친 코드가 바로 반영)
+      - ./wsim/logs:/app/logs        # 로그는 wsim/logs (PC 에서 직접 실행할 때의 logs/ 와 섞이지 않게)
+      - warehouse-maps:/root/maps    # SLAM 으로 저장한 맵
+      - warehouse-data:/data         # DB (SQLite)
+    command: ${WSIM_ARGS:---mode map}
+    stop_grace_period: 30s           # 끌 때 stop_ros.sh 로 노드 정리할 시간
+
+volumes:
+  warehouse-maps:
+    name: warehouse-maps         # docker run -v warehouse-maps:... 와 같은 볼륨
+  warehouse-data:
+    name: warehouse-data

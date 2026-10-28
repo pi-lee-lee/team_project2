@@ -112,26 +112,18 @@ export TURTLEBOT3_MODEL=waffle_pi
 
 자세한 실행 방법과 문제 해결은 [DOCKER_GUIDE.md](DOCKER_GUIDE.md) 를 참고하세요.
 
-`Dockerfile` 이 이미지 하나에 모두 넣습니다: Django 서버, Gazebo(TurtleBot3 Waffle Pi), SLAM/AMCL, A*, 브리지. 컨테이너가 시작되면 `docker/entrypoint.sh` 가 다음 순서로 실행합니다.
-
-1. DB 준비 (`migrate`)
-2. 웹 서버 시작
-3. `scripts/run.sh --robot sim <인자>` 실행
+컨테이너 하나에서 Django 서버, Gazebo(TurtleBot3 Waffle Pi), SLAM/AMCL, A*, 브리지가 돕니다.
+이미지는 실행 환경만 담고, **소스는 프로젝트 폴더를 `/app` 으로 연결해** 씁니다. 그래서 고친 코드가 다시 빌드하지 않아도 반영되고, **로그는 프로젝트 폴더 `wsim/logs/`** 에 생깁니다.
 
 ```bash
-docker build -t warehouse-sim .
-docker run --rm -it -p 8000:8000 -v warehouse-maps:/root/maps -v warehouse-data:/data warehouse-sim                 # 기본: --mode map (turtlebot3_world)
-docker run --rm -it -p 8000:8000 -v warehouse-maps:/root/maps -v warehouse-data:/data warehouse-sim --mode slam --world turtlebot3_house
-docker run --rm -it -p 8000:8000 -v warehouse-maps:/root/maps -v warehouse-data:/data warehouse-sim none            # 서버만 (웹 "실행 모드"에서 시작)
-docker exec -it <컨테이너> bash -c 'cd /app && source scripts/env.sh && ros2 topic hz /scan'                          # ROS 명령
+docker compose up --build                                              # 처음 (이미지 빌드 + 실행, 기본 --mode map)
+WSIM_ARGS="--mode slam --world turtlebot3_house" docker compose up     # run.sh --robot sim 인자 바꾸기
+docker compose down                                                    # 끄기
 ```
 
-- 웹 주소는 http://localhost:8000/ 입니다. 노드 로그는 컨테이너 안 `/app/logs/` 에 있습니다.
-- 저장 위치
-  - DB: SQLite (`DB_ENGINE=sqlite`) 파일 `/data/db.sqlite3`. 처음 실행할 때 저장소의 `server/db.sqlite3` 를 복사합니다.
-  - SLAM 으로 저장한 맵: `/root/maps`
-  - 두 경로 모두 볼륨으로 붙여 두면 컨테이너를 지워도 남습니다.
-- 이미지는 **amd64 고정**입니다. Gazebo classic 의 Humble 패키지가 amd64 만 있기 때문입니다. Apple Silicon Mac 에서도 에뮬레이션으로 동작하지만 느립니다.
+- 웹 주소는 http://localhost:8000/ 입니다.
+- DB 는 SQLite(볼륨 `warehouse-data`), SLAM 으로 저장한 맵은 볼륨 `warehouse-maps` 에 남습니다.
+- 이미지는 **amd64 고정**입니다 (Gazebo classic 의 Humble 패키지가 amd64 만 있음). Apple Silicon Mac 은 에뮬레이션이라 느립니다.
 - 넣지 않은 것: 실물 로봇(Pi SSH), YOLO(`WAREHOUSE_YOLO=0`), Gazebo 화면(`--gui`), AWS 창고 월드.
 
 ## 4. 실행 (모드 선택)

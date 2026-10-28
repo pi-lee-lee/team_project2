@@ -1,12 +1,3 @@
-# docker build 에 넣지 않는 것: PC 에서 만든 빌드 결과/가상환경(컨테이너에서 새로 만듦), 로그, git 기록
-.git
-ros2_ws/build
-ros2_ws/install
-ros2_ws/log
-server/.venv
-yolo/yolo_training/.venv
-logs
-image
-**/__pycache__
-**/*.pyc
-.pytest_cache
+# 이미지에는 실행 환경만 넣는다 (소스는 실행 때 프로젝트 폴더를 /app 으로 연결). 빌드에 쓰는 파일만 남김
+*
+!server/requirements.txt

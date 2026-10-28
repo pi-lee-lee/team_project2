@@ -14,6 +14,8 @@ Thumbs.db
 #   logs/: 노드 로그(*.log), 주행 기록(records/, 목표마다 record.jsonl.gz + 그림), run_mode.env, run.lock,
 #          A* 실패 격자(astar_fail.npz), 예전 분석 결과 등. run.sh 가 폴더를 만들고 env.sh 는 없으면 건너뜀
 logs/
+#   wsim/: Docker 시뮬레이션 컨테이너의 로그 (compose.yaml 이 wsim/logs 를 컨테이너 /app/logs 로 연결)
+wsim/
 #   colcon 빌드 로그
 ros2_ws/log/
 

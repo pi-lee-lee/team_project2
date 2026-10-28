@@ -3,7 +3,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 export WAREHOUSE_HOME="$(cd "$SCRIPT_DIR/.." && pwd)"
 source /opt/ros/humble/setup.bash
 [ -f "$HOME/turtlebot3_ws/install/setup.bash" ] && source "$HOME/turtlebot3_ws/install/setup.bash"
-source "$WAREHOUSE_HOME/ros2_ws/install/setup.bash"
+# WAREHOUSE_ROS_INSTALL: 다른 곳에 빌드한 install 을 쓸 때 (Docker: 컨테이너 안 /opt/warehouse/ros2_ws/install)
+source "${WAREHOUSE_ROS_INSTALL:-$WAREHOUSE_HOME/ros2_ws/install}/setup.bash"
 export TURTLEBOT3_MODEL=waffle_pi
 
 # 실행 모드 (scripts/run.sh 가 logs/run_mode.env 에 기록).
