@@ -110,6 +110,8 @@ export TURTLEBOT3_MODEL=waffle_pi
 
 ### Docker (시뮬레이션만, 컨테이너 하나)
 
+자세한 실행 방법과 문제 해결은 [DOCKER_GUIDE.md](DOCKER_GUIDE.md) 를 참고하세요.
+
 `Dockerfile` 이 이미지 하나에 모두 넣습니다: Django 서버, Gazebo(TurtleBot3 Waffle Pi), SLAM/AMCL, A*, 브리지. 컨테이너가 시작되면 `docker/entrypoint.sh` 가 다음 순서로 실행합니다.
 
 1. DB 준비 (`migrate`)
