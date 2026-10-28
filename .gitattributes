@@ -1,0 +1,13 @@
+# Windows 에서 받아도 리눅스(도커 컨테이너, Ubuntu PC)에서 실행하는 파일은 줄바꿈을 LF 로 유지한다.
+# (Git for Windows 기본 core.autocrlf=true 면 CRLF 로 바뀌어 '/bin/bash^M: bad interpreter' 로 실행이 안 됨)
+*.sh          text eol=lf
+*.py          text eol=lf
+*.launch.py   text eol=lf
+*.yaml        text eol=lf
+*.world       text eol=lf
+*.service     text eol=lf
+Dockerfile    text eol=lf
+.dockerignore text eol=lf
+
+# 커밋해 둔 서버 가상환경은 원래 상태 그대로 (패키지 파일 일부가 CRLF)
+server/.venv/** -text

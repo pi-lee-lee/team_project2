@@ -94,8 +94,9 @@ def _load_env(path):
 _load_env(BASE_DIR / '.env')
 
 if os.environ.get('DB_ENGINE', 'mysql') == 'sqlite':
-    # MySQL 계정을 만들기 전 임시로 쓰는 설정
-    DATABASES = {'default': {'ENGINE': 'django.db.backends.sqlite3', 'NAME': BASE_DIR / 'db.sqlite3'}}
+    # MySQL 계정을 만들기 전 임시로 쓰는 설정. SQLITE_PATH 로 파일 위치 변경 (Docker: /data 볼륨)
+    DATABASES = {'default': {'ENGINE': 'django.db.backends.sqlite3',
+                             'NAME': os.environ.get('SQLITE_PATH') or BASE_DIR / 'db.sqlite3'}}
 else:
     DATABASES = {
         'default': {
