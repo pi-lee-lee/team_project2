@@ -11,20 +11,9 @@ echo "[start_slam] $ENGINE, 시뮬레이션 시간 $WAREHOUSE_SIM_TIME, 도메�
 case "$ENGINE" in
   slam_toolbox)
     # config/slam_toolbox.yaml: 수평일 때 스캔(/scan_slam, 브리지가 발행, inf 빔 → 빈 공간)만 사용
-    # 시뮬레이션 LiDAR 는 3.5 m 까지 (inf → 3.45 로 바뀜) → max_laser_range 를 그보다 작은 3.4 로 (5.0 이면 3.45 를 벽으로 찍음)
-    # 시뮬레이션은 스캔 개수로 정해지는 두 값을 5배로 (실물은 그대로):
-    #   slam_toolbox 의 scan_buffer_size(맞춤에 쓰는 최근 스캔 수)·loop_match_minimum_chain_size(루프 클로저 인정 연속 스캔 수)는
-    #   '개수' 라, 스캔 반영 간격을 0.5 → 0.1 로 줄이면서 맞춤 기준 약 5 m → 1 m, 루프 클로저 인정 구간 약 7.5 m → 1.5 m 로 약해져
-    #   LiDAR 3.5 m 인 넓은 house 에서 map→odom 이 한 번에 2~8° 씩 튀며 맵이 무너졌음 (2026-10-28).
-    #   간격을 0.5 로 되돌리면 안 무너지지만 벽이 0.5 m 움직일 때마다만 들어가 가까이 가야 맵 벽이 됨 →
-    #   간격은 0.1 그대로 두고 개수를 10 → 50, 15 → 75 로 해서 거리 기준을 0.5 시절과 같게
+    # 실물·시뮬레이션 같은 설정. 시뮬레이션 로봇도 실물 LDS-02 사양(10 m, 약 1.45°, 안 맞은 빔 NaN)이라 따로 바꾸지 않는다
+    # (예전에는 시뮬레이션 LiDAR 가 3.5 m 라 max_laser_range 를 3.4 로, 스캔 개수 기준 값도 따로 바꿔 띄웠음)
     PARAMS="$WAREHOUSE_HOME/config/slam_toolbox.yaml"
-    if [ "$WAREHOUSE_ROBOT" = sim ]; then
-      sed -e 's/^\(\s*max_laser_range:\s*\)[0-9.]*/\13.4/' \
-          -e 's/^\(\s*scan_buffer_size:\s*\)[0-9]*/\150/' \
-          -e 's/^\(\s*loop_match_minimum_chain_size:\s*\)[0-9]*/\175/' "$PARAMS" > "$WAREHOUSE_HOME/logs/slam_toolbox_run.yaml"
-      PARAMS="$WAREHOUSE_HOME/logs/slam_toolbox_run.yaml"
-    fi
     grep -E '^\s*(max_laser_range|minimum_travel_distance|minimum_travel_heading|scan_buffer_size|loop_match_minimum_chain_size):' "$PARAMS" \
       | sed 's/#.*//; s/^\s*/[start_slam] /'
     exec ros2 launch slam_toolbox online_async_launch.py use_sim_time:="$WAREHOUSE_SIM_TIME" \

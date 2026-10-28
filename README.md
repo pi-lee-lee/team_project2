@@ -223,7 +223,7 @@ SIGINT → SIGTERM → SIGKILL 순서로 보내고 남은 프로세스가 없는
 - 카메라: 실물 `run.sh` 가 bringup 다음에 Pi 카메라(`yolo/camera.sh`, 320x240)를 띄워 **계속 켜 둡니다** (빼려면 `--no-camera`).
   영상은 YOLO 검출기가 켜졌을 때만 구독되어 Wi-Fi 로 옵니다 (주문 중에는 섹션/사람 위치에 서 있을 때만). 수동: `scripts/pi_camera.sh on|off|status`.
   `stop_ros.sh` 는 카메라를 건드리지 않음. (한때 YOLO 를 켤 때만 카메라를 켰지만 켜는 데 실제 10~15초라 되돌림)
-- **명령 감시 (통신 끊기면 정지)**: 실물 `run.sh` 가 Pi 에 `scripts/pi_cmd_watchdog.py` 를 띄움. 브리지 명령(`cmd_vel_pc`)을 로봇(`cmd_vel`)으로
+- **명령 감시 (통신 끊기면 정지)**: 실물 `run.sh` 가 Pi 에 `scripts/pi_cmd_watchdog.py` 를 띄움 (시뮬레이션은 `start_sim.sh` 가 PC 에 같은 것을 띄워 같은 경로). 브리지 명령(`cmd_vel_pc`)을 로봇(`cmd_vel`)으로
   넘기다가 0.5초 넘게 끊기면 로봇을 세움 (터틀봇은 마지막 명령을 계속 실행해서, Wi-Fi 가 끊기면 벽까지 간 적 있음). 이게 없으면 로봇이
   움직이지 않으니 브리지 로그의 경고나 Pi `~/warehouse_cmd_watchdog.log` 확인. 직접 띄우기: Pi 에서
   `source /opt/ros/humble/setup.bash; ROS_DOMAIN_ID=44 python3 ~/warehouse_cmd_watchdog.py` 직접 띄울 때는 Pi 에서 `bash camera.sh /dev/video0` (장치는 `v4l2-ctl --list-devices`)

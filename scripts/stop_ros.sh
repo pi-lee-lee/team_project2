@@ -34,6 +34,7 @@ PATTERNS=(
   '^/opt/ros/humble/lib/robot_state_publisher/robot_state_publisher'
   '^/opt/ros/humble/lib/nav2_map_server/map_saver_cli'
   '^\S*python\S* -u \S*/yolo/yolo_training/infer_ros'   # scripts/start_yolo.sh (YOLO 검출기)
+  '^\S*python3 \S*/scripts/(sim_real_io|pi_cmd_watchdog)\.py'   # start_sim.sh (시뮬레이션 실물 형식 출력, 명령 감시)
 )
 if [ "$STOP_SERVER" = 1 ]; then
   PATTERNS+=('^/bin/bash (\S*/)?scripts/start_server\.sh( |$)' '^(\S*/)?\.venv/bin/python manage\.py runserver')

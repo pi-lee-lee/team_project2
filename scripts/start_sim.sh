@@ -1,5 +1,8 @@
 #!/bin/bash
 # Gazebo 시뮬레이션 (TurtleBot3 Waffle Pi). 실물 로봇의 bringup 대신 /scan, /odom, /tf 를 낸다.
+# 실물과 같은 사양·같은 처리 경로로: 로봇은 worlds/models/turtlebot3_waffle_pi_real/model.sdf (LiDAR = 실물 LDS-02 측정값),
+# scripts/sim_real_io.py 가 스캔을 실물 드라이버 형식으로, 오도메트리를 실물처럼 바퀴 엔코더 + IMU 로 내고,
+# 실물 Pi 와 같은 명령 감시(scripts/pi_cmd_watchdog.py)가 브리지의 cmd_vel_pc 를 cmd_vel 로 넘긴다 (0.5초 끊기면 정지).
 #   사용: scripts/start_sim.sh [월드] [--gui] [--x X --y Y]
 #     월드: turtlebot3_world(기본) | turtlebot3_house | empty_world | 그 밖의 turtlebot3_gazebo/worlds/*.world
 #           | 이 저장소 worlds/*.world (예: maze_room = 실제 방 복제, tools/map_to_world.py 로 생성)
@@ -53,7 +56,13 @@ if [ "$GUI" = 1 ]; then
 fi
 ros2 launch "$GZ/launch/robot_state_publisher.launch.py" use_sim_time:=true &
 PIDS+=($!)
-ros2 launch "$GZ/launch/spawn_turtlebot3.launch.py" x_pose:="$X" y_pose:="$Y" &
+# 원본 spawn_turtlebot3.launch.py 와 같은 방식(이름 waffle_pi, 높이 0.01)이고 모델 파일만 실물 사양 사본
+ros2 run gazebo_ros spawn_entity.py -entity "$TURTLEBOT3_MODEL" \
+  -file "$WAREHOUSE_HOME/worlds/models/turtlebot3_waffle_pi_real/model.sdf" -x "$X" -y "$Y" -z 0.01 &
+PIDS+=($!)
+python3 "$WAREHOUSE_HOME/scripts/sim_real_io.py" &
+PIDS+=($!)
+python3 "$WAREHOUSE_HOME/scripts/pi_cmd_watchdog.py" --ros-args -p use_sim_time:=true &
 PIDS+=($!)
 trap 'kill -INT "${PIDS[@]}" 2>/dev/null; wait' INT TERM
 wait

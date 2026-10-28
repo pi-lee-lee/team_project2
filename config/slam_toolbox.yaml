@@ -35,7 +35,7 @@ slam_toolbox:
     # 이 거리까지 맞은 점을 장애물로 찍고, 이 거리부터 range_max 사이 값은 빈 칸으로만 칠한다.
     # 브리지가 inf 를 range_max - 0.05 로 바꿔 보내므로, 이 값이 그보다 작아야 '안 맞은 빔' 이 빈 공간으로 반영된다.
     # (20 이면 range_max 로 잘려 inf 빔이 전부 버려지고, 넓은 공간은 영영 미탐색으로 남음)
-    # 실물 LDS-02 (range_max 100, 측정 8 m): 5.0. 시뮬레이션 LiDAR 는 3.5 m 까지라 start_slam.sh 가 3.4 로 바꿔 띄운다
+    # 실물 LDS-02 (range_max 100, 측정 8 m): 5.0. 시뮬레이션도 실물 사양 모델(10 m, worlds/models/turtlebot3_waffle_pi_real)이라 같은 값
     max_laser_range: 5.0
     minimum_time_interval: 0.5
     transform_timeout: 0.2

@@ -685,3 +685,16 @@ lethal 빠져나가기는 멀어지는 쪽으로만, 계획마다 기억 상태 
   (루프 클로저 인정 약 7.5 m) → 거리 기준이 0.5 시절과 같음. `start_slam.sh` 가 시뮬레이션 실행용 사본에만 적용, 실물(config/slam_toolbox.yaml)은 그대로.
   빔 재배열 안 함(시뮬레이션)은 유지. **house 에서 맵이 안 무너지는지 아직 확인 안 함**
 
+### 시뮬레이션을 실물과 같은 사양·같은 처리 경로로 (2026-10-28)
+시뮬레이션만 SLAM 설정을 따로 두면 실물과 차이가 커져서, 설정이 아니라 시뮬레이션 로봇을 실물에 맞춤. 시뮬레이션 전용 분기는 모두 뺌.
+- 로봇 모델 `worlds/models/turtlebot3_waffle_pi_real/model.sdf` (turtlebot3_gazebo 2.3.8 Waffle Pi 사본): LiDAR 를 실물 LDS-02 측정값(real_scan_capture 187 스캔:
+  빔 245~248, 약 1.45°, 약 9.3 Hz, 0.159 m 부터, 10 m 넘는 응답 없음)으로 247 빔 / 9.3 Hz / 0.16~10 m (원본은 LDS-01: 360 빔, 5 Hz, 0.12~3.5 m). Gazebo 오도메트리 끔
+- `scripts/sim_real_io.py` (start_sim.sh 가 띄움): 스캔을 실물 드라이버 형식으로 (안 맞은 빔 NaN, range_max 100), 오도메트리는 실물 turtlebot3_node 처럼
+  바퀴 엔코더(이동) + IMU(회전)로 /odom 과 TF (원점 = 출발 자리, 예전엔 Gazebo 실제 위치 그대로라 오차 0)
+- 명령: 시뮬레이션도 `pi_cmd_watchdog.py` (start_sim.sh 가 PC 에 띄움)를 거침 → 브리지는 항상 `cmd_vel_pc`
+- 같은 날 넣었던 시뮬레이션 전용 값 제거: start_slam.sh 의 max_laser_range 3.4 / scan_buffer_size 50 / chain 75, 브리지의 시뮬레이션 빔 재배열 생략
+- 확인 (mac Docker, house, SLAM + 자동 탐색 13.9분, 실제 이동 76 m, 목표 21개 중 도착 실패 3 = 에뮬레이션이라 느려 90초 초과):
+  오도메트리 오차 위치 최대 2.3 cm, map→odom 회전 −1.7 ~ +0.5° (한 번에 1° 넘게 바뀐 것 1번), SLAM 위치 오차 최대 0.13 m / 마지막 0.02 m,
+  맵 벽 한 겹, 방들이 직각으로 맞음 (수정 전 같은 월드: map→odom −2.6 ~ +13.4°, 2~8° 씩 튐, 맵 무너짐). PC(실제 속도)와 lecture_hall_real 은 아직
+- 남은 차이: 실물 LDS-02 빔 개수 변동(245~248)은 흉내 내지 않음(247 고정, 브리지 재배열은 같이 거침), Gazebo 바퀴는 거의 미끄러지지 않아 오도메트리가 실물보다 정확함
+
