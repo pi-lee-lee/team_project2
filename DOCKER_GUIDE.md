@@ -1,7 +1,7 @@
 ﻿# Docker 실행 가이드 (시뮬레이션)
 
 시뮬레이션 전체를 **컨테이너 하나**로 실행합니다. 들어 있는 것: Django 서버, Gazebo(TurtleBot3 Waffle Pi), SLAM/AMCL, A* 플래너, 브리지.
-파일: [Dockerfile](Dockerfile), [.dockerignore](.dockerignore), [docker/entrypoint.sh](docker/entrypoint.sh) (브랜치 `docker-sim`).
+파일: [Dockerfile](Dockerfile), [.dockerignore](.dockerignore), [docker/entrypoint.sh](docker/entrypoint.sh).
 옵션 전체는 [README.md](README.md), 직접 실행(도커 없이)은 [RUN_GUIDE.md](RUN_GUIDE.md) 참고.
 
 ---
@@ -22,9 +22,11 @@
 
 ## 2. 준비
 
-- Docker 설치 (Ubuntu: Docker Engine, Mac: Docker Desktop). 디스크 약 6 GB (이미지 약 5 GB).
+- Docker 설치 (Ubuntu: Docker Engine, Mac/Windows: Docker Desktop). 디스크 약 6 GB (이미지 약 5 GB).
+  Windows 는 [9. Windows 에서 실행](#9-windows-에서-실행) 도 확인.
 - **CPU 종류**: 이미지는 `linux/amd64` 고정입니다. Gazebo classic 의 ROS 2 Humble 패키지(`gazebo_ros`, `turtlebot3_gazebo`)가 amd64 만 있기 때문입니다.
   - Ubuntu PC (Intel/AMD): 그대로 빠르게 동작
+  - Windows PC (Intel/AMD): Docker Desktop(WSL2) 에서 그대로 동작
   - Apple Silicon Mac: 에뮬레이션으로 동작하지만 느림 (실행 때 `platform (linux/amd64) does not match` 경고는 정상)
 - 포트 8000 이 비어 있어야 합니다. 같은 PC 에서 `scripts/run.sh` 로 띄운 서버가 있으면 먼저 `scripts/stop_ros.sh --all`.
 
@@ -33,7 +35,7 @@
 ## 3. 빌드
 
 ```bash
-cd team_project2          # 저장소 폴더 (docker-sim 브랜치)
+cd team_project2          # 저장소 폴더
 docker build -t warehouse-sim .
 ```
 
@@ -160,3 +162,70 @@ docker cp ~/maps/my_map.yaml wsim:/root/maps/ && docker cp ~/maps/my_map.pgm wsi
 | `run.sh 실패` 후 서버만 떠 있음 | 컨테이너는 계속 실행됨. 로그 확인 후 웹 "실행 모드" 에서 다시 시작 |
 | DB 를 처음 상태로 | `docker volume rm warehouse-data` (맵 파일은 `warehouse-maps` 에 그대로) |
 | Mac 에서 로봇이 느리게/끊기며 움직임 | amd64 에뮬레이션 때문. 시뮬레이션 시간 기준이라 결과는 맞지만 느림. Ubuntu PC 에서 실행 권장 |
+
+---
+
+## 9. Windows 에서 실행
+
+Docker Desktop 이 WSL2 안의 리눅스에서 컨테이너를 돌리므로 이미지와 동작은 같습니다. 일반 Windows PC 는 amd64 라 에뮬레이션 없이 돕니다.
+(아직 Windows 실물에서 시험하지는 않았습니다. 문제가 있으면 이 절에 추가해 주세요.)
+
+### 준비
+
+- Docker Desktop 설정 → General → **Use the WSL 2 based engine** 켜기 (기본값)
+- 메모리: Gazebo + AMCL + 서버가 같이 돌므로 8 GB 이상 권장. WSL2 는 기본으로 PC 메모리의 절반까지 씀
+  (줄이거나 늘리려면 `%USERPROFILE%\.wslconfig` 의 `[wsl2]` 아래 `memory=8GB` 후 `wsl --shutdown`)
+- Git for Windows 로 저장소 받기
+
+### 줄바꿈 (CRLF) 주의
+
+Git for Windows 는 기본(`core.autocrlf=true`)으로 받을 때 줄바꿈을 CRLF 로 바꿉니다. 셸 스크립트가 CRLF 면 리눅스에서
+`/bin/bash^M: bad interpreter` 로 실행이 안 됩니다. 이를 두 겹으로 막아 두었습니다.
+
+- [.gitattributes](.gitattributes): `*.sh`, `*.py`, `*.yaml`, `Dockerfile` 등은 Windows 에서 받아도 LF 로 유지
+- `Dockerfile`: 이미지 안에서 `*.sh` 의 CR 을 한 번 더 지우고 실행 권한을 줌
+
+`.gitattributes` 가 들어오기 전에 받은 저장소라면 한 번 다시 받아 LF 로 맞춥니다 (고친 파일이 없을 때만):
+
+```powershell
+git rm --cached -r -q .
+git reset --hard
+```
+
+### 명령 (PowerShell)
+
+가이드의 명령은 대부분 그대로 쓰면 됩니다. 다른 점:
+
+| 가이드 (bash) | PowerShell | cmd.exe |
+|---|---|---|
+| 줄 끝 `\` 로 이어 쓰기 | 줄 끝 `` ` `` (백틱) 또는 한 줄로 | 줄 끝 `^` 또는 한 줄로 |
+| `bash -c '...'` (작은따옴표) | 그대로 | `bash -c "..."` (큰따옴표로) |
+| `~/maps/...` | 그대로 (`~` = 사용자 폴더) | `%USERPROFILE%\maps\...` |
+
+```powershell
+cd C:\work\team_project2          # 저장소 폴더
+docker build -t warehouse-sim .
+
+# 실행 (한 줄)
+docker run --rm -it --name wsim -p 8000:8000 -v warehouse-maps:/root/maps -v warehouse-data:/data warehouse-sim
+
+# 실행 (여러 줄: 백틱)
+docker run --rm -it --name wsim -p 8000:8000 `
+  -v warehouse-maps:/root/maps -v warehouse-data:/data `
+  warehouse-sim --mode slam --world turtlebot3_house
+
+# 컨테이너 안 확인
+docker exec wsim bash -c 'cd /app && source scripts/env.sh && ros2 topic hz /scan'
+docker cp wsim:/root/maps .\maps_from_docker
+```
+
+웹은 http://localhost:8000/ 입니다. 다른 PC 에서 접속하려면 Windows 방화벽에서 8000 포트(Docker Desktop)를 허용해야 합니다.
+
+### Windows 문제 해결
+
+| 증상 | 원인 / 해결 |
+|---|---|
+| `/bin/bash^M: bad interpreter` 또는 `$'\r': command not found` | 스크립트가 CRLF. 위 "줄바꿈 주의" 대로 다시 받고 다시 빌드 |
+| `docker: error during connect ... pipe/docker_engine` | Docker Desktop 이 꺼져 있음. 실행 후 고래 아이콘이 "running" 이 될 때까지 대기 |
+| 빌드/실행이 매우 느림, 메모리 부족으로 노드가 죽음 | WSL2 메모리 부족. `.wslconfig` 로 늘리고 `wsl --shutdown` 후 Docker Desktop 재시작 |
+| 다른 PC 에서 웹 접속 안 됨 | Windows 방화벽에서 8000 포트 허용 |

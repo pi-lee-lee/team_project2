@@ -34,6 +34,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 COPY . /app
+# .gitattributes 이전에 Windows 에서 받은 저장소면 스크립트가 CRLF 일 수 있으므로 LF 로 바꾸고 실행 권한을 준다
+RUN find scripts docker tools -name '*.sh' -exec sed -i 's/\r$//' {} + \
+    && chmod +x scripts/*.sh docker/*.sh
 
 # Django 서버 가상환경 (start_server.sh 가 server/.venv/bin/python 을 씀). DB 는 SQLite 라 mysqlclient 는 뺀다
 RUN python3 -m venv server/.venv \
