@@ -88,28 +88,17 @@ def _json_default(o):
     raise TypeError(f'{type(o).__name__} 은(는) 기록할 수 없습니다')
 
 
-def to_slam_scan(msg, rebin=True):
+def to_slam_scan(msg):
     """slam_toolbox 용 스캔으로 바꾼다.
-    1) (rebin=True, 실물만) 실물 LDS-02 는 빔 개수가 스캔마다 238~244 개로 바뀌는데, slam_toolbox 는 처음 등록한 개수와 다른 스캔을 전부 버린다
+    1) 실물 LDS-02 는 빔 개수가 스캔마다 238~244 개로 바뀌는데, slam_toolbox 는 처음 등록한 개수와 다른 스캔을 전부 버린다
        ("contains 243 range readings, expected 242") → 지도가 첫 몇 m² 에서 멈추고 로봇은 지도에 없는 벽 앞에서 막혔음.
        → 0~360° 를 1.5° 칸 240 개로 다시 나눠 항상 같은 개수로 넘긴다 (같은 칸에 빔이 여럿이면 가장 가까운 값).
     2) Karto 는 range_max 이상(inf 포함)인 빔을 통째로 버린다 → 3.5 m 안에 아무것도 없는 넓은 공간은 로봇이 가도 빈 칸으로
        칠해지지 않아 미탐색으로 남는다. inf 를 range_max 바로 아래로 바꾸면 Karto 는 max_laser_range 까지만 빈 칸으로 칠하고
        끝점은 장애물로 찍지 않는다. AMCL/A* 기억은 이 값을 장애물로 보므로 scan_level(원본)을 그대로 쓴다.
-    실물 LDS 는 반사 없음을 0 또는 NaN 으로 내보내는데, 0 은 너무 가까움과 구별이 안 되므로 바꾸지 않는다 (inf 만).
-    시뮬레이션(rebin=False)은 빔 개수가 360 개로 일정해 1) 이 필요 없고, 1° 빔을 1.5° 칸으로 줄이면 벽 점이 최대 4.5 cm·
-    각도 ±0.5° 어긋나 SLAM 맵이 틀어지는 데 한몫해서(2026-10-28 house) 예전처럼 2) 만 한다."""
+    실물 LDS 는 반사 없음을 0 또는 NaN 으로 내보내는데, 0 은 너무 가까움과 구별이 안 되므로 바꾸지 않는다 (inf 만)."""
     r = np.asarray(msg.ranges, dtype=np.float32).copy()
     r[np.isposinf(r)] = msg.range_max - NO_RETURN_MARGIN
-    if not rebin:
-        out = LaserScan()
-        out.header = msg.header
-        out.angle_min, out.angle_max, out.angle_increment = msg.angle_min, msg.angle_max, msg.angle_increment
-        out.time_increment, out.scan_time = msg.time_increment, msg.scan_time
-        out.range_min, out.range_max = msg.range_min, msg.range_max
-        out.ranges = r.tolist()
-        out.intensities = msg.intensities
-        return out
     inc = 2.0 * math.pi / SLAM_BEAMS
     ang = (msg.angle_min + np.arange(len(r)) * msg.angle_increment) % (2.0 * math.pi)
     idx = np.round(ang / inc).astype(int) % SLAM_BEAMS
@@ -238,8 +227,6 @@ class BridgeNode(Node):
         self.stall_timeout = p('stall_timeout')
         self.backoff_distance = p('backoff_distance')
         self.mode = p('mode')
-        # SLAM 스캔 빔 재배열(to_slam_scan)은 실물만. 시뮬레이션(use_sim_time)은 빔 개수가 일정해 원래 빔 그대로
-        self.slam_rebin = not self.get_parameter('use_sim_time').value
         # 이 브리지 실행 번호. 서버는 SLAM 실행이 바뀐 것을 알고 이전 SLAM 맵/위치(다른 좌표계)를 지운다
         self.session = self.run_session()
         self.map_dirty = False      # SLAM 모드: 서버로 보낼 새 맵이 있음
@@ -352,9 +339,9 @@ class BridgeNode(Node):
         # /cmd_vel 은 브리지만 내보낸다. 자동 이동은 self.cmd_vel_pub.publish(...) 로 선택기(CmdMux)에 넣고,
         # 수동 조작(웹 teleop, 외부 키보드 cmd_vel_teleop)·정지와 우선순위를 가려 20Hz 로 내보낸다.
         # 실물은 cmd_vel_pc 로 보내고 Pi 의 명령 감시(scripts/pi_cmd_watchdog.py)가 cmd_vel 로 넘긴다: 명령이 0.5초 넘게
-        # 안 오면 로봇 쪽에서 세움 (Wi-Fi 끊김으로 정지 명령이 9초 안 들어가 벽에 부딪힌 적 있음). 시뮬레이션은 cmd_vel 바로
-        default_cmd = 'cmd_vel_pc' if os.environ.get('WAREHOUSE_ROBOT', 'real') == 'real' else 'cmd_vel'
-        self.cmd_topic = self.declare_parameter('cmd_vel_topic', default_cmd).value
+        # 안 오면 로봇 쪽에서 세움 (Wi-Fi 끊김으로 정지 명령이 9초 안 들어가 벽에 부딪힌 적 있음).
+        # 시뮬레이션도 같은 명령 감시를 start_sim.sh 가 띄워 같은 경로로 간다
+        self.cmd_topic = self.declare_parameter('cmd_vel_topic', 'cmd_vel_pc').value
         self._cmd_out = self.create_publisher(Twist, self.cmd_topic, 1)
         self.watchdog_warned = 0.0
         self.mux = CmdMux()
@@ -904,7 +891,7 @@ class BridgeNode(Node):
             self.scan_gated_since = now
         if self.scan_gated_since is None or now - self.scan_gated_since > 3.0:
             self.level_scan_pub.publish(msg)
-            self.slam_scan_pub.publish(to_slam_scan(msg, self.slam_rebin))
+            self.slam_scan_pub.publish(to_slam_scan(msg))
             self.update_tracks(msg)   # 기울어진 스캔은 바닥을 보므로 추적/Frenet 에도 쓰지 않음
 
     def send_scan(self, msg):
