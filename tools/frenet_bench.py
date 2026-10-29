@@ -11,6 +11,8 @@
   python3 tools/frenet_bench.py 폴더 [폴더 ...]   그 기록들
   python3 tools/frenet_bench.py --set frenet.w_change=1.0   파라미터 바꿔서
   python3 tools/frenet_bench.py --recorded                  기록 당시 파라미터로 (기본은 지금 params.yaml 의 frenet.*)
+  python3 tools/frenet_bench.py --map ~/maps/map2_clean.yaml 폴더   재계획 A* 를 실물처럼 지도 + 지도에 없는 점(기억 장애물)으로
+      (기본은 쌓인 스캔 점만으로 격자 → 벽이 두껍게 쌓여 0.4 m 틈은 경로가 안 나옴. 지도 좌표가 기록과 맞는 날만)
 
 지표: 도착(done)/시간, 막힘(blocked) 시간, 주행 중 제자리 회전(출발 전 제외) 횟수, 각속도 흔들림(명령 w 의 주기당 변화 합/초),
 오프셋 바뀜 횟수, 최소 여유(차체+부착물, m).
@@ -57,7 +59,7 @@ def environment(rec, min_hits=10):
     return (keep + 0.5) * 0.02
 
 
-def astar_for(env, pts_extra=(), res=0.05, pad=1.0):
+def astar_for(env, pts_extra=(), res=0.05, pad=1.0, robot_radius=0.24):
     """환경 점으로 만든 점유 격자의 A* (본 적 없는 칸은 빈 칸으로). 브리지/플래너 설정과 같은 반경."""
     from warehouse_robot.astar import GridPlanner
     pts = np.vstack([env] + [np.asarray(pts_extra, dtype=float).reshape(-1, 2)])
@@ -67,7 +69,64 @@ def astar_for(env, pts_extra=(), res=0.05, pad=1.0):
     j = np.floor((env[:, 0] - ox) / res).astype(int)
     i = np.floor((env[:, 1] - oy) / res).astype(int)
     grid[i, j] = 100
-    return GridPlanner(grid.ravel(), w, h, res, ox, oy, robot_radius=0.24, inflation_radius=0.55)
+    return GridPlanner(grid.ravel(), w, h, res, ox, oy, robot_radius=robot_radius, inflation_radius=0.55)
+
+
+MAP = None   # --map: (점유 격자 int16 (아래 행부터), 해상도, 원점 x, y) — 지도 프레임
+
+
+def load_map(path):
+    """map_server 처럼 pgm → -1/0/100 (negate 0, occupied/free_thresh)"""
+    import yaml
+    sys.path.insert(0, os.path.join(HOME, 'tools'))
+    from clean_map import read_pgm
+    conf = yaml.safe_load(open(path, encoding='utf-8'))
+    img = read_pgm(os.path.join(os.path.dirname(path), conf['image'].strip('\'"')))[::-1]
+    p = (255.0 - img) / 255.0
+    grid = np.where(p > conf['occupied_thresh'], 100, np.where(p < conf['free_thresh'], 0, -1)).astype(np.int16)
+    return grid, float(conf['resolution']), float(conf['origin'][0]), float(conf['origin'][1])
+
+
+def replan(env, start, goal, m_o=None):
+    """실물 A* 노드처럼: robot_radius 0.24 로 없으면 fallback_radius 0.20 으로 (0.4 m 틈까지).
+    MAP 이 있으면 지도 + 로봇 2.5 m 안에서 지도 벽과 0.15 m 넘게 떨어진 환경 점(= 기억 장애물) 으로, 지도 프레임에서 계획해 odom 으로 돌려줌."""
+    from warehouse_robot.astar import GridPlanner
+    if MAP is not None and m_o is not None:
+        grid0, res, ox, oy = MAP
+        tx, ty, th = m_o
+        c, sn = math.cos(th), math.sin(th)
+        to_map = lambda P: np.c_[c * (P[:, 0] - tx) + sn * (P[:, 1] - ty), -sn * (P[:, 0] - tx) + c * (P[:, 1] - ty)]  # noqa: E731
+        env = np.asarray(env, dtype=float)
+        env = env[np.hypot(env[:, 0] - start[0], env[:, 1] - start[1]) < 2.5]   # 실물 기억도 최근에 본 것만 (20 s)
+        pm = to_map(env)
+        occ = np.argwhere(grid0 >= 65)
+        from scipy.spatial import cKDTree
+        far = cKDTree((occ[:, ::-1] + 0.5) * res + [ox, oy]).query(pm)[0] > 0.15   # A* 노드 scan_wall_margin
+        grid = grid0.copy()
+        # 실물 기억처럼 5 cm 칸에 계속 보인 것만: 칸마다 환경 점 2개 이상 (한두 점 번진 것은 빼서 기억 칸 수가 실물(3~5칸)과 비슷하게)
+        cell, cnt = np.unique(np.floor(pm[far] / 0.05).astype(int), axis=0, return_counts=True)
+        mem = (cell[cnt >= 2] + 0.5) * 0.05
+        j, i = np.floor((mem[:, 0] - ox) / res).astype(int), np.floor((mem[:, 1] - oy) / res).astype(int)
+        ok = (i >= 0) & (j >= 0) & (i < grid.shape[0]) & (j < grid.shape[1])
+        grid[i[ok], j[ok]] = 100
+        sm, gm = to_map(np.array([start, goal], dtype=float))
+        for r in (0.24, 0.20):
+            try:
+                p = GridPlanner(grid.ravel(), grid.shape[1], grid.shape[0], res, ox, oy, robot_radius=r,
+                                inflation_radius=0.55).plan(tuple(sm), tuple(gm))
+            except Exception:
+                p = None
+            if p and len(p) >= 2:
+                return R.transform_points(np.asarray(p, dtype=float), *m_o)
+        return None
+    for r in (0.24, 0.20):
+        try:
+            p = astar_for(env, [start, goal], robot_radius=r).plan(tuple(start), tuple(goal))
+        except Exception:
+            p = None
+        if p and len(p) >= 2:
+            return p
+    return None
 
 
 def run(rec, overrides=None, max_time=120.0):
@@ -88,7 +147,6 @@ def run(rec, overrides=None, max_time=120.0):
     goal_yaw = rec.start['goal']['yaw'] + m_o[2]
     f = FrenetFollower(path, goal_yaw, cfg)
     env = environment(rec)
-    planner = None
     x, y, yaw = d['pose']
     v = 0.0
     body = body_points(cfg.footprint, cfg.footprint_extra)
@@ -105,13 +163,9 @@ def run(rec, overrides=None, max_time=120.0):
         out['blocked'] += 0.1 * (st == 'blocked')
         blocked_run = blocked_run + 0.1 if st == 'blocked' else 0.0
         if st == 'blocked' and f.static_blocked and blocked_run > 1.0 and out['replans'] < 4:
-            planner = planner or astar_for(env, [(x, y), goal])
-            try:
-                newp = planner.plan((x, y), tuple(goal))
-            except Exception:
-                newp = None
+            newp = replan(env, (x, y), goal, m_o)
             out['replans'] += 1
-            if newp and len(newp) >= 2:
+            if newp is not None and len(newp) >= 2:
                 f = FrenetFollower(newp, goal_yaw, cfg)
                 off_prev, blocked_run = None, 0.0
         if blocked_run > 5.0:          # 실제 브리지는 여기서 물러나기
@@ -159,8 +213,12 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument('records', nargs='*', help='기록 (목표 폴더/파일). 기본: 가장 최근 날짜의 Frenet 기록 전부')
     ap.add_argument('--set', action='append', metavar='이름=값', help='frenet.* 파라미터 바꿔서')
+    ap.add_argument('--map', help='재계획 A* 에 쓸 지도 yaml (실물 A* 처럼 지도 + 기억 장애물)')
     ap.add_argument('--recorded', action='store_true', help='기록 당시 파라미터로 (기본: 지금 params.yaml)')
     a = ap.parse_args()
+    global MAP
+    if a.map:
+        MAP = load_map(os.path.expanduser(a.map))
     files = [R.resolve(p) for p in a.records] if a.records else None
     if not files:
         allf = [f for f in R.all_records() if '_frenet' in f]
