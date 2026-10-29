@@ -303,8 +303,8 @@
 <text x="64.0" y="985.0" class="item" >control_step 은 20 Hz, Frenet 계산은 0.1 s 마다</text>
 <text x="64.0" y="1004.0" class="small" >그 사이 0.05 s 는 같은 명령 (계산 약 10 ms)</text>
 <circle cx="54" cy="1019" r="2.6" fill="#6b7280"/>
-<text x="64.0" y="1023.0" class="item" >실물: 브리지 → cmd_vel_pc → Pi 감시 노드 → cmd_vel</text>
-<text x="64.0" y="1042.0" class="small" >0.5 s 명령이 끊기면 Pi 쪽에서 정지</text>
+<text x="64.0" y="1023.0" class="item" >브리지 → cmd_vel_pc → 명령 감시 노드 → cmd_vel</text>
+<text x="64.0" y="1042.0" class="small" >실물은 Pi, 시뮬레이션은 PC 에서 감시. 0.5 s 명령이 끊기면 정지</text>
 <rect x="550" y="622" width="520" height="482" rx="14" class="card" stroke="#b45309"/>
 <rect x="550" y="622" width="520" height="40" rx="14" fill="#b45309"/>
 <rect x="550" y="648" width="520" height="14" fill="#b45309"/>
