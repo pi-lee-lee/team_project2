@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>라이프사이클 0 · 개요</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #f4f6fb; }
+  body { display: flex; align-items: center; justify-content: center; }
+  svg { width: min(100vw, calc(100vh * 16 / 9)); height: auto; display: block; }
+</style>
+</head>
+<body>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900">
+<defs>
+
+    <style>
+      text { font-family: "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", sans-serif; fill: #1f2937; }
+      .title { font-size: 34px; font-weight: 800; fill: #111827; }
+      .subtitle { font-size: 16px; fill: #4b5563; }
+      .colhead { font-size: 15px; font-weight: 700; fill: #ffffff; }
+      .lanesub { font-size: 12px; fill: #4b5563; font-weight: 700; }
+      .lbl { font-size: 13px; font-weight: 700; fill: #111827; }
+      .lblsub { font-size: 11.5px; fill: #4b5563; }
+      .note { font-size: 12.5px; fill: #1f2937; }
+      .notesub { font-size: 11.5px; fill: #4b5563; }
+      .small { font-size: 11.5px; fill: #4b5563; }
+      .sec { font-size: 13px; font-weight: 800; fill: #374151; }
+      .num { font-size: 11px; font-weight: 800; fill: #ffffff; }
+      .halo { paint-order: stroke; stroke: #f4f6fb; stroke-width: 5px; stroke-linejoin: round; }
+      .mono { font-family: Menlo, Consolas, monospace; }
+      .cellt { font-size: 15px; font-weight: 800; fill: #111827; }
+      .cell { font-size: 12.5px; fill: #374151; }
+    </style>
+<marker id="a_ws" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#2563eb"/></marker>
+<marker id="a_ros" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#059669"/></marker>
+<marker id="a_run" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#6b7280"/></marker>
+<marker id="a_db" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#7c3aed"/></marker>
+<marker id="a_http" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#0891b2"/></marker>
+<marker id="a_warn" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#dc2626"/></marker>
+</defs>
+<rect width="1600" height="900" fill="#f4f6fb"/>
+<rect x="30" y="28" width="8" height="56" rx="3" fill="#2563eb"/>
+<text x="52.0" y="62.0" class="title" text-anchor="start">라이프사이클 0 — 개요</text>
+<text x="54.0" y="86.0" class="subtitle" text-anchor="start">시스템 구동부터 종료까지 5단계. 참여 순서: Django → 로봇(Pi) → 위치 추정 → 브리지 → 브라우저 (가장 나중)</text>
+<rect x="1500" y="40" width="70" height="22" rx="11" fill="#111827"/>
+<text x="1535.0" y="55.0" class="num" text-anchor="middle" style="font-size:12px">0 / 5</text>
+<rect x="254" y="110" width="256" height="34" rx="10" fill="#1f2937"/>
+<text x="382.0" y="128.0" class="colhead" text-anchor="middle">1. 기동</text>
+<text x="382.0" y="140.0" class="num" text-anchor="middle" style="font-size:10.5px;font-weight:600;fill:#cbd5e1">run.sh</text>
+<rect x="518" y="110" width="256" height="34" rx="10" fill="#1f2937"/>
+<text x="646.0" y="128.0" class="colhead" text-anchor="middle">2. 연결 · 등록</text>
+<text x="646.0" y="140.0" class="num" text-anchor="middle" style="font-size:10.5px;font-weight:600;fill:#cbd5e1">hello · snapshot</text>
+<line x1="514" y1="150" x2="514" y2="678" stroke="#cbd5e1" stroke-dasharray="4 5"/>
+<rect x="782" y="110" width="256" height="34" rx="10" fill="#1f2937"/>
+<text x="910.0" y="128.0" class="colhead" text-anchor="middle">3. 이동 1회</text>
+<text x="910.0" y="140.0" class="num" text-anchor="middle" style="font-size:10.5px;font-weight:600;fill:#cbd5e1">goto → nav_status</text>
+<line x1="778" y1="150" x2="778" y2="678" stroke="#cbd5e1" stroke-dasharray="4 5"/>
+<rect x="1046" y="110" width="256" height="34" rx="10" fill="#1f2937"/>
+<text x="1174.0" y="128.0" class="colhead" text-anchor="middle">4. 주문 작업</text>
+<text x="1174.0" y="140.0" class="num" text-anchor="middle" style="font-size:10.5px;font-weight:600;fill:#cbd5e1">load → unload → 홈</text>
+<line x1="1042" y1="150" x2="1042" y2="678" stroke="#cbd5e1" stroke-dasharray="4 5"/>
+<rect x="1310" y="110" width="256" height="34" rx="10" fill="#1f2937"/>
+<text x="1438.0" y="128.0" class="colhead" text-anchor="middle">5. 이상 · 종료</text>
+<text x="1438.0" y="140.0" class="num" text-anchor="middle" style="font-size:10.5px;font-weight:600;fill:#cbd5e1">끊김 · stop_ros.sh</text>
+<line x1="1306" y1="150" x2="1306" y2="678" stroke="#cbd5e1" stroke-dasharray="4 5"/>
+<rect x="30" y="156" width="1540" height="120" rx="12" fill="#ffffff" stroke="#2563eb" stroke-width="1.6"/>
+<rect x="30" y="156" width="200" height="120" rx="12" fill="#eff6ff" stroke="#2563eb" stroke-width="1.6"/>
+<text x="46.0" y="206.0" class="cellt" text-anchor="start">① 브라우저</text>
+<text x="46.0" y="228.0" class="small" text-anchor="start">index · order · robot</text>
+<rect x="659.2" y="167" width="746.4000000000001" height="10" rx="5" fill="#2563eb" opacity="0.85"/>
+<circle cx="659.2" cy="172" r="8" fill="#2563eb"/>
+<rect x="1403.6000000000001" y="163" width="4" height="18" fill="#2563eb"/>
+<text x="268.0" y="204.0" class="cell" text-anchor="start">(참여 전)</text>
+<text x="532.0" y="204.0" class="cell" text-anchor="start">GET / → /ws/ui/ 접속</text>
+<text x="532.0" y="223.0" class="cell" text-anchor="start">snapshot 으로 전체 상태</text>
+<text x="532.0" y="242.0" class="cell" text-anchor="start">초기 위치 지정</text>
+<text x="796.0" y="204.0" class="cell" text-anchor="start">지도 클릭 → goto_point</text>
+<text x="796.0" y="223.0" class="cell" text-anchor="start">pose · path · local_plan</text>
+<text x="796.0" y="242.0" class="cell" text-anchor="start">표시 (LIVE 중계)</text>
+<text x="1060.0" y="204.0" class="cell" text-anchor="start">/order: start_order</text>
+<text x="1060.0" y="223.0" class="cell" text-anchor="start">/robot: 적재 · 하역 확인</text>
+<text x="1060.0" y="242.0" class="cell" text-anchor="start">불일치 → force_next</text>
+<text x="1324.0" y="204.0" class="cell" text-anchor="start">OFFLINE 표시</text>
+<text x="1324.0" y="223.0" class="cell" text-anchor="start">탭을 닫으면 연결만 끊김</text>
+<rect x="30" y="288" width="1540" height="120" rx="12" fill="#ffffff" stroke="#7c3aed" stroke-width="1.6"/>
+<rect x="30" y="288" width="200" height="120" rx="12" fill="#f5f3ff" stroke="#7c3aed" stroke-width="1.6"/>
+<text x="46.0" y="338.0" class="cellt" text-anchor="start">② Django</text>
+<text x="46.0" y="360.0" class="small" text-anchor="start">daphne :8000</text>
+<rect x="265.84" y="299" width="1298.16" height="10" rx="5" fill="#7c3aed" opacity="0.85"/>
+<circle cx="265.84" cy="304" r="8" fill="#7c3aed"/>
+<rect x="1562.0" y="295" width="4" height="18" fill="#7c3aed"/>
+<text x="268.0" y="336.0" class="cell" text-anchor="start">start_server.sh</text>
+<text x="268.0" y="355.0" class="cell" text-anchor="start">→ runserver :8000</text>
+<text x="268.0" y="374.0" class="cell" text-anchor="start">WS 접속 대기</text>
+<text x="532.0" y="336.0" class="cell" text-anchor="start">hello → IDLE (DB)</text>
+<text x="532.0" y="355.0" class="cell" text-anchor="start">map → Map 저장 · 활성</text>
+<text x="532.0" y="374.0" class="cell" text-anchor="start">UI 접속 → snapshot</text>
+<text x="796.0" y="336.0" class="cell" text-anchor="start">Task + TaskStep 생성</text>
+<text x="796.0" y="355.0" class="cell" text-anchor="start">goto 전송 · MOVING</text>
+<text x="796.0" y="374.0" class="cell" text-anchor="start">succeeded → IDLE</text>
+<text x="1060.0" y="336.0" class="cell" text-anchor="start">단계별 goto</text>
+<text x="1060.0" y="355.0" class="cell" text-anchor="start">도착 → yolo_set on</text>
+<text x="1060.0" y="374.0" class="cell" text-anchor="start">check_counts → 다음</text>
+<text x="1324.0" y="336.0" class="cell" text-anchor="start">끊김 → OFFLINE</text>
+<text x="1324.0" y="355.0" class="cell" text-anchor="start">LIVE 비움</text>
+<text x="1324.0" y="374.0" class="cell" text-anchor="start">--all 일 때만 종료</text>
+<rect x="30" y="420" width="1540" height="120" rx="12" fill="#ffffff" stroke="#059669" stroke-width="1.6"/>
+<rect x="30" y="420" width="200" height="120" rx="12" fill="#ecfdf5" stroke="#059669" stroke-width="1.6"/>
+<text x="46.0" y="470.0" class="cellt" text-anchor="start">③ 브리지 · ROS 2</text>
+<text x="46.0" y="492.0" class="small" text-anchor="start">bridge · AMCL · A*</text>
+<rect x="448.0" y="431" width="1015.6800000000001" height="10" rx="5" fill="#059669" opacity="0.85"/>
+<circle cx="448.0" cy="436" r="8" fill="#059669"/>
+<rect x="1461.68" y="427" width="4" height="18" fill="#059669"/>
+<text x="268.0" y="468.0" class="cell" text-anchor="start">start_nav2.sh (AMCL)</text>
+<text x="268.0" y="487.0" class="cell" text-anchor="start">start_bridge.sh</text>
+<text x="268.0" y="506.0" class="cell" text-anchor="start">→ bridge · A* · YOLO</text>
+<text x="532.0" y="468.0" class="cell" text-anchor="start">WS 접속 (2초 재시도)</text>
+<text x="532.0" y="487.0" class="cell" text-anchor="start">hello · map · params</text>
+<text x="532.0" y="506.0" class="cell" text-anchor="start">scan_level → AMCL</text>
+<text x="796.0" y="468.0" class="cell" text-anchor="start">A* 경로 → Frenet</text>
+<text x="796.0" y="487.0" class="cell" text-anchor="start">0.1초마다 cmd_vel_pc</text>
+<text x="796.0" y="506.0" class="cell" text-anchor="start">도착 → nav_status</text>
+<text x="1060.0" y="468.0" class="cell" text-anchor="start">도착 시 YOLO 켬</text>
+<text x="1060.0" y="487.0" class="cell" text-anchor="start">/yolo/counts → 서버</text>
+<text x="1060.0" y="506.0" class="cell" text-anchor="start">떠날 때 끔</text>
+<text x="1324.0" y="468.0" class="cell" text-anchor="start">위치 0.5초 지연 → 정지</text>
+<text x="1324.0" y="487.0" class="cell" text-anchor="start">stop_ros.sh 가</text>
+<text x="1324.0" y="506.0" class="cell" text-anchor="start">노드 종료</text>
+<rect x="30" y="552" width="1540" height="120" rx="12" fill="#ffffff" stroke="#ea580c" stroke-width="1.6"/>
+<rect x="30" y="552" width="200" height="120" rx="12" fill="#fff7ed" stroke="#ea580c" stroke-width="1.6"/>
+<text x="46.0" y="602.0" class="cellt" text-anchor="start">④ 로봇 (Pi)</text>
+<text x="46.0" y="624.0" class="small" text-anchor="start">bringup · 워치독</text>
+<rect x="342.4" y="563" width="1221.6" height="10" rx="5" fill="#ea580c" opacity="0.85"/>
+<circle cx="342.4" cy="568" r="8" fill="#ea580c"/>
+<path d="M1564.0,559 L1576.0,568 L1564.0,577 z" fill="#ea580c"/>
+<text x="268.0" y="600.0" class="cell" text-anchor="start">SSH → bringup</text>
+<text x="268.0" y="619.0" class="cell" text-anchor="start">워치독 · 카메라 시작</text>
+<text x="532.0" y="600.0" class="cell" text-anchor="start">/scan /odom /imu</text>
+<text x="532.0" y="619.0" class="cell" text-anchor="start">/tf /tf_static 발행</text>
+<text x="796.0" y="600.0" class="cell" text-anchor="start">워치독: cmd_vel_pc</text>
+<text x="796.0" y="619.0" class="cell" text-anchor="start">→ cmd_vel → 바퀴</text>
+<text x="1060.0" y="600.0" class="cell" text-anchor="start">카메라 영상</text>
+<text x="1060.0" y="619.0" class="cell" text-anchor="start">(YOLO 켜졌을 때만</text>
+<text x="1060.0" y="638.0" class="cell" text-anchor="start"> Wi-Fi 로 감)</text>
+<text x="1324.0" y="600.0" class="cell" text-anchor="start">명령 0.5초 끊김 → 정지</text>
+<text x="1324.0" y="619.0" class="cell" text-anchor="start">bringup 은 계속 켜 둠</text>
+<text x="36.0" y="708.0" class="sec" text-anchor="start">Robot.state (DB) 흐름</text>
+<rect x="36" y="722" width="78.78" height="28" rx="14" fill="#9ca3af"/>
+<text x="75.4" y="741.0" class="colhead" text-anchor="middle" style="font-size:13px">OFFLINE</text>
+<line x1="120.78" y1="736" x2="160.78" y2="736" stroke="#94a3b8" stroke-width="2" marker-end="url(#a_run)"/>
+<text x="140.8" y="724.0" class="lblsub" text-anchor="middle">hello</text>
+<rect x="166.78" y="722" width="56.16" height="28" rx="14" fill="#059669"/>
+<text x="194.9" y="741.0" class="colhead" text-anchor="middle" style="font-size:13px">IDLE</text>
+<line x1="228.94" y1="736" x2="268.94" y2="736" stroke="#94a3b8" stroke-width="2" marker-end="url(#a_run)"/>
+<text x="248.9" y="724.0" class="lblsub" text-anchor="middle">goto</text>
+<rect x="274.94" y="722" width="74.1" height="28" rx="14" fill="#2563eb"/>
+<text x="312.0" y="741.0" class="colhead" text-anchor="middle" style="font-size:13px">MOVING</text>
+<line x1="355.03999999999996" y1="736" x2="395.03999999999996" y2="736" stroke="#94a3b8" stroke-width="2" marker-end="url(#a_run)"/>
+<text x="375.0" y="724.0" class="lblsub" text-anchor="middle">load 도착</text>
+<rect x="401.03999999999996" y="722" width="119.33999999999997" height="28" rx="14" fill="#d97706"/>
+<text x="460.7" y="741.0" class="colhead" text-anchor="middle" style="font-size:13px">WAITING_LOAD</text>
+<line x1="526.3799999999999" y1="736" x2="566.3799999999999" y2="736" stroke="#94a3b8" stroke-width="2" marker-end="url(#a_run)"/>
+<text x="546.4" y="724.0" class="lblsub" text-anchor="middle">확인</text>
+<rect x="572.3799999999999" y="722" width="74.1" height="28" rx="14" fill="#2563eb"/>
+<text x="609.4" y="741.0" class="colhead" text-anchor="middle" style="font-size:13px">MOVING</text>
+<line x1="652.4799999999999" y1="736" x2="692.4799999999999" y2="736" stroke="#94a3b8" stroke-width="2" marker-end="url(#a_run)"/>
+<text x="672.5" y="724.0" class="lblsub" text-anchor="middle">unload 도착</text>
+<rect x="698.4799999999999" y="722" width="134.41999999999996" height="28" rx="14" fill="#d97706"/>
+<text x="765.7" y="741.0" class="colhead" text-anchor="middle" style="font-size:13px">WAITING_UNLOAD</text>
+<line x1="838.8999999999999" y1="736" x2="878.8999999999999" y2="736" stroke="#94a3b8" stroke-width="2" marker-end="url(#a_run)"/>
+<text x="858.9" y="724.0" class="lblsub" text-anchor="middle">확인</text>
+<rect x="884.8999999999999" y="722" width="74.1" height="28" rx="14" fill="#2563eb"/>
+<text x="921.9" y="741.0" class="colhead" text-anchor="middle" style="font-size:13px">MOVING</text>
+<line x1="964.9999999999999" y1="736" x2="1004.9999999999999" y2="736" stroke="#94a3b8" stroke-width="2" marker-end="url(#a_run)"/>
+<text x="985.0" y="724.0" class="lblsub" text-anchor="middle">홈 도착</text>
+<rect x="1010.9999999999999" y="722" width="56.16" height="28" rx="14" fill="#059669"/>
+<text x="1039.1" y="741.0" class="colhead" text-anchor="middle" style="font-size:13px">IDLE</text>
+<line x1="1073.1599999999999" y1="736" x2="1113.1599999999999" y2="736" stroke="#94a3b8" stroke-width="2" marker-end="url(#a_run)"/>
+<text x="1093.2" y="724.0" class="lblsub" text-anchor="middle">끊김</text>
+<rect x="1119.1599999999999" y="722" width="78.78" height="28" rx="14" fill="#9ca3af"/>
+<text x="1158.5" y="741.0" class="colhead" text-anchor="middle" style="font-size:13px">OFFLINE</text>
+<text x="36.0" y="774.0" class="small" text-anchor="start">ERROR: 여러 단계 작업 중 이동 실패 · 재연결로 이동이 끊김 → 재시도 / 건너뛰기 / 취소 / 상태 초기화로 빠져나감</text>
+<rect x="30" y="800" width="1540" height="64" rx="12" fill="#ffffff" stroke="#e5e7eb"/>
+<circle cx="62" cy="832" r="13" fill="#1f2937"/>
+<text x="62.0" y="837.0" class="num" text-anchor="middle" style="font-size:13px">1</text>
+<text x="84.0" y="828.0" class="lbl" text-anchor="start">lifecycle_1 · 기동</text>
+<text x="84.0" y="846.0" class="small" text-anchor="start">run.sh 가 띄우는 순서</text>
+<circle cx="367" cy="832" r="13" fill="#1f2937"/>
+<text x="367.0" y="837.0" class="num" text-anchor="middle" style="font-size:13px">2</text>
+<text x="389.0" y="828.0" class="lbl" text-anchor="start">lifecycle_2 · 연결 · 등록</text>
+<text x="389.0" y="846.0" class="small" text-anchor="start">hello · map · snapshot · 초기 위치</text>
+<circle cx="672" cy="832" r="13" fill="#1f2937"/>
+<text x="672.0" y="837.0" class="num" text-anchor="middle" style="font-size:13px">3</text>
+<text x="694.0" y="828.0" class="lbl" text-anchor="start">lifecycle_3 · 이동 1회</text>
+<text x="694.0" y="846.0" class="small" text-anchor="start">goto → A* → Frenet → succeeded</text>
+<circle cx="977" cy="832" r="13" fill="#1f2937"/>
+<text x="977.0" y="837.0" class="num" text-anchor="middle" style="font-size:13px">4</text>
+<text x="999.0" y="828.0" class="lbl" text-anchor="start">lifecycle_4 · 주문 작업</text>
+<text x="999.0" y="846.0" class="small" text-anchor="start">YOLO 개수 확인 · force_next</text>
+<circle cx="1282" cy="832" r="13" fill="#1f2937"/>
+<text x="1282.0" y="837.0" class="num" text-anchor="middle" style="font-size:13px">5</text>
+<text x="1304.0" y="828.0" class="lbl" text-anchor="start">lifecycle_5 · 이상 · 종료</text>
+<text x="1304.0" y="846.0" class="small" text-anchor="start">Wi-Fi 지연 · 끊김 · stop_ros.sh</text>
+<text x="36.0" y="884.0" class="small" text-anchor="start">막대 = 실행 중인 구간 (● 참여 시점, ▶ 종료 후에도 계속 켜 둠, | 종료). 브라우저 막대 끝은 탭을 닫는 시점의 예.</text>
+</svg>
+</body>
+</html>

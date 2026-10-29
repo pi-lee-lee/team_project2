@@ -1,0 +1,157 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" width="1600" height="900">
+<defs>
+
+    <style>
+      text { font-family: "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", sans-serif; fill: #1f2937; }
+      .title { font-size: 34px; font-weight: 800; fill: #111827; }
+      .subtitle { font-size: 16px; fill: #4b5563; }
+      .colhead { font-size: 15px; font-weight: 700; fill: #ffffff; }
+      .lanesub { font-size: 12px; fill: #4b5563; font-weight: 700; }
+      .lbl { font-size: 13px; font-weight: 700; fill: #111827; }
+      .lblsub { font-size: 11.5px; fill: #4b5563; }
+      .note { font-size: 12.5px; fill: #1f2937; }
+      .notesub { font-size: 11.5px; fill: #4b5563; }
+      .small { font-size: 11.5px; fill: #4b5563; }
+      .sec { font-size: 13px; font-weight: 800; fill: #374151; }
+      .num { font-size: 11px; font-weight: 800; fill: #ffffff; }
+      .halo { paint-order: stroke; stroke: #f4f6fb; stroke-width: 5px; stroke-linejoin: round; }
+      .mono { font-family: Menlo, Consolas, monospace; }
+      .cellt { font-size: 15px; font-weight: 800; fill: #111827; }
+      .cell { font-size: 12.5px; fill: #374151; }
+    </style>
+<marker id="a_ws" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#2563eb"/></marker>
+<marker id="a_ros" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#059669"/></marker>
+<marker id="a_run" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#6b7280"/></marker>
+<marker id="a_db" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#7c3aed"/></marker>
+<marker id="a_http" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#0891b2"/></marker>
+<marker id="a_warn" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#dc2626"/></marker>
+</defs>
+<rect width="1600" height="900" fill="#f4f6fb"/>
+<rect x="30" y="28" width="8" height="56" rx="3" fill="#2563eb"/>
+<text x="52.0" y="62.0" class="title" text-anchor="start">라이프사이클 5 — 이상 · 종료</text>
+<text x="54.0" y="86.0" class="subtitle" text-anchor="start">Wi-Fi 지연과 연결 끊김은 각 단계에서 멈추고 기다림. 종료는 stop_ros.sh: PC 의 ROS 노드만 끄고 Pi 는 그대로</text>
+<g transform="translate(1150,30)">
+<rect x="0" y="0" width="420" height="60" rx="8" fill="#ffffff" stroke="#e5e7eb"/>
+<line x1="14" y1="18" x2="42" y2="18" stroke="#2563eb" stroke-width="2.4" marker-end="url(#a_ws)"/>
+<text x="50.0" y="22.0" class="small" text-anchor="start">WebSocket (JSON)</text>
+<line x1="150" y1="18" x2="178" y2="18" stroke="#059669" stroke-width="2.4" marker-end="url(#a_ros)"/>
+<text x="186.0" y="22.0" class="small" text-anchor="start">ROS 2 토픽/서비스</text>
+<line x1="290" y1="18" x2="318" y2="18" stroke="#0891b2" stroke-width="2.4" marker-end="url(#a_http)"/>
+<text x="326.0" y="22.0" class="small" text-anchor="start">HTTP</text>
+<line x1="14" y1="42" x2="42" y2="42" stroke="#6b7280" stroke-width="2.4" stroke-dasharray="5 4" marker-end="url(#a_run)"/>
+<text x="50.0" y="46.0" class="small" text-anchor="start">프로세스 실행·종료</text>
+<line x1="150" y1="42" x2="178" y2="42" stroke="#7c3aed" stroke-width="2.4" marker-end="url(#a_db)"/>
+<text x="186.0" y="46.0" class="small" text-anchor="start">DB 읽기/쓰기</text>
+<rect x="290" y="35" width="12" height="14" rx="2" fill="#059669"/>
+<text x="308.0" y="46.0" class="small" text-anchor="start">실행 중 (활성)</text>
+</g>
+<rect x="1500" y="96" width="70" height="22" rx="11" fill="#111827"/>
+<text x="1535.0" y="111.0" class="num" text-anchor="middle" style="font-size:12px">5 / 5</text>
+<rect x="30" y="122" width="200" height="28" rx="14" fill="#2563eb"/>
+<text x="130.0" y="141.0" class="colhead" text-anchor="middle">① 사용자 브라우저</text>
+<text x="130.0" y="165.0" class="lanesub" text-anchor="middle">index.html · app.js</text>
+<rect x="238" y="122" width="124" height="28" rx="14" fill="#6b7280"/>
+<text x="300.0" y="141.0" class="colhead" text-anchor="middle">터미널 (PC)</text>
+<text x="300.0" y="165.0" class="lanesub" text-anchor="middle">scripts/*.sh</text>
+<rect x="372" y="122" width="216" height="28" rx="14" fill="#7c3aed"/>
+<text x="480.0" y="141.0" class="colhead" text-anchor="middle">② Django 서버 (PC)</text>
+<text x="480.0" y="165.0" class="lanesub" text-anchor="middle">daphne :8000 · services.py</text>
+<rect x="1290" y="122" width="260" height="28" rx="14" fill="#ea580c"/>
+<text x="1420.0" y="141.0" class="colhead" text-anchor="middle">④ 로봇 (Raspberry Pi)</text>
+<text x="1420.0" y="165.0" class="lanesub" text-anchor="middle">bringup · 워치독 · 카메라</text>
+<rect x="650" y="122" width="590" height="28" rx="14" fill="#059669"/>
+<text x="945.0" y="141.0" class="colhead" text-anchor="middle">③ PC · ROS 2 (도메인 44, Cyclone DDS)</text>
+<text x="800.0" y="165.0" class="lanesub" text-anchor="middle">bridge_node</text>
+<text x="1090.0" y="165.0" class="lanesub" text-anchor="middle">AMCL · map_server · A* · YOLO</text>
+<line x1="24" y1="196" x2="1576" y2="196" stroke="#cbd5e1" stroke-width="1.2" stroke-dasharray="6 5"/>
+<line x1="24" y1="390" x2="1576" y2="390" stroke="#cbd5e1" stroke-width="1.2" stroke-dasharray="6 5"/>
+<line x1="24" y1="540" x2="1576" y2="540" stroke="#cbd5e1" stroke-width="1.2" stroke-dasharray="6 5"/>
+<line x1="24" y1="616" x2="1576" y2="616" stroke="#cbd5e1" stroke-width="1.2" stroke-dasharray="6 5"/>
+<line x1="130" y1="174" x2="130" y2="850" stroke="#cbd5e1" stroke-width="1.5" stroke-dasharray="3 5"/>
+<rect x="125" y="182" width="10" height="394" rx="3" fill="#2563eb" opacity="0.85"/>
+<line x1="300" y1="174" x2="300" y2="850" stroke="#cbd5e1" stroke-width="1.5" stroke-dasharray="3 5"/>
+<rect x="295" y="632" width="10" height="194" rx="3" fill="#6b7280" opacity="0.85"/>
+<line x1="480" y1="174" x2="480" y2="850" stroke="#cbd5e1" stroke-width="1.5" stroke-dasharray="3 5"/>
+<rect x="475" y="182" width="10" height="624" rx="3" fill="#7c3aed" opacity="0.85"/>
+<line x1="800" y1="174" x2="800" y2="850" stroke="#cbd5e1" stroke-width="1.5" stroke-dasharray="3 5"/>
+<rect x="795" y="182" width="10" height="498" rx="3" fill="#059669" opacity="0.85"/>
+<line x1="1090" y1="174" x2="1090" y2="850" stroke="#cbd5e1" stroke-width="1.5" stroke-dasharray="3 5"/>
+<rect x="1085" y="182" width="10" height="580" rx="3" fill="#059669" opacity="0.85"/>
+<line x1="1420" y1="174" x2="1420" y2="850" stroke="#cbd5e1" stroke-width="1.5" stroke-dasharray="3 5"/>
+<rect x="1415" y="182" width="10" height="668" rx="3" fill="#ea580c" opacity="0.85"/>
+<path d="M1411,850 L1429,850 L1420,862 z" fill="#ea580c"/>
+<rect x="1415.78" y="185" width="160.21999999999997" height="22" rx="11" fill="#e2e8f0"/>
+<text x="1495.9" y="200.5" class="sec" text-anchor="middle">A. Wi-Fi 지연 (주행 중)</text>
+<line x1="1413" y1="232" x2="807" y2="232" stroke="#059669" stroke-width="2.2" marker-end="url(#a_ros)"/>
+<circle cx="1231.06" cy="222" r="9" fill="#059669"/>
+<text x="1231.1" y="226.0" class="num" text-anchor="middle">1</text>
+<text x="1290.0" y="226.0" class="lbl halo" text-anchor="middle">/odom 늦게 옴</text>
+<path d="M1164,226 L1176,238 M1176,226 L1164,238" stroke="#dc2626" stroke-width="3" stroke-linecap="round"/>
+<rect x="721.5" y="246" width="317.0" height="61" rx="7" fill="#ffffff" stroke="#059669" stroke-width="1.4"/>
+<text x="733.5" y="264.0" class="lbl" text-anchor="start">위치 나이 &gt; 0.5초 (tf_timeout) → 그 자리 정지</text>
+<text x="733.5" y="281.0" class="note" text-anchor="start">목표 유지, 다시 오면 이어 감</text>
+<text x="733.5" y="298.0" class="note" text-anchor="start">3초 (pose_lost_timeout) 넘으면 failed</text>
+<rect x="1323.5" y="246" width="193.0" height="44" rx="7" fill="#ffffff" stroke="#ea580c" stroke-width="1.4"/>
+<text x="1335.5" y="264.0" class="note" text-anchor="start">워치독: cmd_vel_pc 가 0.5초</text>
+<text x="1335.5" y="281.0" class="note" text-anchor="start">안 오면 cmd_vel = 0</text>
+<line x1="793" y1="344" x2="487" y2="344" stroke="#2563eb" stroke-width="2.2" marker-end="url(#a_ws)"/>
+<circle cx="542.97" cy="334" r="9" fill="#2563eb"/>
+<text x="543.0" y="338.0" class="num" text-anchor="middle">2</text>
+<text x="640.0" y="338.0" class="lbl halo" text-anchor="middle">health {robot_ok: false}</text>
+<text x="640.0" y="359.0" class="lblsub halo" text-anchor="middle">LiDAR·odom 2초 넘게 없음</text>
+<rect x="207.0" y="304" width="186.0" height="44" rx="7" fill="#ffffff" stroke="#7c3aed" stroke-width="1.4"/>
+<text x="219.0" y="322.0" class="note" text-anchor="start">robot_health → OFFLINE</text>
+<text x="219.0" y="339.0" class="note" text-anchor="start">돌아오면 작업 상태대로 복귀</text>
+<rect x="1442.82" y="379" width="133.18" height="22" rx="11" fill="#e2e8f0"/>
+<text x="1509.4" y="394.5" class="sec" text-anchor="middle">B. 브리지 연결 끊김</text>
+<line x1="793" y1="424" x2="487" y2="424" stroke="#2563eb" stroke-width="2.2" marker-end="url(#a_ws)"/>
+<circle cx="524.56" cy="414" r="9" fill="#2563eb"/>
+<text x="524.6" y="418.0" class="num" text-anchor="middle">3</text>
+<text x="590.0" y="418.0" class="lbl halo" text-anchor="middle">WebSocket 끊김</text>
+<path d="M694,418 L706,430 M706,418 L694,430" stroke="#dc2626" stroke-width="3" stroke-linecap="round"/>
+<rect x="507.2" y="438" width="265.5" height="44" rx="7" fill="#ffffff" stroke="#7c3aed" stroke-width="1.4"/>
+<text x="519.2" y="456.0" class="lbl" text-anchor="start">RobotConsumer.disconnect</text>
+<text x="519.2" y="473.0" class="note" text-anchor="start">LIVE 에서 제거 · Robot.state = OFFLINE</text>
+<line x1="473" y1="500" x2="137" y2="500" stroke="#2563eb" stroke-width="2.2" marker-end="url(#a_ws)"/>
+<circle cx="195.88000000000005" cy="490" r="9" fill="#2563eb"/>
+<text x="195.9" y="494.0" class="num" text-anchor="middle">4</text>
+<text x="305.0" y="494.0" class="lbl halo" text-anchor="middle">pose lost · path [] · OFFLINE</text>
+<rect x="879.5" y="486" width="241.0" height="44" rx="7" fill="#f8fafc" stroke="#64748b" stroke-width="1.4"/>
+<text x="891.5" y="504.0" class="note" text-anchor="start">재접속 → hello → robot_connected</text>
+<text x="891.5" y="521.0" class="note" text-anchor="start">진행 중이던 단계에 맞춰 상태 복구</text>
+<rect x="1459.98" y="529" width="116.02" height="22" rx="11" fill="#e2e8f0"/>
+<text x="1518.0" y="544.5" class="sec" text-anchor="middle">C. 브라우저 닫힘</text>
+<line x1="137" y1="576" x2="473" y2="576" stroke="#2563eb" stroke-width="2.2" marker-end="url(#a_ws)"/>
+<circle cx="217.59000000000003" cy="566" r="9" fill="#2563eb"/>
+<text x="217.6" y="570.0" class="num" text-anchor="middle">5</text>
+<text x="305.0" y="570.0" class="lbl halo" text-anchor="middle">탭 닫힘 (/ws/ui/ 끊김)</text>
+<rect x="572.4" y="556" width="295.2" height="44" rx="7" fill="#ffffff" stroke="#7c3aed" stroke-width="1.4"/>
+<text x="584.4" y="574.0" class="note" text-anchor="start">UIConsumer.disconnect: 그룹 ui 에서 빠질 뿐</text>
+<text x="584.4" y="591.0" class="note" text-anchor="start">로봇 · 작업은 그대로 진행</text>
+<rect x="1371.3200000000002" y="605" width="204.67999999999986" height="22" rx="11" fill="#e2e8f0"/>
+<text x="1473.7" y="620.5" class="sec" text-anchor="middle">D. 종료: scripts/stop_ros.sh</text>
+<rect x="206.0" y="632" width="188.1" height="27" rx="7" fill="#ffffff" stroke="#6b7280" stroke-width="1.4"/>
+<text x="218.0" y="650.0" class="lbl" text-anchor="start">사람: stop_ros.sh [--all]</text>
+<line x1="307" y1="680" x2="793" y2="680" stroke="#6b7280" stroke-width="2.2" stroke-dasharray="6 4" marker-end="url(#a_run)"/>
+<circle cx="449.13" cy="670" r="9" fill="#6b7280"/>
+<text x="449.1" y="674.0" class="num" text-anchor="middle">6</text>
+<text x="620.0" y="674.0" class="lbl halo" text-anchor="middle">SIGINT → SIGTERM → SIGKILL (bridge · launch)</text>
+<text x="620.0" y="695.0" class="lblsub halo" text-anchor="middle">실행 스크립트 → ros2 launch → 노드 순</text>
+<line x1="793" y1="724" x2="487" y2="724" stroke="#2563eb" stroke-width="2.2" marker-end="url(#a_ws)"/>
+<text x="640.0" y="718.0" class="lbl halo" text-anchor="middle">WS 끊김 → B 와 같음 (OFFLINE)</text>
+<line x1="307" y1="762" x2="1083" y2="762" stroke="#6b7280" stroke-width="2.2" stroke-dasharray="6 4" marker-end="url(#a_run)"/>
+<circle cx="666.25" cy="752" r="9" fill="#6b7280"/>
+<text x="666.2" y="756.0" class="num" text-anchor="middle">7</text>
+<text x="860.0" y="756.0" class="lbl halo" text-anchor="middle">AMCL · map_server · lifecycle_manager · A* · YOLO 종료</text>
+<line x1="307" y1="806" x2="473" y2="806" stroke="#6b7280" stroke-width="2.2" stroke-dasharray="6 4" marker-end="url(#a_run)"/>
+<circle cx="331.44000000000005" cy="796" r="9" fill="#6b7280"/>
+<text x="331.4" y="800.0" class="num" text-anchor="middle">8</text>
+<text x="400.0" y="800.0" class="lbl halo" text-anchor="middle">--all / --server</text>
+<text x="496.0" y="812.0" class="lblsub halo" text-anchor="start">runserver 종료 · --all 은 ROS 2 데몬도 종료</text>
+<rect x="1325.3" y="720" width="189.4" height="61" rx="7" fill="#ffffff" stroke="#ea580c" stroke-width="1.4"/>
+<text x="1337.3" y="738.0" class="lbl" text-anchor="start">bringup · 워치독 · 카메라는</text>
+<text x="1337.3" y="755.0" class="note" text-anchor="start">건드리지 않음 → 계속 켜 둠</text>
+<text x="1337.3" y="772.0" class="note" text-anchor="start">(다음 run.sh 가 그대로 씀)</text>
+<text x="36.0" y="872.0" class="small" text-anchor="start">넘어짐(35° 0.5초) · 장애물에 걸쳐 기울기 → 정지/물러나기 후 부딪힌 자리를 A* 에 기억 (astar/obstacle, 120초).</text>
+<text x="36.0" y="887.0" class="small" text-anchor="start">시뮬레이션은 stop_ros.sh 가 Gazebo 와 PC 의 명령 감시까지 같이 정리.</text>
+</svg>

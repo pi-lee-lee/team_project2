@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>라이프사이클 3 · 이동 1회</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #f4f6fb; }
+  body { display: flex; align-items: center; justify-content: center; }
+  svg { width: min(100vw, calc(100vh * 16 / 9)); height: auto; display: block; }
+</style>
+</head>
+<body>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900">
+<defs>
+
+    <style>
+      text { font-family: "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", sans-serif; fill: #1f2937; }
+      .title { font-size: 34px; font-weight: 800; fill: #111827; }
+      .subtitle { font-size: 16px; fill: #4b5563; }
+      .colhead { font-size: 15px; font-weight: 700; fill: #ffffff; }
+      .lanesub { font-size: 12px; fill: #4b5563; font-weight: 700; }
+      .lbl { font-size: 13px; font-weight: 700; fill: #111827; }
+      .lblsub { font-size: 11.5px; fill: #4b5563; }
+      .note { font-size: 12.5px; fill: #1f2937; }
+      .notesub { font-size: 11.5px; fill: #4b5563; }
+      .small { font-size: 11.5px; fill: #4b5563; }
+      .sec { font-size: 13px; font-weight: 800; fill: #374151; }
+      .num { font-size: 11px; font-weight: 800; fill: #ffffff; }
+      .halo { paint-order: stroke; stroke: #f4f6fb; stroke-width: 5px; stroke-linejoin: round; }
+      .mono { font-family: Menlo, Consolas, monospace; }
+      .cellt { font-size: 15px; font-weight: 800; fill: #111827; }
+      .cell { font-size: 12.5px; fill: #374151; }
+    </style>
+<marker id="a_ws" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#2563eb"/></marker>
+<marker id="a_ros" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#059669"/></marker>
+<marker id="a_run" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#6b7280"/></marker>
+<marker id="a_db" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#7c3aed"/></marker>
+<marker id="a_http" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#0891b2"/></marker>
+<marker id="a_warn" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#dc2626"/></marker>
+</defs>
+<rect width="1600" height="900" fill="#f4f6fb"/>
+<rect x="30" y="28" width="8" height="56" rx="3" fill="#2563eb"/>
+<text x="52.0" y="62.0" class="title" text-anchor="start">라이프사이클 3 — 운영: 이동 1회</text>
+<text x="54.0" y="86.0" class="subtitle" text-anchor="start">지도에서 지점 클릭 → services 가 작업 생성 → 브리지가 A* 경로를 Frenet 으로 따라감 → 도착 보고 → IDLE</text>
+<g transform="translate(1150,30)">
+<rect x="0" y="0" width="420" height="60" rx="8" fill="#ffffff" stroke="#e5e7eb"/>
+<line x1="14" y1="18" x2="42" y2="18" stroke="#2563eb" stroke-width="2.4" marker-end="url(#a_ws)"/>
+<text x="50.0" y="22.0" class="small" text-anchor="start">WebSocket (JSON)</text>
+<line x1="150" y1="18" x2="178" y2="18" stroke="#059669" stroke-width="2.4" marker-end="url(#a_ros)"/>
+<text x="186.0" y="22.0" class="small" text-anchor="start">ROS 2 토픽/서비스</text>
+<line x1="290" y1="18" x2="318" y2="18" stroke="#0891b2" stroke-width="2.4" marker-end="url(#a_http)"/>
+<text x="326.0" y="22.0" class="small" text-anchor="start">HTTP</text>
+<line x1="14" y1="42" x2="42" y2="42" stroke="#6b7280" stroke-width="2.4" stroke-dasharray="5 4" marker-end="url(#a_run)"/>
+<text x="50.0" y="46.0" class="small" text-anchor="start">프로세스 실행·종료</text>
+<line x1="150" y1="42" x2="178" y2="42" stroke="#7c3aed" stroke-width="2.4" marker-end="url(#a_db)"/>
+<text x="186.0" y="46.0" class="small" text-anchor="start">DB 읽기/쓰기</text>
+<rect x="290" y="35" width="12" height="14" rx="2" fill="#059669"/>
+<text x="308.0" y="46.0" class="small" text-anchor="start">실행 중 (활성)</text>
+</g>
+<rect x="1500" y="96" width="70" height="22" rx="11" fill="#111827"/>
+<text x="1535.0" y="111.0" class="num" text-anchor="middle" style="font-size:12px">3 / 5</text>
+<rect x="30" y="122" width="200" height="28" rx="14" fill="#2563eb"/>
+<text x="130.0" y="141.0" class="colhead" text-anchor="middle">① 사용자 브라우저</text>
+<text x="130.0" y="165.0" class="lanesub" text-anchor="middle">index.html · app.js</text>
+<rect x="372" y="122" width="216" height="28" rx="14" fill="#7c3aed"/>
+<text x="480.0" y="141.0" class="colhead" text-anchor="middle">② Django 서버 (PC)</text>
+<text x="480.0" y="165.0" class="lanesub" text-anchor="middle">daphne :8000 · services.py</text>
+<rect x="1290" y="122" width="260" height="28" rx="14" fill="#ea580c"/>
+<text x="1420.0" y="141.0" class="colhead" text-anchor="middle">④ 로봇 (Raspberry Pi)</text>
+<text x="1420.0" y="165.0" class="lanesub" text-anchor="middle">bringup · 워치독 · 카메라</text>
+<rect x="650" y="122" width="590" height="28" rx="14" fill="#059669"/>
+<text x="945.0" y="141.0" class="colhead" text-anchor="middle">③ PC · ROS 2 (도메인 44, Cyclone DDS)</text>
+<text x="800.0" y="165.0" class="lanesub" text-anchor="middle">bridge_node</text>
+<text x="1090.0" y="165.0" class="lanesub" text-anchor="middle">AMCL · map_server · A* · YOLO</text>
+<rect x="40" y="458" width="1530" height="264" rx="10" fill="none" stroke="#64748b" stroke-width="1.6" stroke-dasharray="8 5"/>
+<line x1="130" y1="174" x2="130" y2="850" stroke="#cbd5e1" stroke-width="1.5" stroke-dasharray="3 5"/>
+<rect x="125" y="182" width="10" height="668" rx="3" fill="#2563eb" opacity="0.85"/>
+<path d="M121,850 L139,850 L130,862 z" fill="#2563eb"/>
+<line x1="480" y1="174" x2="480" y2="850" stroke="#cbd5e1" stroke-width="1.5" stroke-dasharray="3 5"/>
+<rect x="475" y="182" width="10" height="668" rx="3" fill="#7c3aed" opacity="0.85"/>
+<path d="M471,850 L489,850 L480,862 z" fill="#7c3aed"/>
+<line x1="800" y1="174" x2="800" y2="850" stroke="#cbd5e1" stroke-width="1.5" stroke-dasharray="3 5"/>
+<rect x="795" y="182" width="10" height="668" rx="3" fill="#059669" opacity="0.85"/>
+<path d="M791,850 L809,850 L800,862 z" fill="#059669"/>
+<line x1="1090" y1="174" x2="1090" y2="850" stroke="#cbd5e1" stroke-width="1.5" stroke-dasharray="3 5"/>
+<rect x="1085" y="182" width="10" height="668" rx="3" fill="#059669" opacity="0.85"/>
+<path d="M1081,850 L1099,850 L1090,862 z" fill="#059669"/>
+<line x1="1420" y1="174" x2="1420" y2="850" stroke="#cbd5e1" stroke-width="1.5" stroke-dasharray="3 5"/>
+<rect x="1415" y="182" width="10" height="668" rx="3" fill="#ea580c" opacity="0.85"/>
+<path d="M1411,850 L1429,850 L1420,862 z" fill="#ea580c"/>
+<line x1="137" y1="214" x2="473" y2="214" stroke="#2563eb" stroke-width="2.2" marker-end="url(#a_ws)"/>
+<circle cx="215.77000000000004" cy="204" r="9" fill="#2563eb"/>
+<text x="215.8" y="208.0" class="num" text-anchor="middle">1</text>
+<text x="305.0" y="208.0" class="lbl halo" text-anchor="middle">goto_point {x, y, yaw}</text>
+<text x="305.0" y="229.0" class="lblsub halo" text-anchor="middle">지도 클릭 → "여기로 이동"</text>
+<rect x="556.9" y="194" width="286.2" height="78" rx="7" fill="#ffffff" stroke="#7c3aed" stroke-width="1.4"/>
+<text x="568.9" y="212.0" class="lbl" text-anchor="start">services.goto_point</text>
+<text x="568.9" y="229.0" class="note" text-anchor="start">OFFLINE · 진행 작업 · 금지 구역 검사</text>
+<text x="568.9" y="246.0" class="note" text-anchor="start">Task + TaskStep(move) 생성</text>
+<text x="568.9" y="263.0" class="note" text-anchor="start">step MOVING · Robot.state = MOVING (DB)</text>
+<line x1="487" y1="290" x2="793" y2="290" stroke="#2563eb" stroke-width="2.2" marker-end="url(#a_ws)"/>
+<circle cx="508.1300000000001" cy="280" r="9" fill="#2563eb"/>
+<text x="508.1" y="284.0" class="num" text-anchor="middle">2</text>
+<text x="640.0" y="284.0" class="lbl halo" text-anchor="middle">goto {goal_id: step-&lt;id&gt;, x, y, yaw}</text>
+<line x1="473" y1="290" x2="137" y2="290" stroke="#2563eb" stroke-width="2.2" marker-end="url(#a_ws)"/>
+<text x="305.0" y="284.0" class="lbl halo" text-anchor="middle">state MOVING · log</text>
+<line x1="807" y1="330" x2="1083" y2="330" stroke="#059669" stroke-width="2.2" marker-end="url(#a_ros)"/>
+<circle cx="844.59" cy="320" r="9" fill="#059669"/>
+<text x="844.6" y="324.0" class="num" text-anchor="middle">3</text>
+<text x="945.0" y="324.0" class="lbl halo" text-anchor="middle">astar/get_plan (GetPlan)</text>
+<text x="945.0" y="345.0" class="lblsub halo" text-anchor="middle">출발 = TF map→base_footprint</text>
+<rect x="1141.0" y="344" width="198.0" height="44" rx="7" fill="#ffffff" stroke="#059669" stroke-width="1.4"/>
+<text x="1153.0" y="362.0" class="note" text-anchor="start">A*: 점유 ≥65 · 미탐색 = 벽</text>
+<text x="1153.0" y="379.0" class="note" text-anchor="start">기억한 장애물 · 금지 구역 회피</text>
+<line x1="1083" y1="400" x2="807" y2="400" stroke="#059669" stroke-width="2.2" marker-end="url(#a_ros)"/>
+<circle cx="892.3" cy="390" r="9" fill="#059669"/>
+<text x="892.3" y="394.0" class="num" text-anchor="middle">4</text>
+<text x="945.0" y="394.0" class="lbl halo" text-anchor="middle">경로 (Path)</text>
+<line x1="793" y1="400" x2="487" y2="400" stroke="#2563eb" stroke-width="2.2" marker-end="url(#a_ws)"/>
+<text x="640.0" y="394.0" class="lbl halo" text-anchor="middle">path</text>
+<line x1="473" y1="400" x2="137" y2="400" stroke="#2563eb" stroke-width="2.2" marker-end="url(#a_ws)"/>
+<text x="305.0" y="394.0" class="lbl halo" text-anchor="middle">path (LIVE 중계)</text>
+<rect x="666.6" y="418" width="266.8" height="27" rx="7" fill="#ffffff" stroke="#059669" stroke-width="1.4"/>
+<text x="678.6" y="436.0" class="note" text-anchor="start">FrenetFollower: 경로 → 스플라인 기준선</text>
+<rect x="40" y="458" width="227.44000000000005" height="20" rx="6" fill="#64748b"/>
+<text x="48.0" y="472.0" class="num" text-anchor="start" style="font-size:12px">반복 · 0.1초마다 (제어 타이머 0.05초)</text>
+<rect x="650.4" y="486" width="359.1" height="44" rx="7" fill="#ffffff" stroke="#059669" stroke-width="1.4"/>
+<text x="662.4" y="504.0" class="lbl" text-anchor="start">위치 = map→odom (TF) 에 odom→base (/odom) 합성</text>
+<text x="662.4" y="521.0" class="note" text-anchor="start">/odom 이 0.5초보다 오래되면 서서 기다림</text>
+<rect x="710.1" y="540" width="239.8" height="44" rx="7" fill="#ffffff" stroke="#059669" stroke-width="1.4"/>
+<text x="722.1" y="558.0" class="note" text-anchor="start">후보 궤적 (옆 오프셋 × 거리 × 속도)</text>
+<text x="722.1" y="575.0" class="note" text-anchor="start">중 안전하고 비용 가장 작은 것 → v, w</text>
+<line x1="807" y1="608" x2="1413" y2="608" stroke="#059669" stroke-width="2.2" marker-end="url(#a_ros)"/>
+<circle cx="1179.81" cy="598" r="9" fill="#059669"/>
+<text x="1179.8" y="602.0" class="num" text-anchor="middle">5</text>
+<text x="1255.0" y="602.0" class="lbl halo" text-anchor="middle">cmd_vel_pc (v, w)</text>
+<rect x="1331.1" y="622" width="177.8" height="27" rx="7" fill="#ffffff" stroke="#ea580c" stroke-width="1.4"/>
+<text x="1343.1" y="640.0" class="note" text-anchor="start">워치독 → cmd_vel → 바퀴</text>
+<line x1="1413" y1="672" x2="807" y2="672" stroke="#059669" stroke-width="2.2" marker-end="url(#a_ros)"/>
+<circle cx="1129.3700000000001" cy="662" r="9" fill="#059669"/>
+<text x="1129.4" y="666.0" class="num" text-anchor="middle">6</text>
+<text x="1255.0" y="666.0" class="lbl halo" text-anchor="middle">/odom · /scan · /tf (odom→base)</text>
+<line x1="1083" y1="640" x2="807" y2="640" stroke="#059669" stroke-width="2.2" marker-end="url(#a_ros)"/>
+<text x="945.0" y="634.0" class="lbl halo" text-anchor="middle">/tf map→odom (AMCL 보정)</text>
+<line x1="793" y1="700" x2="487" y2="700" stroke="#2563eb" stroke-width="2.2" marker-end="url(#a_ws)"/>
+<circle cx="511.2500000000001" cy="690" r="9" fill="#2563eb"/>
+<text x="511.3" y="694.0" class="num" text-anchor="middle">7</text>
+<text x="640.0" y="694.0" class="lbl halo" text-anchor="middle">pose · local_plan · scan · obstacles</text>
+<line x1="473" y1="700" x2="137" y2="700" stroke="#2563eb" stroke-width="2.2" marker-end="url(#a_ws)"/>
+<text x="305.0" y="694.0" class="lbl halo" text-anchor="middle">LIVE 중계 (DB 안 씀)</text>
+<rect x="220.1" y="478" width="219.8" height="95" rx="7" fill="#f8fafc" stroke="#64748b" stroke-width="1.4"/>
+<text x="232.1" y="496.0" class="lbl" text-anchor="start">막힘 처리 (브리지 안)</text>
+<text x="232.1" y="513.0" class="note" text-anchor="start">정적 장애물만 → 1초 뒤 A* 재계획</text>
+<text x="232.1" y="530.0" class="note" text-anchor="start">  (목표당 4회, A* 가 장애물 기억)</text>
+<text x="232.1" y="547.0" class="note" text-anchor="start">그 밖 → blocked_timeout 5초</text>
+<text x="232.1" y="564.0" class="note" text-anchor="start">  → 물러나기/돌기 → 재계획</text>
+<rect x="694.8" y="734" width="210.5" height="27" rx="7" fill="#ffffff" stroke="#059669" stroke-width="1.4"/>
+<text x="706.8" y="752.0" class="note" text-anchor="start">도착: 목표 방향으로 회전 후 정지</text>
+<line x1="793" y1="790" x2="487" y2="790" stroke="#2563eb" stroke-width="2.2" marker-end="url(#a_ws)"/>
+<circle cx="516.58" cy="780" r="9" fill="#2563eb"/>
+<text x="516.6" y="784.0" class="num" text-anchor="middle">8</text>
+<text x="640.0" y="784.0" class="lbl halo" text-anchor="middle">nav_status {goal_id, succeeded}</text>
+<text x="640.0" y="805.0" class="lblsub halo" text-anchor="middle">실패면 failed + 이유</text>
+<rect x="182.4" y="734" width="235.2" height="61" rx="7" fill="#ffffff" stroke="#7c3aed" stroke-width="1.4"/>
+<text x="194.4" y="752.0" class="note" text-anchor="start">handle_nav_status: step DONE</text>
+<text x="194.4" y="769.0" class="note" text-anchor="start">→ advance: 남은 단계 없음</text>
+<text x="194.4" y="786.0" class="note" text-anchor="start">→ Task done · Robot.state = IDLE</text>
+<line x1="473" y1="840" x2="137" y2="840" stroke="#2563eb" stroke-width="2.2" marker-end="url(#a_ws)"/>
+<circle cx="200.43000000000004" cy="830" r="9" fill="#2563eb"/>
+<text x="200.4" y="834.0" class="num" text-anchor="middle">9</text>
+<text x="305.0" y="834.0" class="lbl halo" text-anchor="middle">state IDLE · log "작업 완료"</text>
+<text x="36.0" y="872.0" class="small" text-anchor="start">실패(failed): 단일 이동은 Task failed + IDLE, 여러 단계 작업은 ERROR 로 두고 재시도/건너뛰기/취소를 기다림.</text>
+<text x="36.0" y="887.0" class="small" text-anchor="start">진행 중 "취소": cancel → 브리지가 목표를 버리고 canceled 보고.</text>
+</svg>
+</body>
+</html>
