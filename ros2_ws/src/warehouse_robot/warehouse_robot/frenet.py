@@ -6,10 +6,13 @@
   (기준선 스플라인, Frenet→직교 변환 식은 리포/PythonRobotics(MIT) 와 같음)
 
 터틀봇(차동 구동, 0.05~0.18 m/s, 폭 0.9 m 통로)에 맞게 다시 짠 부분:
-  - 옆 모양: d(s) 3차 (지금 d, d' → 거리 D 뒤에 오프셋, 기울기 0) → hold 만큼 유지 → 같은 거리 D 로 경로에 복귀
-    (hold < 0 이면 계속 유지). 자동차는 조향 때문에 곡률 연속(5차)이 필요하지만 차동 구동은 각속도를 바로 바꿀 수 있고,
-    매 주기 지금 상태에서 다시 계획하므로 3차로 충분. 복귀가 없으면 장애물 바로 뒤에서 경로가 꺾일 때(실제 기록:
-    소화기 지나 경로가 벽 쪽으로 꺾임) 오프셋을 계속 유지한 후보가 벽에 걸려 다 막혔음
+  - 옆 모양: d(s) 5차 (지금 d, d', d'' → 거리 D 뒤에 오프셋, 기울기 0, d'' 0) → hold 만큼 유지 → 같은 거리 D 로 5차 복귀
+    (hold < 0 이면 계속 유지). 시작 d'' 는 Werling(2010) 처럼 직전에 고른 궤적의 그 자리 값 (주행 중이 아니었으면 0).
+    5차인 이유 (Werling 은 횡 저크 최소화, 우리는): 명령이 w = v·κ 라 곡률이 끊기면 w 가 튐. 예전 3차(d'' 안 맞춤)는
+    같은 계획을 이어 갈 땐 문제없었지만(실물 37분: |Δw| 0.2 rad/s 넘음 0.3%) 오프셋을 갈아탈 때 6.6%, 0.5 넘음 1.4%
+    (최대 1.69)였고, 그 순간 IMU-바퀴 각속도 차이가 평소의 14배. 시작 d'' + 끝 d''=0 (유지 구간과 곡률 연속) = 조건 6개 → 5차.
+    복귀가 없으면 장애물 바로 뒤에서 경로가 꺾일 때(실제 기록: 소화기 지나 경로가 벽 쪽으로 꺾임) 오프셋을 계속 유지한 후보가
+    벽에 걸려 다 막혔음 (Werling/PythonRobotics 는 후보가 옆 이동 구간까지만이고 복귀는 비용 + 재계획으로)
   - 속도: 다항식 대신 지금 속도에서 max_accel 로 목표 속도까지 가/감속 (cmd_vel 로 속도를 직접 주므로)
   - 경로 모양과 속도를 나눔: 정적 장애물은 모양만으로 '거리' 0~check_dist 를 검사 → 속도와 무관.
     (예전 DWA 는 '시간' 으로 굴려서, 느린 궤적이 장애물까지 못 가 안전으로 남아 장애물 옆/앞에서 기어갔음)
@@ -287,23 +290,28 @@ def body_circles(footprint, n=4):
 
 
 # ------------------------------------------------------------------ 플래너
-def lateral_shape(q, d0, dp0, off, D, hold=-1.0):
+def lateral_shape(q, d0, dp0, off, D, hold=-1.0, dpp0=0.0):
     """옆 모양 d(q), q = 경로를 따라 간 거리. 반환 (d, d', d'') (브로드캐스트).
-    [0, D] 3차: d(0)=d0, d'(0)=dp0 → d(D)=off, d'(D)=0. [D, D+hold] off 유지. [D+hold, 2D+hold] 3차로 0 (기울기 0
-    에서 0), 그 뒤 0. hold < 0 이면 D 이후 계속 off."""
-    a2 = (3.0 * (off - d0) - 2.0 * dp0 * D) / D ** 2
-    a3 = (-2.0 * (off - d0) + dp0 * D) / D ** 3
+    [0, D] 5차: (d0, dp0, dpp0) → (off, 0, 0). [D, D+hold] off 유지. [D+hold, 2D+hold] 5차로 (off, 0, 0) → (0, 0, 0),
+    그 뒤 0. hold < 0 이면 D 이후 계속 off. 이음매마다 d, d', d'' 가 이어짐 (곡률 연속)."""
+    a2 = 0.5 * dpp0
+    A = off - (d0 + dp0 * D + a2 * D ** 2)                              # 끝 조건에서 앞 세 항을 뺀 나머지
+    B = -(dp0 + 2.0 * a2 * D)
+    C = -2.0 * a2
+    a3 = (10.0 * A - 4.0 * B * D + 0.5 * C * D ** 2) / D ** 3
+    a4 = (-15.0 * A + 7.0 * B * D - C * D ** 2) / D ** 4
+    a5 = (6.0 * A - 3.0 * B * D + 0.5 * C * D ** 2) / D ** 5
     qq = np.minimum(q, D)
-    d = d0 + dp0 * qq + a2 * qq ** 2 + a3 * qq ** 3
-    dp = dp0 + 2.0 * a2 * qq + 3.0 * a3 * qq ** 2
-    dpp = 2.0 * a2 + 6.0 * a3 * qq
+    d = d0 + dp0 * qq + a2 * qq ** 2 + a3 * qq ** 3 + a4 * qq ** 4 + a5 * qq ** 5
+    dp = dp0 + 2.0 * a2 * qq + 3.0 * a3 * qq ** 2 + 4.0 * a4 * qq ** 3 + 5.0 * a5 * qq ** 4
+    dpp = 2.0 * a2 + 6.0 * a3 * qq + 12.0 * a4 * qq ** 2 + 20.0 * a5 * qq ** 3
     past = q > D
     d, dp, dpp = np.where(past, off, d), np.where(past, 0.0, dp), np.where(past, 0.0, dpp)
     back = (hold >= 0.0) & (q > D + np.maximum(hold, 0.0))           # 복귀 구간 (그 뒤 포함)
     u = np.clip((q - D - np.maximum(hold, 0.0)) / D, 0.0, 1.0)
-    rd = off * (1.0 - 3.0 * u ** 2 + 2.0 * u ** 3)
-    rdp = off * (-6.0 * u + 6.0 * u ** 2) / D
-    rdpp = np.where(u < 1.0, off * (-6.0 + 12.0 * u) / D ** 2, 0.0)
+    rd = off * (1.0 - 10.0 * u ** 3 + 15.0 * u ** 4 - 6.0 * u ** 5)
+    rdp = off * (-30.0 * u ** 2 + 60.0 * u ** 3 - 30.0 * u ** 4) / D
+    rdpp = off * (-60.0 * u + 180.0 * u ** 2 - 120.0 * u ** 3) / D ** 2
     return np.where(back, rd, d), np.where(back, rdp, dp), np.where(back, rdpp, dpp)
 
 
@@ -333,9 +341,10 @@ class FrenetPlanner:
         slow = min(c.safety_margin_slow, c.safety_margin)
         return slow + (c.safety_margin - slow) * r
 
-    def plan(self, ref, pose, v0, static_points, moving, hint=0, prev_offset=None):
+    def plan(self, ref, pose, v0, static_points, moving, hint=0, prev_offset=None, prev_shape=None):
         """ref: Reference (pose 와 같은 좌표계), pose: (x, y, yaw), v0: 지금 선속도, static_points: (N, 2) 스캔 점,
-        moving: (M, 5) [x, y, vx, vy, r] 움직이는 물체, prev_offset: 직전에 고른 오프셋 (흔들림 비용).
+        moving: (M, 5) [x, y, vx, vy, r] 움직이는 물체, prev_offset: 직전에 고른 오프셋 (흔들림 비용),
+        prev_shape: 직전에 고른 모양 (s0, d0, dp0, dpp0, off, D, hold) → 그 자리 d'' 를 시작 d'' 로 (곡률 이어짐).
         반환 궤적 dict (t, x, y, yaw, v, kappa, valid) 또는 None (막힘). self.last_eval: 후보별 판정 (기록/분석용)."""
         c = self.cfg
         x, y, yaw = pose
@@ -344,6 +353,11 @@ class FrenetPlanner:
         d0 = (y - ry) * math.cos(ryaw) - (x - rx) * math.sin(ryaw)
         dth = float(np.clip(normalize(yaw - ryaw), -1.2, 1.2))
         dp0 = math.tan(dth) * (1.0 - rk * d0)                            # d' = 경로에 대한 기울기
+        dpp0 = 0.0                                                        # d'': 직전 계획의 그 자리 값 (없으면 0)
+        if prev_shape is not None and 0.0 <= s0 - prev_shape['s0'] < 3.0:
+            p = prev_shape
+            dpp0 = float(lateral_shape(np.array(s0 - p['s0']), p['d0'], p['dp0'], p['off'], p['D'], p['hold'],
+                                       p['dpp0'])[2])
         remaining = ref.s_end - s0
         v_end = math.sqrt(2.0 * c.stop_decel * max(remaining - c.stop_margin, 0.0))
         v_top = max(min(c.target_speed, c.max_speed, v_end), 0.02)
@@ -360,7 +374,7 @@ class FrenetPlanner:
 
         # ---- 모양만: 정적 장애물을 거리 0 ~ check_dist 에서 (속도와 무관)
         q = np.arange(0.0, c.check_dist + 1e-9, c.check_step)             # (nq,)
-        dq, dpq, ddq = lateral_shape(q[None, :], d0, dp0, OFF[:, None], DD[:, None], HH[:, None])
+        dq, dpq, ddq = lateral_shape(q[None, :], d0, dp0, OFF[:, None], DD[:, None], HH[:, None], dpp0)
         sq = np.broadcast_to(s0 + q, dq.shape)
         g = frenet_to_cartesian(*ref.at(sq), np.ones_like(dq), np.zeros_like(dq), dq, dpq, ddq)
         on_path = sq <= ref.s_end + 0.02                                  # 경로 끝 너머는 검사 안 함
@@ -395,7 +409,7 @@ class FrenetPlanner:
         V, A, dist = speed_profile(max(v0, 0.0), vs, t, c.max_accel)       # (nV, n)
 
         def along(sdot, sddot, q):
-            dd_, dp_, ddp_ = lateral_shape(q, d0, dp0, OFF[:, None, None], DD[:, None, None], HH[:, None, None])
+            dd_, dp_, ddp_ = lateral_shape(q, d0, dp0, OFF[:, None, None], DD[:, None, None], HH[:, None, None], dpp0)
             return frenet_to_cartesian(*ref.at(s0 + q), sdot, sddot, dd_, dp_, ddp_)
 
         # 프로필 속도는 '실제 속도' 로: 경로 방향 속도 ṡ 를 그대로 쓰면 옆으로 비킬 때/커브 바깥쪽에서 실제 속도가 더 커짐
@@ -452,7 +466,7 @@ class FrenetPlanner:
         cost = np.where(reason == OK, total, np.inf)
         best = np.unravel_index(int(np.argmin(cost)), cost.shape) if np.isfinite(cost).any() else None
         self.last_eval = {
-            's0': s0, 'd0': d0, 'dp0': dp0, 'v_top': v_top, 'index': i0, 'now_static': now_static,
+            's0': s0, 'd0': d0, 'dp0': dp0, 'dpp0': dpp0, 'v_top': v_top, 'index': i0, 'now_static': now_static,
             'need_static': float(need_v.min()), 'need_dynamic': need_d,
             'need_static_v': np.broadcast_to(need_v[None, :], cost.shape).ravel(),   # 후보별 (속도마다 다름)
             'off': np.broadcast_to(OFF[:, None], cost.shape).ravel(),
@@ -469,7 +483,9 @@ class FrenetPlanner:
         b = best
         return {'t': t, 'x': cart[b][:, 0], 'y': cart[b][:, 1], 'yaw': cart[b][:, 2], 'kappa': cart[b][:, 3],
                 'v': cart[b][:, 4], 'valid': valid[b], 'offset': float(OFF[b[0]]), 'D': float(DD[b[0]]),
-                'hold': float(HH[b[0]]), 'speed': float(vs[b[1]])}
+                'hold': float(HH[b[0]]), 'speed': float(vs[b[1]]),
+                'shape': {'s0': float(s0), 'd0': float(d0), 'dp0': float(dp0), 'dpp0': dpp0, 'off': float(OFF[b[0]]),
+                          'D': float(DD[b[0]]), 'hold': float(HH[b[0]])}}
 
     @staticmethod
     def _static_clear(grid, X, Y, TH, body):
@@ -513,6 +529,7 @@ class FrenetFollower:
         self.yaw_tolerance = yaw_tolerance
         self.progress = 0             # 기준선 index (투영을 이 근처에서만 → 되돌아오는 경로에서 튀지 않게)
         self.offset = None            # 직전에 고른 옆 오프셋
+        self.prev_shape = None        # 직전 주기에 고른 모양 (다음 계획의 시작 d''). 후보로 주행한 주기에만 남음
         self.arrived = False
         self.turning = False          # 출발 전 돌아서는 중
         self.turn_dir = 0.0           # 돌아서는 방향 (+1 / -1). 돌기 시작하면 끝날 때까지 유지
@@ -643,6 +660,8 @@ class FrenetFollower:
         self.last_trajectory = None
         self.planner.last_eval = None
         dbg = self.last_debug = {'branch': None}
+        # 직전 모양은 이번에 후보로 주행할 때만 이어 쓴다 (돌기/다가가기/막힘이면 곡률을 이을 계획이 없음 → 다음은 d''=0 에서)
+        prev_shape, self.prev_shape = self.prev_shape, None
         ref = self.ref_map.transformed(*map_to_odom)
         goal_yaw = self.goal_yaw + map_to_odom[2]
         gx, gy = (float(v) for v in ref.at(ref.s_end)[:2])
@@ -683,7 +702,8 @@ class FrenetFollower:
                 return turn
             self.turning = False      # 못 돌면 플래너에 맡김 (다 막히면 blocked → 브리지가 물러나기/재계획)
         self.turn_dir = 0.0
-        traj = self.planner.plan(ref, (x, y, yaw), v0, pts, moving, hint=self.progress, prev_offset=self.offset)
+        traj = self.planner.plan(ref, (x, y, yaw), v0, pts, moving, hint=self.progress, prev_offset=self.offset,
+                                 prev_shape=prev_shape)
         dbg.update(branch='frenet', s0=s0)
         if traj is None:
             # 막혔는데 경로 방향과 30° 넘게 틀어져 있으면 제자리에서 돌아 본다 (60° 미만이라 돌아서기를 안 했거나 움직이는 물체가
@@ -696,6 +716,7 @@ class FrenetFollower:
                     return turn
             return 0.0, 0.0, 'blocked'
         self.offset = traj['offset']
+        self.prev_shape = traj['shape']
         self.last_trajectory = np.column_stack([traj['x'][traj['valid']], traj['y'][traj['valid']]])
         # 계획의 앞부분을 그대로: 0.1초 뒤 속도, 0.1~0.3초 곡률 평균 x 속도
         v = min(float(traj['v'][1]), c.max_speed)

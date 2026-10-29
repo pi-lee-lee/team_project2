@@ -171,6 +171,7 @@ def replay(rec, s, overrides=None):
     f = FrenetFollower(rec.plan_at(s['t']), rec.start['goal']['yaw'], make_frenet_cfg(rec.params, overrides))
     pre = d['pre']
     f.progress, f.offset, f.turning, f.arrived = pre['progress'], pre['offset'], pre['turning'], pre['arrived']
+    f.prev_shape = pre.get('prev_shape')   # 10-29 이전 기록엔 없음 → 시작 d'' = 0 으로 다시 계산
     v, w, state = f.compute(tuple(d['pose']), d['vw'][0], d['vw'][1], tuple(d['map_to_odom']), arr(d['scan']),
                             arr(d['dyn'], (-1, 5)), moving_speed=p.get('tracking.moving_speed', d['moving_speed']))
     return v, w, state, f
@@ -331,7 +332,7 @@ def plot(rec, s, path):
             if key in seen:
                 continue
             seen.add(key)
-            dd, dp, ddp = lateral_shape(q, ev['d0'], ev['dp0'], off[i], D[i], H[i])
+            dd, dp, ddp = lateral_shape(q, ev['d0'], ev['dp0'], off[i], D[i], H[i], ev.get('dpp0', 0.0))
             sq = ev['s0'] + q
             g = frenet_to_cartesian(*ref.at(sq), np.ones_like(q), np.zeros_like(q), dd, dp, ddp)
             col = {0: 'tab:green', 1: 'tab:purple', 2: 'tab:red', 3: 'tab:orange'}[int(reason[i])]

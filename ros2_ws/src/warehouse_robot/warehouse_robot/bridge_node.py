@@ -1350,7 +1350,7 @@ class BridgeNode(Node):
         moving_speed = self.get_parameter('tracking.moving_speed').value
         # 기록용: 계산 전 추종기 상태 (같은 입력으로 다시 계산하면 같은 결과가 나오게)
         pre = {'progress': follower.progress, 'offset': follower.offset, 'turning': follower.turning,
-               'arrived': follower.arrived}
+               'arrived': follower.arrived, 'prev_shape': follower.prev_shape}
         result = follower.compute(pose, *self.odom_vw, map_to_odom, self.scan_odom, dyn, moving_speed=moving_speed)
         follower.last_cmd = (now, result)
         if self.rec is not None:

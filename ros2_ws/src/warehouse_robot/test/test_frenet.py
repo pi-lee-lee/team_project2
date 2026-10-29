@@ -172,6 +172,40 @@ def test_arrival_turn_skipped_in_tight_corner():
     assert f.last_debug.get('align') == 'skipped'
 
 
+def test_lateral_shape_quintic_boundary_conditions():
+    # 시작 (d, d', d'') = 지금 상태, D 에서 (off, 0, 0), 복귀 끝에서 (0, 0, 0): 이음매마다 곡률이 이어짐
+    d0, dp0, dpp0, off, D, hold = 0.05, 0.1, -0.8, 0.2, 0.4, 0.3
+    for q, want in ((0.0, (d0, dp0, dpp0)), (D, (off, 0.0, 0.0)), (D + hold, (off, 0.0, 0.0)),
+                    (2 * D + hold, (0.0, 0.0, 0.0)), (2 * D + hold + 0.2, (0.0, 0.0, 0.0))):
+        got = lateral_shape(np.array(q), d0, dp0, off, D, hold, dpp0)
+        assert np.allclose([float(v) for v in got], want, atol=1e-9), (q, got, want)
+    for q in (D, D + hold):                     # 이음매 양쪽 d'' 가 같음
+        a, b = (float(lateral_shape(np.array(q + e), d0, dp0, off, D, hold, dpp0)[2]) for e in (-1e-6, 1e-6))
+        assert abs(a - b) < 1e-3
+
+
+def test_offset_switch_keeps_curvature_continuous():
+    # 경로 위 상자를 비켜 갈 때 오프셋을 갈아타는 순간의 w 변화. 새 후보의 시작 d'' = 직전 후보의 그 자리 d'' 라
+    # 곡률이 이어짐 (예전 3차는 시작 d'' 를 안 맞춰 이 주행에서 0.50 rad/s 까지 튐, 5차는 0.25)
+    f = FrenetFollower([(0, 0), (4.0, 0.0)], 0.0, FrenetConfig())
+    pts = np.array([(1.5 + i * 0.02, j * 0.02) for i in range(6) for j in range(-4, 5)])
+    x = y = yaw = v = 0.0
+    prev, jumps, st = None, [], None
+    for _ in range(500):
+        vc, wc, st = f.compute((x, y, yaw), v, 0.0, (0.0, 0.0, 0.0), pts, np.zeros((0, 5)))
+        if st == 'done':
+            break
+        off = f.offset if f.last_debug.get('branch') == 'frenet' else None
+        if prev is not None and None not in (off, prev[1]) and off != prev[1]:
+            jumps.append(abs(wc - prev[0]))
+        prev = (wc, off)
+        v += float(np.clip(vc - v, -0.06, 0.03))
+        yaw += wc * 0.1
+        x, y = x + v * math.cos(yaw) * 0.1, y + v * math.sin(yaw) * 0.1
+    assert st == 'done' and jumps
+    assert max(jumps) < 0.35
+
+
 def test_very_short_paths_build_reference():
     # 15 cm 안 되는 짧은 경로 (목표가 바로 옆): 예전엔 곡률 평균이 길이가 어긋나 예외 → 브리지가 죽었음 (실물 step-2738)
     for pts in ([(0, 0), (0.05, 0.0), (0.1, 0.02)], [(0, 0), (0.08, 0.0), (0.08, 0.06)], [(0, 0), (0.05, 0.0)],
