@@ -43,7 +43,7 @@
   <!-- 제목 -->
   <rect x="30" y="28" width="8" height="56" rx="3" fill="#2563eb"/>
   <text x="52" y="62" class="title">창고 로봇 시스템 전체 구성도</text>
-  <text x="54" y="86" class="subtitle">TurtleBot3 Waffle Pi · ROS 2 Humble · Django 4.2 + Channels · MySQL — 웹 지도에서 지점을 고르면 A* + 경로 추종기로 주행</text>
+  <text x="54" y="86" class="subtitle">TurtleBot3 Waffle Pi · ROS 2 Humble · Django 4.2 + Channels · MySQL — 웹 지도에서 지점을 고르면 A* + Frenet 로컬 플래너로 주행</text>
 
   <!-- 범례 -->
   <g transform="translate(1230,38)">
@@ -76,7 +76,7 @@
   <g class="item">
     <text x="46" y="234">• 지도 · 로봇 위치/경로 표시</text>
     <text x="46" y="262">• 지점 클릭 → 이동 · 홈 복귀</text>
-    <text x="46" y="290">• LED 배송: 적재→하역→홈</text>
+    <text x="46" y="290">• 주문: 구역 적재→하역→홈</text>
     <text x="46" y="318">• 실행 모드 (실물/시뮬, SLAM)</text>
     <text x="46" y="346">• 주행 파라미터 실시간 조정</text>
     <text x="46" y="374">• YOLO 검출 켜기/끄기</text>
@@ -92,6 +92,12 @@
   <text x="46" y="536" class="cardsub">/robot · robot.html + robot.js</text>
   <text x="46" y="560" class="item">• 적재/하역 확인 버튼</text>
   <text x="46" y="580" class="item">• 로봇에 달린 화면용</text>
+
+  <!-- ① 주문 화면 -->
+  <rect x="30" y="606" width="220" height="84" rx="12" class="card" stroke="#2563eb"/>
+  <text x="46" y="634" class="cardtitle">주문 화면</text>
+  <text x="46" y="652" class="cardsub">/order · order.html + order.js</text>
+  <text x="46" y="676" class="item">• 주문 넣기 · 진행 보기</text>
 
   <!-- ② Django 서버 -->
   <rect x="300" y="150" width="310" height="362" rx="12" class="card" stroke="#7c3aed"/>
@@ -150,15 +156,16 @@
   <text x="757" y="322" class="small">  옆 오프셋 x 속도 후보</text>
   <text x="757" y="342" class="small">  0.1 s 마다 다시 계획</text>
   <text x="757" y="362" class="small">  v, w = v·κ 실행</text>
-  <text x="757" y="386" class="small" fill="#047857">도착 오차 0.3 m 검사</text>
+  <text x="757" y="386" class="small" fill="#047857">도착 0.08 m · 방향 맞춤</text>
 
   <rect x="903" y="244" width="146" height="154" rx="7" fill="#f0fdf4" stroke="#86efac" class="inner"/>
   <text x="913" y="264" class="boxtitle">안전 감시</text>
-  <text x="913" y="286" class="small">안전 후보 없음 → 정지</text>
-  <text x="913" y="302" class="small">  (정적 1 s / 그 외 5 s → 재계획)</text>
-  <text x="913" y="324" class="small">비상: 앞 ±25° 0.2 m 이내</text>
-  <text x="913" y="344" class="small">TF 0.5 s 끊김 → 정지</text>
-  <text x="913" y="364" class="small">기울기 6° · 2.5 s 못 감</text>
+  <text x="913" y="286" class="small">안전 후보 없음 → 섬</text>
+  <text x="913" y="301" class="small">  정적 1 s · 그 외 5 s 뒤 재계획</text>
+  <text x="913" y="318" class="small">비상: 앞 ±25° 0.2 m 이내</text>
+  <text x="913" y="335" class="small">위치 0.5 s 끊김 → 섬</text>
+  <text x="913" y="350" class="small">  3 s 넘으면 목표 실패</text>
+  <text x="913" y="367" class="small">기울기 6° · 2.5 s 못 감</text>
   <text x="913" y="386" class="small" fill="#047857">→ 물러남 + astar/obstacle</text>
 
   <rect x="1059" y="244" width="136" height="154" rx="7" fill="#f0fdf4" stroke="#86efac" class="inner"/>
@@ -192,11 +199,11 @@
   <text x="1071" y="524" class="small">웹에서 켜기/끄기</text>
   <text x="1071" y="539" class="small">기본 꺼짐</text>
 
-  <!-- 3행: Nav2 선택 -->
+  <!-- 3행: Nav2 (지도 모드의 위치 추정만) -->
   <rect x="735" y="566" width="470" height="50" rx="10" fill="#ffffff" stroke="#059669" stroke-width="1.5" stroke-dasharray="5 4"/>
-  <text x="751" y="587" class="boxtitle">Nav2 (선택)</text>
-  <text x="845" y="587" class="small">NavigateToPose · controller_server — --planner nav2 / --controller nav2</text>
-  <text x="751" y="605" class="small">tf2 ≥ 0.25.24 필요 (0.25.23 TF 교착 버그)</text>
+  <text x="751" y="587" class="boxtitle">Nav2 (지도 모드)</text>
+  <text x="886" y="587" class="small">map_server + AMCL 만 사용 (start_nav2.sh) · 주행 노드는 안 씀</text>
+  <text x="751" y="605" class="small">주행은 브리지가 직접 (A* + Frenet) · tf2 ≥ 0.25.24 필요 (0.25.23 TF 교착 버그)</text>
 
   <!-- 실행 순서 -->
   <rect x="735" y="628" width="470" height="50" rx="10" fill="#f9fafb" stroke="#d1d5db"/>
@@ -217,29 +224,31 @@
   <text x="1346" y="332" class="mono" fill="#c2410c">→ /scan</text>
   <text x="1334" y="356" class="item">IMU · 배터리</text>
   <text x="1346" y="373" class="mono" fill="#c2410c">→ /imu, /battery_state</text>
-  <text x="1334" y="399" class="item">바퀴 구동</text>
-  <text x="1346" y="416" class="mono" fill="#c2410c">← /cmd_vel</text>
+  <text x="1334" y="399" class="item">바퀴 구동 (명령 감시 경유)</text>
+  <text x="1346" y="416" class="mono" fill="#c2410c">← /cmd_vel ← cmd_vel_pc</text>
 
   <rect x="1322" y="442" width="236" height="88" rx="8" fill="#fff7ed" stroke="#fdba74" class="inner"/>
   <text x="1334" y="463" class="boxtitle">CSI 카메라</text>
-  <text x="1334" y="481" class="small">yolo/camera.sh</text>
-  <text x="1346" y="500" class="mono" fill="#c2410c">→ /csi/image_raw</text>
-  <text x="1334" y="520" class="small">YOLO 입력 영상 (따로 실행)</text>
+  <text x="1334" y="481" class="small">yolo/camera.sh · pi_camera.sh on</text>
+  <text x="1346" y="500" class="mono" fill="#c2410c">→ /csi/image_raw/compressed</text>
+  <text x="1334" y="520" class="small">run.sh 가 bringup 뒤에 켬 (계속 켜 둠)</text>
 
   <!-- ④ Gazebo -->
   <rect x="1310" y="562" width="260" height="128" rx="12" fill="#ffffff" stroke="#ea580c" stroke-width="2" stroke-dasharray="7 5"/>
   <text x="1326" y="590" class="cardtitle">또는 Gazebo 시뮬레이션</text>
   <text x="1326" y="608" class="cardsub">start_sim.sh · --robot sim</text>
-  <text x="1326" y="634" class="item">• 같은 토픽을 그대로 제공</text>
-  <text x="1326" y="656" class="item">• worlds/*.world (미로, 강당)</text>
-  <text x="1326" y="678" class="item">• 도메인 77 로 실물과 분리</text>
+  <text x="1326" y="630" class="item">• 실물 사양 모델 (LiDAR LDS-02)</text>
+  <text x="1326" y="648" class="item">• sim_real_io.py: 실물 형식 출력</text>
+  <text x="1326" y="666" class="item">• 명령 감시도 실물과 같은 경로</text>
+  <text x="1326" y="684" class="item">• worlds/*.world · 도메인 77</text>
 
   <!-- ===== 연결선 ===== -->
   <!-- 브라우저 ⇄ UIConsumer -->
   <line x1="252" y1="232" x2="312" y2="232" stroke="#2563eb" stroke-width="2.5" marker-start="url(#aWs)" marker-end="url(#aWs)"/>
   <text x="276" y="222" class="lbl" fill="#2563eb" text-anchor="middle">WS</text>
-  <!-- 태블릿 → 서버 -->
+  <!-- 태블릿 · 주문 화면 → 서버 -->
   <path d="M252,530 H276 V246 H312" fill="none" stroke="#2563eb" stroke-width="2" stroke-dasharray="1 0" marker-end="url(#aWs)" opacity="0.55"/>
+  <path d="M252,648 H276 V530" fill="none" stroke="#2563eb" stroke-width="2" opacity="0.55"/>
 
   <!-- RobotConsumer ⇄ bridge -->
   <line x1="598" y1="284" x2="733" y2="284" stroke="#2563eb" stroke-width="2.5" marker-start="url(#aWs)" marker-end="url(#aWs)"/>
@@ -278,15 +287,15 @@
   <text x="1264" y="266" class="lbl" fill="#047857" text-anchor="middle">/tf /imu</text>
   <!-- PC → Pi cmd_vel -->
   <line x1="1207" y1="360" x2="1320" y2="360" stroke="#059669" stroke-width="2.5" marker-end="url(#aRos)"/>
-  <text x="1264" y="350" class="lbl" fill="#047857" text-anchor="middle">/cmd_vel</text>
+  <text x="1264" y="350" class="lbl" fill="#047857" text-anchor="middle">/cmd_vel_pc</text>
   <!-- 카메라 → YOLO -->
   <line x1="1320" y1="498" x2="1207" y2="498" stroke="#059669" stroke-width="2.5" marker-end="url(#aRos)"/>
-  <text x="1264" y="488" class="lbl" fill="#047857" text-anchor="middle">image_raw</text>
+  <text x="1264" y="488" class="lbl" fill="#047857" text-anchor="middle">compressed</text>
 
   <!-- ===== 하단: 목표 한 번의 흐름 ===== -->
   <rect x="30" y="712" width="1540" height="164" rx="14" fill="#ffffff" stroke="#e5e7eb" stroke-width="1.5"/>
   <text x="50" y="742" class="cardtitle">이동 명령 한 번의 흐름</text>
-  <text x="250" y="742" class="cardsub">웹 클릭부터 도착 보고까지 (배송은 적재 → 하역 → 홈 단계를 차례로 반복)</text>
+  <text x="250" y="742" class="cardsub">웹 클릭부터 도착 보고까지 (주문은 적재 → 하역 → 홈 단계를 차례로 반복)</text>
 
   <g>
     <rect x="50" y="760" width="268" height="96" rx="10" fill="#eff6ff" stroke="#93c5fd"/>
@@ -317,7 +326,7 @@
     <circle cx="994" cy="786" r="14" fill="#059669"/><text x="994" y="791" class="colhead" text-anchor="middle">4</text>
     <text x="1016" y="791" class="step">추종기가 로봇을 주행</text>
     <text x="984" y="818" class="stepsub">Frenet 로컬 플래너가 속도 계산, 안전 감시</text>
-    <text x="984" y="838" class="stepsub mono">/cmd_vel → Pi 바퀴, pose 실시간 표시</text>
+    <text x="984" y="838" class="stepsub mono">cmd_vel_pc → 명령 감시 → 바퀴</text>
 
     <line x1="1240" y1="808" x2="1270" y2="808" stroke="#9ca3af" stroke-width="2.5" marker-end="url(#aStep)"/>
 

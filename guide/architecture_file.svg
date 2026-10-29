@@ -34,7 +34,7 @@
   <!-- 제목 -->
   <rect x="30" y="28" width="8" height="56" rx="3" fill="#2563eb"/>
   <text x="52" y="62" class="title">창고 로봇 시스템 구성도 — 파일 기준</text>
-  <text x="54" y="86" class="subtitle">구성 요소별 담당 폴더·파일 — 맨 앞 / = 저장소 루트 team_project2/, / 없는 경로는 그 칸의 폴더 기준 (hybrid-predict-box)</text>
+  <text x="54" y="86" class="subtitle">구성 요소별 담당 폴더·파일 — 맨 앞 / = 저장소 루트 team_project2/, / 없는 경로는 그 칸의 폴더 기준 (v1.0.0)</text>
 
   <!-- 범례 -->
   <g transform="translate(1230,38)">
@@ -87,6 +87,13 @@
   <text x="46" y="557" class="fs">├ templates/warehouse/robot.html</text>
   <text x="46" y="577" class="fs">└ static/warehouse/robot.js·.css</text>
 
+  <!-- ① 주문 화면 -->
+  <rect x="30" y="600" width="220" height="90" rx="12" class="card" stroke="#2563eb"/>
+  <text x="46" y="627" class="cardtitle">주문 화면</text>
+  <text x="46" y="646" class="dir" fill="#1d4ed8">/server/warehouse/</text>
+  <text x="46" y="664" class="fs">├ templates/warehouse/order.html</text>
+  <text x="46" y="682" class="fs">└ static/warehouse/order.js·.css</text>
+
   <!-- ② Django 서버 -->
   <rect x="300" y="150" width="310" height="362" rx="12" class="card" stroke="#7c3aed"/>
   <text x="316" y="178" class="cardtitle">Django 서버</text>
@@ -135,17 +142,17 @@
   <rect x="735" y="188" width="470" height="222" rx="10" class="card" stroke="#059669"/>
   <text x="751" y="214" class="cardtitle">bridge_node.py</text>
   <text x="900" y="214" class="mono" fill="#047857">warehouse_robot/</text>
-  <text x="751" y="232" class="cardsub">서버 WS 연결 · 목표 실행 · hybrid 전환 · 안전 감시 · 주행 기록</text>
+  <text x="751" y="232" class="cardsub">서버 WS 연결 · 목표 실행 · Frenet 추종 · 안전 감시 · 주행 기록</text>
 
   <rect x="747" y="244" width="146" height="154" rx="7" fill="#f0fdf4" stroke="#86efac" class="inner"/>
   <text x="757" y="264" class="boxtitle">경로 추종</text>
-  <text x="757" y="286" class="f">follower.py</text>
-  <text x="757" y="301" class="small">pure pursuit (평소)</text>
-  <text x="757" y="322" class="f">dwa.py</text>
-  <text x="757" y="337" class="small">DWA (장애물 근처)</text>
+  <text x="757" y="286" class="f">frenet.py</text>
+  <text x="757" y="301" class="small">Frenet 로컬 플래너</text>
+  <text x="757" y="322" class="f">cmd_mux.py</text>
+  <text x="757" y="337" class="small">자동/수동 명령 선택</text>
   <text x="757" y="358" class="f">tracker.py</text>
   <text x="757" y="373" class="small">움직이는 물체 추적</text>
-  <text x="757" y="391" class="small" fill="#047857">전환: bridge_node.py</text>
+  <text x="757" y="391" class="small" fill="#047857">호출: bridge_node.py</text>
 
   <rect x="903" y="244" width="146" height="154" rx="7" fill="#f0fdf4" stroke="#86efac" class="inner"/>
   <text x="913" y="264" class="boxtitle">안전 · 기록</text>
@@ -154,7 +161,7 @@
   <text x="913" y="322" class="small">목표마다 주행 기록</text>
   <text x="913" y="337" class="f">→ /logs/records/</text>
   <text x="913" y="358" class="small">기록 분석·재계산</text>
-  <text x="913" y="373" class="fs">/tools/dwa_replay.py</text>
+  <text x="913" y="373" class="fs">/tools/drive_replay.py</text>
   <text x="913" y="391" class="small" fill="#047857">*.jsonl.gz</text>
 
   <rect x="1059" y="244" width="136" height="154" rx="7" fill="#f0fdf4" stroke="#86efac" class="inner"/>
@@ -196,17 +203,18 @@
   <text x="1071" y="561" class="small">학습: /yolo/colab/</text>
 
   <!-- 3행: 테스트 -->
-  <rect x="735" y="576" width="470" height="34" rx="10" fill="#ffffff" stroke="#059669" stroke-width="1.5" stroke-dasharray="5 4"/>
-  <text x="751" y="598" class="dir" fill="#047857">test/</text>
-  <text x="796" y="598" class="small">test_*.py 7개 — A* · 추종기 · DWA · cmd_mux · 추적 · 맵 가공 · LED (pytest)</text>
+  <rect x="735" y="574" width="470" height="28" rx="10" fill="#ffffff" stroke="#059669" stroke-width="1.5" stroke-dasharray="5 4"/>
+  <text x="751" y="592" class="dir" fill="#047857">test/</text>
+  <text x="796" y="592" class="small">test_*.py 5개 — A* · Frenet · cmd_mux · 추적 · 맵 가공 (pytest)</text>
 
   <!-- 4행: 실행 스크립트 -->
-  <rect x="735" y="618" width="470" height="66" rx="10" fill="#f9fafb" stroke="#d1d5db"/>
-  <text x="751" y="637" class="dir" fill="#374151">/scripts/</text>
-  <text x="826" y="637" class="boxtitle" fill="#374151">실행 순서</text>
-  <text x="751" y="652" class="fs">run.sh → start_server.sh → start_sim.sh | Pi SSH</text>
-  <text x="751" y="665" class="fs">       → start_slam.sh | start_nav2.sh → start_bridge.sh</text>
-  <text x="751" y="679" class="small" style="font-size:10px">정지 stop_ros.sh · 맵 save_map.sh · 초기화 reset_robot.sh · env.sh 도메인/DDS</text>
+  <rect x="735" y="608" width="470" height="80" rx="10" fill="#f9fafb" stroke="#d1d5db"/>
+  <text x="751" y="626" class="dir" fill="#374151">/scripts/</text>
+  <text x="826" y="626" class="boxtitle" fill="#374151">실행 순서</text>
+  <text x="751" y="641" class="fs">run.sh → start_server.sh → start_sim.sh | Pi SSH</text>
+  <text x="751" y="654" class="fs">       → start_slam.sh | start_nav2.sh → start_bridge.sh</text>
+  <text x="751" y="668" class="small" style="font-size:10px">정지 stop_ros.sh · 맵 save_map.sh · 초기화 reset_robot.sh · env.sh 도메인/DDS</text>
+  <text x="751" y="682" class="small" style="font-size:10px">Docker 시뮬레이션 /Dockerfile · /compose.yaml · /docker/entrypoint.sh · /DOCKER_GUIDE.md</text>
 
   <!-- ④ TurtleBot3 -->
   <rect x="1310" y="150" width="260" height="392" rx="12" class="card" stroke="#ea580c"/>
@@ -216,35 +224,39 @@
   <rect x="1322" y="208" width="236" height="222" rx="8" fill="#fff7ed" stroke="#fdba74" class="inner"/>
   <text x="1334" y="228" class="boxtitle">turtlebot3_bringup</text>
   <text x="1334" y="246" class="small">TB3 공식 패키지</text>
-  <text x="1334" y="272" class="item">실행 파일</text>
-  <text x="1346" y="289" class="mono" fill="#c2410c">robot.launch.py</text>
-  <text x="1334" y="315" class="item">PC 에서 실행</text>
-  <text x="1346" y="332" class="mono" fill="#c2410c">/scripts/run.sh → ssh</text>
-  <text x="1334" y="356" class="item">Pi 로그</text>
-  <text x="1346" y="373" class="mono" fill="#c2410c">~/warehouse_bringup.log</text>
-  <text x="1334" y="399" class="item">발행 / 구독</text>
-  <text x="1346" y="416" class="mono" fill="#c2410c">/scan /odom /imu ← /cmd_vel</text>
+  <text x="1334" y="268" class="item">실행 파일</text>
+  <text x="1346" y="283" class="mono" fill="#c2410c">robot.launch.py</text>
+  <text x="1334" y="303" class="item">PC 에서 실행</text>
+  <text x="1346" y="318" class="mono" fill="#c2410c">/scripts/run.sh → ssh</text>
+  <text x="1334" y="338" class="item">명령 감시 (Pi 로 복사)</text>
+  <text x="1346" y="353" class="mono" fill="#c2410c">/scripts/pi_cmd_watchdog.py</text>
+  <text x="1334" y="373" class="item">Pi 로그</text>
+  <text x="1346" y="388" class="mono" fill="#c2410c">~/warehouse_bringup.log</text>
+  <text x="1334" y="408" class="item">발행 / 구독</text>
+  <text x="1346" y="423" class="mono" fill="#c2410c">/scan /odom /imu ← /cmd_vel</text>
 
   <rect x="1322" y="442" width="236" height="88" rx="8" fill="#fff7ed" stroke="#fdba74" class="inner"/>
   <text x="1334" y="463" class="boxtitle">CSI 카메라</text>
   <text x="1334" y="481" class="mono" fill="#c2410c">/yolo/camera.sh (Pi 로 복사)</text>
-  <text x="1346" y="500" class="small">Pi 에서 직접 실행 (v4l2_camera)</text>
-  <text x="1346" y="520" class="mono" fill="#c2410c">→ /csi/image_raw</text>
+  <text x="1346" y="500" class="small">/scripts/pi_camera.sh on 으로 실행</text>
+  <text x="1346" y="520" class="mono" fill="#c2410c">→ /csi/image_raw/compressed</text>
 
   <!-- ④ Gazebo -->
   <rect x="1310" y="562" width="260" height="128" rx="12" fill="#ffffff" stroke="#ea580c" stroke-width="2" stroke-dasharray="7 5"/>
   <text x="1326" y="590" class="cardtitle">또는 Gazebo 시뮬레이션</text>
   <text x="1326" y="608" class="cardsub">--robot sim 일 때 bringup 대신</text>
-  <text x="1326" y="632" class="f">/scripts/start_sim.sh</text>
-  <text x="1326" y="652" class="f">/worlds/*.world</text>
-  <text x="1440" y="652" class="small">미로 · 강당</text>
-  <text x="1326" y="672" class="f">/tools/make_hall_world.py</text>
-  <text x="1326" y="686" class="small" style="font-size:10px">map_to_world.py (맵 → 월드)</text>
+  <text x="1326" y="626" class="fs">/scripts/start_sim.sh · sim_real_io.py</text>
+  <text x="1326" y="640" class="fs">/worlds/*.world</text>
+  <text x="1440" y="640" class="small" style="font-size:10px">미로 · 강당</text>
+  <text x="1326" y="654" class="fs" style="font-size:9.5px">/worlds/models/turtlebot3_waffle_pi_real/</text>
+  <text x="1326" y="668" class="fs">/tools/make_hall_world.py</text>
+  <text x="1326" y="682" class="small" style="font-size:10px">map_to_world.py (맵 → 월드)</text>
 
   <!-- ===== 연결선 ===== -->
   <line x1="252" y1="232" x2="312" y2="232" stroke="#2563eb" stroke-width="2.5" marker-start="url(#aWs)" marker-end="url(#aWs)"/>
   <text x="276" y="222" class="lbl" fill="#2563eb" text-anchor="middle">WS</text>
   <path d="M252,530 H276 V246 H312" fill="none" stroke="#2563eb" stroke-width="2" marker-end="url(#aWs)" opacity="0.55"/>
+  <path d="M252,645 H276 V530" fill="none" stroke="#2563eb" stroke-width="2" opacity="0.55"/>
 
   <line x1="598" y1="284" x2="733" y2="284" stroke="#2563eb" stroke-width="2.5" marker-start="url(#aWs)" marker-end="url(#aWs)"/>
   <text x="665" y="240" class="lbl" fill="#2563eb" text-anchor="middle">goto ▶</text>
@@ -275,9 +287,9 @@
   <text x="1264" y="252" class="lbl" fill="#047857" text-anchor="middle">/scan /odom</text>
   <text x="1264" y="266" class="lbl" fill="#047857" text-anchor="middle">/tf /imu</text>
   <line x1="1207" y1="360" x2="1320" y2="360" stroke="#059669" stroke-width="2.5" marker-end="url(#aRos)"/>
-  <text x="1264" y="350" class="lbl" fill="#047857" text-anchor="middle">/cmd_vel</text>
+  <text x="1264" y="350" class="lbl" fill="#047857" text-anchor="middle">/cmd_vel_pc</text>
   <line x1="1320" y1="498" x2="1207" y2="498" stroke="#059669" stroke-width="2.5" marker-end="url(#aRos)"/>
-  <text x="1264" y="488" class="lbl" fill="#047857" text-anchor="middle">image_raw</text>
+  <text x="1264" y="488" class="lbl" fill="#047857" text-anchor="middle">compressed</text>
 
   <!-- ===== 하단: 흐름별 파일 ===== -->
   <rect x="30" y="712" width="1540" height="164" rx="14" fill="#ffffff" stroke="#e5e7eb" stroke-width="1.5"/>
@@ -312,8 +324,8 @@
     <rect x="968" y="760" width="268" height="96" rx="10" fill="#ecfdf5" stroke="#86efac"/>
     <circle cx="994" cy="786" r="14" fill="#059669"/><text x="994" y="791" class="colhead" text-anchor="middle">4</text>
     <text x="1016" y="791" class="step">추종기가 로봇을 주행</text>
-    <text x="984" y="818" class="f">follower.py · dwa.py · cmd_mux.py</text>
-    <text x="984" y="838" class="stepsub">→ /cmd_vel → Pi bringup 이 바퀴 구동</text>
+    <text x="984" y="818" class="f">frenet.py · tracker.py · cmd_mux.py</text>
+    <text x="984" y="838" class="stepsub">→ cmd_vel_pc → 명령 감시 → 바퀴 구동</text>
 
     <line x1="1240" y1="808" x2="1270" y2="808" stroke="#9ca3af" stroke-width="2.5" marker-end="url(#aStep)"/>
 

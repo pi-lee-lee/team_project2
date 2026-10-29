@@ -220,7 +220,7 @@
 
   <rect x="882" y="432" width="163" height="118" rx="8" class="card" stroke="#7c3aed" style="stroke-width:1.5"/>
   <text x="892" y="452" class="boxtitle" fill="#6d28d9">LIVE 메모리</text>
-  <text x="892" y="468" class="ms" style="fill:#6d28d9">consumers.py</text>
+  <text x="892" y="468" class="ms" style="fill:#6d28d9">live.py · consumers.py</text>
   <text x="892" y="486" class="small">pose · path · health</text>
   <text x="892" y="502" class="small">scan · yolo · cargo</text>
   <text x="892" y="518" class="small">고빈도 → 중계만</text>
