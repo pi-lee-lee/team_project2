@@ -33,7 +33,7 @@ flowchart TD
     L1 -- "아니오" --> L1a["'맵/위치 대기 중' 2초 대기"] --> L0
     L1 -- "예" --> L2["robot_pose() 로 (x, y, yaw)"]
     L2 --> L3{"첫 반복?"}
-    L3 -- "예" --> L3a["lane_heading / wall_axis 로 줄 방향 결정<br/>Sweep(줄 폭 = 센서 거리 3.0 m × 0.65)"] --> L4
+    L3 -- "예" --> L3a["lane_heading / wall_axis 로 줄 방향 결정<br/>Sweep(줄 폭 = 센서 거리 5.0 m × 0.65)"] --> L4
     L3 -- "아니오" --> L4["choose(): 목표 고르기<br/>zone_grid → reachable → _candidates<br/>→ Sweep.pick (줄 중심선 점 / 줄 앞 프론티어)<br/>→ 없으면 choose_by_heading (자투리)"]
 
     L4 --> L5{"결과"}
@@ -238,7 +238,7 @@ sequenceDiagram
 | `effective_unknown` | 미탐색 칸에서 광선 틈(2칸 이하) 메움, 1 m² 미만 막힌 구멍 제외 | — |
 | `frontier_mask` / `frontiers` | 빈 칸 중 4방향에 미탐색이 있는 칸 → 8방향 BFS 로 묶음, 8칸(40 cm) 미만 버림, 40칸(2 m)씩 조각 | — |
 | `_candidates` | 묶음마다 중심 1 m 안에서 벽 0.35 m·미탐색 0.2/0.1/0 m 떨어진 칸, `view_gain` ≥ 0.5 m² 인 첫 칸 | — |
-| `view_gain` | 후보 칸에서 64개 광선(3.0 m)으로 벽에 막히기 전까지 보이는 미탐색 넓이 | — |
+| `view_gain` | 후보 칸에서 64개 광선(5.0 m)으로 벽에 막히기 전까지 보이는 미탐색 넓이 | — |
 | `choose_by_heading` | 진행 방향 ±60° → ±120° → 전부 순서로 넓히며 `거리 + 0.6×각도 − 0.02×크기` 최소 | — |
 | `goto` | 목표 전송 후 작업 끝/`check()` 이유를 기다림, 시간 초과(90초)면 취소 | WS 전송 `goto_point {x, y, yaw, replace}`, `cancel_task`; WS 수신 `state`, `error` |
 | `check` (goto 안) | 0.5초마다: 금지 구역 변경 → 목표 도달 불가? / 0.5 m 이내(`근접`) / 목표 프론티어 사라짐(`이미 봄`, `frontier_left`) | — |

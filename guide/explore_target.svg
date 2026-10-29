@@ -764,7 +764,7 @@
 <circle cx="1228" cy="370" r="2.6" fill="#6b7280"/>
 <text x="1238" y="374" class="item" >③ 의 셀을 묶음 중심에 가까운 순으로 최대 30개 검사</text>
 <circle cx="1228" cy="389" r="2.6" fill="#6b7280"/>
-<text x="1238" y="393" class="item" >셀마다 광선 64개를 3.0 m 까지 쏨 (RAYS, SENSOR_RANGE)</text>
+<text x="1238" y="393" class="item" >셀마다 광선 64개를 5.0 m 까지 쏨 (RAYS, SENSOR_RANGE)</text>
 <circle cx="1228" cy="408" r="2.6" fill="#6b7280"/>
 <text x="1238" y="412" class="item" >벽에 막히기 전까지 지나는 미탐색 넓이를 더함</text>
 <text x="1238" y="431" class="small" >(굵은 선 = 미탐색을 지나는 부분, 빨간 점 = 벽에 막힘)</text>
@@ -828,14 +828,14 @@
 <rect x="476" y="817" width="10" height="7" fill="#fb923c"/>
 <rect x="488" y="817" width="10" height="7" fill="#fb923c"/>
 <line x1="40" y1="677" x2="40" y2="741" stroke="#6d28d9" stroke-width="1.5" marker-start="url(#aK)" marker-end="url(#aK)"/>
-<text x="34" y="709.0" class="lbl" style="fill:#6d28d9" text-anchor="middle" transform="rotate(-90 34 709.0)">줄 폭 1.95 m</text>
+<text x="34" y="709.0" class="lbl" style="fill:#6d28d9" text-anchor="middle" transform="rotate(-90 34 709.0)">줄 폭 3.25 m</text>
 <text x="52" y="972" class="cap" >줄 방향(u) = 벽의 주된 방향 4개 중 출발 시 로봇 방향에 가장 가까운 것 (그림은 축척 아님)</text>
 <text x="560" y="684.0" class="key" >처음 한 번 (첫 반복)</text>
 <circle cx="564" cy="700.5" r="2.6" fill="#6b7280"/>
 <text x="574" y="704.5" class="item" >wall_axis(): 벽 셀을 0~89° 로 돌려 투영한 히스토그램이 가장 뾰족한 각도</text>
 <text x="574" y="725.0" class="small" >= 벽의 주된 방향 (straighten_map.py 와 같은 방식), 벽이 적으면 로봇 방향</text>
 <circle cx="564" cy="741.5" r="2.6" fill="#6b7280"/>
-<text x="574" y="745.5" class="item" >줄 폭 = 센서 거리 3.0 m × 0.65 = 1.95 m (줄 가운데서 양옆 끝까지 보이게)</text>
+<text x="574" y="745.5" class="item" >줄 폭 = 센서 거리 5.0 m × 0.65 = 3.25 m (줄 가운데서 양옆 끝까지 보이게)</text>
 <text x="560" y="766.0" class="key" >매 반복</text>
 <circle cx="564" cy="782.5" r="2.6" fill="#6b7280"/>
 <text x="574" y="786.5" class="item" >후보를 줄별로 나누고, 지금 줄에서 진행 방향 앞쪽(0.3 m 뒤까지 허용) 후보만 봄</text>
