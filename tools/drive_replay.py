@@ -201,7 +201,8 @@ def explain(rec, s, out=print):
     if not ev:
         return
     reason = np.asarray(ev['reason'])
-    off, D, H, v = (np.asarray(ev[k]) for k in ('off', 'D', 'hold', 'v'))
+    off, D, v = (np.asarray(ev[k]) for k in ('off', 'D', 'v'))
+    H = np.asarray(ev['hold']) if 'hold' in ev else None      # 10-29 이전 기록 (유지/복귀가 있던 때)
     ms, md, total = np.asarray(ev['min_static']), np.asarray(ev['min_dynamic']), np.asarray(ev['total'])
     terms = {k: np.asarray(x) for k, x in ev['terms'].items()}
     cnt = {REASONS[r]: int((reason == r).sum()) for r in REASONS}
@@ -212,7 +213,7 @@ def explain(rec, s, out=print):
 
     def row(name, i):
         parts = ' '.join(f"{k}={terms[k][i]:.2f}" for k in terms)
-        out(f"   {name:<10} 오프셋 {off[i]:+.3f} 거리 {D[i]:.1f} {hold(H[i]):<9} 속도 {v[i]:.2f}  정적여유 {ms[i]:.3f} "
+        out(f"   {name:<10} 오프셋 {off[i]:+.3f} 거리 {D[i]:.1f} {'' if H is None else hold(H[i]):<9} 속도 {v[i]:.2f}  정적여유 {ms[i]:.3f} "
             f"동적여유 {md[i]:.3f}  {parts}  합 {total[i]:.2f}  [{REASONS[int(reason[i])]}]")
 
     best = ev.get('best')
@@ -246,7 +247,7 @@ def summary(rec):
     out(f"목표 {g['id']}: ({g['x']:.2f}, {g['y']:.2f}, {math.degrees(g['yaw']):.0f}°)   결과: "
         + (f"{rec.end['status']} {rec.end.get('message', '')}" if rec.end else '끝 기록 없음 (주행 중이거나 브리지가 꺼짐)'))
     out('Frenet: ' + ', '.join(f'{k}={rec.params.get("frenet." + k)}' for k in
-                               ('target_speed', 'safety_margin', 'clear_pref', 'max_offset', 'offset_step', 'check_dist',
+                               ('target_speed', 'safety_margin', 'clear_pref', 'max_offset', 'offset_step', 'lateral_dists',
                                 'w_offset', 'w_change', 'w_turn', 'w_speed', 'w_clear', 'rotate_speed')))
     out('\n[사건]')
     for e in rec.events:
@@ -324,15 +325,18 @@ def plot(rec, s, path):
         _, _, _, f = replay(rec, s)
         ref = f.ref_map.transformed(*m_o)
         fc = f.cfg
-        q = np.arange(0.0, fc.check_dist + 1e-9, fc.check_step)
-        off, D, H, reason = (np.asarray(ev[k]) for k in ('off', 'D', 'hold', 'reason'))
+        off, D, reason = (np.asarray(ev[k]) for k in ('off', 'D', 'reason'))
+        end = np.asarray(ev['off_end']) if 'off_end' in ev else off          # 10-29 6차부터: off = 중간, off_end = 끝
+        sm = np.asarray(ev['s_mid']) if ev.get('s_mid') is not None else None
         seen = set()
         for i in range(len(off)):
-            key = (off[i], D[i], H[i])
+            key = (off[i], end[i], D[i])
             if key in seen:
                 continue
             seen.add(key)
-            dd, dp, ddp = lateral_shape(q, ev['d0'], ev['dp0'], off[i], D[i], H[i], ev.get('dpp0', 0.0))
+            q = np.arange(0.0, D[i] + 1e-9, fc.check_step)              # 후보 길이까지 (지금 방식으로 다시 그림)
+            dd, dp, ddp = lateral_shape(q, ev['d0'], ev['dp0'], end[i], D[i], ev.get('dpp0', 0.0),
+                                        None if sm is None else off[i], None if sm is None else sm[i])
             sq = ev['s0'] + q
             g = frenet_to_cartesian(*ref.at(sq), np.ones_like(q), np.zeros_like(q), dd, dp, ddp)
             col = {0: 'tab:green', 1: 'tab:purple', 2: 'tab:red', 3: 'tab:orange'}[int(reason[i])]

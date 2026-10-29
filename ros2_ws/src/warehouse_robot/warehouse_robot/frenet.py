@@ -6,18 +6,23 @@
   (기준선 스플라인, Frenet→직교 변환 식은 리포/PythonRobotics(MIT) 와 같음)
 
 터틀봇(차동 구동, 0.05~0.18 m/s, 폭 0.9 m 통로)에 맞게 다시 짠 부분:
-  - 옆 모양: d(s) 5차 (지금 d, d', d'' → 거리 D 뒤에 오프셋, 기울기 0, d'' 0) → hold 만큼 유지 → 같은 거리 D 로 5차 복귀
-    (hold < 0 이면 계속 유지). 시작 d'' 는 Werling(2010) 처럼 직전에 고른 궤적의 그 자리 값 (주행 중이 아니었으면 0).
+  - 옆 모양: 후보 하나 = d(s) 다항식 하나 (구간을 이어 붙이지 않음). Werling(2010) IV-B 저속 d(s) 를 바탕으로, 조건 7개 → 6차:
+      시작 d, d', d'' = 지금 상태 (d'' 는 Werling 처럼 직전에 고른 궤적의 그 자리 값)        ← 갈아탈 때 w 튐 (아래)
+      끝(길이 D) d = 끝 오프셋, d' = 0, d'' = 0 (Werling 목표 상태: 경로와 평행, 곡률 이어짐)
+      중간(D x via_ratio) d = 중간 오프셋                                                     ← 좁은 곳 (아래)
+    후보는 D 까지만 있고 검사도 D 까지만 (유지/복귀 구간 없음). 경로로 돌아오는 건 비용(끝 오프셋²) + 매 주기 재계획.
+    중간 오프셋 근거: 5차 한 구간(끝 오프셋 하나)은 좁은 곳에서 '틈 안 위치'와 '그 뒤 위치'를 따로 못 골라 막혔음
+    (실물 기록 57개 재주행: 주행 중 돌아서기 4 → 10~13). 6차, D 1.0 m: 도착 41 → 43, 막힘 108 → 96 s, 오프셋 갈아타기 314 → 208,
+    갈아탈 때 |Δw| 최대 0.30 → 0.24, 최소 여유 같음 (기준 = 3차/5차 + 유지/복귀, 2026-10-29)
     5차인 이유 (Werling 은 횡 저크 최소화, 우리는): 명령이 w = v·κ 라 곡률이 끊기면 w 가 튐. 예전 3차(d'' 안 맞춤)는
     같은 계획을 이어 갈 땐 문제없었지만(실물 37분: |Δw| 0.2 rad/s 넘음 0.3%) 오프셋을 갈아탈 때 6.6%, 0.5 넘음 1.4%
     (최대 1.69)였고, 그 순간 IMU-바퀴 각속도 차이가 평소의 14배. 시작 d'' + 끝 d''=0 (유지 구간과 곡률 연속) = 조건 6개 → 5차.
-    복귀가 없으면 장애물 바로 뒤에서 경로가 꺾일 때(실제 기록: 소화기 지나 경로가 벽 쪽으로 꺾임) 오프셋을 계속 유지한 후보가
-    벽에 걸려 다 막혔음 (Werling/PythonRobotics 는 후보가 옆 이동 구간까지만이고 복귀는 비용 + 재계획으로)
+    (예전: D 뒤 유지/복귀 구간을 붙이고 1.0 m 까지 검사. 논문에 없고 근거가 기록 한 건뿐이라 뺐음, 2026-10-29)
   - 속도: 다항식 대신 지금 속도에서 max_accel 로 목표 속도까지 가/감속 (cmd_vel 로 속도를 직접 주므로)
-  - 경로 모양과 속도를 나눔: 정적 장애물은 모양만으로 '거리' 0~check_dist 를 검사 → 속도와 무관.
+  - 경로 모양과 속도를 나눔: 정적 장애물은 모양만으로 '거리' 0~D 를 검사 → 속도와 무관.
     (예전 DWA 는 '시간' 으로 굴려서, 느린 궤적이 장애물까지 못 가 안전으로 남아 장애물 옆/앞에서 기어갔음)
     움직이는 물체만 시간(속도 프로필)으로 등속 예측 원과 검사 (반경 + dynamic_margin + dynamic_growth·t)
-  - 후보: 오프셋 ±max_offset (offset_step) x 옆 이동 거리 lateral_dists x 유지 거리 hold_dists x 속도 (target 에서
+  - 후보: 오프셋 ±max_offset (offset_step) x 후보 길이 lateral_dists x 속도 (target 에서
     speed_step 씩 n_speed 개 더) → 약 450 개, 0.1초 주기에 10 ms 안팎
   - 비용(자동차의 저크/시간 대신 터틀봇 단위, 각 항 0~1 근처): 경로에서 벗어난 정도(검사 구간 평균 |d|), 직전 오프셋과 다름(흔들림),
     옆으로 꺾는 가파름(max|d'|), 느림, 정적 여유 부족(clear_pref 보다 가까움, 거리 구간에서), 움직이는 물체 여유 부족
@@ -63,10 +68,8 @@ def transform_points(points, x, y, yaw):
 class FrenetConfig:
     dt: float = 0.1               # 시간 샘플 (s)
     horizon: float = 4.0          # 움직이는 물체 검사 시간 (s)
-    check_dist: float = 1.0       # 정적 장애물 검사 거리 (경로 방향, m). 이만큼 앞의 장애물부터 비켜 감
     check_step: float = 0.05      # 그 거리 샘플 간격 (m)
-    lateral_dists: tuple = (0.4, 0.6)        # 옆 오프셋까지 가는(그리고 돌아오는) 거리 후보 (m)
-    hold_dists: tuple = (0.0, 0.3, -1.0)     # 오프셋 유지 거리 후보 (m). 음수 = 돌아오지 않음
+    lateral_dists: tuple = (1.0,)            # 후보 길이 (m). 검사도 이 길이까지
     max_offset: float = 0.3       # 옆 오프셋 후보 ±max_offset (m)
     offset_step: float = 0.025     # 실제 소화기 틈(양쪽 9 cm)은 5 cm 간격으로는 가운데를 못 맞춰 막혔음
     target_speed: float = 0.15    # (m/s) 속도 후보: target, target - speed_step, ... (n_speed 개 더)
@@ -87,13 +90,19 @@ class FrenetConfig:
     dynamic_growth: float = 0.03  # 예측 1초당 여유 증가 (m/s)
     grid_res: float = 0.01        # 정적 거리 격자 (m). 2 cm 는 오차 때문에 소화기 옆 0.5 m 틈을 못 지나갔음
     grid_half: float = 1.6        # 정적 격자 최대 범위: 로봇 중심 ±grid_half (실제 범위는 후보가 지나가는 곳에 맞춤, m)
-    w_offset: float = 1.0         # 검사 구간 평균 |d| / max_offset
+    w_offset: float = 0.0         # (끔: 끝 오프셋² 로) 후보 구간 평균 |d| / max_offset
     w_change: float = 1.0         # |오프셋 - 직전 오프셋| / max_offset (경로로 돌아오는 쪽은 1/4). 0.3 은 좁은 곳에서 오프셋이 주기마다 바뀌어 w 가 튐
                                   # (실물 기록 18개 폐루프: 0.3 → 1.0 에 오프셋 바뀜 181 → 81, 도착 수 같음, 2.5 는 1개 실패)
-    w_turn: float = 0.5           # max|d'| (옆으로 꺾는 기울기, 1 = 45°)
+    w_turn: float = 0.0           # (끔: jerk 로) max|d'| (옆으로 꺾는 기울기, 1 = 45°)
     w_speed: float = 1.0          # (목표 - 속도) / 목표
     w_clear: float = 1.0          # 정적: (clear_pref - 최소 여유) / clear_pref
     w_dynamic: float = 1.0        # 움직이는 물체: 같은 식
+    # Werling(2010) 저속 횡 비용 Cd = kj·Js + kt·S + kd·d1² 의 항목 (각 항 0~1 근처로 나눔). 0 이면 끔
+    w_end: float = 1.0            # 끝 오프셋² (d1 / max_offset)²: 경로로 돌아오게 하는 힘
+    w_jerk: float = 0.3           # ∫ d'''² ds / (720·max_offset² / 0.6⁵) (0.6 m 에 max_offset 만큼 비키는 최적 5차의 값 = 1)
+    w_len: float = 0.2            # 후보 길이 S / 가장 긴 후보 (천천히 수렴하는 후보에 벌점)
+    via_ratio: float = 0.5        # 중간 위치를 고르는 지점 = 후보 길이 x 이 값 (0 이면 중간점 없이 5차)
+    end_offset_step: float = 0.1  # 끝 오프셋 간격 (중간 오프셋은 offset_step). 후보 수 = 중간 x 끝 x 길이 x 속도
     rotate_speed: float = 1.0     # 출발 전 돌아서기 각속도 (rad/s). SLAM 모드는 브리지가 0.6 으로 (빨리 돌면 스캔이 휘어 매칭이 나빠짐)
     stop_decel: float = 0.3       # 경로 끝에서 이 감속으로 멈출 수 있는 속도 이하 (m/s²)
     stop_margin: float = 0.05     # 경로 끝 이만큼 앞에서 멈추는 프로필 (m)
@@ -290,29 +299,40 @@ def body_circles(footprint, n=4):
 
 
 # ------------------------------------------------------------------ 플래너
-def lateral_shape(q, d0, dp0, off, D, hold=-1.0, dpp0=0.0):
-    """옆 모양 d(q), q = 경로를 따라 간 거리. 반환 (d, d', d'') (브로드캐스트).
-    [0, D] 5차: (d0, dp0, dpp0) → (off, 0, 0). [D, D+hold] off 유지. [D+hold, 2D+hold] 5차로 (off, 0, 0) → (0, 0, 0),
-    그 뒤 0. hold < 0 이면 D 이후 계속 off. 이음매마다 d, d', d'' 가 이어짐 (곡률 연속)."""
-    a2 = 0.5 * dpp0
-    A = off - (d0 + dp0 * D + a2 * D ** 2)                              # 끝 조건에서 앞 세 항을 뺀 나머지
-    B = -(dp0 + 2.0 * a2 * D)
-    C = -2.0 * a2
-    a3 = (10.0 * A - 4.0 * B * D + 0.5 * C * D ** 2) / D ** 3
-    a4 = (-15.0 * A + 7.0 * B * D - C * D ** 2) / D ** 4
-    a5 = (6.0 * A - 3.0 * B * D + 0.5 * C * D ** 2) / D ** 5
+def lateral_shape(q, d0, dp0, off, D, dpp0=0.0, mid=None, s_mid=None):
+    """옆 모양 d(q), q = 경로를 따라 간 거리. 반환 (d, d', d'') (브로드캐스트). 후보 하나 = 다항식 하나.
+    mid 없음: 5차, (d0, dp0, dpp0) → D 에서 (off, 0, 0) (Werling 저속 d(s)).
+    mid 있음: 6차, 같은 시작/끝 조건 + 중간 거리 s_mid 에서 d = mid (조건 7개). 좁은 곳에서 '틈 안 위치'와 '그 뒤 위치'를
+    따로 고를 수 있게 (5차는 끝 오프셋 하나뿐이라 틈 뒤에서 벽에 걸렸음). 구간을 이어 붙이지 않는다.
+    D 너머는 끝 상태 (off, 0, 0) (보간/표시용, 검사에는 안 씀)."""
+    a2 = 0.5 * np.asarray(dpp0, dtype=float)
+    if mid is None:
+        A = off - (d0 + dp0 * D + a2 * D ** 2)                          # 끝 조건에서 앞 세 항을 뺀 나머지
+        B = -(dp0 + 2.0 * a2 * D)
+        C = -2.0 * a2
+        co = [(10.0 * A - 4.0 * B * D + 0.5 * C * D ** 2) / D ** 3, (-15.0 * A + 7.0 * B * D - C * D ** 2) / D ** 4,
+              (6.0 * A - 3.0 * B * D + 0.5 * C * D ** 2) / D ** 5]
+    else:
+        off, D, mid, s_mid, a2b = np.broadcast_arrays(*(np.asarray(v, dtype=float) for v in (off, D, mid, s_mid, a2)))
+        m, S = s_mid, D
+        M = np.stack([np.stack([m ** 3, m ** 4, m ** 5, m ** 6], -1),
+                      np.stack([S ** 3, S ** 4, S ** 5, S ** 6], -1),
+                      np.stack([3 * S ** 2, 4 * S ** 3, 5 * S ** 4, 6 * S ** 5], -1),
+                      np.stack([6 * S, 12 * S ** 2, 20 * S ** 3, 30 * S ** 4], -1)], -2)
+        rhs = np.stack([mid - (d0 + dp0 * m + a2b * m ** 2), off - (d0 + dp0 * S + a2b * S ** 2),
+                        -(dp0 + 2.0 * a2b * S), -2.0 * a2b], -1)
+        sol = np.linalg.solve(M, rhs[..., None])[..., 0]
+        co = [sol[..., k] for k in range(4)]
     qq = np.minimum(q, D)
-    d = d0 + dp0 * qq + a2 * qq ** 2 + a3 * qq ** 3 + a4 * qq ** 4 + a5 * qq ** 5
-    dp = dp0 + 2.0 * a2 * qq + 3.0 * a3 * qq ** 2 + 4.0 * a4 * qq ** 3 + 5.0 * a5 * qq ** 4
-    dpp = 2.0 * a2 + 6.0 * a3 * qq + 12.0 * a4 * qq ** 2 + 20.0 * a5 * qq ** 3
+    d = d0 + dp0 * qq + a2 * qq ** 2
+    dp = dp0 + 2.0 * a2 * qq
+    dpp = 2.0 * a2 + 0.0 * qq
+    for k, ak in enumerate(co, start=3):
+        d = d + ak * qq ** k
+        dp = dp + k * ak * qq ** (k - 1)
+        dpp = dpp + k * (k - 1) * ak * qq ** (k - 2)
     past = q > D
-    d, dp, dpp = np.where(past, off, d), np.where(past, 0.0, dp), np.where(past, 0.0, dpp)
-    back = (hold >= 0.0) & (q > D + np.maximum(hold, 0.0))           # 복귀 구간 (그 뒤 포함)
-    u = np.clip((q - D - np.maximum(hold, 0.0)) / D, 0.0, 1.0)
-    rd = off * (1.0 - 10.0 * u ** 3 + 15.0 * u ** 4 - 6.0 * u ** 5)
-    rdp = off * (-30.0 * u ** 2 + 60.0 * u ** 3 - 30.0 * u ** 4) / D
-    rdpp = off * (-60.0 * u + 180.0 * u ** 2 - 120.0 * u ** 3) / D ** 2
-    return np.where(back, rd, d), np.where(back, rdp, dp), np.where(back, rdpp, dpp)
+    return np.where(past, off, d), np.where(past, 0.0, dp), np.where(past, 0.0, dpp)
 
 
 def speed_profile(v0, vs, t, a_max):
@@ -344,7 +364,7 @@ class FrenetPlanner:
     def plan(self, ref, pose, v0, static_points, moving, hint=0, prev_offset=None, prev_shape=None):
         """ref: Reference (pose 와 같은 좌표계), pose: (x, y, yaw), v0: 지금 선속도, static_points: (N, 2) 스캔 점,
         moving: (M, 5) [x, y, vx, vy, r] 움직이는 물체, prev_offset: 직전에 고른 오프셋 (흔들림 비용),
-        prev_shape: 직전에 고른 모양 (s0, d0, dp0, dpp0, off, D, hold) → 그 자리 d'' 를 시작 d'' 로 (곡률 이어짐).
+        prev_shape: 직전에 고른 모양 (s0, d0, dp0, dpp0, off, D) → 그 자리 d'' 를 시작 d'' 로 (곡률 이어짐).
         반환 궤적 dict (t, x, y, yaw, v, kappa, valid) 또는 None (막힘). self.last_eval: 후보별 판정 (기록/분석용)."""
         c = self.cfg
         x, y, yaw = pose
@@ -354,30 +374,40 @@ class FrenetPlanner:
         dth = float(np.clip(normalize(yaw - ryaw), -1.2, 1.2))
         dp0 = math.tan(dth) * (1.0 - rk * d0)                            # d' = 경로에 대한 기울기
         dpp0 = 0.0                                                        # d'': 직전 계획의 그 자리 값 (없으면 0)
-        if prev_shape is not None and 0.0 <= s0 - prev_shape['s0'] < 3.0:
+        if prev_shape is not None and 0.0 <= s0 - prev_shape['s0'] < prev_shape['D']:   # 직전 후보 길이 안에서만
             p = prev_shape
-            dpp0 = float(lateral_shape(np.array(s0 - p['s0']), p['d0'], p['dp0'], p['off'], p['D'], p['hold'],
-                                       p['dpp0'])[2])
+            dpp0 = float(lateral_shape(np.array(s0 - p['s0']), p['d0'], p['dp0'], p['off'], p['D'], p['dpp0'],
+                                       p.get('mid'), p.get('s_mid'))[2])
         remaining = ref.s_end - s0
         v_end = math.sqrt(2.0 * c.stop_decel * max(remaining - c.stop_margin, 0.0))
         v_top = max(min(c.target_speed, c.max_speed, v_end), 0.02)
         vs = np.unique(np.clip(v_top - np.arange(c.n_speed + 1) * c.speed_step, 0.02, None))
         offs = np.round(np.arange(-c.max_offset, c.max_offset + 1e-9, c.offset_step), 6)
         Ds = np.asarray(c.lateral_dists, dtype=float)
-        Hs = np.asarray(c.hold_dists, dtype=float)
-        # 모양 후보 = 오프셋 x 옆 이동 거리 x 유지 거리 → 한 축 (nS) 으로 펴서
-        OFF, DD, HH = (a.ravel() for a in np.meshgrid(offs, Ds, Hs, indexing='ij'))
+        # 모양 후보 = 중간 오프셋 x 끝 오프셋 x 길이 → 한 축 (nS) 으로 펴서 (via_ratio 0 이면 끝 오프셋 x 길이, 5차)
+        if c.via_ratio > 0.0:
+            ends = np.round(np.arange(-c.max_offset, c.max_offset + 1e-9, c.end_offset_step), 6)
+            MID, END, DD = (a.ravel() for a in np.meshgrid(offs, ends, Ds, indexing='ij'))
+            SM = DD * c.via_ratio
+        else:
+            END, DD = (a.ravel() for a in np.meshgrid(offs, Ds, indexing='ij'))
+            MID = SM = None
+        OFF = END if MID is None else MID          # '오프셋' = 가까운 쪽 위치 (갈아타기 비용, 기록)
+        shape_args = lambda e: (END.reshape((-1,) + (1,) * e), DD.reshape((-1,) + (1,) * e), dpp0,   # noqa: E731
+                                None if MID is None else MID.reshape((-1,) + (1,) * e),
+                                None if SM is None else SM.reshape((-1,) + (1,) * e))
         nS, nV = len(OFF), len(vs)
         offs_c, rad = body_circles(c.footprint)
         body = body_points(c.footprint, c.footprint_extra)
         r_body = float(np.hypot(body[:, 0], body[:, 1]).max())            # 기준점에서 차체 끝까지 (부착물 포함)
 
-        # ---- 모양만: 정적 장애물을 거리 0 ~ check_dist 에서 (속도와 무관)
-        q = np.arange(0.0, c.check_dist + 1e-9, c.check_step)             # (nq,)
-        dq, dpq, ddq = lateral_shape(q[None, :], d0, dp0, OFF[:, None], DD[:, None], HH[:, None], dpp0)
+        # ---- 모양만: 정적 장애물을 거리 0 ~ D (후보 길이) 에서 (속도와 무관)
+        q = np.arange(0.0, Ds.max() + 1e-9, c.check_step)                 # (nq,)
+        dq, dpq, ddq = lateral_shape(q[None, :], d0, dp0, *shape_args(1))
+        within = q[None, :] <= DD[:, None] + 1e-9                         # 후보 길이 안 (그 너머는 그 후보에 없음)
         sq = np.broadcast_to(s0 + q, dq.shape)
         g = frenet_to_cartesian(*ref.at(sq), np.ones_like(dq), np.zeros_like(dq), dq, dpq, ddq)
-        on_path = sq <= ref.s_end + 0.02                                  # 경로 끝 너머는 검사 안 함
+        on_path = (sq <= ref.s_end + 0.02) & within                       # 경로 끝/후보 끝 너머는 검사 안 함
         # 인지 범위: 이번 후보들이 지나가는 곳(+ 지금 자세) + 차체 끝 + 선호 여유. 그 밖의 점은 어느 후보의 여유/비용에도
         # 영향이 없다 (뒤쪽은 차체 뒤 끝 근처까지만). ±grid_half 를 넘지 않게
         gx, gy = g[..., 0][on_path], g[..., 1][on_path]
@@ -401,15 +431,17 @@ class FrenetPlanner:
         if now_static < margin_v.max():
             need_v[slowest] = min(margin_v[slowest], max(now_static - 0.02, 0.01))
         curv = np.where(on_path, np.abs(g[..., 3]), 0.0).max(axis=1)      # 모양의 최대 곡률
-        steep = np.abs(dpq).max(axis=1)
-        mean_d = np.abs(dq).mean(axis=1)
+        steep = np.where(within, np.abs(dpq), 0.0).max(axis=1)
+        d3 = np.gradient(ddq, c.check_step, axis=1)                        # d''' (5차라 2차식, 수치 미분으로 충분)
+        jerk = np.where(within, d3 ** 2, 0.0).sum(axis=1) * c.check_step
+        mean_d = np.where(within, np.abs(dq), 0.0).sum(axis=1) / within.sum(axis=1)
 
         # ---- 속도 프로필 x 모양: 시간 샘플 (움직이는 물체, 각속도 한계, 그리고 실행할 궤적)
         t = np.arange(0.0, c.horizon + 1e-9, c.dt)
         V, A, dist = speed_profile(max(v0, 0.0), vs, t, c.max_accel)       # (nV, n)
 
         def along(sdot, sddot, q):
-            dd_, dp_, ddp_ = lateral_shape(q, d0, dp0, OFF[:, None, None], DD[:, None, None], HH[:, None, None], dpp0)
+            dd_, dp_, ddp_ = lateral_shape(q, d0, dp0, *shape_args(2))
             return frenet_to_cartesian(*ref.at(s0 + q), sdot, sddot, dd_, dp_, ddp_)
 
         # 프로필 속도는 '실제 속도' 로: 경로 방향 속도 ṡ 를 그대로 쓰면 옆으로 비킬 때/커브 바깥쪽에서 실제 속도가 더 커짐
@@ -423,7 +455,7 @@ class FrenetPlanner:
                              np.cumsum(0.5 * (sdot[..., 1:] + sdot[..., :-1]) * c.dt, axis=-1)], axis=-1)
         cart = along(sdot, np.gradient(sdot, c.dt, axis=-1), qt)         # (nS, nV, n, 6)
         st = s0 + qt
-        valid = st <= ref.s_end + 0.02
+        valid = (st <= ref.s_end + 0.02) & (qt <= DD[:, None, None] + 1e-9)   # 경로 끝, 후보 끝(D)까지만
         valid[..., 0] = True
         wmax = np.where(valid, np.abs(cart[..., 4] * cart[..., 3]), 0.0).max(axis=2)
         # 실제 속도가 max_speed 를 넘지 않는지 (이미 빠르면 지금 속도까지는 허용 → 감속 후보 통과). 프로필과 딱 맞추면
@@ -449,6 +481,10 @@ class FrenetPlanner:
         stat3 = np.broadcast_to(stat[:, None], (nS, nV))
         reason = np.where(~kin, KINEMATIC, np.where(stat3 < need_v[None, :], STATIC, np.where(dyn < need_d, DYNAMIC, OK)))
         prev = 0.0 if prev_offset is None else prev_offset
+        if MID is not None and prev_shape is not None:     # 직전 계획이 이 후보의 중간 지점에서 있던 옆 위치 (Werling 의 시간 일관성)
+            p = prev_shape
+            prev = float(lateral_shape(np.array(s0 + float(SM.max()) - p['s0']), p['d0'], p['dp0'], p['off'], p['D'],
+                                       p['dpp0'], p.get('mid'), p.get('s_mid'))[0])
         pref = max(c.clear_pref, 1e-6)
         terms = {
             'offset': c.w_offset * mean_d / c.max_offset,
@@ -458,6 +494,9 @@ class FrenetPlanner:
             * np.where((OFF * prev >= 0.0) & (np.abs(OFF) < abs(prev)), 0.25, 1.0),
             'turn': c.w_turn * steep,
             'clear': c.w_clear * np.clip((pref - stat) / pref, 0.0, 1.0),
+            'end': c.w_end * (END / c.max_offset) ** 2,
+            'jerk': c.w_jerk * jerk / (720.0 * c.max_offset ** 2 / 0.6 ** 5),
+            'len': c.w_len * DD / Ds.max(),
         }
         terms = {kk: np.broadcast_to(v[:, None], (nS, nV)) for kk, v in terms.items()}
         terms['speed'] = np.broadcast_to(c.w_speed * (v_top - vs) / v_top, (nS, nV))
@@ -470,8 +509,9 @@ class FrenetPlanner:
             'need_static': float(need_v.min()), 'need_dynamic': need_d,
             'need_static_v': np.broadcast_to(need_v[None, :], cost.shape).ravel(),   # 후보별 (속도마다 다름)
             'off': np.broadcast_to(OFF[:, None], cost.shape).ravel(),
+            'off_end': np.broadcast_to(END[:, None], cost.shape).ravel(),
+            's_mid': None if SM is None else np.broadcast_to(SM[:, None], cost.shape).ravel(),
             'D': np.broadcast_to(DD[:, None], cost.shape).ravel(),
-            'hold': np.broadcast_to(HH[:, None], cost.shape).ravel(),
             'v': np.broadcast_to(vs, cost.shape).ravel(),
             'min_static': stat3.ravel(), 'min_dynamic': dyn.ravel(), 'curv': np.broadcast_to(curv[:, None], cost.shape).ravel(),
             'w_max': wmax.ravel(), 'reason': reason.ravel(), 'total': total.ravel(),
@@ -483,9 +523,10 @@ class FrenetPlanner:
         b = best
         return {'t': t, 'x': cart[b][:, 0], 'y': cart[b][:, 1], 'yaw': cart[b][:, 2], 'kappa': cart[b][:, 3],
                 'v': cart[b][:, 4], 'valid': valid[b], 'offset': float(OFF[b[0]]), 'D': float(DD[b[0]]),
-                'hold': float(HH[b[0]]), 'speed': float(vs[b[1]]),
-                'shape': {'s0': float(s0), 'd0': float(d0), 'dp0': float(dp0), 'dpp0': dpp0, 'off': float(OFF[b[0]]),
-                          'D': float(DD[b[0]]), 'hold': float(HH[b[0]])}}
+                'speed': float(vs[b[1]]),
+                'shape': {'s0': float(s0), 'd0': float(d0), 'dp0': float(dp0), 'dpp0': dpp0, 'off': float(END[b[0]]),
+                          'D': float(DD[b[0]]), 'mid': None if MID is None else float(MID[b[0]]),
+                          's_mid': None if SM is None else float(SM[b[0]])}}
 
     @staticmethod
     def _static_clear(grid, X, Y, TH, body):
@@ -724,5 +765,5 @@ class FrenetFollower:
             v = self.min_v
         kappa = float(np.mean(traj['kappa'][1:4]))
         w = float(np.clip(v * kappa, -c.max_w, c.max_w))
-        dbg.update(offset=traj['offset'], D=traj['D'], hold=traj['hold'], speed=traj['speed'], kappa=kappa)
+        dbg.update(offset=traj['offset'], D=traj['D'], speed=traj['speed'], kappa=kappa)
         return v, w, 'driving'

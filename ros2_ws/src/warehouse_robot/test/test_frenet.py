@@ -50,12 +50,11 @@ def test_reference_is_smooth_and_follows_path():
     assert np.abs(ref.kappa[on]).max() < 5.0
 
 
-def test_lateral_shape_returns_to_path():
-    q = np.arange(0.0, 2.0, 0.05)
-    d, dp, _ = lateral_shape(q, 0.0, 0.0, 0.2, 0.4, 0.3)
-    assert abs(d[0]) < 1e-9 and abs(d[np.searchsorted(q, 0.5)] - 0.2) < 1e-9 and abs(d[-1]) < 1e-9
-    held, _, _ = lateral_shape(q, 0.0, 0.0, 0.2, 0.4, -1.0)
-    assert abs(held[-1] - 0.2) < 1e-9
+def test_lateral_shape_ends_parallel_at_offset():
+    # 후보 하나 = 5차 한 구간: D 에서 오프셋에 평행 (유지/복귀 구간 없음, D 너머는 끝 상태 그대로)
+    q = np.arange(0.0, 1.0, 0.05)
+    d, dp, dpp = lateral_shape(q, 0.0, 0.0, 0.2, 0.4)
+    assert abs(d[0]) < 1e-9 and np.allclose(d[q >= 0.4], 0.2) and np.allclose(dp[q >= 0.4], 0.0)
 
 
 def test_drives_straight_at_target_speed():
@@ -173,15 +172,11 @@ def test_arrival_turn_skipped_in_tight_corner():
 
 
 def test_lateral_shape_quintic_boundary_conditions():
-    # 시작 (d, d', d'') = 지금 상태, D 에서 (off, 0, 0), 복귀 끝에서 (0, 0, 0): 이음매마다 곡률이 이어짐
-    d0, dp0, dpp0, off, D, hold = 0.05, 0.1, -0.8, 0.2, 0.4, 0.3
-    for q, want in ((0.0, (d0, dp0, dpp0)), (D, (off, 0.0, 0.0)), (D + hold, (off, 0.0, 0.0)),
-                    (2 * D + hold, (0.0, 0.0, 0.0)), (2 * D + hold + 0.2, (0.0, 0.0, 0.0))):
-        got = lateral_shape(np.array(q), d0, dp0, off, D, hold, dpp0)
+    # 시작 (d, d', d'') = 지금 상태, D 에서 (off, 0, 0)
+    d0, dp0, dpp0, off, D = 0.05, 0.1, -0.8, 0.2, 0.4
+    for q, want in ((0.0, (d0, dp0, dpp0)), (D, (off, 0.0, 0.0))):
+        got = lateral_shape(np.array(q), d0, dp0, off, D, dpp0)
         assert np.allclose([float(v) for v in got], want, atol=1e-9), (q, got, want)
-    for q in (D, D + hold):                     # 이음매 양쪽 d'' 가 같음
-        a, b = (float(lateral_shape(np.array(q + e), d0, dp0, off, D, hold, dpp0)[2]) for e in (-1e-6, 1e-6))
-        assert abs(a - b) < 1e-3
 
 
 def test_offset_switch_keeps_curvature_continuous():
