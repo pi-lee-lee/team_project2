@@ -330,6 +330,8 @@ def main():
                 ex.capture()
                 turned += 1
             print(f'[위치 찾기] 제자리 {turned * 45}° 돌며 스캔 {len(ex.records)}장', flush=True)
+            if turned == 7:   # 315° 돌면 처음보다 오른쪽 45° 라 마저 돌아 처음 방향으로 (그 방향 스캔은 이미 있음)
+                ex.rotate(ROT_STEP)
             lx, ly = ex.merged()
             best, other = evaluate(lx, ly, dist, info)
             # 2. 모호하거나 잘 안 맞으면 트인 쪽으로 조금 가서 더 모으기
