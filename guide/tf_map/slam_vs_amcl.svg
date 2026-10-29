@@ -439,12 +439,12 @@
 <circle cx="54" cy="796" r="13" fill="#ffffff"/>
 <text x="54.0" y="801.0" class="num" style="fill:#dc2626" text-anchor="middle">3</text>
 <text x="76.0" y="802.0" class="colhead">공통 — 두 모드 모두 결국 "맵 위의 로봇 위치" 를 만든다</text>
-<text x="1556.0" y="802.0" class="colsub" text-anchor="end">bridge_node.current_pose() · lookup_transform(map, base_footprint)</text>
+<text x="1556.0" y="802.0" class="colsub" text-anchor="end">bridge_node.pose_with_age() · /odom 토픽 × TF map → odom</text>
 <path d="M664.0,632.0 L664.0,752.0 L664.0,773.0" fill="none" stroke="#dc2626" stroke-width="2" marker-end="url(#aR)"/>
 <path d="M1449.0,602.0 L1449.0,773.0" fill="none" stroke="#dc2626" stroke-width="2" marker-end="url(#aR)"/>
 <rect x="50" y="836" width="280" height="86" rx="8" fill="#fff7ed" stroke="#ea580c" stroke-width="2"/>
 <text x="190.0" y="860.0" class="monob" style="fill:#ea580c" text-anchor="middle">odom → base_footprint</text>
-<text x="190.0" y="884.0" class="small" text-anchor="middle">오도메트리: 출발 지점부터 누적</text>
+<text x="190.0" y="884.0" class="small" text-anchor="middle">오도메트리 (/odom): 출발 지점부터 누적</text>
 <text x="190.0" y="902.0" class="small" text-anchor="middle">부드럽지만 오차가 계속 쌓임</text>
 <text x="350.0" y="888.0" class="title" text-anchor="middle">+</text>
 <rect x="370" y="836" width="280" height="86" rx="8" fill="#fef2f2" stroke="#dc2626" stroke-width="2"/>
@@ -455,9 +455,9 @@
 <rect x="690" y="836" width="300" height="86" rx="8" fill="#f3f4f6" stroke="#111827" stroke-width="2"/>
 <text x="840.0" y="860.0" class="monob" style="fill:#111827" text-anchor="middle">map → base_footprint</text>
 <text x="840.0" y="884.0" class="small" text-anchor="middle">맵 위의 로봇 현재 위치 (x, y, yaw)</text>
-<text x="840.0" y="902.0" class="small" text-anchor="middle">브리지가 TF 로 두 변환을 합성</text>
+<text x="840.0" y="902.0" class="small" text-anchor="middle">브리지가 /odom 과 TF map → odom 을 합성</text>
 <rect x="50" y="938" width="940" height="32" rx="8" fill="#fef2f2" stroke="#fecaca" stroke-width="1"/>
-<text x="64.0" y="959.0" class="item" style="fill:#dc2626">map → odom 이 없으면 (SLAM·AMCL 이 안 떠 있거나 멈춤) 맵은 그려져도 로봇을 맵 위에 놓을 수 없다 → 웹에서 로봇이 사라지고(pose_lost) 주행도 못 한다</text>
+<text x="64.0" y="959.0" class="item" style="fill:#dc2626">map → odom 이 없으면 (SLAM·AMCL 이 안 떠 있음) 맵은 그려져도 로봇을 맵 위에 놓을 수 없다 → 웹에서 로봇이 사라지고(pose_lost) 주행도 못 한다</text>
 <path d="M990.0,879.0 L1040.0,879.0" fill="none" stroke="#111827" stroke-width="2" marker-end="url(#aK)"/>
 <text x="1015.0" y="870.0" class="mono" text-anchor="middle">pose</text>
 <rect x="1050" y="828" width="470" height="146" rx="8" fill="#f9fafb" stroke="#d1d5db" stroke-width="1"/>
@@ -466,7 +466,7 @@
 <text x="1062.0" y="884.0" class="small">목표까지 A* 경로를 계획한다</text>
 <text x="1062.0" y="910.0" class="cap">· map: 맵 그림 (bridge → server)</text>
 <text x="1062.0" y="927.0" class="cap">· pose: 로봇 위치 (주기적으로)</text>
-<text x="1062.0" y="944.0" class="cap">· pose_lost: 위치 TF 가 1초 넘게</text>
+<text x="1062.0" y="944.0" class="cap">· pose_lost: 위치(/odom)가 1초 넘게</text>
 <text x="1062.0" y="959.0" class="cap">  오래되면 로봇을 지움</text>
 <g transform="translate(1300,836) scale(1.0)">
 <rect x="0" y="0" width="200" height="140" fill="#9ca3af" opacity="0.45"/>

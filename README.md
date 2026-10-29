@@ -19,10 +19,10 @@
                                          │                                              │
                                        MySQL                     ┌──────────────────────┼──────────────┐
                                                                   │                      │              │
-                                                        [A* 플래너 노드]        [Nav2 AMCL/map_server]   cmd_vel
+                                                        [A* 플래너 노드]        [Nav2 AMCL/map_server]   cmd_vel_pc
                                                        (astar/get_plan)          (map → odom TF)          │
                                                                                                           ▼
-                                                                              [Raspberry Pi: turtlebot3_bringup]
+                                                                              [Raspberry Pi: 명령 감시 → cmd_vel → turtlebot3_bringup]
                                                                                OpenCR(모터/odom) + LDS-02(/scan)
 ```
 
@@ -226,7 +226,7 @@ SIGINT → SIGTERM → SIGKILL 순서로 보내고 남은 프로세스가 없는
 | 실패 시 | "재시도" / "건너뛰기" / "작업 취소" / "홈 복귀" |
 | 비상정지 | "비상정지" → 즉시 정지, 작업 취소. "오류 해제"로 대기 상태로 |
 
-### 속도 명령 (`/cmd_vel`) 은 브리지만 내보냄
+### 속도 명령은 브리지만 내보냄 (`cmd_vel_pc` → 명령 감시 → `/cmd_vel`)
 
 - 브리지 안의 선택기(`cmd_mux.py`)가 **정지(비상정지) > 수동 조작 > 자동 이동** 순으로 하나만 골라 20Hz 로 내보냄
 - 키보드로 조작하려면 **`cmd_vel_teleop`** 으로 보내기 (`/cmd_vel` 로 직접 보내면 브리지와 번갈아 내보내 끊기듯 움직임):
@@ -391,8 +391,8 @@ SIGINT → SIGTERM → SIGKILL 순서로 보내고 남은 프로세스가 없는
 - `config/amcl_waffle_pi.yaml` (`start_nav2.sh`): TurtleBot3 기본값보다 빔 수↑(180), 측정 모델을 날카롭게(sigma 0.1), 5cm 마다 갱신. `NAV2_PARAMS` 로 바꿀 수 있음
 - `config/amcl_hall.yaml` (`run.sh --amcl hall`): 위에서 z_hit/z_rand 0.75/0.15, sigma_hit 0.15, likelihood_max_dist 1.5 (강당/교실: 옮겨진 의자·사람 다리 빔에 너그럽게)
 - A* 는 맵을 받을 때 계획용으로 가공해서 씀 (`plan_map.py`, 위 표). 실제로 쓰는 격자는 `astar/plan_map` 토픽 (RViz 확인용)
-- `config/slam_toolbox.yaml` (`start_slam.sh`): 기본값에서 `scan_topic` 만 `/scan_level`
-- AMCL/slam_toolbox/A* 는 브리지가 발행하는 **`scan_level`** (차체가 평소보다 3° 넘게 기울지 않았을 때의 스캔. 3초 넘게 기울어 있으면 다시 전달)을 씁니다. **브리지 없이 AMCL/SLAM 만 띄우면 스캔을 못 받으니** 그때는 `scan_topic` 을 `scan` 으로 바꾸세요.
+- `config/slam_toolbox.yaml` (`start_slam.sh`, 실물·시뮬레이션 같은 설정): 기본값에서 `scan_topic` 은 `/scan_slam` (브리지가 발행: `scan_level` 과 같되 아무것도 안 맞은 빔(inf)을 range_max 바로 아래로)
+- AMCL/A* 는 브리지가 발행하는 **`scan_level`** (차체가 평소보다 3° 넘게 기울지 않았을 때의 스캔. 3초 넘게 기울어 있으면 다시 전달), slam_toolbox 는 그것을 바꾼 **`/scan_slam`** 을 씁니다. **브리지 없이 AMCL/SLAM 만 띄우면 스캔을 못 받으니** 그때는 `scan_topic` 을 `scan` 으로 바꾸세요.
 
 ## 8. 문제 해결
 

@@ -1,6 +1,6 @@
 ﻿# Docker 실행 가이드 (시뮬레이션)
 
-시뮬레이션 전체를 **컨테이너 하나**로 실행합니다. 들어 있는 것: Django 서버, Gazebo(TurtleBot3 Waffle Pi), SLAM/AMCL, A* 플래너, 브리지.
+시뮬레이션 전체를 **컨테이너 하나**로 실행합니다. 들어 있는 것: Django 서버, Gazebo(TurtleBot3 Waffle Pi, LiDAR·오도메트리·명령 감시를 실물과 같은 사양·경로로), SLAM/AMCL, A* 플래너, 브리지.
 
 - **이미지 = 실행 환경만** (ROS 2 Humble, Gazebo, 서버용 파이썬). 소스는 이미지에 넣지 않습니다.
 - **소스 = 프로젝트 폴더**: 실행할 때 프로젝트 폴더를 컨테이너의 `/app` 으로 연결하므로, 고친 코드가 다시 빌드하지 않아도 반영됩니다.
@@ -61,7 +61,7 @@ PC 에서 직접 실행할 때는 이 변수가 없으므로 지금과 같습니
 1. ROS 패키지 빌드: `/app/ros2_ws/src` → `/opt/warehouse/ros2_ws` (`--symlink-install`, 로그 `wsim/logs/colcon_build.log`)
 2. DB 준비: `/data/db.sqlite3` 가 없으면 저장소의 `server/db.sqlite3` 를 복사 → `migrate`
 3. 웹 서버 시작 (`wsim/logs/server.log`)
-4. `scripts/run.sh --robot sim <WSIM_ARGS>`: Gazebo → AMCL 또는 SLAM → A* + 브리지 → (map 모드) 초기 위치 자동 지정
+4. `scripts/run.sh --robot sim <WSIM_ARGS>`: Gazebo(+ `scripts/sim_real_io.py`: 실물 형식 /scan·/odom, `scripts/pi_cmd_watchdog.py`: 명령 감시) → AMCL 또는 SLAM → A* + 브리지 → (map 모드) 초기 위치 자동 지정
 5. 웹 서버가 살아 있는 동안 유지. 끄라는 신호(`Ctrl+C`, `docker compose down`)를 받으면 `scripts/stop_ros.sh --all` 로 노드 정리 후 종료
 
 정상 시작이면 마지막에 이렇게 나옵니다:
@@ -120,7 +120,7 @@ docker run --rm -it --name wsim -p 8000:8000 \
 |---|---|
 | `ros2_ws/src/.../*.py` (브리지, A*, Frenet) | 노드 재시작: 웹 "실행 모드" 에서 다시 시작, 또는 `docker exec wsim /app/scripts/run.sh --robot sim --mode map` |
 | `config/params.yaml`, `config/*.yaml` | 위와 같이 노드 재시작 (`frenet.*` 등 일부는 웹 "주행 파라미터" 로 실행 중 변경 가능) |
-| `scripts/*.sh`, `tools/*.py`, `worlds/*` | 다음 실행부터 바로 |
+| `scripts/*` (`*.sh`, `sim_real_io.py` 등), `tools/*.py`, `worlds/*` | 다음 실행부터 바로 |
 | `server/` (Django 파이썬, 템플릿, `app.js`) | 서버가 파일 변경을 감지해 자동 재시작. 브라우저 새로고침 |
 | `setup.py`, `launch/*`, 파이썬 파일 추가/삭제 | 컨테이너 재시작 (`docker compose restart`): 시작할 때 ROS 패키지를 다시 빌드 |
 | `Dockerfile`, `server/requirements.txt` | 이미지 다시 빌드: `docker compose up --build` |
@@ -141,7 +141,7 @@ ROS 명령은 컨테이너 안에서, 반드시 `source scripts/env.sh` 뒤에 �
 
 ```bash
 docker exec -it wsim bash                                                                       # 컨테이너 셸 (/app = 프로젝트)
-docker exec wsim bash -c 'cd /app && source scripts/env.sh && ros2 topic hz /scan'              # 약 5 Hz 면 정상
+docker exec wsim bash -c 'cd /app && source scripts/env.sh && ros2 topic hz /scan'              # 약 9 Hz 면 정상 (실물 LDS-02 와 같은 9.3 Hz)
 docker exec wsim bash -c 'cd /app && source scripts/env.sh && python3 tools/ui_goto.py -1.6 0.6'   # 웹처럼 목표 보내기
 docker exec wsim bash -c 'cd /app && source scripts/env.sh && python3 tools/drive_replay.py --list'
 ```
@@ -189,7 +189,8 @@ WSIM_ARGS="--mode map --map /root/maps/house_clean.yaml" docker compose up
 | 빌드 중 `Unable to locate package ros-humble-gazebo-ros-pkgs` | arm64 로 빌드된 경우. `Dockerfile` 의 `FROM --platform=linux/amd64` 확인 |
 | `port is already allocated` / 웹이 안 열림 | 8000 포트 사용 중. PC 의 서버를 `scripts/stop_ros.sh --all` 로 끄거나 `compose.yaml` 의 포트를 `"8080:8000"` 으로 |
 | `container name "/wsim" is already in use` | 이전 컨테이너가 남음: `docker rm -f wsim` |
-| 웹에 로봇이 안 보임 (위치 없음) | `wsim/logs/nav2.log` (AMCL), `sim.log` (Gazebo). map 모드는 웹 "초기 위치 지정" 또는 "위치 자동 찾기" |
+| 웹에 로봇이 안 보임 (위치 없음) | `wsim/logs/nav2.log` (AMCL), `sim.log` (Gazebo, `/scan`·`/odom` 을 내는 `sim_real_io.py`). map 모드는 웹 "초기 위치 지정" 또는 "위치 자동 찾기" |
+| 경로는 나오는데 로봇이 안 움직임 | 브리지는 `cmd_vel_pc` 로만 내고 명령 감시(`scripts/pi_cmd_watchdog.py`, `start_sim.sh` 가 띄움)가 `cmd_vel` 로 넘김. `sim.log` 에 `명령 감시 시작` 이 있는지 확인 |
 | `sim.log` 의 `ALSA lib ... error` | 컨테이너에 사운드 장치가 없어서 나는 경고. 무시 |
 | `run.sh 실패` 후 서버만 떠 있음 | 컨테이너는 계속 실행됨. 로그 확인 후 웹 "실행 모드" 에서 다시 시작 |
 | DB 를 처음 상태로 | `docker compose down` 후 `docker volume rm warehouse-data` (맵 파일은 `warehouse-maps` 에 그대로) |

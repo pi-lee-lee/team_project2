@@ -260,7 +260,7 @@
   <rect x="1214" y="252" width="342" height="40" rx="7" fill="#f0fdf4" stroke="#86efac" class="inner"/>
   <text x="1224" y="269" class="boxtitle" fill="#047857">ROS 타이머</text>
   <text x="1310" y="269" class="small">inbox 처리 → 목표 실행 · 안전 감시</text>
-  <text x="1224" y="285" class="small">A* 경로 → Frenet 로컬 플래너 → cmd_vel</text>
+  <text x="1224" y="285" class="small">A* 경로 → Frenet 로컬 플래너 → cmd_vel_pc</text>
 
   <rect x="1214" y="298" width="342" height="40" rx="7" fill="#f0fdf4" stroke="#86efac" class="inner"/>
   <text x="1224" y="315" class="boxtitle" fill="#047857">웹용 가공</text>
@@ -291,7 +291,7 @@
   <rect x="1212" y="466" width="346" height="82" rx="8" fill="#fff7ed" stroke="#ea580c" stroke-width="1.5"/>
   <text x="1224" y="486" class="boxtitle" fill="#c2410c">TurtleBot3 Pi · Wi-Fi · Fast DDS</text>
   <text x="1224" y="504" class="ms" style="fill:#c2410c">→ /scan /odom /tf /imu /battery_state</text>
-  <text x="1224" y="520" class="ms" style="fill:#c2410c">← /cmd_vel</text>
+  <text x="1224" y="520" class="ms" style="fill:#c2410c">← /cmd_vel_pc (명령 감시 → /cmd_vel)</text>
   <text x="1224" y="536" class="ms" style="fill:#c2410c">→ /csi/image_raw/compressed</text>
   <text x="1510" y="520" class="small" text-anchor="end" style="font-size:10.5px">(시뮬: Gazebo)</text>
 
@@ -366,7 +366,7 @@
     <text x="1044" y="715" class="step">RobotConsumer → 브리지  {type: goto, goal_id, x, y, yaw}</text>
 
     <rect x="970" y="728" width="64" height="20" rx="10" fill="#059669"/><text x="1002" y="742" class="badge" text-anchor="middle">DDS</text>
-    <text x="1044" y="743" class="step">브리지 → A* astar/get_plan → Frenet → /cmd_vel → Pi</text>
+    <text x="1044" y="743" class="step">브리지 → A* astar/get_plan → Frenet → /cmd_vel_pc → Pi</text>
 
     <rect x="970" y="756" width="64" height="20" rx="10" fill="#c026d3"/><text x="1002" y="770" class="badge" text-anchor="middle">WS②</text>
     <text x="1044" y="771" class="step">브리지 → RobotConsumer  pose · path · local_plan (계속)</text>

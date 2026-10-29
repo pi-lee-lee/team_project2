@@ -204,7 +204,7 @@
 <circle cx="52" cy="370" r="2.6" fill="#6b7280"/>
 <text x="62" y="374" class="item" >셀 = 점유 격자 한 개 (해상도 0.05 m)</text>
 <circle cx="52" cy="389" r="2.6" fill="#6b7280"/>
-<text x="62" y="393" class="item" >아는 셀 사이 폭 2셀(10 cm) 이하의 미탐색 줄은</text>
+<text x="62" y="393" class="item" >아는 셀 사이 폭 4셀(20 cm) 이하의 미탐색 줄은</text>
 <text x="62" y="412" class="small" >LiDAR 광선 사이 틈으로 보고 빈 셀처럼 취급 (GAP_CELLS)</text>
 <circle cx="52" cy="427" r="2.6" fill="#6b7280"/>
 <text x="62" y="431" class="item" >넓이 1 m² 미만이고 맵 가장자리에 닿지 않는</text>
@@ -552,7 +552,7 @@
 <text x="846" y="393" class="item" >벽에서 0.35 m 이상 (CLEARANCE)</text>
 <circle cx="836" cy="408" r="2.6" fill="#6b7280"/>
 <text x="846" y="412" class="item" >로봇에서 갈 수 있는 셀: 벽·금지 구역에서 0.28 m 밖이며</text>
-<text x="846" y="431" class="small" >로봇과 이어진 영역 (A* 와 같은 기준, reachable())</text>
+<text x="846" y="431" class="small" >로봇과 이어진 영역 (A* 와 같은 방식, 반경만 A* 0.24 보다 큼)</text>
 <circle cx="836" cy="446" r="2.6" fill="#6b7280"/>
 <text x="846" y="450" class="item" >미탐색에서 0.20 m → 0.10 m → 0 m (묶음마다 따로 완화)</text>
 <circle cx="836" cy="465" r="2.6" fill="#6b7280"/>
