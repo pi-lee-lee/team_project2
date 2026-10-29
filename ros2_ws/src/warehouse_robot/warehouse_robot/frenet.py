@@ -22,8 +22,8 @@
   - 경로 모양과 속도를 나눔: 정적 장애물은 모양만으로 '거리' 0~D 를 검사 → 속도와 무관.
     (예전 DWA 는 '시간' 으로 굴려서, 느린 궤적이 장애물까지 못 가 안전으로 남아 장애물 옆/앞에서 기어갔음)
     움직이는 물체만 시간(속도 프로필)으로 등속 예측 원과 검사 (반경 + dynamic_margin + dynamic_growth·t)
-  - 후보: 오프셋 ±max_offset (offset_step) x 후보 길이 lateral_dists x 속도 (target 에서
-    speed_step 씩 n_speed 개 더) → 약 450 개, 0.1초 주기에 10 ms 안팎
+  - 후보: 중간 오프셋 x 끝 오프셋 (±max_offset, ±fine_offset 안은 2.5 cm, 바깥은 5 cm) x 후보 길이 lateral_dists
+    x 속도 (target 에서 speed_step 씩 n_speed 개 더) → 867 개, 0.1초 주기에 50 ms 안팎
   - 비용(자동차의 저크/시간 대신 터틀봇 단위, 각 항 0~1 근처): 경로에서 벗어난 정도(검사 구간 평균 |d|), 직전 오프셋과 다름(흔들림),
     옆으로 꺾는 가파름(max|d'|), 느림, 정적 여유 부족(clear_pref 보다 가까움, 거리 구간에서), 움직이는 물체 여유 부족
   - 여유(safety_margin)는 제약, 그 위로는 비용 → 틈에서는 가운데 쪽, 넓으면 경로 위
@@ -102,7 +102,9 @@ class FrenetConfig:
     w_jerk: float = 0.3           # ∫ d'''² ds / (720·max_offset² / 0.6⁵) (0.6 m 에 max_offset 만큼 비키는 최적 5차의 값 = 1)
     w_len: float = 0.2            # 후보 길이 S / 가장 긴 후보 (천천히 수렴하는 후보에 벌점)
     via_ratio: float = 0.5        # 중간 위치를 고르는 지점 = 후보 길이 x 이 값 (0 이면 중간점 없이 5차)
-    end_offset_step: float = 0.05 # 끝 오프셋 간격 (중간 오프셋은 offset_step). 후보 수 = 중간 x 끝 x 길이 x 속도
+    end_offset_step: float = 0.025 # 끝 오프셋 간격 (중간 오프셋은 offset_step). 후보 수 = 중간 x 끝 x 길이 x 속도
+    fine_offset: float = 0.1      # |오프셋| 이 이 안쪽만 offset_step / end_offset_step 간격, 바깥은 coarse_offset_step (0 이면 전부 균일)
+    coarse_offset_step: float = 0.05
     rotate_speed: float = 1.0     # 출발 전 돌아서기 각속도 (rad/s). SLAM 모드는 브리지가 0.6 으로 (빨리 돌면 스캔이 휘어 매칭이 나빠짐)
     stop_decel: float = 0.3       # 경로 끝에서 이 감속으로 멈출 수 있는 속도 이하 (m/s²)
     stop_margin: float = 0.05     # 경로 끝 이만큼 앞에서 멈추는 프로필 (m)
@@ -281,6 +283,16 @@ def _rect_points(x0, x1, y0, y1, step, middle=False):
     return [np.c_[xs, np.full_like(xs, y)] for y in rows] + [np.c_[np.full_like(ys, x), ys] for x in (x0, x1)]
 
 
+def offset_grid(max_offset, step, fine=0.0, coarse=0.0):
+    """옆 오프셋 후보 -max_offset..max_offset. |o| <= fine 은 step 간격, 바깥은 coarse 간격 (fine 0 이면 전부 step)."""
+    if fine <= 0.0 or coarse <= step:
+        return np.round(np.arange(-max_offset, max_offset + 1e-9, step), 6)
+    inner = np.arange(0.0, fine + 1e-9, step)
+    outer = np.arange(inner[-1] + coarse, max_offset + 1e-9, coarse)
+    half = np.concatenate([inner, outer])
+    return np.round(np.unique(np.concatenate([-half, half])), 6)
+
+
 def body_points(footprint, extra=(), step=0.02):
     """차체 직사각형 (x_min, x_max, 반폭) 의 둘레 + 가운데 줄 점, 붙인 물건 사각형들의 둘레 (로봇 좌표, (P, 2)).
     이 점들에서 장애물까지 거리의 최소 = 차체까지 거리 (밖의 점). 가운데 줄은 점이 차체 안으로 깊이 들어온 경우를 잡는다."""
@@ -382,11 +394,11 @@ class FrenetPlanner:
         v_end = math.sqrt(2.0 * c.stop_decel * max(remaining - c.stop_margin, 0.0))
         v_top = max(min(c.target_speed, c.max_speed, v_end), 0.02)
         vs = np.unique(np.clip(v_top - np.arange(c.n_speed + 1) * c.speed_step, 0.02, None))
-        offs = np.round(np.arange(-c.max_offset, c.max_offset + 1e-9, c.offset_step), 6)
+        offs = offset_grid(c.max_offset, c.offset_step, c.fine_offset, c.coarse_offset_step)
         Ds = np.asarray(c.lateral_dists, dtype=float)
         # 모양 후보 = 중간 오프셋 x 끝 오프셋 x 길이 → 한 축 (nS) 으로 펴서 (via_ratio 0 이면 끝 오프셋 x 길이, 5차)
         if c.via_ratio > 0.0:
-            ends = np.round(np.arange(-c.max_offset, c.max_offset + 1e-9, c.end_offset_step), 6)
+            ends = offset_grid(c.max_offset, c.end_offset_step, c.fine_offset, c.coarse_offset_step)
             MID, END, DD = (a.ravel() for a in np.meshgrid(offs, ends, Ds, indexing='ij'))
             SM = DD * c.via_ratio
         else:

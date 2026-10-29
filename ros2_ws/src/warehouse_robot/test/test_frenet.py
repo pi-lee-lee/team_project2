@@ -3,7 +3,7 @@ import math
 
 import numpy as np
 
-from warehouse_robot.frenet import FrenetConfig, FrenetFollower, body_circles, body_points, build_reference, lateral_shape
+from warehouse_robot.frenet import FrenetConfig, FrenetFollower, body_circles, body_points, build_reference, lateral_shape, offset_grid
 
 
 def drive(path, pts, start=(0.0, 0.0, 0.0), goal_yaw=0.0, steps=400, moving=None, cfg=None):
@@ -246,3 +246,11 @@ def test_wide_corridor_keeps_full_speed():
     f, log = drive(STRAIGHT, _corridor(0.45), steps=400)
     assert log['state'][-1] == 'done'
     assert max(log['v']) > 0.13
+
+
+def test_offset_grid_fine_inside_coarse_outside():
+    g = offset_grid(0.3, 0.025, 0.1, 0.05)
+    assert np.allclose(g, -g[::-1]) and 0.0 in g
+    assert np.allclose(np.diff(g[np.abs(g) <= 0.1 + 1e-9]), 0.025)
+    assert np.allclose(np.diff(g[g >= 0.1 - 1e-9]), 0.05) and abs(g[-1] - 0.3) < 1e-9
+    assert len(offset_grid(0.3, 0.05, 0.1, 0.05)) == 13          # 바깥 간격이 안쪽보다 촘촘하지 않으면 균일
