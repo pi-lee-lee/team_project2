@@ -1,9 +1,10 @@
 ﻿# 구동 및 중지 가이드
 
-`scripts/` 분석 기준 (커밋 5c294f1). 옵션 전체와 웹 사용법은 [README.md](README.md), 현재 상태는 [STATUS.md](STATUS.md) 참고.
+`scripts/` 분석 기준 (태그 v1.0.0). 옵션 전체와 웹 사용법은 [README.md](README.md), 현재 상태는 [STATUS.md](STATUS.md) 참고.
 
 > **어디서 실행하나:** 모든 스크립트는 **Ubuntu PC (192.168.0.188)** 에서 실행합니다.
 > `setsid`, `flock`, `/proc/<pid>/environ`, `hostname -I`, `/opt/ros/humble` 을 쓰므로 mac 에서는 동작하지 않습니다 (mac 은 코드 분석/편집용).
+> 시뮬레이션만은 Docker 컨테이너 하나로도 실행할 수 있습니다 (mac/Windows 포함): [DOCKER_GUIDE.md](DOCKER_GUIDE.md).
 
 ---
 
@@ -32,10 +33,12 @@ run.sh ── (잠금 logs/run.lock, 동시 실행 거절)
   ├─ logs/run_mode.env 기록  → env.sh 가 읽음 (도메인, sim 시간, 맵 이름, AMCL 설정)
   ├─ 1) start_server.sh      Django :8000  (이미 응답하면 건너뜀)
   ├─ 2) real: ssh Pi → turtlebot3_bringup robot.launch.py   (이미 실행 중이면 건너뜀)
-  │     sim : start_sim.sh   Gazebo + 로봇 생성
+  │           + Pi 명령 감시 pi_cmd_watchdog.py (매번 다시 띄움) + Pi 카메라 pi_camera.sh on (--no-camera 면 off)
+  │           + (real+slam) Pi 에서 /reset_odometry → SLAM 원점 = 지금 로봇 자리
+  │     sim : start_sim.sh   Gazebo + 실물 사양 로봇 생성 + sim_real_io.py + 명령 감시
   ├─ 3) slam: start_slam.sh  slam_toolbox | cartographer
   │     map : start_nav2.sh  map_server + AMCL
-  ├─ 4) start_bridge.sh      A* 플래너 + 브리지 (warehouse.launch.py)
+  ├─ 4) start_bridge.sh      A* 플래너 + 브리지 + YOLO 검출기 (warehouse.launch.py)
   └─ 5) sim+map: tools/localize.py 로 초기 위치 자동 지정 / real+map: 웹에서 직접
 ```
 
@@ -44,10 +47,13 @@ run.sh ── (잠금 logs/run.lock, 동시 실행 거절)
 | `env.sh` | ROS 환경 + 도메인 + RMW 설정 (`source` 로 사용) | real=도메인 44, sim=77. PC 는 Cyclone DDS |
 | `run.sh` | 전체 실행 (백그라운드, 로그 `logs/*.log`) | 끝나도 노드는 계속 돎 |
 | `start_server.sh` | `manage.py runserver 0.0.0.0:8000` | |
-| `start_sim.sh` | gzserver(+gzclient), robot_state_publisher, 로봇 생성 | `gazebo_ros_state` 플러그인 없으면 넣은 사본 `logs/world_*.world` 사용 |
-| `start_slam.sh` | SLAM. `config/slam_toolbox.yaml` (`/scan_slam` 사용) | **AMCL 과 같이 띄우면 안 됨** |
+| `start_sim.sh` | gzserver(+gzclient), robot_state_publisher, 로봇 생성(`worlds/models/turtlebot3_waffle_pi_real`: LiDAR = 실물 LDS-02 값, Gazebo 오도메트리 끔), `sim_real_io.py`, 명령 감시 | `gazebo_ros_state` 플러그인 없으면 넣은 사본 `logs/world_*.world` 사용 |
+| `sim_real_io.py` | (sim) `scan_gz` → `/scan` 을 실물 드라이버 형식으로, `/odom` + TF 를 바퀴 엔코더 + IMU 로 (실물 turtlebot3_node 처럼) | SLAM/AMCL/브리지는 실물과 같은 설정 |
+| `pi_cmd_watchdog.py` | 명령 감시: 브리지의 `cmd_vel_pc` 를 `cmd_vel` 로 넘기고, 움직이는 명령이 0.5초 넘게 끊기면 정지 | real: `run.sh` 가 Pi `~/warehouse_cmd_watchdog.py` 로 복사해 띄움, sim: `start_sim.sh`. **없으면 로봇이 움직이지 않음** |
+| `pi_camera.sh` | Pi 카메라(`yolo/camera.sh`) `on` / `off` / `status` | 실물 `run.sh` 가 `on` (계속 켜 둠). 영상은 YOLO 검출기가 켜졌을 때만 Wi-Fi 로 옴 |
+| `start_slam.sh` | SLAM. `config/slam_toolbox.yaml` (`/scan_slam` 사용, 실물·sim 같은 설정) | **AMCL 과 같이 띄우면 안 됨** |
 | `start_nav2.sh` | AMCL(`config/amcl_waffle_pi.yaml`) + map_server (Nav2 localization_launch) | 주행은 브리지가 함 |
-| `start_bridge.sh` | A* + 브리지. SLAM 모드는 맵 이름 `slam_live`, 미탐색 통과 허용 | |
+| `start_bridge.sh` | A* + 브리지 + YOLO 검출기(`start_yolo.sh`, 꺼진 상태로 시작). SLAM 모드는 맵 이름 `slam_live`, 미탐색 통과 허용 | YOLO 빼기: `WAREHOUSE_YOLO=0` |
 | `save_map.sh` | `/map` 저장 → 기울기 보정 + 1칸 직선 정리 (`straighten_map.py --auto`, 직선이 아닌 공간은 자동으로 `clean_map.py`) | `~/maps/<이름>.yaml` + `_clean.yaml` |
 | `reset_robot.sh` | 정지 명령 1초 (sim 은 월드 초기화 + 위치 재지정) | 웹 "상태 초기화" 가 브리지를 통해 실행 |
 | `stop_ros.sh` | PC 쪽 노드/Gazebo 정리 | Pi bringup 은 건드리지 않음 |
@@ -74,7 +80,7 @@ cd ~/webserver                       # 서버 PC 의 저장소 위치 (ros2_ws/i
 scripts/run.sh --robot real --mode map --map ~/maps/<맵>_clean.yaml [--name <DB맵이름>]
 ```
 
-- `--name` 생략 시 파일 이름에서 `_clean` / `_straight` 를 뺀 것이 DB 맵 이름 → 등록 위치(홈, LED 등)가 이 이름에 묶입니다. 맵을 다시 만들어도 이름을 같게 하면 위치가 이어지지만 좌표계가 다르면 위치가 어긋납니다.
+- `--name` 생략 시 파일 이름에서 `_clean` / `_straight` 를 뺀 것이 DB 맵 이름 → 등록 위치(홈, 물류 위치, 사람 위치 등)가 이 이름에 묶입니다. 맵을 다시 만들어도 이름을 같게 하면 위치가 이어지지만 좌표계가 다르면 위치가 어긋납니다.
 - 끝나면 **웹에서 "초기 위치 지정"** (지도에서 로봇 위치를 찍고 방향 드래그), 또는 실행 모드 카드의 자동 위치 찾기(`localize.py --global`), 또는
   ```bash
   source scripts/env.sh && python3 tools/localize.py <x> <y> <방향°>
@@ -92,7 +98,7 @@ scripts/run.sh --robot real --mode slam
    - 기본 `_clean` 은 벽을 1칸 직선/직각으로 반듯하게 하고, 직선이 아닌 공간(강당 책상·의자 등)은 자동으로 회전 없이 정리만 합니다. 강제로 고르려면 `--plain` / `--straighten`.
 3. 기존 맵 모드로 다시 실행: `scripts/run.sh --robot real --mode map --map ~/maps/<이름>_clean.yaml`
    (`run.sh` 가 이전 노드를 먼저 정리하므로 stop 없이 바로 실행해도 됩니다)
-4. 홈/LED 위치 등록은 **저장 후 기존 맵 모드에서** 합니다 (SLAM 중 등록한 위치는 루프 클로저 후 어긋날 수 있음).
+4. 홈/물류/사람 위치 등록은 **저장 후 기존 맵 모드에서** 합니다 (SLAM 중 등록한 위치는 루프 클로저 후 어긋날 수 있음).
 
 ### 3.4 시뮬레이션
 
@@ -103,12 +109,14 @@ scripts/run.sh --robot sim --mode map --map ~/maps/<이름>_clean.yaml   # 저�
 - 도메인 77 이라 Pi 가 켜져 있어도 섞이지 않습니다.
 - 기존 맵 모드는 출발 위치를 알고 있어 초기 위치를 자동 지정합니다 (5단계).
 - 화면 없이 돌리면(`--gui` 생략) gzserver 만 뜹니다.
+- 로봇은 실물 사양 모델(LDS-02 LiDAR, 엔코더 + IMU 오도메트리)이고 명령도 실물처럼 명령 감시(`cmd_vel_pc` → `cmd_vel`)를 거칩니다. SLAM/AMCL/브리지 설정은 실물과 같습니다.
 
 ### 3.5 실행 옵션 (주행은 항상 A* + Frenet 로컬 플래너)
 
 | 옵션 | 의미 |
 |---|---|
 | `--slam cartographer` | SLAM 엔진 변경 (기본 slam_toolbox) |
+| `--no-camera` | (real) Pi 카메라를 띄우지 않음 (YOLO 개수 확인 불가). 기본은 bringup 뒤 `pi_camera.sh on` |
 | `--amcl hall` | 강당/교실용 위치 추정 설정 (`config/amcl_hall.yaml`). 웹 실행 모드의 체크와 같음 |
 | `--world lecture_hall_real` | (sim) 실물형 강당: 책상 앞판 없음, 좌우 끝 열이 벽에 붙음, 좌석 줄 사이 0.25m(로봇이 못 지나감), 의자 무작위 |
 
@@ -122,6 +130,8 @@ ros2 topic hz /scan                       # LiDAR 가 들어오는지
 python3 tools/tf_rates.py                 # TF 갱신 주기
 tail -f logs/bridge.log                   # 브리지 (서버 연결, 목표 진행)
 ssh test@192.168.0.181 tail -n 30 ~/warehouse_bringup.log   # Pi bringup ("Run!" 이 있어야 정상)
+ssh test@192.168.0.181 tail -n 5 ~/warehouse_cmd_watchdog.log   # Pi 명령 감시 (끊김/다시 받음)
+scripts/pi_camera.sh status               # Pi 카메라
 ```
 
 | 로그 | 내용 |
@@ -130,7 +140,9 @@ ssh test@192.168.0.181 tail -n 30 ~/warehouse_bringup.log   # Pi bringup ("Run!"
 | `logs/sim.log` | Gazebo |
 | `logs/slam.log` | SLAM |
 | `logs/nav2.log` | map_server + AMCL |
-| `logs/bridge.log` | A* 플래너 + 브리지 |
+| `logs/bridge.log` | A* 플래너 + 브리지 + YOLO 검출기 |
+| `logs/records/` | 목표별 주행 기록 (`record.jsonl.gz` + `summary.txt` + `plot_*.png`, `tools/drive_replay.py --list`) |
+| Pi `~/warehouse_bringup.log`, `~/warehouse_cmd_watchdog.log`, `~/warehouse_camera.log` | bringup, 명령 감시, 카메라 |
 
 ---
 
@@ -152,10 +164,10 @@ ssh test@192.168.0.181 tail -n 30 ~/warehouse_bringup.log   # Pi bringup ("Run!"
 ```bash
 scripts/stop_ros.sh
 ```
-- 대상: `start_*.sh`(server 제외), `ros2 launch`, Nav2/AMCL/map_server, slam_toolbox/cartographer, 브리지·A*(warehouse_robot), Gazebo, robot_state_publisher, map_saver.
+- 대상: `start_*.sh`(server 제외), `ros2 launch`, Nav2/AMCL/map_server, slam_toolbox/cartographer, 브리지·A*(warehouse_robot), YOLO 검출기, Gazebo, robot_state_publisher, map_saver, (sim) `sim_real_io.py`·명령 감시.
 - 순서: SIGINT → (5초 대기) → SIGTERM → (5초) → SIGKILL. 남은 프로세스가 있으면 목록을 보여 주고 종료 코드 1.
 - **도메인 44/77 또는 도메인 미설정 프로세스만** 끕니다 (다른 도메인의 다른 프로젝트는 유지).
-- 로봇이 움직이는 중이라면 먼저 웹에서 정지한 뒤 끄세요. 브리지가 꺼지면 `/cmd_vel` 을 내는 노드가 없어지지만, 마지막 명령이 남는 경우를 피하기 위함입니다.
+- 로봇이 움직이는 중이라면 먼저 웹에서 정지한 뒤 끄세요. 브리지가 꺼져 명령이 끊기면 명령 감시가 0.5초 뒤 정지를 보내지만, 그 사이 움직이는 것을 피하기 위함입니다.
 
 ### 5.2 PC 전부 끄기
 
@@ -168,9 +180,11 @@ scripts/stop_ros.sh --all      # = --server --daemon
 
 ### 5.3 Pi bringup 끄기 (수동)
 
-`stop_ros.sh` 는 Pi 를 건드리지 않습니다. 하루 운영을 마칠 때나 로봇을 옮길 때:
+`stop_ros.sh` 는 Pi 를 건드리지 않습니다 (bringup, 명령 감시, 카메라 모두 그대로). 하루 운영을 마칠 때나 로봇을 옮길 때:
 
 ```bash
+scripts/pi_camera.sh off
+ssh test@192.168.0.181 'pkill -f "[w]arehouse_cmd_watchdog.py"'
 ssh test@192.168.0.181 'pkill -INT -f "ros2 launch turtlebot3_bringup"; sleep 3; pgrep -af turtlebot3 || echo 종료됨'
 ```
 그 뒤 로봇 전원 OFF. Pi 까지 끌 때는 `ssh -t test@192.168.0.181 sudo poweroff` (sudo 비밀번호 필요할 수 있음) 후 LED 가 꺼지면 전원 스위치 OFF.
@@ -182,7 +196,7 @@ ssh test@192.168.0.181 'pkill -INT -f "ros2 launch turtlebot3_bringup"; sleep 3;
 
 ```bash
 pgrep -af "ros2|gzserver|warehouse_robot|manage.py"     # PC: 아무것도 없어야 함 (--all 기준)
-ssh test@192.168.0.181 pgrep -af turtlebot3             # Pi
+ssh test@192.168.0.181 pgrep -af "turtlebot3|warehouse_cmd_watchdog|v4l2_camera"   # Pi
 ```
 
 ---
@@ -194,6 +208,8 @@ ssh test@192.168.0.181 pgrep -af turtlebot3             # Pi
 | "다른 run.sh 가 실행 중입니다" | 웹 실행 모드와 터미널에서 동시에 실행. 앞의 것이 끝난 뒤 다시 (SLAM 이 두 개 뜨면 지도가 망가져서 막아 둠) |
 | "Pi 에 접속할 수 없습니다" | 로봇 전원/Wi-Fi, SSH 키. `ssh test@192.168.0.181` 로 직접 확인 |
 | "bringup 확인 필요" | Pi `~/warehouse_bringup.log` 확인. OpenCR USB 연결, 배터리 |
+| 경로는 그려지는데 로봇이 안 움직임 | 명령 감시가 없음 (브리지는 `cmd_vel_pc` 로만 냄). real: `run.sh` 의 "명령 감시 확인 필요", Pi `~/warehouse_cmd_watchdog.log`. `run.sh` 를 다시 실행하면 다시 띄움 |
+| 이동 중 "위치 정보 지연 … 서서 기다림" 후 이어 감 | Wi-Fi 지연으로 `/odom` 이 `tf_timeout`(0.5초)보다 늦음. 정상 동작이며 `pose_lost_timeout`(3초) 넘게 안 오면 그 목표 실패 |
 | `ros2 topic list` 에 `/parameter_events`, `/rosout` 만 | 도메인 불일치. `source scripts/env.sh` 후 `ros2 daemon stop` |
 | map_server 는 떴는데 맵이 안 보임 | 맵 파일 경로 오류 → `start_nav2.sh` 가 바로 종료하므로 `logs/nav2.log` 확인 |
 | 로컬화/SLAM 이 스캔을 못 받음 | AMCL·SLAM 은 브리지가 내는 `scan_level` / `scan_slam` 을 씀 → 브리지가 떠 있어야 함 |

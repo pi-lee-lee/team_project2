@@ -5,7 +5,7 @@
 
 - 탐색기 본체: `tools/explore.py` (ROS 노드 `explore_tool` + 서버 `/ws/ui/` WebSocket 클라이언트, 즉 **웹 화면과 같은 자격으로** 이동 명령을 보냄)
 - 실행/중지: `server/warehouse/runner.py` 의 `explore()` / `cancel()` (서버가 별도 스레드에서 프로세스를 띄움)
-- 실제 주행: 일반 "여기로 이동" 과 같은 경로 (`services.goto_point` → 브리지 `start_goal` → A* → Frenet 로컬 플래너 → `/cmd_vel`)
+- 실제 주행: 일반 "여기로 이동" 과 같은 경로 (`services.goto_point` → 브리지 `start_goal` → A* → Frenet 로컬 플래너 → `/cmd_vel_pc` → 명령 감시 → `/cmd_vel`)
 
 > 아래 다이어그램은 Mermaid 입니다. GitHub, VS Code(Markdown Preview Mermaid Support) 등에서 그림으로 보입니다.
 
@@ -112,7 +112,7 @@ flowchart LR
         B2["on_map / flush_map<br/>/ send_map"]
         B3["process_inbox<br/>→ start_goal → request_plan"]
         B4["on_plan<br/>send_path, FrenetFollower 생성"]
-        B5["control_step 20 Hz<br/>앞 장애물 정지 · TF 끊김 · 재계획<br/>→ CmdMux → mux_step"]
+        B5["control_step 20 Hz<br/>앞 장애물 정지 · 위치 지연 대기 · 재계획<br/>→ CmdMux → mux_step"]
         B6["report<br/>도착 / 실패"]
     end
 
@@ -125,8 +125,9 @@ flowchart LR
         S1["스캔 매칭 + 포즈 그래프<br/>맵 갱신 2초마다"]
     end
 
-    subgraph PI["Pi bringup / Gazebo"]
+    subgraph PI["Pi bringup / Gazebo + sim_real_io"]
         P1["LiDAR · 오도메트리 · IMU"]
+        P3["명령 감시 pi_cmd_watchdog<br/>0.5초 끊기면 정지"]
         P2["모터 드라이버"]
     end
 
@@ -159,7 +160,8 @@ flowchart LR
     B3 == "서비스 /astar/get_plan<br/>(nav_msgs/GetPlan)" ==> A2
     A2 == "응답 plan<br/>실패 시 /astar/fail_reason" ==> B4
     B4 ==> B5
-    B5 == "/cmd_vel" ==> P2
+    B5 == "/cmd_vel_pc" ==> P3
+    P3 == "/cmd_vel" ==> P2
     B4 -- "WS path" --> W3
     B5 ==> B6
     B6 == "WS nav_status<br/>succeeded / failed" ==> D5
@@ -200,7 +202,7 @@ sequenceDiagram
     BR->>DJ: WS path (웹에 경로 표시)
     loop control_step 20 Hz
         PI->>BR: /odom, /tf, /imu
-        BR->>PI: /cmd_vel
+        BR->>PI: /cmd_vel_pc (명령 감시가 /cmd_vel 로)
     end
     par 0.5초마다 check()
         EX->>EX: 0.5 m 이내? 목표 프론티어가 보였나? 금지 구역 바뀜?
@@ -265,8 +267,8 @@ sequenceDiagram
 | `on_zones` | 금지 구역이 바뀌면 플래너에 전달, 이동 중이면 0.3초 뒤 재계획 | 발행 `/astar/zones` |
 | `start_goal` / `request_plan` | 넘어짐·기울어짐 확인, A* 요청 | 서비스 호출 `/astar/get_plan` |
 | `on_plan` | 경로 전송, `FrenetFollower` 생성 | WS `path`; 실패면 `/astar/fail_reason` 을 붙여 `report('failed')` |
-| `control_step` (20 Hz) | 금지 구역 재계획, TF 나이·기울기 확인, Frenet 계획(0.1초마다)·막힘 처리, 속도 계산 → `CmdMux` | 구독 `/odom`, `/imu`, TF; (실패·부딪힘 시 발행 `/astar/obstacle`) |
-| `mux_step` | 자동 주행·웹 수동 조작·정지 중 우선순위로 골라 내보냄 | 발행 `/cmd_vel` |
+| `control_step` (20 Hz) → `drive_step` | 금지 구역 재계획, 위치(`/odom` + TF map→odom) 나이·기울기 확인 (`tf_timeout` 넘게 늦으면 서서 기다렸다 이어 감, `pose_lost_timeout` 넘으면 실패), Frenet 계획(0.1초마다)·막힘 처리, 속도 계산 → `CmdMux` | 구독 `/odom`, `/imu`, TF; (실패·부딪힘 시 발행 `/astar/obstacle`) |
+| `mux_step` | 자동 주행·웹 수동 조작·정지 중 우선순위로 골라 내보냄 | 발행 `/cmd_vel_pc` (명령 감시가 `/cmd_vel` 로 넘김) |
 | `report` | 결과 전송, 목표 비움, 경로 지움 | WS `nav_status {goal_id, status, message}`, `path []` |
 | `save_map` → `run_script` | `scripts/save_map.sh <이름>` 실행 | WS `map_saved {ok, message}` |
 
@@ -274,9 +276,10 @@ sequenceDiagram
 
 | 노드 | 하는 일 | 구독 | 발행 / 제공 |
 |---|---|---|---|
-| `slam_toolbox` (`config/slam_toolbox.yaml`, mode=mapping) | 스캔 매칭 + 루프 클로저로 맵 작성, 0.05 m 격자, 2초마다 맵 갱신, max_laser_range 5.0 m (sim 3.4 m) | `/scan_slam`, `/tf` (odom→base_footprint) | `/map`, `/tf` (map→odom) |
+| `slam_toolbox` (`config/slam_toolbox.yaml`, mode=mapping) | 스캔 매칭 + 루프 클로저로 맵 작성, 0.05 m 격자, 2초마다 맵 갱신, max_laser_range 5.0 m (실물·sim 같음) | `/scan_slam`, `/tf` (odom→base_footprint) | `/map`, `/tf` (map→odom) |
 | `astar_planner` (`allow_unknown=true`) | 미탐색 칸도 통과하는 A*, 금지 구역 반영, 실패 이유 발행 | `/map`, `/astar/zones`, `/scan_level`, `/astar/obstacle` | 서비스 `/astar/get_plan`, `/astar/fail_reason`, `/astar/plan` |
-| Pi bringup / Gazebo | 센서·모터 | `/cmd_vel` | `/scan`, `/odom`, `/imu`, `/tf` (odom→base_footprint), `/battery_state` |
+| Pi bringup / Gazebo (+ `sim_real_io.py`: 스캔·오도메트리를 실물 형식으로) | 센서·모터 | `/cmd_vel` | `/scan`, `/odom`, `/imu`, `/tf` (odom→base_footprint), `/battery_state` |
+| `cmd_watchdog` (`scripts/pi_cmd_watchdog.py`, real: Pi / sim: PC) | 브리지 명령을 넘기고, 움직이는 명령이 0.5초 넘게 끊기면 정지 | `/cmd_vel_pc` | `/cmd_vel` |
 
 ---
 
