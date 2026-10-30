@@ -19,15 +19,15 @@
   <!-- Order form (when no order is in progress) -->
   <section id="form-view">
     <div class="card">
-      <h2>1. 받을 위치</h2>
+      <h2><span class="n">1</span>받을 위치</h2>
       <div id="places" class="places"></div>
     </div>
     <div class="card">
-      <h2>2. 필요한 물건</h2>
+      <h2><span class="n">2</span>필요한 물건</h2>
       <div id="items" class="items"></div>
     </div>
-    <div class="card summary">
-      <p id="summary" class="muted">위치와 물건을 고르세요</p>
+    <div class="summary">
+      <p id="summary">위치와 물건을 고르세요</p>
       <p id="preview" class="muted small"></p>
       <button id="btn-order" class="primary" disabled>주문하기</button>
       <p id="busy" class="warn"></p>
@@ -36,16 +36,17 @@
 
   <!-- Progress (when an order is in progress or just finished) -->
   <section id="status-view" hidden>
-    <div class="card">
+    <div class="card hero">
       <h2 id="status-title">주문 진행 중</h2>
       <p id="status-sub" class="muted"></p>
-      <ol id="steps" class="steps"></ol>
+      <p id="status-eta" class="eta" hidden></p>
       <p id="status-note" class="warn"></p>
     </div>
-    <div class="row">
-      <button id="btn-cancel" class="outline">주문 취소</button>
-      <button id="btn-new" class="primary" hidden>새 주문</button>
+    <div class="card">
+      <ol id="steps" class="steps"></ol>
     </div>
+    <button id="btn-new" class="primary" hidden>새 주문</button>
+    <button id="btn-cancel" class="text-danger">주문 취소</button>
   </section>
 
   <p id="error" class="error" hidden></p>

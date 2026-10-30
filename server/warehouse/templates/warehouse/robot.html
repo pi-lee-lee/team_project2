@@ -12,14 +12,15 @@
 <!-- Page for the tablet/phone mounted on the robot (large prompt + confirm button, like a restaurant serving robot) -->
 <header>
   <span id="conn" class="conn off">연결 안 됨</span>
-  <span id="battery"></span>
+  <span id="battery" class="battery" hidden><i><b id="battery-fill"></b></i><span id="battery-text"></span></span>
 </header>
 
 <main>
   <div id="led" class="led" hidden></div>
+  <p id="eyebrow" class="eyebrow"></p>
   <h1 id="title">연결 중...</h1>
   <p id="sub"></p>
-  <table id="counts" class="counts" hidden></table>
+  <div id="counts" class="counts" hidden></div>
   <p id="note" class="note"></p>
   <div class="buttons">
     <button id="btn-manual" class="manual" hidden></button>
@@ -28,7 +29,7 @@
 </main>
 
 <footer>
-  <span id="step"></span>
+  <ol id="route" class="route"></ol>
 </footer>
 
 <script src="{% static 'warehouse/robot.js' %}?v={{ static_version }}"></script>

@@ -12,7 +12,7 @@ const MANUAL_AFTER = 20;
 // if a detection label is a color name, show it in that color (same as app.js)
 const CARGO_COLORS = { red: '#ef4444', green: '#22c55e', blue: '#3b82f6', yellow: '#eab308', white: '#e5e7eb',
                        빨강: '#ef4444', 초록: '#22c55e', 파랑: '#3b82f6', 노랑: '#eab308' };
-const cargoColor = (label) => CARGO_COLORS[(label || '').toLowerCase()] || '#94a3b8';
+const cargoColor = (label) => CARGO_COLORS[(label || '').toLowerCase().replace(/^led_/, '')] || '#94a3b8';
 
 function connect() {
   const proto = location.protocol === 'https:' ? 'wss' : 'ws';
@@ -96,20 +96,18 @@ function renderCounts(step) {
   const have = parseCounts(fresh);
   table.hidden = false;
   table.innerHTML = '';
+  // one card per item: color dot + label, camera count vs expected, verdict
   for (const [label, n] of Object.entries(want)) {
-    const tr = document.createElement('tr');
     const h = fresh ? (have[label.toLowerCase()] || 0) : null;
-    tr.className = h === null ? '' : h === n ? 'ok' : 'bad';
-    const mark = h === null ? '?' : h === n ? '✓' : '✗';
-    const cells = step.action === 'unload'
-      ? [label, h === null ? '-' : `${h}개 남음`, mark]
-      : [label, `${h === null ? '-' : h} / ${n}`, mark];
-    for (const c of cells) {
-      const td = document.createElement('td');
-      td.textContent = c;
-      tr.appendChild(td);
-    }
-    table.appendChild(tr);
+    const card = document.createElement('div');
+    card.className = 'count ' + (h === null ? 'wait' : h === n ? 'ok' : 'bad');
+    card.innerHTML = '<div class="label"><i></i><span></span></div><div class="num"></div><div class="verdict"></div>';
+    card.querySelector('i').style.background = cargoColor(label);
+    card.querySelector('.label span').textContent = label;
+    card.querySelector('.num').textContent = step.action === 'unload'
+      ? (h === null ? '–' : `${h}개 남음`) : `${h === null ? '–' : h} / ${n}`;
+    card.querySelector('.verdict').textContent = h === null ? '카메라 확인 중' : h === n ? '✓ 맞음' : '✗ 다름';
+    table.appendChild(card);
   }
 }
 
@@ -117,8 +115,8 @@ function orderView(state, step, r) {
   if (state === 'WAITING_LOAD' || state === 'WAITING_UNLOAD') {
     const load = state === 'WAITING_LOAD';
     const base = load
-      ? { key: 'LOAD', title: `${itemsText(step.items)} 실어 주세요`, sub: `${step.name} · 다 실으면 "적재 완료"` }
-      : { key: 'UNLOAD', title: '물건을 꺼내 주세요', sub: `${itemsText(step.items)} · 다 꺼내면 "꺼냈어요"` };
+      ? { key: 'LOAD', title: `${itemsText(step.items)} 실어 주세요`, sub: '다 실으면 아래 버튼을 눌러 주세요' }
+      : { key: 'UNLOAD', title: '물건을 꺼내 주세요', sub: `${itemsText(step.items)} · 다 꺼내면 아래 버튼` };
     // Button pressed but the server found a YOLO mismatch (wrong load / not fully unloaded / no YOLO counts) -> ask the person
     const warn = /^(적재 잘못|꺼내기 덜 됨|YOLO)/.test(r.message || '') ? r.message : '';
     if (warn && S.dismissed !== warn) {
@@ -179,6 +177,11 @@ function render() {
     S.stateSince = Date.now();
   }
   document.body.className = v.key;
+  const step0 = currentStep();
+  const place = step0 && step0.name;
+  $('#eyebrow').textContent = {
+    LOAD: `적재 · ${place}`, UNLOAD: `수령 · ${place}`, GO_LOAD: '이동 중', DELIVER: '이동 중', RETURN: '복귀 중',
+    MOVING: '이동 중', IDLE: '대기', ERROR: '확인 필요', OFFLINE: '연결 끊김' }[v.key] || '';
   $('#title').textContent = v.title;
   $('#sub').textContent = v.sub || '';
   const led = $('#led');
@@ -208,10 +211,26 @@ function render() {
     btn.hidden = true;
   }
   const r = S.robot;
-  $('#battery').textContent = r && r.battery_percentage != null ? `배터리 ${Math.round(r.battery_percentage)}%` : '';
+  const pct = r && r.battery_percentage != null && r.state !== 'OFFLINE' ? Math.round(r.battery_percentage) : null;
+  $('#battery').hidden = pct === null;
+  if (pct !== null) {
+    $('#battery-text').textContent = `${pct}%`;
+    $('#battery-fill').style.width = `${pct}%`;
+    $('#battery').classList.toggle('low', pct < 20);
+  }
+  // route: each stop as a chip (done / now / next)
   const step = currentStep();
-  $('#step').textContent = S.task && S.task.status === 'running'
-    ? S.task.steps.map((s) => (s === step ? `[${s.name}]` : s.name)).join(' → ') : '';
+  const route = $('#route');
+  route.innerHTML = '';
+  if (S.task && S.task.status === 'running') {
+    for (const s of S.task.steps) {
+      const li = document.createElement('li');
+      const done = s.status === 'done' || s.status === 'skipped';
+      li.className = done ? 'done' : s === step ? 'now' : '';
+      li.textContent = (done ? '✓ ' : '') + s.name;
+      route.appendChild(li);
+    }
+  }
 }
 
 $('#btn-manual').addEventListener('click', () => {

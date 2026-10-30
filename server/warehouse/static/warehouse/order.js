@@ -109,8 +109,9 @@ function renderForm() {
   if (!list.length) box.innerHTML = '<p class="muted">등록된 받을 위치가 없습니다 (관리자에게 문의)</p>';
   for (const loc of list) {
     const b = document.createElement('button');
-    b.textContent = loc.name;
-    b.className = loc.id === S.place ? 'active' : '';
+    b.className = 'place' + (loc.id === S.place ? ' active' : '');
+    b.innerHTML = '<span class="radio"></span><span class="pname"></span>';
+    b.querySelector('.pname').textContent = loc.name;
     b.addEventListener('click', () => {
       S.place = loc.id;
       store('order.place', String(loc.id));
@@ -128,8 +129,9 @@ function renderForm() {
     const row = document.createElement('div');
     row.className = 'item';
     const n = S.counts[label] || 0;
+    row.className = 'item' + (n ? ' chosen' : '');
     row.innerHTML = `<i style="background:${color(label)}"></i><span class="name"></span>
-      <button data-d="-1" aria-label="빼기">−</button><span class="count">${n}</span><button data-d="1" aria-label="더하기">+</button>`;
+      <span class="stepper"><button data-d="-1" aria-label="빼기">−</button><span class="count">${n}</span><button data-d="1" aria-label="더하기">+</button></span>`;
     row.querySelector('.name').textContent = label;
     row.querySelectorAll('button').forEach((b) => b.addEventListener('click', () => {
       S.counts[label] = Math.min(9, Math.max(0, (S.counts[label] || 0) + Number(b.dataset.d)));
@@ -184,7 +186,7 @@ function stepLine(s, now, state) {
         detail += left > 0 ? ` · 약 ${fmtSec(left)}` : ' · 조금 늦어지고 있어요';
       }
     } else if (s.status === 'arrived') {
-      detail = s.action === 'unload' ? '도착! 물건을 꺼내고 로봇 화면에서 "꺼냈어요"' : '싣는 중';
+      detail = s.action === 'unload' ? '도착' : '싣는 중';
     } else if (s.status === 'failed' || state === 'ERROR') {
       detail = '멈춤 (관리자 확인 중)';
     }
@@ -206,10 +208,21 @@ function renderStatus() {
     const after = dropoff && (dropoff.status === 'done' || dropoff.status === 'skipped');
     $('#status-title').textContent = atMe ? '로봇이 도착했어요' : after ? '받기 완료 · 로봇 복귀 중'
       : state === 'ERROR' ? '로봇이 멈췄어요' : '주문 진행 중';
-    $('#status-sub').textContent = dropoff ? `${dropoff.name} · ${itemsText(dropoff.items)}` : '';
+    $('#status-sub').textContent = atMe ? '물건을 꺼내고 로봇 화면에서 "꺼냈어요" 를 눌러 주세요'
+      : dropoff ? `${dropoff.name} · ${itemsText(dropoff.items)}` : '';
+    $('.hero').classList.toggle('arrived', !!atMe);
   } else {
+    $('.hero').classList.remove('arrived');
     $('#status-title').textContent = { done: '배달 완료', canceled: '주문 취소됨', failed: '주문 실패' }[t.status] || t.status;
     $('#status-sub').textContent = dropoff ? `${dropoff.name} · ${itemsText(dropoff.items)}` : '';
+  }
+  // big ETA while the robot heads to the person's location
+  const eta = $('#status-eta');
+  eta.hidden = true;
+  if (running && now && now.status === 'moving' && now.predicted_sec != null && now.started_at) {
+    const left = now.predicted_sec - (Date.now() - new Date(now.started_at).getTime()) / 1000;
+    eta.textContent = `${now.name}까지 ${left > 0 ? `약 ${fmtSec(left)}` : '곧 도착'}`;
+    eta.hidden = false;
   }
   const ol = $('#steps');
   ol.innerHTML = '';
@@ -217,7 +230,7 @@ function renderStatus() {
     const l = stepLine(s, now, state);
     const li = document.createElement('li');
     li.className = l.cls;
-    li.innerHTML = '<span class="mark"></span><span><b></b><br><span class="what"></span></span>';
+    li.innerHTML = '<span class="mark"></span><span class="body"><b></b><span class="what"></span></span>';
     li.querySelector('.mark').textContent = l.mark;
     li.querySelector('b').textContent = l.name;
     li.querySelector('.what').textContent = l.what;

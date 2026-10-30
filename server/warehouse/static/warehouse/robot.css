@@ -1,12 +1,15 @@
-/* 로봇 위 태블릿 화면: 멀리서도 보이게 큰 글씨, 상태마다 배경색 */
+/* 로봇 위 태블릿 화면 (서빙 로봇 화면처럼): 멀리서도 보이는 큰 제목, 큰 버튼 하나, 상태마다 배경색 */
 :root {
   --fg: #0f172a;
   --muted: #475569;
+  --accent: #2563eb;
+  --surface: rgba(255, 255, 255, 0.78);
 }
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 html, body { height: 100%; margin: 0; }
 body {
-  font-family: system-ui, -apple-system, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+  font-family: Pretendard, "Pretendard Variable", system-ui, -apple-system, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
   color: var(--fg);
   background: #f1f5f9;
   display: flex;
@@ -15,25 +18,25 @@ body {
   -webkit-user-select: none;
   user-select: none;
 }
-body.IDLE { background: #f1f5f9; }
-body.GO_LOAD, body.DELIVER, body.MOVING, body.RETURN { background: #dbeafe; }
-body.LOAD { background: #fef3c7; }
-body.UNLOAD { background: #ede9fe; }
-body.ERROR { background: #fee2e2; }
-body.OFFLINE { background: #e2e8f0; }
+/* 상태별 배경 + 강조색 */
+body.IDLE { background: #f1f5f9; --accent: #475569; }
+body.GO_LOAD, body.DELIVER, body.MOVING, body.RETURN { background: #e0ecff; --accent: #2563eb; }
+body.LOAD { background: #fff4d6; --accent: #b45309; }
+body.UNLOAD { background: #efe9ff; --accent: #6d28d9; }
+body.ERROR { background: #fee2e2; --accent: #b91c1c; }
+body.OFFLINE { background: #e2e8f0; --accent: #64748b; }
 
-header, footer {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px 18px;
-  font-size: 16px;
-  color: var(--muted);
-}
-header #battery { flex: 1; }
-.conn { padding: 4px 10px; border-radius: 999px; font-size: 14px; font-weight: 600; }
-.conn.on { background: #dcfce7; color: #15803d; }
+header, footer { display: flex; align-items: center; gap: 12px; padding: min(14px, 2vh) 20px; color: var(--muted); }
+header { justify-content: space-between; font-size: 16px; }
+.conn { padding: 5px 12px; border-radius: 999px; font-size: 14px; font-weight: 700; }
+.conn.on { background: var(--surface); color: #15803d; }
 .conn.off { background: #fee2e2; color: #b91c1c; }
+.battery { display: inline-flex; align-items: center; gap: 8px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.battery i { position: relative; width: 34px; height: 16px; border: 2px solid currentColor; border-radius: 4px; padding: 2px; }
+.battery i::after { content: ""; position: absolute; right: -5px; top: 3px; width: 3px; height: 6px; border-radius: 0 2px 2px 0; background: currentColor; }
+.battery b { display: block; height: 100%; border-radius: 1px; background: #16a34a; }
+.battery.low { color: #b91c1c; }
+.battery.low b { background: #dc2626; }
 
 main {
   flex: 1;
@@ -42,59 +45,73 @@ main {
   align-items: center;
   justify-content: center;
   text-align: center;
-  padding: 12px 24px;
-  gap: 14px;
+  padding: 4px 32px;
+  gap: min(12px, 1.6vh);
 }
-h1 { margin: 0; font-size: clamp(32px, 7vw, 72px); line-height: 1.15; }
-#sub { margin: 0; font-size: clamp(18px, 3.2vw, 30px); color: var(--muted); }
-.note { margin: 0; min-height: 1.4em; font-size: clamp(16px, 2.6vw, 24px); color: #b45309; font-weight: 700; }
+.eyebrow {
+  margin: 0; padding: 6px 16px; border-radius: 999px; background: var(--surface);
+  font-size: clamp(15px, 2.2vw, 20px); font-weight: 800; letter-spacing: 0.02em; color: var(--accent);
+}
+.eyebrow:empty { display: none; }
+body.GO_LOAD .eyebrow::after, body.DELIVER .eyebrow::after, body.MOVING .eyebrow::after, body.RETURN .eyebrow::after {
+  content: " ···"; animation: blink 1.4s steps(4) infinite;
+}
+@keyframes blink { 50% { opacity: 0.25; } }
+h1 { margin: 0; font-size: clamp(30px, min(6.8vw, 9.5vh), 72px); line-height: 1.15; letter-spacing: -0.02em; }
+#sub { margin: 0; font-size: clamp(17px, min(3vw, 4.2vh), 28px); color: var(--muted); }
+#sub:empty { display: none; }
+.note { margin: 0; font-size: clamp(16px, 2.4vw, 22px); color: #b45309; font-weight: 700; }
+.note:empty { display: none; }
+body.ask .note { color: #b91c1c; padding: 8px 18px; border-radius: 12px; background: rgba(255, 255, 255, 0.7); }
+
 .led {
-  width: clamp(110px, 22vw, 200px);
-  height: clamp(110px, 22vw, 200px);
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: clamp(36px, 7vw, 64px);
-  font-weight: 800;
-  color: #fff;
+  width: clamp(110px, 22vw, 200px); height: clamp(110px, 22vw, 200px); border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: clamp(36px, 7vw, 64px); font-weight: 800; color: #fff;
   text-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
   box-shadow: 0 0 0 8px rgba(255, 255, 255, 0.7), 0 10px 30px rgba(0, 0, 0, 0.15);
 }
-.led[hidden], .manual[hidden], .force[hidden], .counts[hidden] { display: none; }
 body.LOAD .led, body.UNLOAD .led { animation: pulse 1.6s ease-in-out infinite; }
 @keyframes pulse { 50% { transform: scale(1.06); } }
+
+/* 물건별 개수 카드 (카메라 개수 / 필요 개수) */
+.counts { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; margin: 4px 0; }
+.count {
+  min-width: 180px; padding: min(12px, 1.4vh) 18px; border-radius: 18px; background: #fff;
+  border: 3px solid #e2e8f0; box-shadow: 0 4px 14px rgba(15, 23, 42, 0.06);
+}
+.count .label { display: flex; align-items: center; justify-content: center; gap: 8px; font-size: clamp(15px, 2vw, 19px); font-weight: 700; color: var(--muted); }
+.count .label i { width: 14px; height: 14px; border-radius: 50%; }
+.count .num { font-size: clamp(26px, min(5vw, 6.5vh), 46px); font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1.2; }
+.count .verdict { font-size: clamp(14px, 1.8vw, 17px); font-weight: 800; color: #94a3b8; }
+.count.ok { border-color: #86efac; }
+.count.ok .verdict { color: #16a34a; }
+.count.bad { border-color: #fca5a5; }
+.count.bad .verdict, .count.bad .num { color: #dc2626; }
+
+/* 버튼: 주 버튼 하나 크게, 보조는 그 옆(같은 무게면) 또는 아래 글자 버튼 */
+.buttons { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 14px; margin-top: 8px; }
+.buttons:has(.force.small) { flex-direction: column; gap: 6px; }
+button { font: inherit; cursor: pointer; }
 .manual {
-  margin-top: 8px;
-  font-size: clamp(24px, 4.5vw, 40px);
-  font-weight: 800;
-  padding: 18px 48px;
-  border: 0;
-  border-radius: 20px;
-  background: #16a34a;
-  color: #fff;
-  box-shadow: 0 6px 18px rgba(22, 163, 74, 0.35);
+  min-width: min(440px, 80vw); min-height: clamp(64px, 13vh, 96px); padding: 0 48px; border: 0; border-radius: 24px;
+  font-size: clamp(26px, 4.4vw, 40px); font-weight: 800;
+  background: #16a34a; color: #fff; box-shadow: 0 8px 22px rgba(22, 163, 74, 0.35);
+}
+body.ask .manual { background: #ea580c; box-shadow: 0 8px 22px rgba(234, 88, 12, 0.35); }
+.force {
+  min-height: clamp(64px, 13vh, 96px); padding: 0 32px; border-radius: 24px; border: 3px solid #cbd5e1; background: #fff;
+  font-size: clamp(20px, 3vw, 28px); font-weight: 700; color: #334155;
+}
+.force.small {
+  min-height: 40px; padding: 0 16px; border: 0; background: transparent;
+  font-size: clamp(15px, 2vw, 18px); font-weight: 600; color: #64748b; text-decoration: underline; text-underline-offset: 4px;
 }
 .manual:active, .force:active { transform: translateY(2px); }
-.buttons { display: flex; flex-wrap: wrap; gap: 16px; justify-content: center; }
-.force.small { font-size: clamp(14px, 2vw, 18px); padding: 10px 18px; border-width: 2px; color: #64748b; }
-body.ask .note { color: #dc2626; }
-body.ask .manual { background: #ea580c; box-shadow: 0 6px 18px rgba(234, 88, 12, 0.35); }
-.force {
-  margin-top: 8px;
-  font-size: clamp(18px, 3vw, 28px);
-  font-weight: 700;
-  padding: 18px 32px;
-  border: 3px solid #64748b;
-  border-radius: 20px;
-  background: #fff;
-  color: #334155;
-}
-/* 주문: 적재함 YOLO 개수 / 기대 개수 */
-.counts { border-collapse: collapse; font-size: clamp(20px, 3.6vw, 34px); font-weight: 700; }
-.counts td { padding: 4px 14px; }
-.counts td:first-child { text-align: left; }
-.counts tr.ok td:last-child { color: #16a34a; }
-.counts tr.bad td:last-child { color: #dc2626; }
-.counts tr.now td:first-child { text-decoration: underline; }
-footer { justify-content: space-between; font-size: 15px; flex-wrap: wrap; }
+
+/* 아래: 경로 단계 (지난 곳 ✓, 지금 가는/서 있는 곳 강조) */
+footer { justify-content: center; padding-bottom: min(20px, 2.5vh); }
+.route { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.route li { padding: 6px 14px; border-radius: 999px; background: var(--surface); font-size: 16px; font-weight: 600; color: #64748b; }
+.route li.done { color: #94a3b8; }
+.route li.now { background: var(--accent); color: #fff; font-weight: 800; }

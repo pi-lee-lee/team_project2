@@ -1402,26 +1402,30 @@ function renderLocations() {
   const running = S.task && S.task.status === 'running';
   for (const loc of S.locations) {
     const li = document.createElement('li');
+    const kind = document.createElement('span');
+    kind.className = `kind ${loc.kind}`;
+    kind.textContent = { home: '홈', dropoff: '받는 곳', pickup: '구역' }[loc.kind] || loc.kind;
     const name = document.createElement('span');
     name.className = 'name';
-    name.textContent = locPrefix(loc) + loc.name;
+    name.textContent = loc.name;
     name.title = '클릭해서 수정';
     name.addEventListener('click', () => openLocationForm(loc));
     const coord = document.createElement('span');
     coord.className = 'coord';
     coord.textContent = `${loc.x.toFixed(2)}, ${loc.y.toFixed(2)}`;
     const go = document.createElement('button');
-    go.className = 'small';
+    go.className = 'small outline';
     go.textContent = '이동';
     go.disabled = !online || running;
     go.addEventListener('click', () => send('goto_location', { location_id: loc.id }));
     const del = document.createElement('button');
-    del.className = 'small';
-    del.textContent = '삭제';
+    del.className = 'small icon-del';
+    del.textContent = '✕';
+    del.title = '삭제';
     del.addEventListener('click', () => {
       if (confirm(`"${loc.name}" 위치를 삭제할까요?`)) send('delete_location', { location_id: loc.id });
     });
-    li.append(name, coord, go, del);
+    li.append(kind, name, coord, go, del);
     ul.appendChild(li);
   }
 }
