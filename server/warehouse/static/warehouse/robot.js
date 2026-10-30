@@ -228,9 +228,6 @@ $('#btn-force').addEventListener('click', () => {
   if (f.local === 'dismiss') { S.dismissed = f.key; render(); return; }
   if (!f.ask || confirm(f.ask)) send(f.action);
 });
-$('#btn-stop').addEventListener('click', () => {
-  if (confirm('로봇을 멈추고 진행 중인 요청을 취소할까요?')) send('estop');
-});
 
 setInterval(render, 1000);  // refresh when the manual button appears
 connect();
