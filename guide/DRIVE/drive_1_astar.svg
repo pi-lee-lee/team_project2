@@ -1,0 +1,200 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" width="1600" height="900">
+<defs>
+
+    <style>
+      text { font-family: "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", sans-serif; fill: #1f2937; }
+      .title { font-size: 34px; font-weight: 800; fill: #111827; }
+      .subtitle { font-size: 15px; fill: #4b5563; }
+      .ph { font-size: 17px; font-weight: 800; fill: #ffffff; }
+      .tag { font-size: 11px; fill: #ffffff; opacity: 0.9; }
+      .num { font-size: 13px; font-weight: 800; }
+      .b { font-size: 13px; fill: #1f2937; }
+      .bb { font-size: 13px; font-weight: 700; fill: #111827; }
+      .s { font-size: 11.5px; fill: #4b5563; }
+      .lbl { font-size: 12.5px; font-weight: 700; fill: #111827; }
+      .lbls { font-size: 11px; fill: #4b5563; }
+      .mono { font-family: Menlo, Consolas, "DejaVu Sans Mono", monospace; }
+      .halo { paint-order: stroke; stroke: #ffffff; stroke-width: 4px; stroke-linejoin: round; }
+      .foot { font-size: 11.5px; fill: #4b5563; }
+    </style>
+<marker id="ar_6b7280" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#6b7280"/></marker><marker id="ar_2563eb" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#2563eb"/></marker><marker id="ar_059669" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#059669"/></marker><marker id="ar_dc2626" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#dc2626"/></marker><marker id="ar_ea580c" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#ea580c"/></marker><marker id="ar_7c3aed" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#7c3aed"/></marker><marker id="ar_0891b2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#0891b2"/></marker><marker id="ar_ca8a04" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#ca8a04"/></marker><marker id="ar_111827" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#111827"/></marker>
+</defs>
+<rect width="1600" height="900" fill="#f4f6fb"/>
+<rect x="30" y="26" width="8" height="58" rx="3" fill="#2563eb"/>
+<text x="52.0" y="62.0" class="title" text-anchor="start">주행 모듈 1 — 경로 계획: A*</text>
+<text x="54.0" y="86.0" class="subtitle" text-anchor="start">목표를 받으면 브리지가 astar/get_plan 서비스를 부른다. A* 노드는 지도(+ 금지 구역, 기억한 장애물, 부딪힌 자리)로 격자를 만들고, 벽에서 먼 쪽을 선호하는 비용으로 8방향 A* 를 돌려 5 cm 점 경로를 돌려준다.</text>
+<rect x="30.0" y="130" width="500.0" height="360" rx="10" fill="#ffffff" stroke="#2563eb" stroke-width="2"/>
+<path d="M30.0,140 a10,10 0 0 1 10,-10 h480.0 a10,10 0 0 1 10,10 v28 h-500.0 z" fill="#2563eb"/>
+<circle cx="52.0" cy="149" r="11" fill="#ffffff"/>
+<text x="52.0" y="154.0" class="num" text-anchor="middle" style="fill:#2563eb">1</text>
+<text x="72.0" y="155.0" class="ph" text-anchor="start">계획용 격자 만들기</text>
+<text x="518.0" y="154.0" class="tag mono" text-anchor="end">plan_map.py</text>
+<circle cx="50.0" cy="188.5" r="2.4" fill="#374151"/>
+<text x="60.0" y="193.0" class="b" text-anchor="start">지도 칸 값 0~100, −1 = 미탐색 (해상도 5 cm)</text>
+<text x="72.0" y="210.0" class="s" text-anchor="start">65 이상 = 장애물. 미탐색도 장애물 (SLAM 모드는 통과 가능, 비용 +2)</text>
+<circle cx="50.0" cy="226.0" r="2.4" fill="#374151"/>
+<text x="60.0" y="230.5" class="b" text-anchor="start">좁은 미탐색 줄무늬 채우기 (지도 모드만)</text>
+<text x="72.0" y="247.5" class="s" text-anchor="start">빈 칸 사이 폭 20 cm 미만 회색 줄 → 빈 칸. 멀리서 빔 사이가 벌어져 생긴 틈</text>
+<circle cx="50.0" cy="263.5" r="2.4" fill="#374151"/>
+<text x="60.0" y="268.0" class="b" text-anchor="start">작은 장애물 덩어리 부풀리기</text>
+<text x="72.0" y="285.0" class="s" text-anchor="start">책상·의자 다리 점(가로·세로 0.4 m 이하)을 0.1 m 키움 → 다리 사이로 경로가 안 남.</text>
+<text x="72.0" y="300.5" class="s" text-anchor="start">벽은 그대로</text>
+<circle cx="50.0" cy="316.5" r="2.4" fill="#374151"/>
+<text x="60.0" y="321.0" class="b" text-anchor="start">웹에서 그린 금지 구역(사각형·선) → 장애물 칸</text>
+<circle cx="50.0" cy="338.5" r="2.4" fill="#374151"/>
+<text x="60.0" y="343.0" class="b" text-anchor="start">출발 위치 0.35 m 안은 위 가공에서 뺌</text>
+<text x="72.0" y="360.0" class="s" text-anchor="start">금지 구역 안에 서 있어도 빠져나올 수 있게</text>
+<circle cx="50.0" cy="376.0" r="2.4" fill="#374151"/>
+<text x="60.0" y="380.5" class="b" text-anchor="start">AMCL 은 원본 지도를 그대로 씀</text>
+<text x="72.0" y="397.5" class="s" text-anchor="start">가공은 경로 계획에만. 결과는 astar/plan_map 토픽</text>
+<rect x="550.0" y="130" width="500.0" height="360" rx="10" fill="#ffffff" stroke="#2563eb" stroke-width="2"/>
+<path d="M550.0,140 a10,10 0 0 1 10,-10 h480.0 a10,10 0 0 1 10,10 v28 h-500.0 z" fill="#2563eb"/>
+<circle cx="572.0" cy="149" r="11" fill="#ffffff"/>
+<text x="572.0" y="154.0" class="num" text-anchor="middle" style="fill:#2563eb">2</text>
+<text x="592.0" y="155.0" class="ph" text-anchor="start">장애물 거리 → 통과 불가 · 비용</text>
+<text x="1038.0" y="154.0" class="tag mono" text-anchor="end">GridPlanner</text>
+<defs><linearGradient id="cg" x1="0" x2="1"><stop offset="0" stop-color="#fb923c"/><stop offset="1" stop-color="#ffffff"/></linearGradient></defs>
+<rect x="570.0" y="184" width="30" height="54" fill="#374151"/>
+<text x="585.0" y="216.0" class="lbl" text-anchor="middle" style="fill:#ffffff">벽</text>
+<rect x="600.0" y="184" width="137.6" height="54" fill="#fecaca" stroke="#dc2626"/>
+<rect x="737.6" y="184" width="177.7" height="54" fill="url(#cg)" stroke="#fdba74"/>
+<rect x="915.3" y="184" width="114.7" height="54" fill="#ffffff" stroke="#d1d5db"/>
+<text x="668.8" y="209.0" class="lbl" text-anchor="middle" style="fill:#b91c1c">통과 불가</text>
+<text x="668.8" y="226.0" class="lbls" text-anchor="middle">(lethal)</text>
+<text x="829.3" y="209.0" class="lbl" text-anchor="middle">비용 4 → 1</text>
+<text x="829.3" y="226.0" class="lbls" text-anchor="middle">벽 가까울수록 비쌈</text>
+<text x="972.7" y="217.0" class="lbl" text-anchor="middle">비용 1</text>
+<line x1="600.0" y1="238" x2="600.0" y2="246" stroke="#374151"/>
+<text x="600.0" y="260.0" class="lbls mono" text-anchor="middle">0.00 m</text>
+<line x1="737.6" y1="238" x2="737.6" y2="246" stroke="#374151"/>
+<text x="737.6" y="260.0" class="lbls mono" text-anchor="middle">0.24 m</text>
+<line x1="915.3" y1="238" x2="915.3" y2="246" stroke="#374151"/>
+<text x="915.3" y="260.0" class="lbls mono" text-anchor="middle">0.55 m</text>
+<text x="1030.0" y="260.0" class="lbls" text-anchor="end">벽까지 거리 →</text>
+<circle cx="570.0" cy="284.5" r="2.4" fill="#374151"/>
+<text x="580.0" y="289.0" class="b" text-anchor="start">모든 칸에서 가장 가까운 장애물까지 거리 계산</text>
+<text x="592.0" y="306.0" class="s" text-anchor="start">scipy distance_transform_edt (없으면 칸 넓히기 반복으로 근사)</text>
+<circle cx="570.0" cy="322.0" r="2.4" fill="#374151"/>
+<text x="580.0" y="326.5" class="b" text-anchor="start">거리 &lt; robot_radius 0.24 m → 통과 불가</text>
+<text x="592.0" y="343.5" class="s" text-anchor="start">차체 반폭 0.153 m + 여유. A* 가 지나는 틈은 Frenet 도 지나갈 수 있게 (제자리 회전</text>
+<text x="592.0" y="359.0" class="s" text-anchor="start">원은 Frenet 이 따로 검사)</text>
+<circle cx="570.0" cy="375.0" r="2.4" fill="#374151"/>
+<text x="580.0" y="379.5" class="b" text-anchor="start">0.24 ~ 0.55 m: 칸 비용 = 1 + 3·c²</text>
+<text x="592.0" y="396.5" class="s" text-anchor="start">c = (0.55 − 거리) / 0.31. 넓은 통로에서는 가운데로, 좁은 곳은 비싸도 지나감</text>
+<rect x="1070.0" y="130" width="500.0" height="360" rx="10" fill="#ffffff" stroke="#2563eb" stroke-width="2"/>
+<path d="M1070.0,140 a10,10 0 0 1 10,-10 h480.0 a10,10 0 0 1 10,10 v28 h-500.0 z" fill="#2563eb"/>
+<circle cx="1092.0" cy="149" r="11" fill="#ffffff"/>
+<text x="1092.0" y="154.0" class="num" text-anchor="middle" style="fill:#2563eb">3</text>
+<text x="1112.0" y="155.0" class="ph" text-anchor="start">A* 탐색</text>
+<text x="1558.0" y="154.0" class="tag mono" text-anchor="end">_astar()</text>
+<rect x="1100.0" y="182" width="34" height="34" fill="#ffffff" stroke="#93c5fd"/>
+<rect x="1134.0" y="182" width="34" height="34" fill="#ffffff" stroke="#93c5fd"/>
+<rect x="1168.0" y="182" width="34" height="34" fill="#ffffff" stroke="#93c5fd"/>
+<rect x="1100.0" y="216" width="34" height="34" fill="#ffffff" stroke="#93c5fd"/>
+<rect x="1134.0" y="216" width="34" height="34" fill="#dbeafe" stroke="#93c5fd"/>
+<rect x="1168.0" y="216" width="34" height="34" fill="#ffffff" stroke="#93c5fd"/>
+<rect x="1100.0" y="250" width="34" height="34" fill="#ffffff" stroke="#93c5fd"/>
+<rect x="1134.0" y="250" width="34" height="34" fill="#ffffff" stroke="#93c5fd"/>
+<rect x="1168.0" y="250" width="34" height="34" fill="#ffffff" stroke="#93c5fd"/>
+<line x1="1151.0" y1="233.0" x2="1126.5" y2="208.5" stroke="#2563eb" stroke-width="1.6" marker-end="url(#ar_2563eb)"/>
+<line x1="1151.0" y1="233.0" x2="1151.0" y2="208.5" stroke="#2563eb" stroke-width="1.6" marker-end="url(#ar_2563eb)"/>
+<line x1="1151.0" y1="233.0" x2="1175.5" y2="208.5" stroke="#2563eb" stroke-width="1.6" marker-end="url(#ar_2563eb)"/>
+<line x1="1151.0" y1="233.0" x2="1126.5" y2="233.0" stroke="#2563eb" stroke-width="1.6" marker-end="url(#ar_2563eb)"/>
+<line x1="1151.0" y1="233.0" x2="1175.5" y2="233.0" stroke="#2563eb" stroke-width="1.6" marker-end="url(#ar_2563eb)"/>
+<line x1="1151.0" y1="233.0" x2="1126.5" y2="257.5" stroke="#2563eb" stroke-width="1.6" marker-end="url(#ar_2563eb)"/>
+<line x1="1151.0" y1="233.0" x2="1151.0" y2="257.5" stroke="#2563eb" stroke-width="1.6" marker-end="url(#ar_2563eb)"/>
+<line x1="1151.0" y1="233.0" x2="1175.5" y2="257.5" stroke="#2563eb" stroke-width="1.6" marker-end="url(#ar_2563eb)"/>
+<text x="1151.0" y="300.0" class="lbls" text-anchor="middle">8방향</text>
+<text x="1226.0" y="198.0" class="lbls mono" text-anchor="start">g(다음) = g(지금) + 이동 거리 × 들어갈 칸 비용</text>
+<text x="1226.0" y="216.0" class="lbls" text-anchor="start">  이동 거리: 상하좌우 1, 대각선 √2</text>
+<text x="1226.0" y="238.0" class="lbls mono" text-anchor="start">h = octile 거리 (칸 단위)</text>
+<text x="1226.0" y="256.0" class="lbls mono" text-anchor="start">  = (Δr + Δc) + (√2 − 2)·min(Δr, Δc)</text>
+<text x="1226.0" y="274.0" class="lbls" text-anchor="start">  비용 ≥ 1 이라 과대평가 없음 → 최단</text>
+<circle cx="1090.0" cy="322.5" r="2.4" fill="#374151"/>
+<text x="1100.0" y="327.0" class="b" text-anchor="start">f = g + h 가 가장 작은 칸부터 꺼냄 (heap)</text>
+<circle cx="1090.0" cy="344.5" r="2.4" fill="#374151"/>
+<text x="1100.0" y="349.0" class="b" text-anchor="start">장애물 모서리는 대각선으로 자르지 않음</text>
+<circle cx="1090.0" cy="366.5" r="2.4" fill="#374151"/>
+<text x="1100.0" y="371.0" class="b" text-anchor="start">목표가 벽에 붙어 있으면 0.3 m 안 가장 가까운 빈 칸으로</text>
+<circle cx="1090.0" cy="388.5" r="2.4" fill="#374151"/>
+<text x="1100.0" y="393.0" class="b" text-anchor="start">출발이 통과 불가 띠 안(벽에 붙음)이면 빠져나오기만 허용</text>
+<text x="1112.0" y="410.0" class="s" text-anchor="start">장애물에서 멀어지는 칸으로만, 벌점 +20. 띠를 따라 좁은 틈을 지나는 경로 방지</text>
+<circle cx="1090.0" cy="426.0" r="2.4" fill="#374151"/>
+<text x="1100.0" y="430.5" class="b" text-anchor="start">실패 메시지: 맵 밖 / 목표가 장애물에 너무 가까움 / 경로 없음</text>
+<rect x="30.0" y="505" width="500.0" height="360" rx="10" fill="#ffffff" stroke="#0891b2" stroke-width="2"/>
+<path d="M30.0,515 a10,10 0 0 1 10,-10 h480.0 a10,10 0 0 1 10,10 v28 h-500.0 z" fill="#0891b2"/>
+<circle cx="52.0" cy="524" r="11" fill="#ffffff"/>
+<text x="52.0" y="529.0" class="num" text-anchor="middle" style="fill:#0891b2">4</text>
+<text x="72.0" y="530.0" class="ph" text-anchor="start">지도에 없는 장애물 기억</text>
+<text x="518.0" y="529.0" class="tag mono" text-anchor="end">on_scan · on_bump</text>
+<circle cx="50.0" cy="563.5" r="2.4" fill="#374151"/>
+<text x="60.0" y="568.0" class="b" text-anchor="start">scan_level 을 0.5 초마다 지도 좌표로 바꿈 (AMCL 모드만)</text>
+<text x="72.0" y="585.0" class="s" text-anchor="start">5 m 안, 지도 벽에서 0.15 m 넘게 떨어진 점 = 지도에 없는 물체</text>
+<circle cx="50.0" cy="601.0" r="2.4" fill="#374151"/>
+<text x="60.0" y="605.5" class="b" text-anchor="start">같은 5 cm 칸에 2.5 초 넘게 계속 보인 점만 기억</text>
+<text x="72.0" y="622.5" class="s" text-anchor="start">지나가는 사람·물체(칸마다 1~2 초)의 자취가 가짜 벽이 되어 통로를 막지 않게. 1 초 안</text>
+<text x="72.0" y="638.0" class="s" text-anchor="start">보이면 다시 셈</text>
+<circle cx="50.0" cy="654.0" r="2.4" fill="#374151"/>
+<text x="60.0" y="658.5" class="b" text-anchor="start">기억 20 초 → 만료. 웹 지도에 표시 (astar/remembered)</text>
+<circle cx="50.0" cy="676.0" r="2.4" fill="#374151"/>
+<text x="60.0" y="680.5" class="b" text-anchor="start">부딪힌 자리: LiDAR(약 13 cm 높이)에 안 보이는 낮은 물체</text>
+<text x="72.0" y="697.5" class="s" text-anchor="start">브리지가 기울기·멈춤으로 감지 → astar/obstacle → 반경 0.15 m 를 120 초 장애물로</text>
+<circle cx="50.0" cy="713.5" r="2.4" fill="#374151"/>
+<text x="60.0" y="718.0" class="b" text-anchor="start">웹 &quot;상태 초기화&quot; → 기억 전부 지움 (astar/clear_obstacles)</text>
+<circle cx="50.0" cy="735.5" r="2.4" fill="#374151"/>
+<text x="60.0" y="740.0" class="b" text-anchor="start">SLAM 모드는 기억 안 함</text>
+<text x="72.0" y="757.0" class="s" text-anchor="start">지도가 자라는 중이라 벽 너머 점이 쌓여 통로를 막음. SLAM 지도 자체가 몇 초마다 반영</text>
+<rect x="550.0" y="505" width="500.0" height="360" rx="10" fill="#ffffff" stroke="#0891b2" stroke-width="2"/>
+<path d="M550.0,515 a10,10 0 0 1 10,-10 h480.0 a10,10 0 0 1 10,10 v28 h-500.0 z" fill="#0891b2"/>
+<circle cx="572.0" cy="524" r="11" fill="#ffffff"/>
+<text x="572.0" y="529.0" class="num" text-anchor="middle" style="fill:#0891b2">5</text>
+<text x="592.0" y="530.0" class="ph" text-anchor="start">경로가 없을 때 — 단계별로 완화</text>
+<text x="1038.0" y="529.0" class="tag mono" text-anchor="end">on_get_plan()</text>
+<rect x="572.0" y="555" width="456.0" height="44" rx="7" fill="#ecfeff" stroke="#0891b2" stroke-width="1.5"/>
+<text x="584.0" y="582.0" class="lbl" text-anchor="start">① 지도 + 부딪힌 자리 + 기억 장애물, 반경 0.24</text>
+<line x1="602.0" y1="599" x2="602.0" y2="612" stroke="#6b7280" stroke-width="2" marker-end="url(#ar_6b7280)"/>
+<text x="612.0" y="611.0" class="lbls" text-anchor="start">경로 없음</text>
+<rect x="572.0" y="614" width="456.0" height="44" rx="7" fill="#ecfeff" stroke="#0891b2" stroke-width="1.5"/>
+<text x="584.0" y="633.0" class="lbl" text-anchor="start">② 반경만 0.20 m 로 줄여 다시</text>
+<text x="584.0" y="650.0" class="lbls" text-anchor="start">차체 반폭 + 느린 Frenet 여유 0.04 → 0.40 m 틈까지</text>
+<line x1="602.0" y1="658" x2="602.0" y2="671" stroke="#6b7280" stroke-width="2" marker-end="url(#ar_6b7280)"/>
+<text x="612.0" y="670.0" class="lbls" text-anchor="start">경로 없음</text>
+<rect x="572.0" y="673" width="456.0" height="44" rx="7" fill="#ecfeff" stroke="#0891b2" stroke-width="1.5"/>
+<text x="584.0" y="692.0" class="lbl" text-anchor="start">③ 최근 3 초 안에 다시 본 기억 장애물만</text>
+<text x="584.0" y="709.0" class="lbls" text-anchor="start">지나간 사람, 회전 중 번진 스캔 같은 잘못된 기억 빼기</text>
+<line x1="602.0" y1="717" x2="602.0" y2="730" stroke="#6b7280" stroke-width="2" marker-end="url(#ar_6b7280)"/>
+<text x="612.0" y="729.0" class="lbls" text-anchor="start">경로 없음</text>
+<rect x="572.0" y="732" width="456.0" height="44" rx="7" fill="#fef2f2" stroke="#dc2626" stroke-width="1.5"/>
+<text x="584.0" y="751.0" class="lbl" text-anchor="start">④ 실패: &quot;지나갈 틈이 없습니다&quot;</text>
+<text x="584.0" y="768.0" class="lbls" text-anchor="start">지도만으로는 길이 있어도 쓰지 않음</text>
+<circle cx="570.0" cy="801.5" r="2.4" fill="#374151"/>
+<text x="580.0" y="806.0" class="b" text-anchor="start">왜 지도만으로 계획하지 않나</text>
+<text x="592.0" y="823.0" class="s" text-anchor="start">막던 물체를 그대로 지나는 경로가 나와 Frenet 이 매번 거부 → 재계획만 반복</text>
+<circle cx="570.0" cy="839.0" r="2.4" fill="#374151"/>
+<text x="580.0" y="843.5" class="b" text-anchor="start">③ 에서 더할 장애물이 없으면(최근에 못 봄) 지나간 물체로 보고 지도만으로</text>
+<rect x="1070.0" y="505" width="500.0" height="360" rx="10" fill="#ffffff" stroke="#0891b2" stroke-width="2"/>
+<path d="M1070.0,515 a10,10 0 0 1 10,-10 h480.0 a10,10 0 0 1 10,10 v28 h-500.0 z" fill="#0891b2"/>
+<circle cx="1092.0" cy="524" r="11" fill="#ffffff"/>
+<text x="1092.0" y="529.0" class="num" text-anchor="middle" style="fill:#0891b2">6</text>
+<text x="1112.0" y="530.0" class="ph" text-anchor="start">다듬기 → 전달 → 재계획</text>
+<text x="1558.0" y="529.0" class="tag mono" text-anchor="end">smooth_path</text>
+<circle cx="1090.0" cy="563.5" r="2.4" fill="#374151"/>
+<text x="1100.0" y="568.0" class="b" text-anchor="start">이동 평균(앞뒤 2점)으로 계단 모양 다듬기, 양 끝 고정</text>
+<circle cx="1090.0" cy="585.5" r="2.4" fill="#374151"/>
+<text x="1100.0" y="590.0" class="b" text-anchor="start">점마다 다음 점 방향, 마지막 점 = 목표 방향 → nav_msgs/Path</text>
+<text x="1112.0" y="607.0" class="s" text-anchor="start">웹 지도에 파란 경로로 표시</text>
+<circle cx="1090.0" cy="623.0" r="2.4" fill="#374151"/>
+<text x="1100.0" y="627.5" class="b" text-anchor="start">브리지가 Frenet 기준선(스무딩 스플라인)으로 바꿔 따라감</text>
+<text x="1112.0" y="644.5" class="s" text-anchor="start">0.1 초마다 후보 궤적 중 하나 실행 → guide/frenet_drive.html</text>
+<text x="1086.0" y="665.0" class="bb" text-anchor="start">다시 계획하는 때</text>
+<circle cx="1090.0" cy="682.5" r="2.4" fill="#374151"/>
+<text x="1100.0" y="687.0" class="b" text-anchor="start">Frenet 이 정적 장애물만으로 1 초 막힘 → 바로 A* (목표당 4번)</text>
+<text x="1112.0" y="704.0" class="s" text-anchor="start">A* 가 그 물체를 기억해 돌아가는 경로</text>
+<circle cx="1090.0" cy="720.0" r="2.4" fill="#374151"/>
+<text x="1100.0" y="724.5" class="b" text-anchor="start">막힘 5 초(사람 등) → 물러나기 / 돌기 → A*</text>
+<circle cx="1090.0" cy="742.0" r="2.4" fill="#374151"/>
+<text x="1100.0" y="746.5" class="b" text-anchor="start">부딪힘 → 15 cm 물러남 → 그 자리 기억 → A*</text>
+<circle cx="1090.0" cy="764.0" r="2.4" fill="#374151"/>
+<text x="1100.0" y="768.5" class="b" text-anchor="start">금지 구역이 바뀜 / 이동 실패 재시도 (2번까지)</text>
+<text x="30.0" y="888.0" class="foot" text-anchor="start">값: config/params.yaml astar_planner (robot_radius 0.24, inflation_radius 0.55, cost_weight 3.0, scan_memory 20, scan_persist 2.5, fallback_radius 0.20, scan_recent 3.0, bump_memory 120). 실패 진단: logs/astar_fail.npz</text>
+</svg>

@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>주행 모듈 3</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #f4f6fb; }
+  body { display: flex; align-items: center; justify-content: center; }
+  svg { width: min(100vw, calc(100vh * 16 / 9)); height: auto; display: block; }
+</style>
+</head>
+<body>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900">
+<defs>
+
+    <style>
+      text { font-family: "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", sans-serif; fill: #1f2937; }
+      .title { font-size: 34px; font-weight: 800; fill: #111827; }
+      .subtitle { font-size: 15px; fill: #4b5563; }
+      .ph { font-size: 17px; font-weight: 800; fill: #ffffff; }
+      .tag { font-size: 11px; fill: #ffffff; opacity: 0.9; }
+      .num { font-size: 13px; font-weight: 800; }
+      .b { font-size: 13px; fill: #1f2937; }
+      .bb { font-size: 13px; font-weight: 700; fill: #111827; }
+      .s { font-size: 11.5px; fill: #4b5563; }
+      .lbl { font-size: 12.5px; font-weight: 700; fill: #111827; }
+      .lbls { font-size: 11px; fill: #4b5563; }
+      .mono { font-family: Menlo, Consolas, "DejaVu Sans Mono", monospace; }
+      .halo { paint-order: stroke; stroke: #ffffff; stroke-width: 4px; stroke-linejoin: round; }
+      .foot { font-size: 11.5px; fill: #4b5563; }
+    </style>
+<marker id="ar_6b7280" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#6b7280"/></marker><marker id="ar_2563eb" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#2563eb"/></marker><marker id="ar_059669" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#059669"/></marker><marker id="ar_dc2626" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#dc2626"/></marker><marker id="ar_ea580c" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#ea580c"/></marker><marker id="ar_7c3aed" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#7c3aed"/></marker><marker id="ar_0891b2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#0891b2"/></marker><marker id="ar_ca8a04" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#ca8a04"/></marker><marker id="ar_111827" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#111827"/></marker>
+</defs>
+<rect width="1600" height="900" fill="#f4f6fb"/>
+<rect x="30" y="26" width="8" height="58" rx="3" fill="#ea580c"/>
+<text x="52.0" y="62.0" class="title" text-anchor="start">주행 모듈 3 — 추적 결과를 주행에 쓰는 법</text>
+<text x="54.0" y="86.0" class="subtitle" text-anchor="start">멈춘 물체는 스캔 점까지의 거리로(시간 무관), 움직이는 물체는 등속 예측으로(시간별) 따로 검사한다. Frenet 은 0.1 초마다 후보 궤적 867개를 이 두 검사로 거르고 비용이 가장 작은 것을 고른다.</text>
+<rect x="30.0" y="130" width="500.0" height="360" rx="10" fill="#ffffff" stroke="#ea580c" stroke-width="2"/>
+<path d="M30.0,140 a10,10 0 0 1 10,-10 h480.0 a10,10 0 0 1 10,10 v28 h-500.0 z" fill="#ea580c"/>
+<circle cx="52.0" cy="149" r="11" fill="#ffffff"/>
+<text x="52.0" y="154.0" class="num" text-anchor="middle" style="fill:#ea580c">1</text>
+<text x="72.0" y="155.0" class="ph" text-anchor="start">정적 / 움직이는 물체 나누기</text>
+<text x="518.0" y="154.0" class="tag mono" text-anchor="end">compute()</text>
+<rect x="44.0" y="178" width="472.0" height="130" rx="6" fill="#f9fafb" stroke="#e5e7eb"/>
+<circle cx="162.0" cy="243.0" r="2.6" fill="#9ca3af"/>
+<line x1="158.0" y1="239.0" x2="166.0" y2="247.0" stroke="#dc2626" stroke-width="1.2"/>
+<circle cx="159.1" cy="254.0" r="2.6" fill="#9ca3af"/>
+<line x1="155.1" y1="250.0" x2="163.1" y2="258.0" stroke="#dc2626" stroke-width="1.2"/>
+<circle cx="151.0" cy="262.1" r="2.6" fill="#9ca3af"/>
+<line x1="147.0" y1="258.1" x2="155.0" y2="266.1" stroke="#dc2626" stroke-width="1.2"/>
+<circle cx="140.0" cy="265.0" r="2.6" fill="#9ca3af"/>
+<line x1="136.0" y1="261.0" x2="144.0" y2="269.0" stroke="#dc2626" stroke-width="1.2"/>
+<circle cx="129.0" cy="262.1" r="2.6" fill="#9ca3af"/>
+<line x1="125.0" y1="258.1" x2="133.0" y2="266.1" stroke="#dc2626" stroke-width="1.2"/>
+<circle cx="120.9" cy="254.0" r="2.6" fill="#9ca3af"/>
+<line x1="116.9" y1="250.0" x2="124.9" y2="258.0" stroke="#dc2626" stroke-width="1.2"/>
+<circle cx="118.0" cy="243.0" r="2.6" fill="#9ca3af"/>
+<line x1="114.0" y1="239.0" x2="122.0" y2="247.0" stroke="#dc2626" stroke-width="1.2"/>
+<circle cx="120.9" cy="232.0" r="2.6" fill="#9ca3af"/>
+<line x1="116.9" y1="228.0" x2="124.9" y2="236.0" stroke="#dc2626" stroke-width="1.2"/>
+<circle cx="129.0" cy="223.9" r="2.6" fill="#9ca3af"/>
+<line x1="125.0" y1="219.9" x2="133.0" y2="227.9" stroke="#dc2626" stroke-width="1.2"/>
+<circle cx="140.0" cy="221.0" r="2.6" fill="#9ca3af"/>
+<line x1="136.0" y1="217.0" x2="144.0" y2="225.0" stroke="#dc2626" stroke-width="1.2"/>
+<circle cx="151.0" cy="223.9" r="2.6" fill="#9ca3af"/>
+<line x1="147.0" y1="219.9" x2="155.0" y2="227.9" stroke="#dc2626" stroke-width="1.2"/>
+<circle cx="159.1" cy="232.0" r="2.6" fill="#9ca3af"/>
+<line x1="155.1" y1="228.0" x2="163.1" y2="236.0" stroke="#dc2626" stroke-width="1.2"/>
+<circle cx="140.0" cy="243" r="32" fill="none" stroke="#ea580c" stroke-dasharray="4 3"/>
+<circle cx="140.0" cy="243" r="14" fill="#fed7aa" stroke="#ea580c"/>
+<line x1="140.0" y1="243" x2="200.0" y2="225" stroke="#ea580c" stroke-width="2" marker-end="url(#ar_ea580c)"/>
+<text x="140.0" y="293.0" class="lbls" text-anchor="middle">움직이는 트랙: 반경 + 0.1 m 안 점 빼기</text>
+<circle cx="400.0" cy="233" r="2.6" fill="#059669"/>
+<circle cx="409.0" cy="237" r="2.6" fill="#059669"/>
+<circle cx="418.0" cy="233" r="2.6" fill="#059669"/>
+<circle cx="427.0" cy="237" r="2.6" fill="#059669"/>
+<circle cx="436.0" cy="233" r="2.6" fill="#059669"/>
+<circle cx="445.0" cy="237" r="2.6" fill="#059669"/>
+<text x="422.0" y="261.0" class="lbls" text-anchor="middle">나머지 점</text>
+<text x="422.0" y="276.0" class="lbls" text-anchor="middle">= 정적 장애물</text>
+<circle cx="50.0" cy="328.5" r="2.4" fill="#374151"/>
+<text x="60.0" y="333.0" class="b" text-anchor="start">움직이는 물체 = 확정 트랙 중 |v| &gt; 0.08 m/s</text>
+<circle cx="50.0" cy="350.5" r="2.4" fill="#374151"/>
+<text x="60.0" y="355.0" class="b" text-anchor="start">그 물체의 스캔 점은 정적 점에서 뺌</text>
+<text x="72.0" y="372.0" class="s" text-anchor="start">같은 물체를 &quot;지금 자리 벽&quot; 과 &quot;예측 위치&quot; 로 두 번 세지 않게</text>
+<circle cx="50.0" cy="388.0" r="2.4" fill="#374151"/>
+<text x="60.0" y="392.5" class="b" text-anchor="start">멈춘 물체(트랙이 느림)는 스캔 점 그대로</text>
+<text x="72.0" y="409.5" class="s" text-anchor="start">정적 검사는 시간과 무관: 언제 도착하든 부딪히는 건 같음 → 느린 후보가 유리해지지</text>
+<text x="72.0" y="425.0" class="s" text-anchor="start">않음</text>
+<rect x="550.0" y="130" width="500.0" height="360" rx="10" fill="#ffffff" stroke="#ea580c" stroke-width="2"/>
+<path d="M550.0,140 a10,10 0 0 1 10,-10 h480.0 a10,10 0 0 1 10,10 v28 h-500.0 z" fill="#ea580c"/>
+<circle cx="572.0" cy="149" r="11" fill="#ffffff"/>
+<text x="572.0" y="154.0" class="num" text-anchor="middle" style="fill:#ea580c">2</text>
+<text x="592.0" y="155.0" class="ph" text-anchor="start">등속 예측 원과 시간별 비교</text>
+<text x="1038.0" y="154.0" class="tag mono" text-anchor="end">_dynamic_clear()</text>
+<rect x="564.0" y="178" width="472.0" height="150" rx="6" fill="#f9fafb" stroke="#e5e7eb"/>
+<path d="M590.0,288 C710.0,288 790.0,278 970.0,268" fill="none" stroke="#dc2626" stroke-width="2.4"/>
+<rect x="574.0" y="278" width="30" height="20" rx="3" fill="#bfdbfe" stroke="#2563eb"/>
+<circle cx="650.0" cy="285" r="3" fill="#dc2626"/>
+<text x="650.0" y="308.0" class="lbls mono" text-anchor="middle">t=0s</text>
+<circle cx="740.0" cy="280" r="3" fill="#dc2626"/>
+<text x="740.0" y="303.0" class="lbls mono" text-anchor="middle">t=1s</text>
+<circle cx="830.0" cy="275" r="3" fill="#dc2626"/>
+<text x="830.0" y="298.0" class="lbls mono" text-anchor="middle">t=2s</text>
+<circle cx="920.0" cy="270" r="3" fill="#dc2626"/>
+<text x="920.0" y="293.0" class="lbls mono" text-anchor="middle">t=3s</text>
+<circle cx="880.0" cy="198" r="29" fill="#ffedd5" fill-opacity="0.55" stroke="#ea580c" stroke-dasharray="3 3"/>
+<circle cx="848.0" cy="218" r="32" fill="#ffedd5" fill-opacity="0.45" stroke="#ea580c" stroke-dasharray="3 3"/>
+<circle cx="816.0" cy="238" r="35" fill="#ffedd5" fill-opacity="0.35" stroke="#ea580c" stroke-dasharray="3 3"/>
+<circle cx="784.0" cy="258" r="38" fill="#ffedd5" fill-opacity="0.25" stroke="#ea580c" stroke-dasharray="3 3"/>
+<circle cx="880.0" cy="198" r="10" fill="#fb923c" stroke="#ea580c"/>
+<line x1="880.0" y1="198" x2="840.0" y2="223" stroke="#ea580c" stroke-width="2" marker-end="url(#ar_ea580c)"/>
+<text x="896.0" y="192.0" class="lbls" text-anchor="start">사람 (vx, vy)</text>
+<text x="580.0" y="196.0" class="lbl" text-anchor="start">같은 시각끼리 거리 비교</text>
+<circle cx="570.0" cy="348.5" r="2.4" fill="#374151"/>
+<text x="580.0" y="353.0" class="b" text-anchor="start">시각 t (0 ~ 4 초): 물체 위치 = p + v·t</text>
+<circle cx="570.0" cy="370.5" r="2.4" fill="#374151"/>
+<text x="580.0" y="375.0" class="b" text-anchor="start">예측 원 반지름 = 물체 반경 + 0.15 + 0.03·t</text>
+<text x="592.0" y="392.0" class="s" text-anchor="start">멀리 볼수록 예측이 불확실하니 원을 키움</text>
+<circle cx="570.0" cy="408.0" r="2.4" fill="#374151"/>
+<text x="580.0" y="412.5" class="b" text-anchor="start">차체는 원 4개로 덮어서 거리 계산</text>
+<text x="592.0" y="429.5" class="s" text-anchor="start">후보 궤적이 그 시각에 있을 자리 vs 예측 원 → 가장 가까운 거리</text>
+<circle cx="570.0" cy="445.5" r="2.4" fill="#374151"/>
+<text x="580.0" y="450.0" class="b" text-anchor="start">속도 후보(0.15 / 0.10 / 0.05)마다 도착 시각이 달라 결과도 다름</text>
+<text x="592.0" y="467.0" class="s" text-anchor="start">빨리 지나가기 / 늦춰서 먼저 보내기가 자연스럽게 나옴</text>
+<rect x="1070.0" y="130" width="500.0" height="360" rx="10" fill="#ffffff" stroke="#ea580c" stroke-width="2"/>
+<path d="M1070.0,140 a10,10 0 0 1 10,-10 h480.0 a10,10 0 0 1 10,10 v28 h-500.0 z" fill="#ea580c"/>
+<circle cx="1092.0" cy="149" r="11" fill="#ffffff"/>
+<text x="1092.0" y="154.0" class="num" text-anchor="middle" style="fill:#ea580c">3</text>
+<text x="1112.0" y="155.0" class="ph" text-anchor="start">판정과 비용</text>
+<text x="1558.0" y="154.0" class="tag mono" text-anchor="end">plan()</text>
+<text x="1086.0" y="195.0" class="bb" text-anchor="start">후보 탈락 (제약)</text>
+<circle cx="1090.0" cy="212.5" r="2.4" fill="#374151"/>
+<text x="1100.0" y="217.0" class="b" text-anchor="start">예측 거리 &lt; 필요 여유 → &quot;움직이는 물체&quot; 로 탈락</text>
+<text x="1112.0" y="234.0" class="s" text-anchor="start">필요 여유 = 0.06 m. 이미 더 가까우면 &quot;지금보다 0.5 cm 덜 가까워지는&quot; 후보까지 허용</text>
+<text x="1112.0" y="249.5" class="s" text-anchor="start">(가까이 붙은 채로 빠져나갈 수 있게)</text>
+<text x="1086.0" y="270.0" class="bb" text-anchor="start">비용 (가까울수록 비쌈)</text>
+<circle cx="1090.0" cy="287.5" r="2.4" fill="#374151"/>
+<text x="1100.0" y="292.0" class="b" text-anchor="start">w_dynamic · (0.15 − 거리) / 0.15, 0.15 m 넘으면 0</text>
+<text x="1112.0" y="309.0" class="s" text-anchor="start">같은 안전 후보라도 물체에서 더 먼 쪽 선호</text>
+<circle cx="1090.0" cy="325.0" r="2.4" fill="#374151"/>
+<text x="1100.0" y="329.5" class="b" text-anchor="start">다른 비용과 합쳐 가장 작은 후보 선택</text>
+<text x="1112.0" y="346.5" class="s" text-anchor="start">끝 오프셋², 옆 jerk, 오프셋 바뀜, 느림, 정적 여유 → frenet_drive</text>
+<text x="1086.0" y="367.0" class="bb" text-anchor="start">후보가 하나도 없으면</text>
+<circle cx="1090.0" cy="384.5" r="2.4" fill="#374151"/>
+<text x="1100.0" y="389.0" class="b" text-anchor="start">blocked → 제자리 정지 (사람이 지나가길 기다림)</text>
+<rect x="30.0" y="505" width="500.0" height="360" rx="10" fill="#ffffff" stroke="#ca8a04" stroke-width="2"/>
+<path d="M30.0,515 a10,10 0 0 1 10,-10 h480.0 a10,10 0 0 1 10,10 v28 h-500.0 z" fill="#ca8a04"/>
+<circle cx="52.0" cy="524" r="11" fill="#ffffff"/>
+<text x="52.0" y="529.0" class="num" text-anchor="middle" style="fill:#ca8a04">4</text>
+<text x="72.0" y="530.0" class="ph" text-anchor="start">검사에서 빼는 물체</text>
+<text x="518.0" y="529.0" class="tag mono" text-anchor="end">헛멈춤 방지</text>
+<rect x="44.0" y="553" width="472.0" height="120" rx="6" fill="#f9fafb" stroke="#e5e7eb"/>
+<rect x="190.0" y="597" width="52" height="32" rx="4" fill="#bfdbfe" stroke="#2563eb"/>
+<line x1="242.0" y1="613" x2="310.0" y2="613" stroke="#2563eb" stroke-width="2" marker-end="url(#ar_2563eb)"/>
+<line x1="190.0" y1="561" x2="190.0" y2="665" stroke="#6b7280" stroke-dasharray="4 3"/>
+<text x="186.0" y="573.0" class="lbls" text-anchor="end">차체 뒤끝</text>
+<circle cx="125.0" cy="623" r="12" fill="#e5e7eb" stroke="#9ca3af"/>
+<line x1="125.0" y1="623" x2="165.0" y2="623" stroke="#9ca3af" stroke-width="2" marker-end="url(#ar_6b7280)"/>
+<text x="125.0" y="653.0" class="lbls" text-anchor="middle">뒤에서 오는 물체: 무시</text>
+<circle cx="470.0" cy="579" r="9" fill="#e5e7eb" stroke="#9ca3af"/>
+<text x="470.0" y="605.0" class="lbls" text-anchor="middle">너무 멂: 무시</text>
+<circle cx="50.0" cy="693.5" r="2.4" fill="#374151"/>
+<text x="60.0" y="698.0" class="b" text-anchor="start">4 초 안에 후보 궤적 영역까지 올 수 없는 물체</text>
+<text x="72.0" y="715.0" class="s" text-anchor="start">거리 − 반경 − 속도·4 s − 여유 &gt; 후보가 닿는 범위</text>
+<circle cx="50.0" cy="731.0" r="2.4" fill="#374151"/>
+<text x="60.0" y="735.5" class="b" text-anchor="start">그 시각에 차체 뒤끝보다 완전히 뒤에 있는 물체</text>
+<text x="72.0" y="752.5" class="s" text-anchor="start">뒤에서 오는 것은 멈춰도 못 피하고, 멈추면 길만 막음 → 모든 전진 후보가 탈락하지</text>
+<text x="72.0" y="768.0" class="s" text-anchor="start">않게</text>
+<circle cx="50.0" cy="784.0" r="2.4" fill="#374151"/>
+<text x="60.0" y="788.5" class="b" text-anchor="start">추적 거리 5 m 밖 점, 기울어진 스캔</text>
+<rect x="550.0" y="505" width="500.0" height="360" rx="10" fill="#ffffff" stroke="#ca8a04" stroke-width="2"/>
+<path d="M550.0,515 a10,10 0 0 1 10,-10 h480.0 a10,10 0 0 1 10,10 v28 h-500.0 z" fill="#ca8a04"/>
+<circle cx="572.0" cy="524" r="11" fill="#ffffff"/>
+<text x="572.0" y="529.0" class="num" text-anchor="middle" style="fill:#ca8a04">5</text>
+<text x="592.0" y="530.0" class="ph" text-anchor="start">막힘 처리 · 제자리 회전</text>
+<text x="1038.0" y="529.0" class="tag mono" text-anchor="end">bridge drive_step</text>
+<rect x="570.0" y="555" width="460.0" height="32" rx="7" fill="#fef9c3" stroke="#ca8a04" stroke-width="1.4"/>
+<text x="582.0" y="576.0" class="lbl" text-anchor="start">안전한 후보 없음 → blocked, 정지</text>
+<line x1="600.0" y1="587" x2="600.0" y2="598" stroke="#6b7280" stroke-width="2" marker-end="url(#ar_6b7280)"/>
+<rect x="570.0" y="599" width="460.0" height="44" rx="7" fill="#fef9c3" stroke="#ca8a04" stroke-width="1.4"/>
+<text x="582.0" y="617.0" class="lbl" text-anchor="start">정적 장애물만으로 막힘?</text>
+<text x="582.0" y="634.0" class="lbls" text-anchor="start">예 → 1 초 뒤 A* 재계획 (기다려도 안 비킴, 목표당 4번)</text>
+<line x1="600.0" y1="643" x2="600.0" y2="654" stroke="#6b7280" stroke-width="2" marker-end="url(#ar_6b7280)"/>
+<rect x="570.0" y="655" width="460.0" height="44" rx="7" fill="#fef9c3" stroke="#ca8a04" stroke-width="1.4"/>
+<text x="582.0" y="673.0" class="lbl" text-anchor="start">아니면(움직이는 물체 포함) 기다림</text>
+<text x="582.0" y="690.0" class="lbls" text-anchor="start">지나가면 바로 다시 출발</text>
+<line x1="600.0" y1="699" x2="600.0" y2="710" stroke="#6b7280" stroke-width="2" marker-end="url(#ar_6b7280)"/>
+<rect x="570.0" y="711" width="460.0" height="32" rx="7" fill="#fef2f2" stroke="#dc2626" stroke-width="1.4"/>
+<text x="582.0" y="732.0" class="lbl" text-anchor="start">5 초 넘게 막힘 → 물러나기 / 돌기 → A*</text>
+<circle cx="570.0" cy="767.5" r="2.4" fill="#374151"/>
+<text x="580.0" y="772.0" class="b" text-anchor="start">1.5 m 안에 움직이는 물체가 있으면 출발 전 제자리 회전 생략</text>
+<text x="592.0" y="789.0" class="s" text-anchor="start">도는 동안에는 피할 수 없음 → 후보 궤적으로 처리</text>
+<circle cx="570.0" cy="805.0" r="2.4" fill="#374151"/>
+<text x="580.0" y="809.5" class="b" text-anchor="start">앞 ±25° 0.20 m 안은 후보와 별개로 전진 금지 (비상 정지)</text>
+<rect x="1070.0" y="505" width="500.0" height="360" rx="10" fill="#ffffff" stroke="#ca8a04" stroke-width="2"/>
+<path d="M1070.0,515 a10,10 0 0 1 10,-10 h480.0 a10,10 0 0 1 10,10 v28 h-500.0 z" fill="#ca8a04"/>
+<circle cx="1092.0" cy="524" r="11" fill="#ffffff"/>
+<text x="1092.0" y="529.0" class="num" text-anchor="middle" style="fill:#ca8a04">6</text>
+<text x="1112.0" y="530.0" class="ph" text-anchor="start">물체 종류별로 누가 처리하나</text>
+<text x="1558.0" y="529.0" class="tag mono" text-anchor="end">역할 나누기</text>
+<rect x="1084.0" y="557" width="472.0" height="34" fill="#ca8a04" stroke="#fde68a"/>
+<text x="1092.0" y="579.0" class="lbl" text-anchor="start" style="fill:#ffffff">물체</text>
+<text x="1192.0" y="579.0" class="lbl" text-anchor="start" style="fill:#ffffff">Frenet (0.1 초)</text>
+<text x="1378.0" y="579.0" class="lbl" text-anchor="start" style="fill:#ffffff">A* (계획 때)</text>
+<rect x="1084.0" y="591" width="472.0" height="34" fill="#fefce8" stroke="#fde68a"/>
+<text x="1092.0" y="613.0" class="lbl" text-anchor="start">지나가는 사람</text>
+<text x="1192.0" y="613.0" class="lbls" text-anchor="start">추적 + 등속 예측</text>
+<text x="1378.0" y="613.0" class="lbls" text-anchor="start">기억 안 함 (2.5 s 조건)</text>
+<rect x="1084.0" y="625" width="472.0" height="34" fill="#ffffff" stroke="#fde68a"/>
+<text x="1092.0" y="647.0" class="lbl" text-anchor="start">새로 놓인 상자</text>
+<text x="1192.0" y="647.0" class="lbls" text-anchor="start">스캔 점 거리 검사</text>
+<text x="1378.0" y="647.0" class="lbls" text-anchor="start">2.5 s 뒤 기억 → 우회</text>
+<rect x="1084.0" y="659" width="472.0" height="34" fill="#fefce8" stroke="#fde68a"/>
+<text x="1092.0" y="681.0" class="lbl" text-anchor="start">서 있는 사람</text>
+<text x="1192.0" y="681.0" class="lbls" text-anchor="start">스캔 점 (트랙은 느림)</text>
+<text x="1378.0" y="681.0" class="lbls" text-anchor="start">2.5 s 넘게 서 있으면 기억</text>
+<rect x="1084.0" y="693" width="472.0" height="34" fill="#ffffff" stroke="#fde68a"/>
+<text x="1092.0" y="715.0" class="lbl" text-anchor="start">낮은 물체</text>
+<text x="1192.0" y="715.0" class="lbls" text-anchor="start">안 보임</text>
+<text x="1378.0" y="715.0" class="lbls" text-anchor="start">부딪힌 자리 120 s</text>
+<rect x="1084.0" y="727" width="472.0" height="34" fill="#fefce8" stroke="#fde68a"/>
+<text x="1092.0" y="749.0" class="lbl" text-anchor="start">지도 벽</text>
+<text x="1192.0" y="749.0" class="lbls" text-anchor="start">스캔 점</text>
+<text x="1378.0" y="749.0" class="lbls" text-anchor="start">지도 + 거리 비용</text>
+<circle cx="1090.0" cy="783.5" r="2.4" fill="#374151"/>
+<text x="1100.0" y="788.0" class="b" text-anchor="start">확인: 웹 지도 주황 원·화살표와 local_plan(고른 궤적)</text>
+<circle cx="1090.0" cy="805.5" r="2.4" fill="#374151"/>
+<text x="1100.0" y="810.0" class="b" text-anchor="start">주행 기록에 후보별 탈락 이유(&quot;움직이는 물체&quot;) 저장</text>
+<text x="1112.0" y="827.0" class="s" text-anchor="start">tools/drive_replay.py --at T 로 그 순간 설명·그림</text>
+<text x="30.0" y="888.0" class="foot" text-anchor="start">값: config/params.yaml frenet (horizon 4.0, safety_margin 0.06, clear_pref 0.15, dynamic_margin 0.15, dynamic_growth 0.03, w_dynamic 1.0), tracking.moving_speed 0.08, blocked_timeout 5.0, estop_distance 0.20</text>
+</svg>
+</body>
+</html>

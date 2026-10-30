@@ -1,0 +1,271 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" width="1600" height="900">
+<defs>
+
+    <style>
+      text { font-family: "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", sans-serif; fill: #1f2937; }
+      .title { font-size: 34px; font-weight: 800; fill: #111827; }
+      .subtitle { font-size: 15px; fill: #4b5563; }
+      .ph { font-size: 17px; font-weight: 800; fill: #ffffff; }
+      .tag { font-size: 11px; fill: #ffffff; opacity: 0.9; }
+      .num { font-size: 13px; font-weight: 800; }
+      .b { font-size: 13px; fill: #1f2937; }
+      .bb { font-size: 13px; font-weight: 700; fill: #111827; }
+      .s { font-size: 11.5px; fill: #4b5563; }
+      .lbl { font-size: 12.5px; font-weight: 700; fill: #111827; }
+      .lbls { font-size: 11px; fill: #4b5563; }
+      .mono { font-family: Menlo, Consolas, "DejaVu Sans Mono", monospace; }
+      .halo { paint-order: stroke; stroke: #ffffff; stroke-width: 4px; stroke-linejoin: round; }
+      .foot { font-size: 11.5px; fill: #4b5563; }
+    </style>
+<marker id="ar_6b7280" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#6b7280"/></marker><marker id="ar_2563eb" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#2563eb"/></marker><marker id="ar_059669" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#059669"/></marker><marker id="ar_dc2626" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#dc2626"/></marker><marker id="ar_ea580c" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#ea580c"/></marker><marker id="ar_7c3aed" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#7c3aed"/></marker><marker id="ar_0891b2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#0891b2"/></marker><marker id="ar_ca8a04" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#ca8a04"/></marker><marker id="ar_111827" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#111827"/></marker>
+</defs>
+<rect width="1600" height="900" fill="#f4f6fb"/>
+<rect x="30" y="26" width="8" height="58" rx="3" fill="#dc2626"/>
+<text x="52.0" y="62.0" class="title" text-anchor="start">주행 모듈 2 — 사물 추적: LiDAR 군집 + 칼만 필터</text>
+<text x="54.0" y="86.0" class="subtitle" text-anchor="start">스캔이 올 때마다(LDS-02 약 9.3 Hz) 브리지 update_tracks() 가 지도에 없는 점만 골라 덩어리로 묶고, 등속 칼만 필터로 물체마다 위치·속도를 이어 간다. 좌표는 odom (AMCL 보정이 튀어도 속도에 안 섞임). 기울어진 스캔은</text>
+<text x="54.0" y="105.0" class="subtitle" text-anchor="start">쓰지 않는다.</text>
+<rect x="30.0" y="130" width="373.0" height="400" rx="10" fill="#ffffff" stroke="#dc2626" stroke-width="2"/>
+<path d="M30.0,140 a10,10 0 0 1 10,-10 h353.0 a10,10 0 0 1 10,10 v28 h-373.0 z" fill="#dc2626"/>
+<circle cx="52.0" cy="149" r="11" fill="#ffffff"/>
+<text x="52.0" y="154.0" class="num" text-anchor="middle" style="fill:#dc2626">1</text>
+<text x="72.0" y="155.0" class="ph" text-anchor="start">스캔 → odom 점</text>
+<text x="391.0" y="154.0" class="tag mono" text-anchor="end">update_tracks</text>
+<rect x="44.0" y="178" width="345.0" height="150" rx="6" fill="#f9fafb" stroke="#e5e7eb"/>
+<line x1="216.5" y1="260" x2="155.9" y2="225.0" stroke="#bbf7d0"/>
+<circle cx="155.9" cy="225.0" r="2.6" fill="#059669"/>
+<line x1="216.5" y1="260" x2="159.9" y2="218.9" stroke="#bbf7d0"/>
+<circle cx="159.9" cy="218.9" r="2.6" fill="#059669"/>
+<line x1="216.5" y1="260" x2="164.5" y2="213.2" stroke="#bbf7d0"/>
+<circle cx="164.5" cy="213.2" r="2.6" fill="#059669"/>
+<line x1="216.5" y1="260" x2="169.7" y2="208.0" stroke="#bbf7d0"/>
+<circle cx="169.7" cy="208.0" r="2.6" fill="#059669"/>
+<line x1="216.5" y1="260" x2="175.4" y2="203.4" stroke="#bbf7d0"/>
+<circle cx="175.4" cy="203.4" r="2.6" fill="#059669"/>
+<line x1="216.5" y1="260" x2="181.5" y2="199.4" stroke="#bbf7d0"/>
+<circle cx="181.5" cy="199.4" r="2.6" fill="#059669"/>
+<line x1="216.5" y1="260" x2="197.8" y2="218.0" stroke="#bbf7d0"/>
+<circle cx="197.8" cy="218.0" r="2.6" fill="#059669"/>
+<line x1="216.5" y1="260" x2="202.3" y2="216.3" stroke="#bbf7d0"/>
+<circle cx="202.3" cy="216.3" r="2.6" fill="#059669"/>
+<line x1="216.5" y1="260" x2="206.9" y2="215.0" stroke="#bbf7d0"/>
+<circle cx="206.9" cy="215.0" r="2.6" fill="#059669"/>
+<line x1="216.5" y1="260" x2="211.7" y2="214.3" stroke="#bbf7d0"/>
+<circle cx="211.7" cy="214.3" r="2.6" fill="#059669"/>
+<line x1="216.5" y1="260" x2="216.5" y2="214.0" stroke="#bbf7d0"/>
+<circle cx="216.5" cy="214.0" r="2.6" fill="#059669"/>
+<line x1="216.5" y1="260" x2="221.3" y2="214.3" stroke="#bbf7d0"/>
+<circle cx="221.3" cy="214.3" r="2.6" fill="#059669"/>
+<line x1="216.5" y1="260" x2="226.1" y2="215.0" stroke="#bbf7d0"/>
+<circle cx="226.1" cy="215.0" r="2.6" fill="#059669"/>
+<line x1="216.5" y1="260" x2="230.7" y2="216.3" stroke="#bbf7d0"/>
+<circle cx="230.7" cy="216.3" r="2.6" fill="#059669"/>
+<line x1="216.5" y1="260" x2="235.2" y2="218.0" stroke="#bbf7d0"/>
+<circle cx="235.2" cy="218.0" r="2.6" fill="#059669"/>
+<line x1="216.5" y1="260" x2="251.5" y2="199.4" stroke="#bbf7d0"/>
+<circle cx="251.5" cy="199.4" r="2.6" fill="#059669"/>
+<line x1="216.5" y1="260" x2="257.6" y2="203.4" stroke="#bbf7d0"/>
+<circle cx="257.6" cy="203.4" r="2.6" fill="#059669"/>
+<line x1="216.5" y1="260" x2="263.3" y2="208.0" stroke="#bbf7d0"/>
+<circle cx="263.3" cy="208.0" r="2.6" fill="#059669"/>
+<line x1="216.5" y1="260" x2="268.5" y2="213.2" stroke="#bbf7d0"/>
+<circle cx="268.5" cy="213.2" r="2.6" fill="#059669"/>
+<line x1="216.5" y1="260" x2="273.1" y2="218.9" stroke="#bbf7d0"/>
+<circle cx="273.1" cy="218.9" r="2.6" fill="#059669"/>
+<line x1="216.5" y1="260" x2="277.1" y2="225.0" stroke="#bbf7d0"/>
+<circle cx="277.1" cy="225.0" r="2.6" fill="#059669"/>
+<rect x="202.5" y="250" width="28" height="22" rx="3" fill="#bfdbfe" stroke="#2563eb"/>
+<text x="216.5" y="312.0" class="lbls" text-anchor="middle">빔마다 (거리, 각도) → (x, y)</text>
+<circle cx="48.0" cy="348.5" r="2.4" fill="#374151"/>
+<text x="58.0" y="353.0" class="b" text-anchor="start">유효한 값 + 5 m 이하만 (max_range)</text>
+<circle cx="48.0" cy="370.5" r="2.4" fill="#374151"/>
+<text x="58.0" y="375.0" class="b" text-anchor="start">스캔 찍은 시각의 TF 로 odom 좌표</text>
+<text x="70.0" y="392.0" class="s" text-anchor="start">로봇이 도는 중이어도 점이 제자리</text>
+<circle cx="48.0" cy="408.0" r="2.4" fill="#374151"/>
+<text x="58.0" y="412.5" class="b" text-anchor="start">이 점 전부 = Frenet 정적 장애물 입력</text>
+<text x="70.0" y="429.5" class="s" text-anchor="start">추적과 별개. 지도에 있든 없든 다 피함</text>
+<circle cx="48.0" cy="445.5" r="2.4" fill="#374151"/>
+<text x="58.0" y="450.0" class="b" text-anchor="start">기울어진 스캔(3° 넘게, 3 초까지)은 건너뜀</text>
+<text x="70.0" y="467.0" class="s" text-anchor="start">LiDAR 가 바닥을 벽으로 봄</text>
+<rect x="419.0" y="130" width="373.0" height="400" rx="10" fill="#ffffff" stroke="#dc2626" stroke-width="2"/>
+<path d="M419.0,140 a10,10 0 0 1 10,-10 h353.0 a10,10 0 0 1 10,10 v28 h-373.0 z" fill="#dc2626"/>
+<circle cx="441.0" cy="149" r="11" fill="#ffffff"/>
+<text x="441.0" y="154.0" class="num" text-anchor="middle" style="fill:#dc2626">2</text>
+<text x="461.0" y="155.0" class="ph" text-anchor="start">지도 벽 점 빼기</text>
+<text x="780.0" y="154.0" class="tag mono" text-anchor="end">map_dist</text>
+<rect x="433.0" y="178" width="345.0" height="150" rx="6" fill="#f9fafb" stroke="#e5e7eb"/>
+<rect x="459.0" y="190" width="14" height="126" fill="#374151"/>
+<rect x="473.0" y="190" width="22" height="126" fill="#e5e7eb" opacity="0.8"/>
+<text x="484.0" y="186.0" class="lbls mono" text-anchor="middle">0.15 m</text>
+<circle cx="477.0" cy="198" r="2.6" fill="#9ca3af"/>
+<line x1="472.0" y1="193" x2="482.0" y2="203" stroke="#dc2626" stroke-width="1.3"/>
+<circle cx="480.0" cy="212" r="2.6" fill="#9ca3af"/>
+<line x1="475.0" y1="207" x2="485.0" y2="217" stroke="#dc2626" stroke-width="1.3"/>
+<circle cx="483.0" cy="226" r="2.6" fill="#9ca3af"/>
+<line x1="478.0" y1="221" x2="488.0" y2="231" stroke="#dc2626" stroke-width="1.3"/>
+<circle cx="477.0" cy="240" r="2.6" fill="#9ca3af"/>
+<line x1="472.0" y1="235" x2="482.0" y2="245" stroke="#dc2626" stroke-width="1.3"/>
+<circle cx="480.0" cy="254" r="2.6" fill="#9ca3af"/>
+<line x1="475.0" y1="249" x2="485.0" y2="259" stroke="#dc2626" stroke-width="1.3"/>
+<circle cx="483.0" cy="268" r="2.6" fill="#9ca3af"/>
+<line x1="478.0" y1="263" x2="488.0" y2="273" stroke="#dc2626" stroke-width="1.3"/>
+<circle cx="477.0" cy="282" r="2.6" fill="#9ca3af"/>
+<line x1="472.0" y1="277" x2="482.0" y2="287" stroke="#dc2626" stroke-width="1.3"/>
+<circle cx="480.0" cy="296" r="2.6" fill="#9ca3af"/>
+<line x1="475.0" y1="291" x2="485.0" y2="301" stroke="#dc2626" stroke-width="1.3"/>
+<circle cx="483.0" cy="310" r="2.6" fill="#9ca3af"/>
+<line x1="478.0" y1="305" x2="488.0" y2="315" stroke="#dc2626" stroke-width="1.3"/>
+<circle cx="663.2" cy="246.2" r="2.8" fill="#dc2626"/>
+<circle cx="666.7" cy="240.1" r="2.8" fill="#dc2626"/>
+<circle cx="672.0" cy="235.7" r="2.8" fill="#dc2626"/>
+<circle cx="678.5" cy="233.3" r="2.8" fill="#dc2626"/>
+<circle cx="685.5" cy="233.3" r="2.8" fill="#dc2626"/>
+<circle cx="692.0" cy="235.7" r="2.8" fill="#dc2626"/>
+<circle cx="697.3" cy="240.1" r="2.8" fill="#dc2626"/>
+<circle cx="700.8" cy="246.2" r="2.8" fill="#dc2626"/>
+<text x="682.0" y="283.0" class="lbls" text-anchor="middle">남는 점</text>
+<text x="529.0" y="318.0" class="lbls" text-anchor="start">벽 근처 점 버림</text>
+<circle cx="437.0" cy="348.5" r="2.4" fill="#374151"/>
+<text x="447.0" y="353.0" class="b" text-anchor="start">지도 좌표로 바꿔 두 조건 모두 맞는 점만 남김</text>
+<text x="459.0" y="370.0" class="s" text-anchor="start">그 칸이 빈 칸(0~64) — 지도 밖·벽 너머·미탐색 점 제외</text>
+<text x="459.0" y="385.5" class="s" text-anchor="start">지도 벽에서 0.15 m 넘게 떨어짐 (AMCL 오차 감안)</text>
+<circle cx="437.0" cy="401.5" r="2.4" fill="#374151"/>
+<text x="447.0" y="406.0" class="b" text-anchor="start">지도는 이 판단에만 씀</text>
+<text x="459.0" y="423.0" class="s" text-anchor="start">추적 좌표는 odom 그대로라 AMCL 이 몇 cm 튀어도 속도가 안</text>
+<text x="459.0" y="438.5" class="s" text-anchor="start">튐</text>
+<circle cx="437.0" cy="454.5" r="2.4" fill="#374151"/>
+<text x="447.0" y="459.0" class="b" text-anchor="start">SLAM 중 아직 지도에 없는 벽은 미탐색 칸 → 추적 안 함</text>
+<rect x="808.0" y="130" width="373.0" height="400" rx="10" fill="#ffffff" stroke="#dc2626" stroke-width="2"/>
+<path d="M808.0,140 a10,10 0 0 1 10,-10 h353.0 a10,10 0 0 1 10,10 v28 h-373.0 z" fill="#dc2626"/>
+<circle cx="830.0" cy="149" r="11" fill="#ffffff"/>
+<text x="830.0" y="154.0" class="num" text-anchor="middle" style="fill:#dc2626">3</text>
+<text x="850.0" y="155.0" class="ph" text-anchor="start">군집 → 검출 (중심, 반경)</text>
+<text x="1169.0" y="154.0" class="tag mono" text-anchor="end">detect_clusters</text>
+<rect x="822.0" y="178" width="345.0" height="150" rx="6" fill="#f9fafb" stroke="#e5e7eb"/>
+<rect x="836.0" y="289" width="24" height="18" rx="3" fill="#bfdbfe" stroke="#2563eb"/>
+<text x="848.0" y="322.0" class="lbls" text-anchor="middle">센서</text>
+<circle cx="1036.8" cy="244.0" r="2.8" fill="#dc2626"/>
+<circle cx="1034.0" cy="237.2" r="2.8" fill="#dc2626"/>
+<circle cx="1033.0" cy="230.0" r="2.8" fill="#dc2626"/>
+<circle cx="1034.0" cy="222.8" r="2.8" fill="#dc2626"/>
+<circle cx="1036.8" cy="216.0" r="2.8" fill="#dc2626"/>
+<circle cx="1041.2" cy="210.2" r="2.8" fill="#dc2626"/>
+<circle cx="1047.0" cy="205.8" r="2.8" fill="#dc2626"/>
+<circle cx="1053.8" cy="203.0" r="2.8" fill="#dc2626"/>
+<circle cx="1061.0" cy="202.0" r="2.8" fill="#dc2626"/>
+<circle cx="1061.0" cy="230" r="28" fill="none" stroke="#dc2626" stroke-dasharray="3 3"/>
+<circle cx="1041.9" cy="219.0" r="3.5" fill="#ffffff" stroke="#374151" stroke-width="1.5"/>
+<circle cx="1061.0" cy="230" r="3.5" fill="#dc2626"/>
+<line x1="1041.9" y1="219.0" x2="1058.0" y2="232" stroke="#111827" stroke-width="1.4" marker-end="url(#ar_111827)"/>
+<line x1="860.0" y1="292" x2="1037.9" y2="222.0" stroke="#9ca3af" stroke-dasharray="3 3"/>
+<text x="1025.0" y="249.0" class="lbls" text-anchor="end">점 평균</text>
+<text x="1097.0" y="228.0" class="lbls" text-anchor="start">보정한 중심</text>
+<text x="1097.0" y="243.0" class="lbls" text-anchor="start">(+ 반경만큼)</text>
+<circle cx="826.0" cy="348.5" r="2.4" fill="#374151"/>
+<text x="836.0" y="353.0" class="b" text-anchor="start">스캔 순서대로 이웃 점 간격 &gt; 0.25 m 면 자름</text>
+<text x="848.0" y="370.0" class="s" text-anchor="start">360° 스캔이라 마지막·처음 점도 이어 붙임</text>
+<circle cx="826.0" cy="386.0" r="2.4" fill="#374151"/>
+<text x="836.0" y="390.5" class="b" text-anchor="start">점 2개 미만, 지름 0.8 m 초과(벽 등) 버림</text>
+<circle cx="826.0" cy="408.0" r="2.4" fill="#374151"/>
+<text x="836.0" y="412.5" class="b" text-anchor="start">반경 = 중심에서 가장 먼 점 (최소 0.05 m)</text>
+<circle cx="826.0" cy="430.0" r="2.4" fill="#374151"/>
+<text x="836.0" y="434.5" class="b" text-anchor="start">중심 보정: LiDAR 는 앞면만 봄 → 점 평균이 센서 쪽으로</text>
+<text x="836.0" y="452.5" class="b" text-anchor="start">치우침 → 센서 반대쪽으로 반경만큼 밀기</text>
+<rect x="1197.0" y="130" width="373.0" height="400" rx="10" fill="#ffffff" stroke="#dc2626" stroke-width="2"/>
+<path d="M1197.0,140 a10,10 0 0 1 10,-10 h353.0 a10,10 0 0 1 10,10 v28 h-373.0 z" fill="#dc2626"/>
+<circle cx="1219.0" cy="149" r="11" fill="#ffffff"/>
+<text x="1219.0" y="154.0" class="num" text-anchor="middle" style="fill:#dc2626">4</text>
+<text x="1239.0" y="155.0" class="ph" text-anchor="start">매칭 + 칼만 필터</text>
+<text x="1558.0" y="154.0" class="tag mono" text-anchor="end">MultiObjectTracker</text>
+<rect x="1211.0" y="178" width="345.0" height="150" rx="6" fill="#f9fafb" stroke="#e5e7eb"/>
+<circle cx="1247.0" cy="268" r="6" fill="#dc2626"/>
+<text x="1247.0" y="292.0" class="lbls" text-anchor="middle">이전 추정</text>
+<line x1="1247.0" y1="268" x2="1361.0" y2="231" stroke="#dc2626" stroke-width="1.6" stroke-dasharray="5 3" marker-end="url(#ar_dc2626)"/>
+<ellipse cx="1367.0" cy="228" rx="34" ry="22" fill="#fee2e2" opacity="0.7" stroke="#fca5a5"/>
+<circle cx="1367.0" cy="228" r="4" fill="none" stroke="#dc2626" stroke-width="1.6"/>
+<text x="1367.0" y="200.0" class="lbls" text-anchor="middle">예측 (v·dt), 불확실 ↑</text>
+<circle cx="1391.0" cy="244" r="4" fill="#111827"/>
+<text x="1399.0" y="262.0" class="lbls" text-anchor="start">검출</text>
+<circle cx="1377.0" cy="234" r="5" fill="#dc2626"/>
+<circle cx="1367.0" cy="228" r="55" fill="none" stroke="#9ca3af" stroke-dasharray="2 4"/>
+<text x="1425.0" y="284.0" class="lbls mono" text-anchor="start">gate 0.55 m</text>
+<circle cx="1215.0" cy="348.5" r="2.4" fill="#374151"/>
+<text x="1225.0" y="353.0" class="b" text-anchor="start">예측: 등속 이동, 공분산 + 가속 잡음 1.8 m/s²</text>
+<circle cx="1215.0" cy="370.5" r="2.4" fill="#374151"/>
+<text x="1225.0" y="375.0" class="b" text-anchor="start">매칭: 예측 위치와 검출 거리 &lt; 0.55 m 인 쌍을 가까운</text>
+<text x="1225.0" y="393.0" class="b" text-anchor="start">순서로 하나씩 (greedy)</text>
+<circle cx="1215.0" cy="410.5" r="2.4" fill="#374151"/>
+<text x="1225.0" y="415.0" class="b" text-anchor="start">보정: 위치 측정(잡음 0.13 m)으로 [x, y, vx, vy] 갱신</text>
+<text x="1237.0" y="432.0" class="s" text-anchor="start">속도 1.5 m/s 넘으면 자름 (잘못 맞춘 튐 방지)</text>
+<text x="1237.0" y="447.5" class="s" text-anchor="start">반경 = 0.7·이전 + 0.3·이번 (부드럽게)</text>
+<rect x="30" y="548" width="502.6666666666667" height="322" rx="10" fill="#ffffff" stroke="#ea580c" stroke-width="2"/>
+<path d="M30,558 a10,10 0 0 1 10,-10 h482.6666666666667 a10,10 0 0 1 10,10 v28 h-502.6666666666667 z" fill="#ea580c"/>
+<circle cx="52" cy="567" r="11" fill="#ffffff"/>
+<text x="52.0" y="572.0" class="num" text-anchor="middle" style="fill:#ea580c">5</text>
+<text x="72.0" y="573.0" class="ph" text-anchor="start">트랙 생애</text>
+<text x="520.7" y="572.0" class="tag mono" text-anchor="end">hits / misses</text>
+<rect x="46.0" y="602" width="104.2" height="74" rx="8" fill="#fff7ed" stroke="#ea580c" stroke-width="1.4"/>
+<text x="98.1" y="626.0" class="lbl" text-anchor="middle">새 트랙</text>
+<text x="98.1" y="644.0" class="lbls mono" text-anchor="middle">안 맞은 검출</text>
+<text x="98.1" y="661.0" class="lbls" text-anchor="middle">속도 0, 불확실 큼</text>
+<line x1="152.16666666666669" y1="639" x2="166.16666666666669" y2="639" stroke="#ea580c" stroke-width="2" marker-end="url(#ar_ea580c)"/>
+<rect x="168.2" y="602" width="104.2" height="74" rx="8" fill="#fff7ed" stroke="#ea580c" stroke-width="1.4"/>
+<text x="220.3" y="626.0" class="lbl" text-anchor="middle">후보</text>
+<text x="220.3" y="644.0" class="lbls mono" text-anchor="middle">hits &lt; 5</text>
+<text x="220.3" y="661.0" class="lbls" text-anchor="middle">웹·Frenet 에 안 씀</text>
+<line x1="274.33333333333337" y1="639" x2="288.33333333333337" y2="639" stroke="#ea580c" stroke-width="2" marker-end="url(#ar_ea580c)"/>
+<rect x="290.3" y="602" width="104.2" height="74" rx="8" fill="#fee2e2" stroke="#ea580c" stroke-width="1.4"/>
+<text x="342.4" y="626.0" class="lbl" text-anchor="middle">확정</text>
+<text x="342.4" y="644.0" class="lbls mono" text-anchor="middle">hits ≥ 5</text>
+<text x="342.4" y="661.0" class="lbls" text-anchor="middle">웹·Frenet 에 전달</text>
+<line x1="396.50000000000006" y1="639" x2="410.50000000000006" y2="639" stroke="#ea580c" stroke-width="2" marker-end="url(#ar_ea580c)"/>
+<rect x="412.5" y="602" width="104.2" height="74" rx="8" fill="#f3f4f6" stroke="#ea580c" stroke-width="1.4"/>
+<text x="464.6" y="626.0" class="lbl" text-anchor="middle">삭제</text>
+<text x="464.6" y="644.0" class="lbls mono" text-anchor="middle">misses &gt; 5</text>
+<text x="464.6" y="661.0" class="lbls" text-anchor="middle">약 0.5 초 못 봄</text>
+<circle cx="50" cy="702.5" r="2.4" fill="#374151"/>
+<text x="60.0" y="707.0" class="b" text-anchor="start">맞춰지면 hits+1, misses=0 / 못 맞추면 misses+1</text>
+<circle cx="50" cy="724.5" r="2.4" fill="#374151"/>
+<text x="60.0" y="729.0" class="b" text-anchor="start">5번 연속 보여야 확정 → 한두 번 튄 점은 물체로 안 봄</text>
+<circle cx="50" cy="746.5" r="2.4" fill="#374151"/>
+<text x="60.0" y="751.0" class="b" text-anchor="start">잠깐 가려져도(5 스캔까지) 예측으로 유지 → 같은 ID</text>
+<circle cx="50" cy="768.5" r="2.4" fill="#374151"/>
+<text x="60.0" y="773.0" class="b" text-anchor="start">ID 는 1부터 계속 증가 (웹 표시·주행 기록에 남음)</text>
+<rect x="548.6666666666667" y="548" width="502.6666666666667" height="322" rx="10" fill="#ffffff" stroke="#ea580c" stroke-width="2"/>
+<path d="M548.6666666666667,558 a10,10 0 0 1 10,-10 h482.6666666666667 a10,10 0 0 1 10,10 v28 h-502.6666666666667 z" fill="#ea580c"/>
+<circle cx="570.6666666666667" cy="567" r="11" fill="#ffffff"/>
+<text x="570.7" y="572.0" class="num" text-anchor="middle" style="fill:#ea580c">6</text>
+<text x="590.7" y="573.0" class="ph" text-anchor="start">움직이는 물체 판정 · 웹 표시</text>
+<text x="1039.3" y="572.0" class="tag mono" text-anchor="end">moving_speed 0.08</text>
+<circle cx="568.6666666666667" cy="608.5" r="2.4" fill="#374151"/>
+<text x="578.7" y="613.0" class="b" text-anchor="start">속도 |v| ≥ 0.08 m/s → &quot;움직이는 물체&quot;</text>
+<text x="590.7" y="630.0" class="s" text-anchor="start">멈춘 물체의 속도 잡음보다 크고, 천천히 걷는 사람보다 작게 정한 값 (실행 중 변경 가능)</text>
+<circle cx="568.6666666666667" cy="646.0" r="2.4" fill="#374151"/>
+<text x="578.7" y="650.5" class="b" text-anchor="start">그보다 느린 확정 트랙 = 지도에 없는 멈춘 물체</text>
+<text x="590.7" y="667.5" class="s" text-anchor="start">상자, 서 있는 사람 등. 주행에서는 스캔 점 그대로 정적 장애물로 처리</text>
+<circle cx="568.6666666666667" cy="683.5" r="2.4" fill="#374151"/>
+<text x="578.7" y="688.0" class="b" text-anchor="start">웹: 0.25 초마다 obstacles 메시지</text>
+<text x="590.7" y="705.0" class="s" text-anchor="start">지도 좌표로 바꿔 id, 위치, 반경, 속도, moving 전송 → 주황 원 + 속도 화살표</text>
+<circle cx="568.6666666666667" cy="721.0" r="2.4" fill="#374151"/>
+<text x="578.7" y="725.5" class="b" text-anchor="start">주행 기록: 0.1 초마다 모든 트랙 [id, x, y, vx, vy, r, hits, misses]</text>
+<rect x="1067.3333333333335" y="548" width="502.6666666666667" height="322" rx="10" fill="#ffffff" stroke="#6b7280" stroke-width="2"/>
+<path d="M1067.3333333333335,558 a10,10 0 0 1 10,-10 h482.6666666666667 a10,10 0 0 1 10,10 v28 h-502.6666666666667 z" fill="#6b7280"/>
+<circle cx="1089.3333333333335" cy="567" r="11" fill="#ffffff"/>
+<text x="1089.3" y="572.0" class="num" text-anchor="middle" style="fill:#6b7280">7</text>
+<text x="1109.3" y="573.0" class="ph" text-anchor="start">식 요약 · 한계</text>
+<text x="1558.0" y="572.0" class="tag mono" text-anchor="end">tracker.py</text>
+<rect x="1081.3333333333335" y="598" width="474.6666666666667" height="104" rx="6" fill="#f9fafb" stroke="#e5e7eb"/>
+<text x="1091.3" y="618.0" class="lbls mono" text-anchor="start">상태 x = [px, py, vx, vy],  측정 z = [px, py]</text>
+<text x="1091.3" y="637.0" class="lbls mono" text-anchor="start">F = [[1,0,dt,0],[0,1,0,dt],[0,0,1,0],[0,0,0,1]]</text>
+<text x="1091.3" y="656.0" class="lbls mono" text-anchor="start">Q = G·Gᵀ·σa²  (σa = 1.8 m/s²)</text>
+<text x="1091.3" y="675.0" class="lbls mono" text-anchor="start">G = [[dt²/2,0],[0,dt²/2],[dt,0],[0,dt]]</text>
+<text x="1091.3" y="694.0" class="lbls mono" text-anchor="start">K = P·Hᵀ·(H·P·Hᵀ + R)⁻¹,  R = 0.13²·I</text>
+<circle cx="1087.3333333333335" cy="720.5" r="2.4" fill="#374151"/>
+<text x="1097.3" y="725.0" class="b" text-anchor="start">LiDAR 한 평면(약 13 cm 높이): 사람은 다리만 보임</text>
+<text x="1109.3" y="742.0" class="s" text-anchor="start">두 다리가 따로/하나로 잡히며 중심이 흔들림</text>
+<circle cx="1087.3333333333335" cy="758.0" r="2.4" fill="#374151"/>
+<text x="1097.3" y="762.5" class="b" text-anchor="start">9.3 Hz · 빔 약 1.45° 간격: 멀수록 점이 적어 놓치기 쉬움</text>
+<circle cx="1087.3333333333335" cy="780.0" r="2.4" fill="#374151"/>
+<text x="1097.3" y="784.5" class="b" text-anchor="start">greedy 매칭: 가까이 엇갈려 지나가면 ID 가 바뀔 수 있음</text>
+<text x="1109.3" y="801.5" class="s" text-anchor="start">헝가리안 매칭은 안 씀</text>
+<text x="30.0" y="888.0" class="foot" text-anchor="start">값: config/params.yaml bridge tracking (cluster_gap 0.25, min_points 2, max_diameter 0.8, gate 0.55, min_hits 5, max_misses 5, accel_noise 1.8, meas_noise 0.13, max_speed 1.5, moving_speed 0.08). 추적기 원본: tb3_nav obstacle_tracker</text>
+</svg>
