@@ -100,7 +100,7 @@ warehouse_bridge:
       # Werling (2010) low-speed lateral cost terms
       w_end: 1.0              # end offset²
       w_jerk: 0.3             # ∫ d'''² ds
-      w_len: 0.2              # candidate length
+      w_len: 0.0              # candidate length S / longest (Werling kt*S). Off: with a single lateral_dists value every candidate gets the same term. Set > 0 when using several lengths
     # Drive record: logs/records/<bridge start time>_frenet/<time>_<goal>/record.jsonl.gz (pose/cmd/tracks/scan every 0.1 s,
     # plus Frenet inputs and per-candidate checks/costs). Analyze with: python3 tools/drive_replay.py. About 2 MB per minute
     record:
