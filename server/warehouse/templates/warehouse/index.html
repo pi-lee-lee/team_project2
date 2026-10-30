@@ -12,7 +12,7 @@
     <span class="logo">◆</span>
     <div>
       <h1>창고 로봇 관제</h1>
-      <p class="sub">TurtleBot3 Waffle Pi · A* 경로 계획</p>
+      <p class="sub">TurtleBot3 Waffle Pi · A* + Frenet 주행</p>
     </div>
   </div>
   <div class="top-status">
@@ -75,109 +75,40 @@
       <p id="robot-message"></p>
     </section>
 
-    <section class="card" id="yolo-card">
-      <div class="card-head"><h2>카메라 검출 (YOLO)</h2><span id="yolo-state" class="badge">-</span></div>
-      <div id="yolo-classes" class="yolo-classes" title="/yolo/counts 의 클래스별 개수 (현재 프레임)" hidden></div>
-      <div class="btn-row three">
-        <button id="btn-yolo-on" title="검출기 enabled=true: 카메라 영상을 받아 추론, 검출 영상(/yolo/image_raw)과 개수(/yolo/counts) 발행">▶ YOLO 시작</button>
-        <button id="btn-yolo-off" title="검출기 enabled=false: 카메라 영상 구독, 추론, 발행을 모두 멈춤 (모델은 메모리에 남아 다시 시작이 빠름, 로봇 카메라 발행은 그대로)">■ YOLO 정지</button>
-        <button id="btn-yolo-capture" class="ghost" title="다음 검출 장면을 PNG 한 장으로 저장 (~/camera_dataset/captures)">📷 장면 캡처</button>
-      </div>
-      <p id="yolo-summary" class="yolo-summary"></p>
-      <p id="yolo-counts" class="yolo-counts muted small" title="/yolo/counts 원문 (현재 프레임의 클래스별 개수)"></p>
-      <p id="yolo-timing" class="yolo-timing muted small"></p>
-      <div id="yolo-loading" class="yolo-loading" hidden>
-        <div class="spinner"></div>
-        <div><strong id="yolo-loading-title"></strong><div id="yolo-loading-time" class="muted small"></div></div>
-      </div>
-    </section>
-
-    <details class="card collapsible" id="params-card">
-      <summary class="card-head"><h2>주행 파라미터</h2><span class="chev">▾</span></summary>
-      <p class="muted small">값을 고치고 Enter 를 누르면 (또는 칸을 벗어나면) 주행 중이어도 바로 반영됩니다. 메모리에서만 바뀌므로
-        다시 시작하면 params.yaml 값으로 돌아갑니다. 노란 칸 = 시작 값과 다름 (↺ 로 되돌림).</p>
-      <div id="params-list" class="params-list"></div>
-    </details>
-
-    <section class="card" id="order-card">
-      <div class="card-head"><h2>주문</h2><span><a href="/order" target="_blank" class="muted small">사용자 화면 ↗</a>
-        <a href="/robot" target="_blank" class="muted small">로봇 화면 ↗</a></span></div>
-      <p class="muted small">받을 사람 위치와 물건별 개수를 정하면 로봇이 홈에서 출발해 물건 구역들을 가장 빠른 순서로 돌고
-        사람 위치를 거쳐 홈으로 돌아옵니다. 섹션마다 실은 뒤 "적재 완료"를 누르면 YOLO 로 그 섹션 물건 개수를 확인하고,
-        다르면 태블릿이 물어봅니다 (사람이 확인했으면 그대로 보냄).</p>
-      <label>받을 곳 <select id="order-dropoff"></select></label>
-      <div id="order-items" class="order-items"></div>
-      <p id="order-preview" class="muted small"></p>
-      <button id="btn-order" class="primary">주문 시작</button>
-    </section>
-
-    <section class="card">
-      <div class="card-head"><h2>주행 제어</h2></div>
-      <div class="btn-row two">
+    <section class="card" id="task-card">
+      <div class="card-head"><h2>작업</h2><span id="task-status" class="muted small"></span></div>
+      <ol id="task-steps" class="timeline"><li class="muted">없음</li></ol>
+      <div id="wait-actions" class="wait-actions" hidden>
         <button id="btn-confirm" class="primary lg">✓ 적재 완료</button>
-        <button id="btn-home" class="outline lg">⌂ 홈 복귀</button>
+        <button id="btn-force" class="outline" hidden title="YOLO 확인 없이 다음 경유지로 (그때 개수는 기록에 남음)">⏭ 다음 경유지로 (확인 없이)</button>
       </div>
-      <button id="btn-force" class="outline" hidden title="YOLO 확인 없이 다음 경유지로 (그때 개수는 기록에 남음)">⏭ 다음 경유지로 (확인 없이)</button>
-      <div class="btn-row three">
-        <button id="btn-retry">↻ 재시도</button>
-        <button id="btn-skip">⤼ 건너뛰기</button>
-        <button id="btn-cancel">✕ 작업 취소</button>
+      <div id="step-actions" class="btn-row two" hidden>
+        <button id="btn-retry" title="실패한 단계를 다시 시도">↻ 재시도</button>
+        <button id="btn-skip" title="이 단계를 건너뛰고 다음으로">⤼ 건너뛰기</button>
       </div>
-      <div class="btn-row three">
-        <button id="btn-set-home" class="ghost" title="로봇이 지금 있는 위치와 방향을 홈으로 저장">홈으로 지정</button>
-        <button id="btn-reset" class="ghost">오류 해제</button>
+      <div class="btn-row two">
+        <button id="btn-home" class="outline">⌂ 홈 복귀</button>
+        <button id="btn-cancel" class="danger-soft">✕ 작업 취소</button>
+      </div>
+      <div class="btn-row two">
+        <button id="btn-reset" class="ghost" hidden title="오류 상태만 풀고 대기로">오류 해제</button>
         <button id="btn-reset-robot" class="ghost" title="작업 취소, 정지, 시뮬레이션이면 로봇을 출발 위치에 바로 세움">⟲ 상태 초기화</button>
       </div>
     </section>
 
-    <section class="card" id="teleop-card">
-      <div class="card-head"><h2>수동 조작</h2><span class="muted small">맵 만들기 등에 사용</span></div>
-      <p class="muted small">버튼을 누르고 있는 동안만 움직입니다 (키보드: 방향키 / WASD, 이 카드에서 '키보드 사용'을 켠 동안). 앞뒤가 막히면 그쪽으로는 가지 않습니다. 작업 중에는 쓸 수 없습니다.</p>
-      <div class="teleop">
-        <div class="teleop-pad">
-          <button data-tv="1" data-tw="0.6" title="앞으로 가며 왼쪽" class="diag">◤</button><button data-tv="1" data-tw="0" title="앞으로">▲</button><button data-tv="1" data-tw="-0.6" title="앞으로 가며 오른쪽" class="diag">◥</button>
-          <button data-tv="0" data-tw="1" title="제자리에서 왼쪽으로 돌기">⟲</button><button id="teleop-stop" class="danger" title="정지">■</button><button data-tv="0" data-tw="-1" title="제자리에서 오른쪽으로 돌기">⟳</button>
-          <span></span><button data-tv="-1" data-tw="0" title="뒤로">▼</button><span></span>
-        </div>
-        <div class="teleop-opts">
-          <label>속도
-            <select id="teleop-speed">
-              <option value="0.08">느리게 (0.08 m/s)</option>
-              <option value="0.15" selected>보통 (0.15 m/s)</option>
-              <option value="0.2">빠르게 (0.2 m/s)</option>
-            </select>
-          </label>
-          <label class="check keys-only"><input type="checkbox" id="teleop-keys"> 키보드 사용</label>
-          <p id="teleop-status" class="muted small"></p>
-        </div>
-      </div>
+    <section class="card" id="order-card">
+      <div class="card-head"><h2>주문</h2><span class="links"><a href="/order" target="_blank" class="small">사용자 화면 ↗</a>
+        <a href="/robot" target="_blank" class="small">로봇 화면 ↗</a></span></div>
+      <p class="muted small" title="섹션마다 실은 뒤 &quot;적재 완료&quot;를 누르면 YOLO 로 그 섹션 물건 개수를 확인하고, 다르면 태블릿이 물어봅니다 (사람이 확인했으면 그대로 보냄)">홈 → 물건 구역(빠른 순서) → 받을 곳 → 홈. 구역마다 YOLO 로 개수 확인.</p>
+      <label class="field-inline">받을 곳 <select id="order-dropoff"></select></label>
+      <div id="order-items" class="order-items"></div>
+      <p id="order-preview" class="muted small"></p>
+      <button id="btn-order" class="primary lg wide">주문 시작</button>
     </section>
 
     <section class="card">
-      <div class="card-head"><h2>현재 작업</h2></div>
-      <ol id="task-steps" class="timeline"><li class="muted">없음</li></ol>
-    </section>
-
-    <section class="card">
-      <div class="card-head"><h2>위치</h2></div>
+      <div class="card-head"><h2>위치</h2><button id="btn-set-home" class="small" title="로봇이 지금 있는 위치와 방향을 홈으로 저장">⌂ 현재 위치를 홈으로</button></div>
       <ul id="locations"></ul>
-      <label class="check"><input type="checkbox" id="with-home" checked> 마지막에 홈으로 복귀</label>
-      <div id="plan-result" class="plan" hidden>
-        <div class="plan-route" id="plan-route"></div>
-        <div class="plan-time" id="plan-time"></div>
-        <div class="plan-legs muted" id="plan-legs"></div>
-      </div>
-      <div class="btn-row two" style="margin-top:10px">
-        <button id="btn-plan" class="outline" title="선택한 위치를 가장 빨리 도는 순서와 예상 시간 (학습한 이동 시간 모델)">⇅ 순서 최적화</button>
-        <button id="btn-start" class="primary">▶ 작업 시작</button>
-      </div>
-      <p id="travel-model" class="model-note"></p>
-    </section>
-
-    <section class="card">
-      <div class="card-head"><h2>금지 구역</h2></div>
-      <ul id="zones"></ul>
-      <p class="model-note">경로 계획(A*)만 피하고, 수동 조작과 위치 추정에는 영향이 없습니다. 로봇이 구역 안에 있으면 0.35m 주변은 빼고 계획해서 빠져나옵니다.</p>
     </section>
 
     <section class="card" id="loc-form-card" hidden>
@@ -203,6 +134,35 @@
           <button type="button" id="loc-form-cancel" class="outline">닫기</button>
         </div>
       </form>
+    </section>
+
+    <section class="card">
+      <div class="card-head"><h2>금지 구역</h2></div>
+      <ul id="zones"></ul>
+      <p class="model-note" title="로봇이 구역 안에 있으면 0.35m 주변은 빼고 계획해서 빠져나옵니다">경로 계획(A*)만 피함 · 수동 조작·위치 추정과는 무관</p>
+    </section>
+
+    <section class="card" id="teleop-card">
+      <div class="card-head"><h2>수동 조작</h2><span class="muted small">맵 만들기 등에 사용</span></div>
+      <p class="muted small" title="앞뒤가 막히면 그쪽으로는 가지 않습니다. 작업 중에는 쓸 수 없습니다.">누르고 있는 동안만 움직임 · 키보드: 방향키 / WASD ('키보드 사용' 켠 동안)</p>
+      <div class="teleop">
+        <div class="teleop-pad">
+          <button data-tv="1" data-tw="0.6" title="앞으로 가며 왼쪽" class="diag">◤</button><button data-tv="1" data-tw="0" title="앞으로">▲</button><button data-tv="1" data-tw="-0.6" title="앞으로 가며 오른쪽" class="diag">◥</button>
+          <button data-tv="0" data-tw="1" title="제자리에서 왼쪽으로 돌기">⟲</button><button id="teleop-stop" class="danger" title="정지">■</button><button data-tv="0" data-tw="-1" title="제자리에서 오른쪽으로 돌기">⟳</button>
+          <span></span><button data-tv="-1" data-tw="0" title="뒤로">▼</button><span></span>
+        </div>
+        <div class="teleop-opts">
+          <label>속도
+            <select id="teleop-speed">
+              <option value="0.08">느리게 (0.08 m/s)</option>
+              <option value="0.15" selected>보통 (0.15 m/s)</option>
+              <option value="0.2">빠르게 (0.2 m/s)</option>
+            </select>
+          </label>
+          <label class="check keys-only"><input type="checkbox" id="teleop-keys"> 키보드 사용</label>
+          <p id="teleop-status" class="muted small"></p>
+        </div>
+      </div>
     </section>
 
     <details class="card collapsible" id="runner-card" open>
@@ -236,6 +196,31 @@
       </div>
       <button id="btn-run-stop" class="ghost wide" title="ROS 노드와 시뮬레이션 정지 (웹 서버는 유지)">전체 정지</button>
       <p id="runner-busy" class="busy"></p>
+    </details>
+
+    <p class="group-label">시험 · 튜닝</p>
+    <details class="card collapsible" id="yolo-card">
+      <summary class="card-head"><h2>카메라 검출 (YOLO)</h2><span class="head-right"><span id="yolo-state" class="badge">-</span><span class="chev">▾</span></span></summary>
+      <p class="muted small">주문 중에는 섹션·사람 위치에 서 있을 때 자동으로 켜고 끕니다. 여기는 시험용입니다.</p>
+      <div id="yolo-classes" class="yolo-classes" title="/yolo/counts 의 클래스별 개수 (현재 프레임)" hidden></div>
+      <div class="btn-row three">
+        <button id="btn-yolo-on" title="검출기 enabled=true: 카메라 영상을 받아 추론, 검출 영상(/yolo/image_raw)과 개수(/yolo/counts) 발행">▶ YOLO 시작</button>
+        <button id="btn-yolo-off" title="검출기 enabled=false: 카메라 영상 구독, 추론, 발행을 모두 멈춤 (모델은 메모리에 남아 다시 시작이 빠름, 로봇 카메라 발행은 그대로)">■ YOLO 정지</button>
+        <button id="btn-yolo-capture" class="ghost" title="다음 검출 장면을 PNG 한 장으로 저장 (~/camera_dataset/captures)">📷 장면 캡처</button>
+      </div>
+      <p id="yolo-summary" class="yolo-summary"></p>
+      <p id="yolo-counts" class="yolo-counts muted small" title="/yolo/counts 원문 (현재 프레임의 클래스별 개수)"></p>
+      <p id="yolo-timing" class="yolo-timing muted small"></p>
+      <div id="yolo-loading" class="yolo-loading" hidden>
+        <div class="spinner"></div>
+        <div><strong id="yolo-loading-title"></strong><div id="yolo-loading-time" class="muted small"></div></div>
+      </div>
+    </details>
+
+    <details class="card collapsible" id="params-card">
+      <summary class="card-head"><h2>주행 파라미터</h2><span class="chev">▾</span></summary>
+      <p class="muted small" title="메모리에서만 바뀌므로 다시 시작하면 params.yaml 값으로 돌아갑니다. 노란 칸 = 시작 값과 다름 (↺ 로 되돌림)">Enter 로 바로 반영 (주행 중에도), 다시 시작하면 params.yaml 값으로.</p>
+      <div id="params-list" class="params-list"></div>
     </details>
 
     <details class="card collapsible" open>

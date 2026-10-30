@@ -11,7 +11,6 @@ const S = {
   zones: [],          // keep-out zones [{id, name, shape: rect|line, x1, y1, x2, y2}] - avoided by A*
   pose: null,         // {x, y, yaw}
   path: [],           // [[x, y], ...]
-  selected: new Set(),
   mode: 'view',       // view | goto | add | initpose | zone | wall
   view: { scale: 1, ox: 0, oy: 0 },  // scale = canvas pixels per map cell, (ox, oy) = canvas position of rotated coords (0, 0)
   rot: Math.PI / 2,   // view rotation (rad, CCW): map x axis points up, y axis left (robot front = x shown upward, ROS convention)
@@ -39,7 +38,6 @@ function connect() {
   S.ws = ws;
   ws.onopen = () => {
     setWsStatus(true);
-    ws.send(JSON.stringify({ action: 'travel_model' }));  // travel time model summary
   };
   ws.onclose = () => {
     setWsStatus(false);
@@ -141,9 +139,6 @@ function handle(msg) {
       break;
     case 'locations':
       S.locations = msg.locations;
-      for (const id of [...S.selected]) {
-        if (!S.locations.some((l) => l.id === id)) S.selected.delete(id);
-      }
       renderPanel();  // button state depends on whether home exists
       break;
     case 'pose':
@@ -197,14 +192,8 @@ function handle(msg) {
       }
       renderRunner();
       break;
-    case 'plan_order':
-      showPlan(msg);
-      break;
     case 'order_preview':
       $('#order-preview').textContent = `순서: ${msg.names.join(' → ')} (사람 위치까지 약 ${fmtSec(msg.total)})`;
-      break;
-    case 'travel_model':
-      showModel(msg);
       break;
     case 'runner_info':
       setRunner(msg);
@@ -801,7 +790,7 @@ function draw() {
     const [cx, cy] = worldToCanvas(loc.x, loc.y);
     const isHome = loc.kind === 'home';
     const isTarget = current && current.x === loc.x && current.y === loc.y;
-    const color = isHome ? '#7c3aed' : loc.kind === 'dropoff' ? '#db2777' : S.selected.has(loc.id) ? '#d97706' : '#2563eb';
+    const color = isHome ? '#7c3aed' : loc.kind === 'dropoff' ? '#db2777' : '#2563eb';
     drawArrow(cx, cy, loc.yaw, Math.max(8, 0.25 * pxPerM), color, isTarget);
     ctx.fillStyle = '#111';
     ctx.font = '12px system-ui, sans-serif';
@@ -1362,12 +1351,15 @@ function renderPanel() {
   const running = S.task && S.task.status === 'running';
   const step = currentStep();
   const unload = step && step.action === 'unload';
+  // arrival actions only while waiting at a stop; retry/skip only while a step is active
+  const arrived = !!(step && step.status === 'arrived');
+  $('#wait-actions').hidden = !arrived;
   $('#btn-confirm').textContent = unload ? '✓ 수령 완료' : '✓ 적재 완료';
-  $('#btn-confirm').disabled = !(step && step.status === 'arrived');
-  const orderWait = !!(step && step.status === 'arrived' && step.items && Object.keys(step.items).length);
+  const orderWait = arrived && !!(step.items && Object.keys(step.items).length);
   $('#btn-force').hidden = !orderWait;
   $('#btn-force').textContent = unload ? '⏭ 강제 보내기 (확인 없이 홈으로)' : '⏭ 다음 경유지로 (확인 없이)';
   renderOrder();
+  $('#step-actions').hidden = !(online && step);
   $('#btn-retry').disabled = !(online && step && (step.status === 'failed' || state === 'ERROR'));
   $('#btn-skip').disabled = !(online && step);
   $('#btn-cancel').disabled = !running;
@@ -1375,8 +1367,8 @@ function renderPanel() {
   $('#btn-home').disabled = !online || !hasHome;
   $('#btn-home').title = hasHome ? '' : '홈 위치가 없습니다. 로봇을 홈에 두고 "현재 위치를 홈으로"를 누르세요.';
   $('#btn-set-home').disabled = !S.pose || running;
-  $('#btn-reset').disabled = !(state === 'ERROR' && !running);
-  $('#btn-start').disabled = !(online && !running);
+  $('#btn-reset').hidden = !(state === 'ERROR' && !running);
+  $('#task-status').textContent = S.task ? `#${S.task.id} ${{ running: '진행 중', done: '완료', canceled: '취소됨', failed: '실패' }[S.task.status] || S.task.status}` : '';
 
   const ol = $('#task-steps');
   ol.innerHTML = '';
@@ -1392,13 +1384,6 @@ function renderPanel() {
         eta = left > 0 ? ` · 약 ${fmtSec(left)} 남음` : ' · 예상보다 지연';
       }
       li.textContent = `${s.name} - ${STEP_LABEL[s.status] || s.status}${eta}`;
-      ol.appendChild(li);
-    }
-    if (S.task.status !== 'running') {
-      const li = document.createElement('li');
-      li.className = 'muted';
-      li.style.listStyle = 'none';
-      li.textContent = `(작업 #${S.task.id} ${{ done: '완료', canceled: '취소됨', failed: '실패' }[S.task.status] || S.task.status})`;
       ol.appendChild(li);
     }
   }
@@ -1417,14 +1402,6 @@ function renderLocations() {
   const running = S.task && S.task.status === 'running';
   for (const loc of S.locations) {
     const li = document.createElement('li');
-    const cb = document.createElement('input');
-    cb.type = 'checkbox';
-    cb.checked = S.selected.has(loc.id);
-    cb.disabled = loc.kind === 'home';
-    cb.addEventListener('change', () => {
-      cb.checked ? S.selected.add(loc.id) : S.selected.delete(loc.id);
-      draw();
-    });
     const name = document.createElement('span');
     name.className = 'name';
     name.textContent = locPrefix(loc) + loc.name;
@@ -1444,7 +1421,7 @@ function renderLocations() {
     del.addEventListener('click', () => {
       if (confirm(`"${loc.name}" 위치를 삭제할까요?`)) send('delete_location', { location_id: loc.id });
     });
-    li.append(cb, name, coord, go, del);
+    li.append(name, coord, go, del);
     ul.appendChild(li);
   }
 }
@@ -1568,56 +1545,10 @@ $('#btn-legend').addEventListener('click', () => {
 $('#btn-reset-robot').addEventListener('click', () => {
   if (confirm('작업을 취소하고 로봇 상태를 초기화할까요?\n(시뮬레이션이면 로봇이 출발 위치로 돌아갑니다)')) send('reset_robot');
 });
-// selected location ids (list order), or the optimized order if "optimize order" was run on the same locations
-function selectedIds() {
-  const ids = S.locations.filter((l) => S.selected.has(l.id)).map((l) => l.id);
-  const p = S.plan;
-  if (p && p.withHome === $('#with-home').checked && p.order.length === ids.length
-      && p.order.every((id) => S.selected.has(id))) return p.order;
-  return ids;
-}
-
 function fmtSec(sec) {
   if (sec == null) return '-';
   sec = Math.round(sec);
   return sec >= 60 ? `${Math.floor(sec / 60)}분 ${sec % 60}초` : `${sec}초`;
-}
-
-function clearPlan() {
-  S.plan = null;
-  $('#plan-result').hidden = true;
-}
-
-$('#btn-start').addEventListener('click', () => {
-  const ids = selectedIds();
-  if (!ids.length) { toast('이동할 위치를 선택하세요.'); return; }
-  send('start_task', { location_ids: ids, with_home: $('#with-home').checked });
-  S.selected.clear();
-  clearPlan();
-});
-
-$('#btn-plan').addEventListener('click', () => {
-  const ids = S.locations.filter((l) => S.selected.has(l.id)).map((l) => l.id);
-  if (!ids.length) { toast('최적화할 위치를 선택하세요.'); return; }
-  send('plan_order', { location_ids: ids, with_home: $('#with-home').checked });
-});
-$('#with-home').addEventListener('change', clearPlan);
-
-function showPlan(msg) {
-  S.plan = { order: msg.order, withHome: $('#with-home').checked };
-  const saved = msg.original_total != null ? msg.original_total - msg.total : null;
-  $('#plan-route').textContent = msg.names.join(' → ');
-  $('#plan-time').textContent = `예상 ${fmtSec(msg.total)}`
-    + (saved != null && saved > 0.5 ? ` · 선택 순서(${fmtSec(msg.original_total)})보다 ${fmtSec(saved)} 단축` : ' · 선택 순서가 이미 최적');
-  $('#plan-legs').textContent = msg.legs.map((l) => `${l.length}m ${fmtSec(l.sec)}`).join(' / ');
-  $('#plan-result').hidden = false;
-  showModel(msg.model);
-}
-
-function showModel(m) {
-  $('#travel-model').textContent = m.learned
-    ? `이동 시간 모델: ${m.summary} · 기록 ${m.n}개${m.outliers ? ` (이상치 ${m.outliers}개 제외)` : ''}, 평균 오차 ${m.mae.toFixed(1)}초`
-    : `이동 시간 모델: 기본값 (${m.summary}) · 학습할 이동 기록이 아직 부족합니다`;
 }
 
 window.addEventListener('resize', resizeCanvas);

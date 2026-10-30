@@ -209,8 +209,6 @@ function render() {
   }
   const r = S.robot;
   $('#battery').textContent = r && r.battery_percentage != null ? `배터리 ${Math.round(r.battery_percentage)}%` : '';
-  $('#camera').textContent = S.cargo === null || S.cargo === undefined ? '카메라: 인식 노드 없음'
-    : `카메라: ${S.cargo || '비어 있음'}`;
   const step = currentStep();
   $('#step').textContent = S.task && S.task.status === 'running'
     ? S.task.steps.map((s) => (s === step ? `[${s.name}]` : s.name)).join(' → ') : '';
