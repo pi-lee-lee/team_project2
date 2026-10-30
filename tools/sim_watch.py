@@ -1,13 +1,13 @@
-"""시뮬레이션 진단: 정답 위치(Gazebo odom = 월드 좌표)와 비교해 좌표 오차, 충돌, 기울기를 기록한다.
+"""Simulation diagnostics: compares against the ground-truth pose (Gazebo odom = world coordinates) and logs pose error, collisions and tilt.
 
-    source scripts/env.sh   (sim 모드)
+    source scripts/env.sh   (sim mode)
     python3 tools/sim_watch.py [--world worlds/maze_room.world] [--seconds 300] [--every 5]
 
-- 좌표 오차: SLAM/AMCL 이 추정한 map->base_footprint 와 정답 위치의 거리/각도 차이
-  (sim 에서는 slam_toolbox 맵 좌표 = odom 좌표 = 월드 좌표라서 그대로 비교 가능)
-- 벽 여유: 월드 파일의 상자(벽) 와 로봇 외곽(직사각형) 사이 최소 거리. 0 이하면 충돌
-- 기울기: IMU 로 계산
-끝나면 최대 오차, 충돌 횟수, 최소 여유를 요약한다.
+- Pose error: distance/angle difference between the SLAM/AMCL estimate of map->base_footprint and the ground truth
+  (in sim, slam_toolbox map coordinates = odom coordinates = world coordinates, so they compare directly)
+- Wall clearance: minimum distance between the world file's boxes (walls) and the robot outline (rectangle). <= 0 means collision
+- Tilt: computed from the IMU
+At the end, summarizes the max error, number of collisions and minimum clearance.
 """
 import argparse
 import math
@@ -22,7 +22,7 @@ from rclpy.qos import qos_profile_sensor_data
 from sensor_msgs.msg import Imu
 from tf2_ros import Buffer, TransformListener
 
-# Waffle Pi 외곽 (base_footprint 기준, m): Gazebo 충돌 상자 0.265x0.265 가 x=-0.064 에 있고 바퀴가 좌우로 조금 더 나옴
+# Waffle Pi outline (relative to base_footprint, m): the Gazebo collision box 0.265x0.265 sits at x=-0.064 and the wheels stick out a little further to the sides
 FOOT = (-0.197, 0.069, -0.153, 0.153)
 
 
@@ -31,7 +31,7 @@ def yaw_q(q):
 
 
 def load_boxes(path):
-    """월드 파일에서 (cx, cy, sx, sy, yaw) 상자 목록 (월드 좌표). <model><pose> + <collision><pose> 단순 합성."""
+    """List of (cx, cy, sx, sy, yaw) boxes from a world file (world coordinates). Simple composition of <model><pose> + <collision><pose>."""
     boxes = []
     root = ET.parse(path).getroot()
     for model in root.iter('model'):
@@ -48,14 +48,14 @@ def load_boxes(path):
 
 
 def rect_gap(pose, box):
-    """로봇 외곽 직사각형과 상자 사이 대략적인 최소 거리 (외곽 점들을 상자 좌표계로 옮겨 계산)."""
+    """Approximate minimum distance between the robot outline rectangle and a box (outline points transformed into the box frame)."""
     x, y, yaw = pose
     bx, by, sx, sy, byaw = box
     pts = []
     for fx in (FOOT[0], FOOT[1]):
         for fy in (FOOT[2], FOOT[3]):
             pts.append((fx, fy))
-    for i in range(1, 4):  # 변 위의 점도 몇 개
+    for i in range(1, 4):  # plus a few points along the edges
         pts += [(FOOT[0] + (FOOT[1] - FOOT[0]) * i / 4, FOOT[2]), (FOOT[0] + (FOOT[1] - FOOT[0]) * i / 4, FOOT[3]),
                 (FOOT[0], FOOT[2] + (FOOT[3] - FOOT[2]) * i / 4), (FOOT[1], FOOT[2] + (FOOT[3] - FOOT[2]) * i / 4)]
     best = math.inf
@@ -80,7 +80,7 @@ def main():
     boxes = [b for w in args.world for b in load_boxes(w)]
 
     rclpy.init()
-    # Ctrl-C/kill 로 끝내도 요약을 출력하도록 rclpy 의 신호 처리를 덮어쓴다
+    # override rclpy's signal handling so the summary is printed even on Ctrl-C/kill
     stop = []
     signal.signal(signal.SIGINT, lambda *_: stop.append(1))
     signal.signal(signal.SIGTERM, lambda *_: stop.append(1))
@@ -135,7 +135,7 @@ def main():
                       f'추정 오차 {err if err is None else round(err, 3)} m / {yerr if yerr is None else round(yerr, 1)}° '
                       f'벽 여유 {"-" if not boxes else f"{gap:.3f} m"}', flush=True)
     except KeyboardInterrupt:
-        pass  # Ctrl-C 로 끝내도 요약은 출력
+        pass  # still print the summary on Ctrl-C
     print(f'[watch] 요약: 최대 위치 오차 {worst_err:.3f} m, 최대 방향 오차 {worst_yaw:.1f}°, '
           f'충돌 {contacts}회, 최소 벽 여유 {min_gap:.3f} m, 최대 기울기 {max_tilt:.1f}°', flush=True)
     if max_tilt_at and max_tilt > 5:

@@ -74,14 +74,14 @@ TEMPLATES = [
 WSGI_APPLICATION = 'config.wsgi.application'
 ASGI_APPLICATION = 'config.asgi.application'
 
-# 단일 프로세스(daphne) 기준. 여러 프로세스로 띄울 때는 channels_redis로 교체
+# Assumes a single process (daphne). Replace with channels_redis when running multiple processes
 CHANNEL_LAYERS = {'default': {'BACKEND': 'channels.layers.InMemoryChannelLayer'}}
 
 
 # Database
 # https://docs.djangoproject.com/en/4.2/ref/settings/#databases
 
-# DB 접속 정보는 server/.env (KEY=VALUE 형식)나 환경 변수로 지정한다. 코드에 비밀번호를 넣지 않기 위함
+# DB connection settings come from server/.env (KEY=VALUE) or environment variables, to keep passwords out of the code
 def _load_env(path):
     if path.exists():
         for line in path.read_text(encoding='utf-8').splitlines():
@@ -94,7 +94,7 @@ def _load_env(path):
 _load_env(BASE_DIR / '.env')
 
 if os.environ.get('DB_ENGINE', 'mysql') == 'sqlite':
-    # MySQL 계정을 만들기 전 임시로 쓰는 설정. SQLITE_PATH 로 파일 위치 변경 (Docker: /data 볼륨)
+    # Temporary setting for use before a MySQL account exists. SQLITE_PATH changes the file location (Docker: /data volume)
     DATABASES = {'default': {'ENGINE': 'django.db.backends.sqlite3',
                              'NAME': os.environ.get('SQLITE_PATH') or BASE_DIR / 'db.sqlite3'}}
 else:

@@ -1,24 +1,23 @@
 #!/usr/bin/env python3
-"""주행 기록(logs/records/**/record.jsonl.gz, bridge_node 가 목표마다 남김) 분석.
+"""Analyze drive records (logs/records/**/record.jsonl.gz, written by bridge_node for each goal).
 
-  python3 tools/drive_replay.py                     가장 최근 기록 요약 (사건, 1초 간격 표, 느림/정지 구간 설명)
-                                                    + 중요한 순간 그림 자동 저장 (막힘 시작, 재계획/물러나기 직전, 가장 가까움,
-                                                    느린 구간 가운데. 그 목표 폴더의 plot_<t>_<이유>.png, --no-plots 로 끔)
-  python3 tools/drive_replay.py --list              세션(브리지 켠 단위) / 주행(목표) 목록과 결과
-  python3 tools/drive_replay.py 폴더|파일            그 기록 요약 (목표 폴더, 세션 폴더(그 안 최근), record.jsonl.gz)
-  python3 tools/drive_replay.py --at 23.4           23.4초에 가장 가까운 Frenet 주기를 자세히 (왜 그 명령이 나왔나)
-  python3 tools/drive_replay.py --at 23.4 --plot    + 그림 (그 목표 폴더의 plot_23.4.png)
+  python3 tools/drive_replay.py                     summarize the latest record (events, 1 s table, slow/stopped segments explained)
+                                                    + auto-save plots of key moments (blocked start, just before replan/back-off,
+                                                    closest approach, middle of slow segments; plot_<t>_<reason>.png in that goal folder, --no-plots to disable)
+  python3 tools/drive_replay.py --list              list sessions (one per bridge start) / drives (goals) with results
+  python3 tools/drive_replay.py DIR|FILE            summarize that record (goal folder, session folder (latest inside), record.jsonl.gz)
+  python3 tools/drive_replay.py --at 23.4           detail the Frenet cycle closest to 23.4 s (why that command was issued)
+  python3 tools/drive_replay.py --at 23.4 --plot    + plot (plot_23.4.png in that goal folder)
   python3 tools/drive_replay.py --set frenet.safety_margin=0.05 [--set ...]
-                                                    같은 입력(스캔/위치/트래킹)으로 다시 계산해서 원래 명령과 비교
-                                                    (열린 루프: 로봇이 실제로 다르게 움직였을 때의 결과는 아님)
-폐루프로 다시 달려 보려면 tools/frenet_bench.py.
+                                                    recompute with the same inputs (scan/pose/tracks) and compare to the original commands
+                                                    (open loop: not what would happen if the robot had actually moved differently)
+For a closed-loop re-drive use tools/frenet_bench.py.
 
-기록 위치: logs/records/<브리지 켠 시각>_frenet/<시각>_<목표>/record.jsonl.gz
-기록 한 줄 = JSON. type: start(목표, 파라미터) / plan(A* 경로, map) / step(0.1초마다) / event(로그) / end.
-step: pose(map), odom, vw(odom 실제 속도), raw(추종기가 낸 v, w, state), cmd(실제로 낸 명령), mode(frenet/recovery/backoff),
-      front(LiDAR 앞 ±25° 최소 거리), tracks([id, x, y, vx, vy, r, hits, misses] odom),
-      Frenet 을 새로 계산한 주기면 frenet (입력 전부 + 결과 + debug(갈래) + eval(후보별 판정/비용)).
-(PP/DWA 를 쓰던 예전 기록은 사건/표만 나오고 플래너 설명은 없음)
+Location: logs/records/<bridge start time>_frenet/<time>_<goal>/record.jsonl.gz
+One line = JSON. type: start (goal, params) / plan (A* path, map) / step (every 0.1 s) / event (log) / end.
+step: pose (map), odom, vw (actual odom velocity), raw (follower's v, w, state), cmd (command actually sent), mode (frenet/recovery/backoff),
+      front (LiDAR min distance in front +-25 deg), tracks ([id, x, y, vx, vy, r, hits, misses] odom),
+      frenet on cycles where Frenet was recomputed (all inputs + result + debug (branch) + eval (per-candidate verdict/cost)).
 """
 import argparse
 import glob
@@ -37,7 +36,7 @@ from warehouse_robot.frenet import (REASONS, FrenetConfig, FrenetFollower, frene
 
 
 def load(path):
-    """기록을 읽는다. 주행 중이거나 끊긴 파일(끝이 잘림)도 읽은 데까지."""
+    """Read a record. Files still being written or cut off (truncated end) are read up to the break."""
     rows = []
     with gzip.open(path, 'rt', encoding='utf-8') as fh:
         try:
@@ -52,7 +51,7 @@ def load(path):
 
 
 def all_records():
-    """logs/records 아래 모든 기록 파일 (수정 시각 순)."""
+    """All record files under logs/records (by modification time)."""
     files = glob.glob(os.path.join(HOME, 'logs', 'records', '**', '*.jsonl.gz'), recursive=True)
     return sorted(files, key=os.path.getmtime)
 
@@ -65,7 +64,7 @@ def latest():
 
 
 def resolve(arg):
-    """목표 폴더 / 세션 폴더(그 안 최근) / 파일 → 기록 파일."""
+    """Goal folder / session folder (latest inside) / file -> record file."""
     if os.path.isdir(arg):
         files = sorted(glob.glob(os.path.join(arg, '**', '*.jsonl.gz'), recursive=True), key=os.path.getmtime)
         if not files:
@@ -101,7 +100,7 @@ def make_frenet_cfg(params, overrides=None):
 
 
 def kind(s):
-    """이 주기에 Frenet 을 새로 계산했으면 'frenet', 아니면 None."""
+    """'frenet' if Frenet was recomputed in this cycle, else None."""
     return 'frenet' if 'frenet' in s else None
 
 
@@ -110,7 +109,7 @@ def arr(x, shape=(-1, 2)):
 
 
 def body_clearance(cfg, pose, pts):
-    """지금 자세에서 차체(직사각형 + 붙인 물건) 외곽 ~ 가장 가까운 점 거리 (m, 안에 있으면 0)."""
+    """Distance from the body outline (rectangle + attachments) at this pose to the nearest point (m, 0 if inside)."""
     pts = arr(pts)
     if not len(pts) or pose is None:
         return math.inf
@@ -142,7 +141,7 @@ class Record:
         self.end = next((r for r in self.rows if r['type'] == 'end'), None)
 
     def plan_at(self, t):
-        """t 시점에 따르던 A* 경로 (map)."""
+        """A* path being followed at time t (map)."""
         path = None
         for r in self.rows:
             if r['type'] == 'plan' and r['t'] <= t:
@@ -163,21 +162,21 @@ class Record:
         return s[kind(s)]['pose'] if kind(s) else s.get('odom')
 
 
-# ------------------------------------------------------------------ 다시 계산
+# ------------------------------------------------------------------ recompute
 def replay(rec, s, overrides=None):
-    """기록된 Frenet 입력으로 같은 계산을 다시 (overrides 로 파라미터를 바꿔서). (v, w, state, follower)."""
+    """Redo the same computation from the recorded Frenet inputs (with parameters changed by overrides). (v, w, state, follower)."""
     d = s['frenet']
     p = {**rec.params, **(overrides or {})}
     f = FrenetFollower(rec.plan_at(s['t']), rec.start['goal']['yaw'], make_frenet_cfg(rec.params, overrides))
     pre = d['pre']
     f.progress, f.offset, f.turning, f.arrived = pre['progress'], pre['offset'], pre['turning'], pre['arrived']
-    f.prev_shape = pre.get('prev_shape')   # 10-29 이전 기록엔 없음 → 시작 d'' = 0 으로 다시 계산
+    f.prev_shape = pre.get('prev_shape')   # missing in older records -> recompute with initial d'' = 0
     v, w, state = f.compute(tuple(d['pose']), d['vw'][0], d['vw'][1], tuple(d['map_to_odom']), arr(d['scan']),
                             arr(d['dyn'], (-1, 5)), moving_speed=p.get('tracking.moving_speed', d['moving_speed']))
     return v, w, state, f
 
 
-# ------------------------------------------------------------------ 설명
+# ------------------------------------------------------------------ explain
 def explain(rec, s, out=print):
     d = s['frenet']
     ev, dbg = d.get('eval') or {}, d.get('debug') or {}
@@ -202,7 +201,7 @@ def explain(rec, s, out=print):
         return
     reason = np.asarray(ev['reason'])
     off, D, v = (np.asarray(ev[k]) for k in ('off', 'D', 'v'))
-    H = np.asarray(ev['hold']) if 'hold' in ev else None      # 10-29 이전 기록 (유지/복귀가 있던 때)
+    H = np.asarray(ev['hold']) if 'hold' in ev else None      # only in older records (with hold/return)
     ms, md, total = np.asarray(ev['min_static']), np.asarray(ev['min_dynamic']), np.asarray(ev['total'])
     terms = {k: np.asarray(x) for k, x in ev['terms'].items()}
     cnt = {REASONS[r]: int((reason == r).sum()) for r in REASONS}
@@ -238,7 +237,7 @@ def fmt_vw(c):
     return '-' if not c else f'v={c[0]:.3f} w={c[1]:.2f}'
 
 
-# ------------------------------------------------------------------ 요약
+# ------------------------------------------------------------------ summary
 def summary(rec):
     st, cfg = rec.start, rec.cfg
     out = print
@@ -283,7 +282,7 @@ def summary(rec):
                       f"/{len(ev['reason'])}")
         out(f"  {s['t']:6.1f}  {s['mode'] or '-':8} {fmt_vw(s.get('cmd')):18} {s['vw'][0]:+.3f}  "
             f"{body_clearance(cfg, pose, scan):6.3f}  {s.get('front', math.inf):6.3f}  {tr:16} {dw}")
-    # 느림/정지 구간: Frenet 으로 가는데 0.03 m/s 미만이 1초 넘게
+    # slow/stopped segments: driving with Frenet below 0.03 m/s for more than 1 s
     out('\n[느리게(<0.03 m/s) 1초 넘게 간 구간 (제자리 회전 제외)]')
     seg = []
     found = False
@@ -303,7 +302,7 @@ def summary(rec):
         out('  없음')
 
 
-# ------------------------------------------------------------------ 그림
+# ------------------------------------------------------------------ plots
 def plot(rec, s, path):
     import matplotlib
     matplotlib.use('Agg')
@@ -321,12 +320,12 @@ def plot(rec, s, path):
         ax.add_patch(plt.Circle((t[1], t[2]), t[5], fill=False, color='m'))
         ax.arrow(t[1], t[2], t[3], t[4], head_width=0.02, color='m')
     if ev.get('off') is not None:
-        # 후보 모양 (속도와 무관, 정적 검사 거리만큼): 다시 계산한 기준선 위에
+        # candidate shapes (independent of speed, over the static check distance) on the recomputed reference line
         _, _, _, f = replay(rec, s)
         ref = f.ref_map.transformed(*m_o)
         fc = f.cfg
         off, D, reason = (np.asarray(ev[k]) for k in ('off', 'D', 'reason'))
-        end = np.asarray(ev['off_end']) if 'off_end' in ev else off          # 10-29 6차부터: off = 중간, off_end = 끝
+        end = np.asarray(ev['off_end']) if 'off_end' in ev else off          # newer records: off = middle, off_end = end
         sm = np.asarray(ev['s_mid']) if ev.get('s_mid') is not None else None
         seen = set()
         for i in range(len(off)):
@@ -334,7 +333,7 @@ def plot(rec, s, path):
             if key in seen:
                 continue
             seen.add(key)
-            q = np.arange(0.0, D[i] + 1e-9, fc.check_step)              # 후보 길이까지 (지금 방식으로 다시 그림)
+            q = np.arange(0.0, D[i] + 1e-9, fc.check_step)              # up to the candidate length (redrawn with the current shape)
             dd, dp, ddp = lateral_shape(q, ev['d0'], ev['dp0'], end[i], D[i], ev.get('dpp0', 0.0),
                                         None if sm is None else off[i], None if sm is None else sm[i])
             sq = ev['s0'] + q
@@ -360,7 +359,7 @@ def plot(rec, s, path):
 
 
 def plot_path(rec, s, tag=''):
-    """그림 파일: 목표 폴더 기록이면 그 폴더의 plot_<t>[_<이유>].png, 예전 파일이면 옆에 <이름>_<t>.png."""
+    """Plot file: plot_<t>[_<reason>].png in the goal folder for goal-folder records, otherwise <name>_<t>.png next to the file."""
     name = f"{s['t']:.1f}" + (f'_{tag}' if tag else '')
     if os.path.basename(rec.path) == 'record.jsonl.gz':
         return os.path.join(os.path.dirname(rec.path), f'plot_{name}.png')
@@ -368,8 +367,9 @@ def plot_path(rec, s, tag=''):
 
 
 def key_moments(rec, limit=10):
-    """그림으로 남길 중요한 순간 [(step, 이유)]: 막힘 시작, 재계획/물러나기/부딪힘/비상 정지 직전, 장애물과 가장 가까운 순간,
-    느린 구간 가운데. 1초 안에 겹치면 앞의 것(우선순위 높은 것)만. Frenet 을 계산한 주기만 (그림에 후보가 나오게)."""
+    """Key moments to plot [(step, reason)]: blocked start, just before replan/back-off/bump/e-stop, closest approach to
+    obstacles, middle of slow segments. Within 1 s of each other only the earlier (higher-priority) one is kept. Only cycles
+    where Frenet was computed (so the plot shows candidates)."""
     planned = [s for s in rec.steps if kind(s)]
     if not planned:
         return []
@@ -379,30 +379,30 @@ def key_moments(rec, limit=10):
         cand = [s for s in planned if s['t'] <= t + 1e-6]
         return cand[-1] if cand else None
     prev = None
-    for s in planned:                                       # 막힘 시작
+    for s in planned:                                       # blocked start
         st = s[kind(s)]['result'][2]
         if st == 'blocked' and prev != 'blocked':
             picks.append((s, 'blocked'))
         prev = st
-    for e in rec.events:                                    # 재계획/물러나기/부딪힘/비상 정지 직전
+    for e in rec.events:                                    # just before replan/back-off/bump/e-stop
         text = e.get('text', '')
         if e['type'] == 'event' and any(k in text for k in ('재계획', '다시 계획', '물러', '부딪힘', '비상 정지', '나온 뒤')):
             s = before(e['t'])
             if s is not None:
                 picks.append((s, 'event'))
     driving = [s for s in planned if s[kind(s)]['result'][2] == 'driving']
-    if driving:                                             # 가장 가까운 순간 (주행 중)
+    if driving:                                             # closest moment (while driving)
         s = min(driving, key=lambda s: body_clearance(rec.cfg, rec.odom_pose(s), rec.scan_of(s)[0]))
         picks.append((s, 'closest'))
     seg = []
-    for s in planned + [None]:                              # 느린 구간 (제자리 회전 제외) 가운데
+    for s in planned + [None]:                              # middle of slow segments (excluding in-place turns)
         if s is not None and abs(s[kind(s)]['result'][0]) < 0.03 and s[kind(s)]['result'][2] not in ('rotating', 'blocked'):
             seg.append(s)
             continue
         if seg and seg[-1]['t'] - seg[0]['t'] > 1.0:
             picks.append((seg[len(seg) // 2], 'slow'))
         seg = []
-    # 이유별 개수 제한 (막힘만 10장이 되지 않게), 우선순위: 사건 > 가장 가까움 > 막힘 > 느림
+    # per-reason quota (so plots are not all 'blocked'), priority: event > closest > blocked > slow
     quota = {'event': 4, 'closest': 1, 'blocked': 5, 'slow': 2}
     out = []
     for why in quota:
@@ -422,7 +422,7 @@ def auto_plots(rec):
     for s, why in moments:
         try:
             plot(rec, s, plot_path(rec, s, why))
-        except Exception as e:                              # 그림 하나 실패로 분석 전체가 멈추지 않게
+        except Exception as e:                              # one failed plot must not stop the whole analysis
             print(f"  {s['t']:.1f}s 그림 실패: {e}")
 
 
@@ -457,7 +457,7 @@ def main():
         explain(rec, s)
         v, w, state, _ = replay(rec, s)
         r = s[kind(s)]['result']
-        same = abs(v - r[0]) < 1e-3 and abs(w - r[1]) < 5e-3   # 기록은 입력을 소수 4자리로 저장 → 아주 작은 차이는 같음
+        same = abs(v - r[0]) < 1e-3 and abs(w - r[1]) < 5e-3   # records store inputs to 4 decimals -> tiny differences count as equal
         print(f"  (기록 입력으로 다시 계산: v={v:.3f} w={w:.2f} {'= 기록과 같음' if same else '≠ 기록과 다름!'})")
         if ov:
             v2, w2, st2, f2 = replay(rec, s, ov)

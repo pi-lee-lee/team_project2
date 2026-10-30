@@ -2,19 +2,19 @@ from django.db import models
 
 
 class Map(models.Model):
-    """SLAM으로 만든 맵. 이미지는 PNG(위쪽 행 = y 최대값)로 저장한다."""
+    """A map built with SLAM. The image is stored as PNG (top row = max y)."""
 
     name = models.CharField(max_length=100, unique=True)
     resolution = models.FloatField()  # m/pixel
-    origin_x = models.FloatField()    # 이미지 왼쪽 아래 픽셀의 월드 좌표
+    origin_x = models.FloatField()    # World coordinates of the image's bottom-left pixel
     origin_y = models.FloatField()
     width = models.IntegerField()
     height = models.IntegerField()
     png = models.BinaryField()
     is_active = models.BooleanField(default=False)
     updated_at = models.DateTimeField(auto_now=True)
-    # SLAM 맵(slam_live)을 만든 브리지 실행 번호. SLAM 좌표계(원점 = 시작 때 로봇 위치)는 실행마다 다르므로
-    # 새 실행이면 이전 맵과 위치를 지운다
+    # Bridge run ID that built the SLAM map (slam_live). The SLAM frame (origin = robot pose at start) differs per run,
+    # so a new run clears the previous map and locations
     session = models.CharField(max_length=40, blank=True, default='')
 
     def __str__(self):
@@ -28,7 +28,7 @@ class Map(models.Model):
             'origin': [self.origin_x, self.origin_y],
             'width': self.width,
             'height': self.height,
-            # SLAM 맵이 0.5~2초마다 바뀌므로 ms 단위로 (초 단위면 같은 초 안의 갱신을 브라우저 캐시가 막을 수 있음)
+            # In ms because the SLAM map changes every 0.5-2 s (with seconds, the browser cache could hide updates within the same second)
             'image_url': f'/map/{self.id}.png?v={int(self.updated_at.timestamp() * 1000)}',
         }
 
@@ -36,7 +36,7 @@ class Map(models.Model):
 class Location(models.Model):
     KIND_PICKUP = 'pickup'
     KIND_HOME = 'home'
-    KIND_DROPOFF = 'dropoff'   # 주문한 사람이 물건을 받는 자리 (예: 골방)
+    KIND_DROPOFF = 'dropoff'   # Where the orderer receives the items
     KIND_CHOICES = [(KIND_PICKUP, '물류 위치'), (KIND_HOME, '홈(복귀 위치)'), (KIND_DROPOFF, '사람 위치(수령)')]
 
     map = models.ForeignKey(Map, on_delete=models.CASCADE, related_name='locations')
@@ -44,9 +44,9 @@ class Location(models.Model):
     kind = models.CharField(max_length=10, choices=KIND_CHOICES, default=KIND_PICKUP)
     x = models.FloatField()
     y = models.FloatField()
-    yaw = models.FloatField(default=0.0)  # rad, 도착 시 바라볼 방향
-    # 이 위치에 놓인 물건(LED)을 카메라가 인식했을 때의 라벨 (예: red, B). 비우면 위치 이름으로 비교.
-    # 주문 섹션은 쉼표로 여러 개 (예: led_red, led_green)
+    yaw = models.FloatField(default=0.0)  # rad, heading to face on arrival
+    # Camera label of the item (LED) placed at this location (e.g. red, B). Empty = compare with the location name.
+    # Order sections can list several, comma-separated (e.g. led_red, led_green)
     cargo = models.CharField(max_length=200, blank=True, default='')
 
     class Meta:
@@ -64,8 +64,8 @@ class Location(models.Model):
 
 
 class Zone(models.Model):
-    """웹에서 그린 금지 구역. A* 가 장애물로 보고 피한다 (위치 추정에는 영향 없음).
-    rect: (x1, y1)~(x2, y2) 사각형 (맵 축 기준), line: (x1, y1)-(x2, y2) 선분 (두께 0.1m 가상 벽)."""
+    """Keep-out zone drawn on the web. A* treats it as an obstacle (does not affect localization).
+    rect: (x1, y1)-(x2, y2) rectangle (map-axis aligned), line: (x1, y1)-(x2, y2) segment (0.1 m thick virtual wall)."""
     SHAPE_RECT = 'rect'
     SHAPE_LINE = 'line'
     SHAPE_CHOICES = [(SHAPE_RECT, '사각형'), (SHAPE_LINE, '선(가상 벽)')]
@@ -94,7 +94,7 @@ class Robot(models.Model):
     STATE_IDLE = 'IDLE'
     STATE_MOVING = 'MOVING'
     STATE_WAITING_LOAD = 'WAITING_LOAD'
-    STATE_WAITING_UNLOAD = 'WAITING_UNLOAD'   # 배달 도착, 받는 사람이 꺼내기를 기다림
+    STATE_WAITING_UNLOAD = 'WAITING_UNLOAD'   # Delivery arrived, waiting for the recipient to take the item out
     STATE_ERROR = 'ERROR'
     STATE_CHOICES = [(s, s) for s in
                      (STATE_OFFLINE, STATE_IDLE, STATE_MOVING, STATE_WAITING_LOAD, STATE_WAITING_UNLOAD, STATE_ERROR)]
@@ -147,9 +147,9 @@ class Task(models.Model):
 
 
 class TaskStep(models.Model):
-    ACTION_LOAD = 'load'      # 도착 후 적재 확인을 기다림
-    ACTION_UNLOAD = 'unload'  # 도착 후 수령(물건 꺼냄) 확인을 기다림 (LED 배달)
-    ACTION_MOVE = 'move'      # 도착하면 바로 완료 (복귀, 단순 이동)
+    ACTION_LOAD = 'load'      # After arrival, wait for load confirmation
+    ACTION_UNLOAD = 'unload'  # After arrival, wait for unload (item taken out) confirmation (LED delivery)
+    ACTION_MOVE = 'move'      # Done on arrival (return home, plain move)
     ACTION_CHOICES = [(ACTION_LOAD, '적재'), (ACTION_UNLOAD, '수령'), (ACTION_MOVE, '이동')]
 
     STATUS_PENDING = 'pending'
@@ -165,24 +165,24 @@ class TaskStep(models.Model):
     task = models.ForeignKey(Task, on_delete=models.CASCADE, related_name='steps')
     order = models.IntegerField()
     action = models.CharField(max_length=10, choices=ACTION_CHOICES)
-    # 위치가 나중에 삭제돼도 작업 기록은 남도록 좌표를 복사해 둔다
+    # Copy the coordinates so the task record survives if the location is deleted later
     location = models.ForeignKey(Location, on_delete=models.SET_NULL, null=True, blank=True)
     name = models.CharField(max_length=100)
     x = models.FloatField()
     y = models.FloatField()
     yaw = models.FloatField()
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default=STATUS_PENDING)
-    # LED 배달: 이 단계에서 카메라로 확인할 물건 라벨 (적재: 이 라벨이 보이면 완료, 수령: 아무것도 안 보이면 완료)
+    # LED delivery: item label to check with the camera at this step (load: done when the label is seen, unload: done when nothing is seen)
     cargo = models.CharField(max_length=50, blank=True, default='')
-    # 주문: 이 단계의 요구량 {라벨: 개수} (적재: 이 구역에서 실을 것, 수령: 주문 전체). 비면 주문이 아님
+    # Order: required counts for this step {label: count} (load: what to load at this section, unload: the whole order). Empty = not an order
     items = models.JSONField(blank=True, default=dict)
-    # 이동 기록 (이동 시간 학습용, planning.py). 출발할 때 채우고 도착하면 finished_at
+    # Travel record (for learning travel time, planning.py). Filled on departure; finished_at on arrival
     start_x = models.FloatField(null=True, blank=True)
     start_y = models.FloatField(null=True, blank=True)
     start_yaw = models.FloatField(null=True, blank=True)
-    plan_length = models.FloatField(null=True, blank=True)   # 출발 시 A* 경로 길이 (m)
-    plan_turn = models.FloatField(null=True, blank=True)     # 출발 시 경로의 총 회전량 (rad)
-    predicted_sec = models.FloatField(null=True, blank=True)  # 출발 시 예측한 이동 시간
+    plan_length = models.FloatField(null=True, blank=True)   # A* path length at departure (m)
+    plan_turn = models.FloatField(null=True, blank=True)     # Total turning of the path at departure (rad)
+    predicted_sec = models.FloatField(null=True, blank=True)  # Travel time predicted at departure
     started_at = models.DateTimeField(null=True, blank=True)
     finished_at = models.DateTimeField(null=True, blank=True)
 

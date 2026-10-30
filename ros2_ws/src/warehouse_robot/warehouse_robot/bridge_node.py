@@ -1,14 +1,15 @@
-"""Django 서버(WebSocket)와 ROS 2 를 잇는 브리지 노드.
+"""Bridge node connecting the Django server (WebSocket) and ROS 2.
 
-서버 → 로봇: goto, cancel, stop, initial_pose
-로봇 → 서버: hello, map, pose, battery, path, nav_status
+Server → robot: goto, cancel, stop, initial_pose
+Robot → server: hello, map, pose, battery, path, nav_status
 
-이동 방식: astar_planner 노드로 경로 계획 후 Frenet 로컬 플래너(frenet.py)로 추종
-  A* 경로를 기준선으로 매 0.1초 '옆 오프셋 x 속도' 후보 중 안전하고 비용이 가장 낮은 궤적을 골라 그 앞부분을 실행.
-  정적 장애물만으로 막히면 1초 뒤 A* 재계획, 그 밖에는 대기 후 물러나기/재계획.
+Driving: plan a path with the astar_planner node, then follow it with the Frenet local planner (frenet.py).
+  Using the A* path as the reference line, every 0.1 s pick the safe, lowest-cost trajectory among 'lateral offset x speed'
+  candidates and execute its beginning.
+  Blocked by static obstacles only → A* replan after 1 s; otherwise wait, then back off / replan.
 
-안전장치: 위치 TF가 끊기면 정지, 앞쪽 estop_distance 안이면 전진 금지, 부딪힘(기울기/끼임) 감지 후 물러나기,
-진행 없음/오래 막힘 → 물러나기 후 재계획 또는 실패.
+Safety: stop when the pose TF is lost, no forward motion within estop_distance ahead, back off after a bump (tilt/stuck),
+no progress / blocked too long → back off and replan, or fail.
 """
 import base64
 import gzip
@@ -45,14 +46,14 @@ from .frenet import FrenetConfig, FrenetFollower, transform_points
 from .tracker import MultiObjectTracker, detect_clusters
 
 
-# LiPo 셀 전압 → 남은 용량(%) (일반적인 방전 곡선)
+# LiPo cell voltage → remaining capacity (%) (typical discharge curve)
 LIPO_CURVE = [(3.27, 0), (3.61, 5), (3.69, 10), (3.71, 15), (3.73, 20), (3.75, 25), (3.77, 30),
               (3.79, 35), (3.80, 40), (3.82, 45), (3.84, 50), (3.85, 55), (3.87, 60), (3.91, 65),
               (3.95, 70), (3.98, 75), (4.02, 80), (4.08, 85), (4.11, 90), (4.15, 95), (4.20, 100)]
 
 
 def lipo_capacity(cell_voltage):
-    """셀 전압을 LIPO_CURVE로 선형 보간한 남은 용량(0~100%)."""
+    """Remaining capacity (0-100%) by linear interpolation of the cell voltage on LIPO_CURVE."""
     if cell_voltage <= LIPO_CURVE[0][0]:
         return 0.0
     for (v0, p0), (v1, p1) in zip(LIPO_CURVE, LIPO_CURVE[1:]):
@@ -62,23 +63,23 @@ def lipo_capacity(cell_voltage):
 
 
 def battery_percent(voltage, cells=3, empty_voltage=11.0):
-    """팩 전압 → 표시용 %. empty_voltage 를 0% 로 본다 (TurtleBot3 는 11V 아래에서 충전 경고).
-    그 위는 LiPo 방전 곡선 모양을 유지한 채 0~100% 로 다시 맞춘다."""
+    """Pack voltage → % for display. empty_voltage counts as 0% (TurtleBot3 warns to charge below 11 V).
+    Above that, rescale to 0-100% keeping the shape of the LiPo discharge curve."""
     lo = lipo_capacity(empty_voltage / cells)
     cap = lipo_capacity(voltage / cells)
     return max(0.0, min(100.0, (cap - lo) / (100.0 - lo) * 100.0))
 
 
-NO_RETURN_MARGIN = 0.05  # m. inf 빔을 range_max - 이 값으로 바꿈 (slam_toolbox max_laser_range 는 이보다 작아야 함)
+NO_RETURN_MARGIN = 0.05  # m. inf beams are replaced with range_max minus this (slam_toolbox max_laser_range must be smaller than that)
 
 
-SCAN_SEND_INTERVAL = 0.15  # s, 웹에 실시간 LiDAR 를 보내는 최소 간격 (화면 표시용). LiDAR 5Hz 면 스캔마다 (0.25 면 한 번 건너 2.5Hz 였음)
-MAP_MIN_INTERVAL = 0.5  # s, SLAM 맵을 서버로 보내는 최소 간격 (갱신되면 바로 보내되 몰려 오면 이 간격으로)
-SLAM_BEAMS = 240  # slam_toolbox 에 넘기는 스캔의 빔 개수 (1.5° 간격 고정). 실물 LDS-02 가 238~244 개라 빈 칸이 거의 없게
+SCAN_SEND_INTERVAL = 0.15  # s, minimum interval for sending the live LiDAR to the web (display only). With a 5 Hz LiDAR this sends every scan
+MAP_MIN_INTERVAL = 0.5  # s, minimum interval for sending the SLAM map to the server (sent as soon as updated, throttled to this if updates bunch up)
+SLAM_BEAMS = 240  # beam count of scans passed to slam_toolbox (fixed 1.5° spacing). Close to the real LDS-02's beam count so few bins are empty
 
 
 def _json_default(o):
-    """주행 기록용: numpy 값을 JSON 으로 (실수는 소수 4자리)."""
+    """For drive records: numpy values to JSON (floats rounded to 4 decimals)."""
     if isinstance(o, np.ndarray):
         return np.round(o, 4).tolist() if o.dtype.kind == 'f' else o.tolist()
     if isinstance(o, np.floating):
@@ -89,14 +90,15 @@ def _json_default(o):
 
 
 def to_slam_scan(msg):
-    """slam_toolbox 용 스캔으로 바꾼다.
-    1) 실물 LDS-02 는 빔 개수가 스캔마다 238~244 개로 바뀌는데, slam_toolbox 는 처음 등록한 개수와 다른 스캔을 전부 버린다
-       ("contains 243 range readings, expected 242") → 지도가 첫 몇 m² 에서 멈추고 로봇은 지도에 없는 벽 앞에서 막혔음.
-       → 0~360° 를 1.5° 칸 240 개로 다시 나눠 항상 같은 개수로 넘긴다 (같은 칸에 빔이 여럿이면 가장 가까운 값).
-    2) Karto 는 range_max 이상(inf 포함)인 빔을 통째로 버린다 → 3.5 m 안에 아무것도 없는 넓은 공간은 로봇이 가도 빈 칸으로
-       칠해지지 않아 미탐색으로 남는다. inf 를 range_max 바로 아래로 바꾸면 Karto 는 max_laser_range 까지만 빈 칸으로 칠하고
-       끝점은 장애물로 찍지 않는다. AMCL/A* 기억은 이 값을 장애물로 보므로 scan_level(원본)을 그대로 쓴다.
-    실물 LDS 는 반사 없음을 0 또는 NaN 으로 내보내는데, 0 은 너무 가까움과 구별이 안 되므로 바꾸지 않는다 (inf 만)."""
+    """Convert a scan for slam_toolbox.
+    1) The real LDS-02's beam count varies from scan to scan, but slam_toolbox drops every scan whose count differs from the
+       first one it registered, so the map would stop growing.
+       → Re-bin 0-360° into 240 bins of 1.5° so the count is always the same (nearest value when several beams fall in a bin).
+    2) Karto drops beams at or beyond range_max (incl. inf) → open areas with nothing within range are never painted free
+       and stay unexplored. Replacing inf with a value just below range_max makes Karto paint free space up to
+       max_laser_range without marking the endpoint as an obstacle. AMCL/A* memory would treat that value as an obstacle,
+       so they use scan_level (the original) as is.
+    The real LDS reports no-return as 0 or NaN; 0 can't be told apart from 'too close', so it is left unchanged (inf only)."""
     r = np.asarray(msg.ranges, dtype=np.float32).copy()
     r[np.isposinf(r)] = msg.range_max - NO_RETURN_MARGIN
     inc = 2.0 * math.pi / SLAM_BEAMS
@@ -104,7 +106,7 @@ def to_slam_scan(msg):
     idx = np.round(ang / inc).astype(int) % SLAM_BEAMS
     out_r = np.full(SLAM_BEAMS, np.nan, dtype=np.float32)
     valid = np.isfinite(r)
-    # 칸마다 가장 가까운 값 (정렬 후 뒤에서부터 쓰면 마지막에 쓴 값 = 가장 작은 값)
+    # Nearest value per bin (sorted, written from the back, so the last write = the smallest value)
     order = np.argsort(-np.where(valid, r, -1.0))
     order = order[valid[order]]
     out_r[idx[order]] = r[order]
@@ -120,7 +122,7 @@ def to_slam_scan(msg):
 
 
 class ServerConnection:
-    """별도 스레드에서 WebSocket 연결을 유지한다. 받은 메시지는 inbox 큐에 넣는다."""
+    """Keeps the WebSocket connection alive in a separate thread. Received messages go into the inbox queue."""
 
     def __init__(self, url, logger):
         self.url = url
@@ -162,7 +164,7 @@ class ServerConnection:
         try:
             with self.lock:
                 self.ws.send(json.dumps(msg))
-        except Exception as e:  # 연결이 끊기는 중이면 다음 재연결 때 다시 보냄
+        except Exception as e:  # if the connection is closing, it is resent on the next reconnect
             self.logger.debug(f'전송 실패: {e}')
 
     def close(self):
@@ -172,11 +174,11 @@ class ServerConnection:
 
 
 class _AutoCmd:
-    """자동 이동 명령을 선택기에 넣는 창구. 예전 코드의 self.cmd_vel_pub.publish(Twist) 를 그대로 쓰게 한다."""
+    """Entry point that feeds automatic motion commands into the selector. Lets code keep calling self.cmd_vel_pub.publish(Twist)."""
 
     def __init__(self, mux):
         self.mux = mux
-        self.last = None   # (v, w, 시각) 마지막으로 낸 자동 명령 (주행 기록용)
+        self.last = None   # (v, w, time) last automatic command issued (for drive records)
 
     def publish(self, msg):
         now = time.monotonic()
@@ -193,22 +195,22 @@ class BridgeNode(Node):
         self.declare_parameter('global_frame', 'map')
         self.declare_parameter('base_frame', 'base_footprint')
         self.declare_parameter('pose_rate', 5.0)
-        self.declare_parameter('max_retries', 2)   # 이동 실패 시 재계획 횟수
-        self.declare_parameter('stop_distance', 0.35)      # 차체가 기운 채 앞쪽 ±25° 이 거리 안이 막히면 '걸침' 으로 보고 물러남 (m, LiDAR 기준)
-        self.declare_parameter('estop_distance', 0.2)      # 앞쪽 ±25° 이 거리 안이면 앞으로는 안 감 (비상 정지, m, LiDAR 기준)
-        self.declare_parameter('blocked_timeout', 10.0)    # 이 시간 넘게 막히면 재계획/실패 (s)
-        self.declare_parameter('progress_timeout', 15.0)   # 이 시간 동안 5cm도 못 가면 실패 (s)
-        self.declare_parameter('tf_timeout', 0.5)          # 위치(오도메트리)가 이보다 오래되면 즉시 정지 (s)
-        self.declare_parameter('pose_lost_timeout', 3.0)   # 위치가 이 시간 넘게 계속 안 오면 목표 실패 (그 전엔 서서 기다렸다 이어 감, s)
-        self.declare_parameter('rotate_timeout', 15.0)     # 제자리 회전이 이보다 길면 정지 후 재계획/실패 (s)
-        # 부딪힘 감지 (LiDAR 보다 낮은 장애물 등): 기울기가 이 각도를 넘거나, 앞으로 가는데 이 시간 동안
-        # 3cm 도 못 가면 멈추고 뒤로 물러난 뒤, 부딪힌 자리를 플래너에 장애물로 알리고 재계획
+        self.declare_parameter('max_retries', 2)   # number of replans when a move fails
+        self.declare_parameter('stop_distance', 0.35)      # if the front ±25° within this distance is blocked while the body is tilted, treat it as 'hung up' and back off (m, from LiDAR)
+        self.declare_parameter('estop_distance', 0.2)      # no forward motion if anything is within this distance in the front ±25° (emergency stop, m, from LiDAR)
+        self.declare_parameter('blocked_timeout', 10.0)    # replan/fail if blocked longer than this (s)
+        self.declare_parameter('progress_timeout', 15.0)   # fail if not even 5 cm of progress in this time (s)
+        self.declare_parameter('tf_timeout', 0.5)          # stop immediately if the pose (odometry) is older than this (s)
+        self.declare_parameter('pose_lost_timeout', 3.0)   # fail the goal if the pose keeps not arriving for longer than this (until then, stand and wait, then continue, s)
+        self.declare_parameter('rotate_timeout', 15.0)     # stop and replan/fail if turning in place takes longer than this (s)
+        # Bump detection (obstacles lower than the LiDAR, etc.): if the tilt exceeds this angle, or the robot moves forward but
+        # makes less than 3 cm in this time, stop and back off, then report the bump spot to the planner as an obstacle and replan
         self.declare_parameter('bump_tilt_deg', 6.0)
         self.declare_parameter('stall_timeout', 2.5)       # s
         self.declare_parameter('backoff_distance', 0.15)   # m
-        self.declare_parameter('battery_cells', 3)         # LiPo 셀 수 (TurtleBot3: 3셀 11.1V)
-        self.declare_parameter('battery_empty_v', 11.0)    # 0% 로 볼 전압 (TurtleBot3 충전 경고 전압)
-        self.declare_parameter('mode', 'map')              # map: 기존 맵+AMCL / slam: 맵 만들기
+        self.declare_parameter('battery_cells', 3)         # LiPo cell count (TurtleBot3: 3 cells, 11.1 V)
+        self.declare_parameter('battery_empty_v', 11.0)    # voltage counted as 0% (TurtleBot3 low-battery warning voltage)
+        self.declare_parameter('mode', 'map')              # map: saved map + AMCL / slam: building a map
 
         p = lambda name: self.get_parameter(name).value  # noqa: E731
         self.global_frame = p('global_frame')
@@ -227,25 +229,25 @@ class BridgeNode(Node):
         self.stall_timeout = p('stall_timeout')
         self.backoff_distance = p('backoff_distance')
         self.mode = p('mode')
-        # 이 브리지 실행 번호. 서버는 SLAM 실행이 바뀐 것을 알고 이전 SLAM 맵/위치(다른 좌표계)를 지운다
+        # Run ID of this bridge. The server uses it to notice a new SLAM run and clear the old SLAM map/pose (different frame)
         self.session = self.run_session()
-        self.map_dirty = False      # SLAM 모드: 서버로 보낼 새 맵이 있음
+        self.map_dirty = False      # SLAM mode: a new map is pending for the server
         self.last_map_sent = 0.0
-        self.script_running = None  # 실행 중인 scripts/*.sh 이름
+        self.script_running = None  # name of the scripts/*.sh currently running
 
         self.tf_buffer = Buffer()
-        # TF 는 별도 노드 + 스레드에서 받는다. 이 노드는 IMU(~200Hz)·odom·scan·타이머를 한 스레드에서 처리하는데
-        # 실행기는 한 바퀴에 구독마다 메시지 하나씩만 꺼내므로, 부하가 높으면 /tf(~100Hz) 가 큐에 쌓여
-        # 0.5초 넘게 밀리고 '위치 TF 끊김' 으로 멈췄다 (바깥 노드에서 잰 TF 는 정상이었음)
-        # use_global_arguments=False: launch 의 '__node:=warehouse_bridge' 가 이 노드에도 적용되어
-        # 노드 목록에 /warehouse_bridge 가 두 개로 보였음 (브리지가 둘 떠 있는 것처럼)
-        # 로봇 여러 대(네임스페이스 있음)면 TF 도 그 로봇 것(/<ns>/tf)만 받는다. 이 노드는 launch 인자를 안 받으므로 직접 넘김
+        # TF is received in a separate node + thread. This node handles IMU (~200 Hz), odom, scan and timers in one thread, and
+        # the executor takes only one message per subscription per spin, so under load /tf (~100 Hz) would queue up, lag
+        # beyond the timeout and trigger a 'pose TF lost' stop.
+        # use_global_arguments=False: otherwise the launch '__node:=warehouse_bridge' applies to this node too and
+        # /warehouse_bridge shows up twice in the node list (as if two bridges were running)
+        # With multiple robots (namespaced), only that robot's TF (/<ns>/tf) is received. This node gets no launch args, so pass it explicitly
         ns = self.get_namespace()
         tf_args = [] if ns == '/' else ['--ros-args', '-r', '/tf:=tf', '-r', '/tf_static:=tf_static']
         self.tf_node = rclpy.create_node('warehouse_bridge_tf', namespace=ns, use_global_arguments=False, cli_args=tf_args,
                                          parameter_overrides=[rclpy.parameter.Parameter(
                                              'use_sim_time', value=self.get_parameter('use_sim_time').value)])
-        TransformListener(self.tf_buffer, self.tf_node, spin_thread=True)   # 구독 콜백이 리스너를 붙잡고 있음
+        TransformListener(self.tf_buffer, self.tf_node, spin_thread=True)   # the subscription callback holds the listener
 
         map_qos = QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL,
                              reliability=ReliabilityPolicy.RELIABLE)
@@ -253,41 +255,41 @@ class BridgeNode(Node):
         self.create_subscription(OccupancyGrid, p('map_topic'), self.on_map, map_qos)
         self.create_subscription(BatteryState, 'battery_state', self.on_battery, qos_profile_sensor_data)
         self.scan = None
-        self.last_scan_sent = 0.0   # 웹 실시간 LiDAR (send_scan)
+        self.last_scan_sent = 0.0   # web live LiDAR (send_scan)
         self.create_subscription(LaserScan, 'scan', self.on_scan, qos_profile_sensor_data)
-        self.tilt = 0.0           # IMU 로 계산한 기울기 (rad)
-        # 평소 기울기 (IMU 기본 오프셋, 기운 바닥): 천천히 따라가는 평균. tilt_rel = 평소보다 더 기운 정도
+        self.tilt = 0.0           # tilt computed from the IMU (rad)
+        # Usual tilt (IMU offset, sloped floor): a slowly following average. tilt_rel = how much more tilted than usual
         self.tilt_base = None
         self.tilt_rel = 0.0
         self.last_imu_time = None
-        self.scan_gated_since = None  # 기울어서 AMCL/SLAM 에 스캔을 안 넘기기 시작한 시각
-        self.lift_dir = 0.0           # 들린 쪽 방향 (로봇 기준 rad, 0 = 앞). 장애물이 있는 쪽
-        self.tipped_since = None  # 넘어진 상태가 시작된 시각
+        self.scan_gated_since = None  # time we started withholding scans from AMCL/SLAM because of tilt
+        self.lift_dir = 0.0           # direction of the lifted side (robot frame, rad, 0 = front). The side where the obstacle is
+        self.tipped_since = None  # time the tipped-over state started
         self.create_subscription(Imu, 'imu', self.on_imu, qos_profile_sensor_data)
-        # 카메라 물건(LED) 인식 결과: 인식 노드(cargo_detector 또는 직접 만든 YOLO 노드)가 보이는 라벨을 발행.
-        # '' = 아무것도 없음. 흔들림을 막기 위해 cargo_stable_sec 동안 같을 때만 서버에 알린다
+        # Camera object (LED) detection: a detector node (cargo_detector or a custom YOLO node) publishes the visible label.
+        # '' = nothing. To avoid flicker, the server is notified only when it stays the same for cargo_stable_sec
         self.declare_parameter('cargo_stable_sec', 1.0)
-        self.cargo_raw = None       # (라벨, 처음 본 시각)
-        self.cargo_sent = None      # 서버에 마지막으로 알린 라벨 (None = 인식 노드 없음)
-        self.cargo_resend = False   # 서버에 다시 연결되면 지금 라벨을 다시 알림
+        self.cargo_raw = None       # (label, first seen time)
+        self.cargo_sent = None      # label last reported to the server (None = no detector node)
+        self.cargo_resend = False   # re-report the current label after reconnecting to the server
         self.create_subscription(String, 'cargo/detected', self.on_cargo, 10)
         self.create_timer(0.2, self.flush_cargo)
-        # YOLO 부품 검출기 (yolo/yolo_training/infer_ros_switch.py): 웹 버튼으로 enabled(추론+검출 영상 발행)를 켜고 끄고,
-        # 클래스별 개수 글자(/yolo/counts, 약 1초마다)를 웹에 띄운다. 검출기 노드가 없으면 '없음'으로 표시
-        # 상대 이름: 네임스페이스 없이 띄우면 /component_detector_switch, /yolo/counts (로봇 여러 대면 /<ns>/...)
+        # YOLO component detector (yolo/yolo_training/infer_ros_switch.py): a web button toggles enabled (inference + publishing
+        # the detection image), and the per-class count text (/yolo/counts, about every 1 s) is shown on the web. Shown as 'none' if no detector node
+        # Relative names: without a namespace /component_detector_switch, /yolo/counts (with multiple robots /<ns>/...)
         self.declare_parameter('yolo_node', 'component_detector_switch')
         self.declare_parameter('yolo_counts_topic', 'yolo/counts')
         yn = self.get_parameter('yolo_node').value.rstrip('/')
         self.yolo_get = self.create_client(GetParameters, f'{yn}/get_parameters')
         self.yolo_set = self.create_client(SetParameters, f'{yn}/set_parameters')
-        self.yolo_enabled = None     # None = 모름 (검출기 없음)
-        self.yolo_counts = ('', None)   # (글자, 받은 시각)
-        self.yolo_pending = None     # 답을 기다리는 enabled 조회 (future, 보낸 시각)
+        self.yolo_enabled = None     # None = unknown (no detector)
+        self.yolo_counts = ('', None)   # (text, time received)
+        self.yolo_pending = None     # pending enabled query awaiting a reply (future, time sent)
         self.create_subscription(String, self.get_parameter('yolo_counts_topic').value, self.on_yolo_counts, 10)
         self.create_timer(1.0, self.poll_yolo)
 
-        # 움직이는 장애물 추적 (tb3_nav 의 obstacle_tracker 를 브리지 안으로): 스캔 → odom 점 → 지도 벽 근처 제외
-        # → 덩어리 → 칼만필터로 위치/속도. Frenet 이 미래 위치를 피하는 데 쓰고, 웹 지도에 표시한다
+        # Moving obstacle tracking (tb3_nav's obstacle_tracker moved into the bridge): scan → odom points → drop points near map
+        # walls → clusters → Kalman filter for position/velocity. Frenet uses it to avoid future positions; shown on the web map
         tp = lambda n, d: self.declare_parameter(f'tracking.{n}', d).value  # noqa: E731
         self.tracking = tp('enabled', True)
         self.track_cfg = dict(max_range=tp('max_range', 5.0), static_match_dist=tp('static_match_dist', 0.15),
@@ -296,39 +298,39 @@ class BridgeNode(Node):
         self.tracker = MultiObjectTracker(gate=tp('gate', 0.5), min_hits=tp('min_hits', 3),
                                           max_misses=tp('max_misses', 5), accel_noise=tp('accel_noise', 1.0),
                                           meas_noise=tp('meas_noise', 0.05), max_speed=tp('max_speed', 1.5))
-        # 이보다 빠른 track 만 움직이는 물체로 예측/웹 표시 (멈춘 물체 속도 노이즈 중앙값 0.06, 느린 사람 0.1)
+        # Only tracks faster than this are predicted/shown as moving objects (above the speed noise of stopped objects, below a slow walker)
         self.declare_parameter('tracking.moving_speed', 0.08)
-        self.tracks = []                   # 확정된 track (odom)
-        self.scan_odom = np.empty((0, 2))  # 최근 스캔 점 (odom) - Frenet 정적 장애물
-        self.scan_unmapped = np.empty((0, 2))   # 그중 지도에 없는 점 (기록용)
-        self.map_dist = None               # 지도 벽까지 거리 (벽 근처 점 = 정적) (dist, msg)
+        self.tracks = []                   # confirmed tracks (odom)
+        self.scan_odom = np.empty((0, 2))  # recent scan points (odom) - Frenet static obstacles
+        self.scan_unmapped = np.empty((0, 2))   # those not in the map (for records)
+        self.map_dist = None               # distance to map walls (points near walls = static) (dist, msg)
         self.last_obstacles_sent = 0.0
         self.last_plan_sent = 0.0
-        # 차체 직사각형 (base_footprint 기준 x_min, x_max, 반폭): Waffle Pi 외곽
+        # Body rectangle (relative to base_footprint: x_min, x_max, half-width): Waffle Pi outline
         fp = tuple(float(v) for v in self.declare_parameter('footprint', [-0.197, 0.069, 0.153]).value)
-        # 차체에 붙인 물건 (base_footprint 기준 사각형 x_min, x_max, y_min, y_max 를 4개씩 이어 붙인 목록).
-        # 기본: 뒤쪽 가운데 8cm x 8cm (차체 뒤 끝 x=-0.197 에서 8cm 더 나옴). Frenet 충돌 검사, 물러나기/제자리 회전 여유, 웹 로봇 모양
+        # Objects attached to the body (rectangles relative to base_footprint, x_min, x_max, y_min, y_max concatenated in groups of 4).
+        # Default: 8 cm x 8 cm at the rear center (sticks out 8 cm past the body's rear end x=-0.197). Used for Frenet collision checks, back-off/in-place turn clearance, robot shape on the web
         ex = [float(v) for v in self.declare_parameter('footprint_extra', [-0.277, -0.197, -0.04, 0.04]).value]
         self.footprint_extra = [tuple(ex[i:i + 4]) for i in range(0, len(ex) - 3, 4)]
-        # Frenet 로컬 플래너 설정 (frenet.* : 목록 값 빼고 실행 중에 바꿀 수 있음)
+        # Frenet local planner settings (frenet.*: all but list values can be changed while running)
         fdef = FrenetConfig(footprint=fp, footprint_extra=tuple(v for r in self.footprint_extra for v in r))
         self.frenet_cfg = FrenetConfig(**{
             k: (tuple(float(x) for x in self.declare_parameter(f'frenet.{k}', [float(x) for x in v]).value)
                 if isinstance(v, tuple) else type(v)(self.declare_parameter(f'frenet.{k}', v).value))
             for k, v in vars(fdef).items()})
-        if self.mode == 'slam':   # 지도를 만드는 중에는 천천히 돈다 (빨리 돌면 스캔이 휘어 SLAM 매칭이 나빠짐)
+        if self.mode == 'slam':   # turn slowly while building a map (fast turns warp the scan and worsen SLAM matching)
             self.frenet_cfg.rotate_speed = min(self.frenet_cfg.rotate_speed, 0.6)
         self.odom_vw = (0.0, 0.0)
-        # 로봇 위치(odom 프레임)는 /tf 대신 /odom 메시지로: /tf 는 신뢰성(재전송) 전송이라 Wi-Fi 에서 패킷 하나가 빠지면 뒤 데이터까지
-        # 재전송을 기다려 최대 2.4초 멈췄고, /odom(best effort)은 같은 때 0.67초 (실물 측정 2026-10-26: 0.5초 넘는 사건 3 → 1)
-        self.odom_msg = None   # (x, y, yaw, 스탬프 Time)
+        # Robot pose (odom frame) comes from /odom messages instead of /tf: /tf is reliable (retransmitting), so on Wi-Fi one lost
+        # packet stalls the following data until retransmission, while /odom (best effort) recovers much sooner
+        self.odom_msg = None   # (x, y, yaw, stamp Time)
         self.create_subscription(Odometry, 'odom', self.on_odom, qos_profile_sensor_data)
-        # 기록용: 바퀴 엔코더 속도(rad/s)와 IMU 회전 속도. 명령보다 실제 회전이 절반쯤만 나와서(실물 2026-10-26, 오도메트리·AMCL 둘 다)
-        # 바퀴는 명령대로 도는데 몸체가 덜 도는지(미끄러짐/끌림) 바퀴부터 덜 도는지(모터/펌웨어) 가르려고
-        self.wheel_vel = None    # {관절 이름: rad/s}
+        # For records: wheel encoder velocities (rad/s) and IMU angular velocity, to tell whether the wheels turn as commanded but
+        # the body turns less (slipping/dragging) or the wheels themselves turn less (motor/firmware)
+        self.wheel_vel = None    # {joint name: rad/s}
         self.imu_wz = None
         self.create_subscription(JointState, 'joint_states', self.on_joint_states, qos_profile_sensor_data)
-        # A* 가 기억 중인 장애물 (맵에 없는 LiDAR 장애물, 부딪힌 자리) → 웹 지도 표시
+        # Obstacles remembered by A* (LiDAR obstacles not in the map, bump spots) → web map display
         self.memory = {'remembered': [], 'bumps': []}
         self.create_subscription(PoseArray, 'astar/remembered', lambda m: self.on_memory('remembered', m), 1)
         self.create_subscription(PoseArray, 'astar/bumps', lambda m: self.on_memory('bumps', m), 1)
@@ -336,11 +338,11 @@ class BridgeNode(Node):
         self.nomotion_client = self.create_client(Empty, 'request_nomotion_update')  # AMCL
         self.nomotion_left = 0
         self.create_timer(0.3, self.nomotion_step)
-        # /cmd_vel 은 브리지만 내보낸다. 자동 이동은 self.cmd_vel_pub.publish(...) 로 선택기(CmdMux)에 넣고,
-        # 수동 조작(웹 teleop, 외부 키보드 cmd_vel_teleop)·정지와 우선순위를 가려 20Hz 로 내보낸다.
-        # 실물은 cmd_vel_pc 로 보내고 Pi 의 명령 감시(scripts/pi_cmd_watchdog.py)가 cmd_vel 로 넘긴다: 명령이 0.5초 넘게
-        # 안 오면 로봇 쪽에서 세움 (Wi-Fi 끊김으로 정지 명령이 9초 안 들어가 벽에 부딪힌 적 있음).
-        # 시뮬레이션도 같은 명령 감시를 start_sim.sh 가 띄워 같은 경로로 간다
+        # Only the bridge publishes /cmd_vel. Automatic motion goes into the selector (CmdMux) via self.cmd_vel_pub.publish(...),
+        # which arbitrates with manual control (web teleop, external keyboard cmd_vel_teleop) and stop, publishing at 20 Hz.
+        # On the real robot it publishes to cmd_vel_pc and the Pi's watchdog (scripts/pi_cmd_watchdog.py) forwards it to cmd_vel:
+        # if no command arrives for 0.5 s, the robot side stops (so a Wi-Fi drop can't leave it driving on its last command).
+        # In simulation start_sim.sh runs the same watchdog, so the path is the same
         self.cmd_topic = self.declare_parameter('cmd_vel_topic', 'cmd_vel_pc').value
         self._cmd_out = self.create_publisher(Twist, self.cmd_topic, 1)
         self.watchdog_warned = 0.0
@@ -348,61 +350,61 @@ class BridgeNode(Node):
         self.cmd_vel_pub = _AutoCmd(self.mux)
         self.create_subscription(Twist, 'cmd_vel_teleop', self.on_external_teleop, 10)
         self.create_timer(0.05, self.mux_step)
-        self.bump_pub = self.create_publisher(PointStamped, 'astar/obstacle', 10)  # 부딪힌 자리 → A* 플래너
+        self.bump_pub = self.create_publisher(PointStamped, 'astar/obstacle', 10)  # bump spots → A* planner
         self.clear_obstacles_client = self.create_client(Empty, 'astar/clear_obstacles')
-        # 웹에서 그린 금지 구역 → A* 플래너 (JSON 목록). 플래너가 나중에 떠도 받도록 transient local
+        # Keep-out zones drawn on the web → A* planner (JSON list). Transient local so a planner started later still gets them
         self.zones_pub = self.create_publisher(String, 'astar/zones', map_qos)
         self.zones_json = None
-        self.zone_replan_at = None   # 금지 구역이 바뀌어 경로를 다시 계산할 시각
-        # A* 가 경로를 못 찾은 이유 (금지 구역 때문 등). 서비스 응답과 따로 오므로 받은 시각과 같이 둔다
+        self.zone_replan_at = None   # time to recompute the path after the keep-out zones changed
+        # Why A* found no path (keep-out zones, etc.). It arrives separately from the service reply, so keep the time received with it
         self.plan_fail = (0.0, '')
         self.create_subscription(String, 'astar/fail_reason',
                                  lambda m: setattr(self, 'plan_fail', (time.monotonic(), m.data)), 10)
         self.level_scan_pub = self.create_publisher(LaserScan, 'scan_level', qos_profile_sensor_data)
-        # SLAM 전용: 아무것도 안 맞은 빔(inf)을 range_max 바로 아래 값으로 바꿔서 발행 (to_slam_scan 참고)
+        # SLAM only: publish with no-return beams (inf) replaced by a value just below range_max (see to_slam_scan)
         self.slam_scan_pub = self.create_publisher(LaserScan, 'scan_slam', qos_profile_sensor_data)
 
         self.plan_client = self.create_client(GetPlan, 'astar/get_plan')
 
-        # 현재 목표. generation은 취소된 목표의 늦은 콜백을 무시하기 위한 번호
+        # Current goal. generation is a counter for ignoring late callbacks of cancelled goals
         self.goal = None
         self.generation = 0
         self.last_battery_sent = 0.0
-        self.battery_history = []  # (시각, 전압)
+        self.battery_history = []  # (time, voltage)
         self.stop_count = 0
-        self.follower = None  # 추종 상태 {'frenet': FrenetFollower, 막힘/진행/회복 상태}
+        self.follower = None  # following state {'frenet': FrenetFollower, blocked/progress/recovery state}
         self.last_goal_id = None
 
         self.server = ServerConnection(p('server_url'), self.get_logger())
         self.create_timer(0.05, self.process_inbox)
         self.create_timer(1.0 / p('pose_rate'), self.send_pose)
         self.create_timer(0.1, self.publish_stop)
-        # 웹 수동 조작 (teleop): 누르고 있는 동안 0.1초마다 명령이 온다. 0.4초 넘게 안 오면 멈춤
-        self.teleop = None   # (v, w, 받은 시각)
-        # (수동 조작 목표는 mux_step 에서 선택기로 넣음)
+        # Web manual control (teleop): commands arrive every 0.1 s while held. Stop if none for over 0.4 s
+        self.teleop = None   # (v, w, time received)
+        # (manual control targets are fed into the selector in mux_step)
         self.create_timer(0.05, self.control_step)
         self.create_timer(1.0, self.send_health)
         self.create_timer(0.1, self.flush_map)
-        # 실행 중 파라미터 변경 (ros2 param set, 웹 '주행 파라미터' 카드). 메모리에서만 바뀌고 재시작하면 params.yaml 값.
-        # 시작 값을 기억해 웹에서 바뀐 것을 표시/되돌림. declare 가 모두 끝난 뒤에 등록 (declare 도 콜백을 부름)
+        # Runtime parameter changes (ros2 param set, web 'driving parameters' card). Memory only; on restart the params.yaml values apply.
+        # Start values are kept so the web can show/revert changes. Registered after all declares (declare also calls the callback)
         self.param_start = {n: self.get_parameter(n).value for n in self.tunable_params()}
         self.params_dirty = False
-        # 주행 기록 (tools/drive_replay.py 로 분석): 브리지를 켤 때마다 세션 폴더 logs/records/<켠 시각>_frenet/,
-        # 그 안에 목표 하나 = <시각>_<목표>/record.jsonl.gz (분석 그림도 그 폴더에).
-        # 0.1초마다 위치/속도/명령/트래킹/스캔 점, Frenet 을 계산한 주기엔 그 입력과 후보별 판정·비용까지
+        # Drive records (analyzed with tools/drive_replay.py): each bridge start gets a session folder logs/records/<start time>_frenet/,
+        # inside it one goal = <time>_<goal>/record.jsonl.gz (analysis plots go in the same folder).
+        # Every 0.1 s pose/velocity/command/tracks/scan points; in cycles where Frenet was computed, also its inputs and per-candidate verdicts/costs
         self.record_enabled = self.declare_parameter('record.enabled', True).value
-        # 목표가 끝나면 그 폴더에 요약(summary.txt)과 중요한 순간 그림(plot_*.png)을 만든다 (tools/drive_replay.py, 낮은 우선순위)
+        # When a goal ends, a summary (summary.txt) and key-moment plots (plot_*.png) are written into its folder (tools/drive_replay.py, low priority)
         self.record_plots = self.declare_parameter('record.plots', True).value
         self.record_dir = os.path.join(os.environ.get('WAREHOUSE_HOME') or os.getcwd(), 'logs', 'records')
-        self.record_session = None   # 이번 브리지 세션 폴더 (첫 기록 때 만듦)
-        self.rec = None        # 열린 기록 {'file', 't0', 'last', 'flushed', 'path'}
-        self.rec_raw = None    # 이번 주기 Frenet 추종기가 낸 값 (v, w, state). 비상 정지 등으로 바뀌기 전
-        self.rec_frenet = None  # 이번 주기 Frenet 입력/결과 (frenet_compute 가 채움)
+        self.record_session = None   # this bridge session's folder (created on the first record)
+        self.rec = None        # open record {'file', 't0', 'last', 'flushed', 'path'}
+        self.rec_raw = None    # what the Frenet follower output this cycle (v, w, state), before emergency stop etc. altered it
+        self.rec_frenet = None  # this cycle's Frenet inputs/results (filled by frenet_compute)
         self.add_on_set_parameters_callback(self.on_set_params)
         self.create_timer(0.2, self.flush_params)
         self.get_logger().info('브리지 시작 (A* + Frenet 로컬 플래너)')
 
-    # ---------------------------------------------------------- 서버 메시지 처리
+    # ---------------------------------------------------------- server message handling
     def process_inbox(self):
         while True:
             try:
@@ -424,7 +426,7 @@ class BridgeNode(Node):
                 elif kind == 'stop':
                     self.teleop = None
                     self.cancel_goal()
-                    self.stop_count = 10  # 1초 동안 정지 명령 발행
+                    self.stop_count = 10  # publish stop for 1 s
                 elif kind == 'save_map':
                     self.save_map(str(msg['name']))
                 elif kind == 'reset':
@@ -450,22 +452,21 @@ class BridgeNode(Node):
     def on_zones(self, zones):
         data = json.dumps(zones, sort_keys=True)
         if data == self.zones_json:
-            return   # SLAM 맵 갱신마다 같은 목록이 다시 오므로 바뀔 때만 발행
+            return   # the same list comes again with every SLAM map update, so publish only on change
         self.zones_json = data
         self.zones_pub.publish(String(data=data))
         self.get_logger().info(f'금지 구역 {len(zones)}개 → A* 플래너')
-        # 이동 중이면 새 구역으로 경로를 다시 계산한다 (예전에는 출발 때 계산한 경로를 그대로 따라가 구역을 뚫고 지나감).
-        # 플래너가 구역을 먼저 받도록 0.3초 뒤에 (control_step 에서)
+        # While moving, recompute the path for the new zones (otherwise the path planned at the start would cut through the zone).
+        # Done 0.3 s later (in control_step) so the planner gets the zones first
         if self.goal is not None:
             self.zone_replan_at = time.monotonic() + 0.3
 
-    # ---------------------------------------------------------- 로봇 상태 → 서버
+    # ---------------------------------------------------------- robot state → server
     def on_map(self, msg):
         self.map_msg = msg
         self.update_map_dist(msg)
         if self.mode == 'slam':
-            # SLAM 이 맵을 갱신하면(2초마다) 바로 보낸다. 짧은 간격으로 몰려 오면 MAP_MIN_INTERVAL 마다 최신 것만 (flush_map)
-            # (예전: 3초에 한 번만 보내서 웹 지도가 최대 3초 늦었음)
+            # Send as soon as SLAM updates the map. If updates bunch up, send only the latest every MAP_MIN_INTERVAL (flush_map)
             self.map_dirty = True
             self.flush_map()
             return
@@ -479,8 +480,8 @@ class BridgeNode(Node):
             self.send_map()
 
     def run_script(self, script_name, args, reply_type, tag, env_extra=None, timeout=180):
-        """scripts/<script_name> 을 별도 스레드로 실행하고, [tag] 로 시작하는 출력 마지막 3줄을 서버에 알린다.
-        한 번에 하나만 실행한다."""
+        """Run scripts/<script_name> in a separate thread and report the last 3 output lines starting with [tag] to the server.
+        Only one runs at a time."""
         if self.script_running:
             self.server.send({'type': reply_type, 'ok': False, 'message': f'{self.script_running} 이(가) 실행 중입니다.'})
             return
@@ -498,7 +499,7 @@ class BridgeNode(Node):
                 lines = [l for l in (r.stdout + r.stderr).splitlines() if l.startswith(f'[{tag}]')]
                 self.server.send({'type': reply_type, 'ok': r.returncode == 0,
                                   'message': ' / '.join(l.replace(f'[{tag}] ', '') for l in lines[-3:])})
-            except Exception as e:  # 시간 초과 등
+            except Exception as e:  # timeout etc.
                 self.server.send({'type': reply_type, 'ok': False, 'message': str(e)})
             finally:
                 self.script_running = None
@@ -506,30 +507,30 @@ class BridgeNode(Node):
         self.get_logger().info(f'{script_name} 실행: {args}')
 
     def save_map(self, name):
-        """웹의 '맵 저장': scripts/save_map.sh"""
+        """Web 'save map': scripts/save_map.sh"""
         if self.mode != 'slam':
             self.server.send({'type': 'map_saved', 'ok': False, 'message': 'SLAM 모드에서만 맵을 저장할 수 있습니다.'})
             return
         env = {}
         pose = self.current_pose()
-        if pose is not None:  # 로봇이 있는 공간을 기준으로 맵을 정리하도록
+        if pose is not None:  # so the map is cleaned up relative to the space the robot is in
             env = {'SEED_X': f'{pose[0]:.3f}', 'SEED_Y': f'{pose[1]:.3f}'}
         self.run_script('save_map.sh', [name], 'map_saved', 'save_map', env)
 
     def reset_robot(self):
-        """웹의 '상태 초기화': 즉시 멈추고 목표를 취소한 뒤 scripts/reset_robot.sh
-        (시뮬레이션이면 Gazebo 월드 초기화로 로봇을 출발 위치에 세움)."""
+        """Web 'reset state': stop immediately, cancel the goal, then scripts/reset_robot.sh
+        (in simulation, the Gazebo world reset puts the robot back at its start)."""
         self.cancel_goal()
         self.stop_count = 10
         self.tipped_since = None
         if self.clear_obstacles_client.service_is_ready():
-            self.clear_obstacles_client.call_async(Empty.Request())  # 부딪힌 자리 기억도 지움
+            self.clear_obstacles_client.call_async(Empty.Request())  # also clears the remembered bump spots
         self.run_script('reset_robot.sh', [], 'reset_done', 'reset', timeout=60)
 
     def send_map(self):
         m = self.map_msg
         if m is None or m.info.width == 0 or m.info.height == 0:
-            return  # SLAM 시작 직후 빈 맵은 보내지 않는다 (웹은 맵 없이 로봇 주변 격자를 보여줌)
+            return  # don't send the empty map right after SLAM starts (the web shows a grid around the robot without a map)
         raw = np.asarray(m.data, dtype=np.int8).tobytes()
         self.server.send({
             'type': 'map',
@@ -550,7 +551,7 @@ class BridgeNode(Node):
         return tr.x, tr.y, yaw_from_quaternion(t.transform.rotation)
 
     def send_pose(self):
-        # 위치 TF가 없거나 오래됐으면(로봇/AMCL이 멈춤) 화면에서 지우도록 알린다
+        # If the pose TF is missing or stale (robot/AMCL stopped), tell the UI to remove it from the screen
         pose = self.pose_with_age()
         if pose is not None and pose[3] <= 1.0:
             self.server.send({'type': 'pose', 'x': pose[0], 'y': pose[1], 'yaw': pose[2]})
@@ -565,7 +566,7 @@ class BridgeNode(Node):
         return (self.get_clock().now() - Time.from_msg(t.header.stamp)).nanoseconds / 1e9
 
     def send_health(self):
-        """로봇(Pi)이 살아 있는지(LiDAR, 오도메트리), 위치를 아는지 1초마다 서버에 알린다."""
+        """Report every 1 s whether the robot (Pi) is alive (LiDAR, odometry) and whether its pose is known."""
         now = self.get_clock().now()
         scan_age = None if self.scan is None else \
             (now - Time.from_msg(self.scan.header.stamp)).nanoseconds / 1e9
@@ -582,7 +583,7 @@ class BridgeNode(Node):
             'localized': odom_ok and map_age is not None and map_age < 2.0,
             'tipped': self.tipped,
             'tilt_deg': round(math.degrees(self.tilt)),
-            'footprint': [[round(v, 3) for v in r] for r in self.body_rects()],   # 웹 로봇 모양
+            'footprint': [[round(v, 3) for v in r] for r in self.body_rects()],   # robot shape on the web
         })
 
     def on_battery(self, msg):
@@ -593,7 +594,7 @@ class BridgeNode(Node):
         if now - self.last_battery_sent < 5.0 or not self.battery_history:
             return
         self.last_battery_sent = now
-        # 주행 중 전압이 출렁이므로 최근 30초 중앙값 사용
+        # voltage fluctuates while driving, so use the median of the last 30 s
         voltage = float(np.median([v for _, v in self.battery_history]))
         self.server.send({'type': 'battery', 'voltage': voltage,
                           'percentage': battery_percent(voltage, self.battery_cells, self.battery_empty_v)})
@@ -601,11 +602,11 @@ class BridgeNode(Node):
     def send_path(self, poses):
         pts = [[p.pose.position.x, p.pose.position.y] for p in poses]
         if len(pts) > 2:
-            pts = pts[:-1:3] + [pts[-1]]  # 전송량 줄이기
+            pts = pts[:-1:3] + [pts[-1]]  # reduce the amount sent
         self.server.send({'type': 'path', 'points': pts})
 
     def report(self, status, message=''):
-        """현재 목표의 결과를 서버에 알리고 목표를 비운다."""
+        """Report the current goal's result to the server and clear the goal."""
         if self.goal is None:
             return
         self.get_logger().info(f'목표 {self.goal["id"]}: {status} {message}')
@@ -616,17 +617,17 @@ class BridgeNode(Node):
             self.goal = None
             self.send_path([])
 
-    # ---------------------------------------------------------- 이동
+    # ---------------------------------------------------------- motion
     def start_goal(self, goal_id, x, y, yaw):
         self.cancel_goal(report=False)
-        self.teleop = None   # 목표가 오면 수동 조작은 끝
+        self.teleop = None   # a new goal ends manual control
         if self.tipped:
             self.last_goal_id = goal_id
             self.server.send({'type': 'nav_status', 'goal_id': goal_id, 'status': 'failed',
                               'message': '로봇이 넘어져 있습니다. 세운 뒤 상태 초기화를 하세요.'})
             return
         if self.tilt_rel > self.bump_tilt:
-            # 장애물에 걸쳐 기운 채로 출발하면 더 올라타기만 한다 (sim 에서 43도까지 기움)
+            # Starting while tilted on an obstacle would only climb further onto it
             self.last_goal_id = goal_id
             self.server.send({'type': 'nav_status', 'goal_id': goal_id, 'status': 'failed',
                               'message': f'차체가 {math.degrees(self.tilt_rel):.0f}도 기운 채 장애물에 걸려 있습니다. '
@@ -658,7 +659,7 @@ class BridgeNode(Node):
          ps.pose.orientation.z, ps.pose.orientation.w) = quaternion_from_yaw(yaw)
         return ps
 
-    # 경로 계획 (A*) ------------------------------------------------
+    # Path planning (A*) ------------------------------------------------
     def request_plan(self):
         gen = self.generation
         pose = self.current_pose()
@@ -679,11 +680,11 @@ class BridgeNode(Node):
             return
         plan = future.result().plan if future.result() else None
         if plan is None or not plan.poses:
-            # 실패 이유(astar/fail_reason)는 토픽으로 따로 오므로 잠깐 기다렸다가 붙인다
+            # The failure reason (astar/fail_reason) arrives on a separate topic, so wait briefly before attaching it
             asked = time.monotonic()
 
             def report_fail():
-                self.destroy_timer(timer)   # 한 번만
+                self.destroy_timer(timer)   # once only
                 if gen != self.generation or self.goal is None:
                     return
                 t, why = self.plan_fail
@@ -695,18 +696,18 @@ class BridgeNode(Node):
             self.report('failed', '로봇 위치를 알 수 없습니다. 초기 위치를 지정하세요.')
             return
         self.send_path(plan.poses)
-        self.stop_count = 0  # 이전 목표의 정지 명령이 새 주행에 섞이지 않게
+        self.stop_count = 0  # so the previous goal's stop commands don't mix into the new drive
         points = [(ps.pose.position.x, ps.pose.position.y) for ps in plan.poses]
         self.record_write({'type': 'plan', 'retries': self.goal['retries'], 'start': start, 'path': points})
         try:
             try:
                 fr = FrenetFollower(points, self.goal['yaw'], self.frenet_cfg)
             except ValueError:
-                # 경로 점이 하나뿐 (이미 목표 칸 안): 목표 방향으로 5 cm 짜리 경로 → 바로 도착으로 보고 방향만 맞춤
+                # Only one path point (already within the goal cell): a 5 cm path toward the goal → treated as arrived, only align heading
                 sx, sy = points[0]
                 yaw = self.goal['yaw']
                 fr = FrenetFollower([(sx, sy), (sx + 0.05 * math.cos(yaw), sy + 0.05 * math.sin(yaw))], yaw, self.frenet_cfg)
-        except Exception as e:   # 기준선을 못 만드는 경로가 와도 브리지가 죽지 않게 (죽으면 로봇이 '오프라인')
+        except Exception as e:   # don't let the bridge die on a path that can't form a reference line (if it dies, the robot goes 'offline')
             self.get_logger().error(f'경로로 기준선을 못 만듦 ({len(points)}개 점): {e!r}')
             self.record_event(f'기준선 만들기 실패: {e!r}')
             self.report('failed', '경로를 따라갈 기준선을 만들지 못했습니다.')
@@ -715,7 +716,7 @@ class BridgeNode(Node):
                          'frenet': fr}
 
     def fail_or_retry(self, reason):
-        """재시도 횟수가 남았으면 현재 위치에서 다시 계획, 아니면 실패 보고."""
+        """If retries remain, replan from the current pose; otherwise report failure."""
         if self.goal['retries'] < self.max_retries:
             self.goal['retries'] += 1
             self.get_logger().warn(f'{reason} 재시도 {self.goal["retries"]}/{self.max_retries}')
@@ -726,19 +727,19 @@ class BridgeNode(Node):
         else:
             self.report('failed', reason)
 
-    # 카메라 / 파라미터 ---------------------------------------------
+    # Camera / parameters ---------------------------------------------
     def on_cargo(self, msg):
         label = msg.data.strip()
         if self.cargo_raw is None or self.cargo_raw[0] != label:
             self.cargo_raw = (label, time.monotonic())
 
-    # YOLO 검출기 ------------------------------------------------
+    # YOLO detector ------------------------------------------------
     def on_yolo_counts(self, msg):
         self.yolo_counts = (msg.data.strip(), time.monotonic())
         self.send_yolo()
 
     def poll_yolo(self):
-        """1초마다 검출기의 enabled 를 읽어 (노드가 있는지도 같이) 서버에 알린다."""
+        """Every 1 s read the detector's enabled (which also tells whether the node exists) and report it to the server."""
         if not self.yolo_get.service_is_ready():
             self.yolo_enabled = None
             self.send_yolo()
@@ -747,14 +748,14 @@ class BridgeNode(Node):
             fut, sent = self.yolo_pending
             if time.monotonic() - sent < 3.0:
                 return
-            # 답이 안 온 요청(통신 끊김, 검출기 바쁨)은 버리고 다시 묻는다. 안 그러면 영영 다시 묻지 않음
+            # Drop requests that got no reply (link down, detector busy) and ask again; otherwise it would never ask again
             self.yolo_get.remove_pending_request(fut)
         fut = self.yolo_get.call_async(GetParameters.Request(names=['enabled']))
         self.yolo_pending = (fut, time.monotonic())
 
         def done(f):
             if self.yolo_pending is None or self.yolo_pending[0] is not f:
-                return   # 이미 버린 요청의 늦은 답
+                return   # late reply to an already dropped request
             self.yolo_pending = None
             r = f.result()
             if r is not None and r.values and r.values[0].type == ParameterType.PARAMETER_BOOL:
@@ -762,7 +763,7 @@ class BridgeNode(Node):
             self.send_yolo()
         fut.add_done_callback(done)
 
-    # 실행 중에 바꾸면 바로 쓰이는 파라미터 → 브리지 속성 (나머지 tunable 은 쓸 때마다 get_parameter 로 읽음)
+    # Parameters that take effect immediately when changed at runtime → bridge attributes (other tunables are read with get_parameter on each use)
     LIVE_ATTRS = {'stop_distance': 'stop_distance', 'estop_distance': 'estop_distance',
                   'blocked_timeout': 'blocked_timeout', 'progress_timeout': 'progress_timeout',
                   'tf_timeout': 'tf_timeout', 'pose_lost_timeout': 'pose_lost_timeout', 'rotate_timeout': 'rotate_timeout', 'stall_timeout': 'stall_timeout',
@@ -770,14 +771,14 @@ class BridgeNode(Node):
                   'max_retries': 'max_retries', 'bump_tilt_deg': 'bump_tilt'}
 
     def tunable_params(self):
-        """실행 중에 바꿀 수 있는 파라미터 이름 (웹 카드 순서). frenet.* 의 목록 값(lateral_dists 등)은 재시작해야 바뀜."""
+        """Names of parameters changeable at runtime (web card order). frenet.* list values (lateral_dists, etc.) need a restart."""
         names = [f'frenet.{k}' for k, v in vars(self.frenet_cfg).items() if not isinstance(v, tuple)]
         names += ['tracking.moving_speed']
         names += list(self.LIVE_ATTRS)
         return names
 
     def on_set_params(self, params):
-        """파라미터가 바뀌기 직전에 불림: 실행 중에 못 바꾸는 것은 거절하고, 나머지는 지금 주행에도 바로 반영."""
+        """Called just before parameters change: reject those that can't change at runtime, apply the rest to the current drive immediately."""
         for prm in params:
             n = prm.name
             if n not in self.param_start:
@@ -789,7 +790,7 @@ class BridgeNode(Node):
             if n in self.LIVE_ATTRS:
                 setattr(self, self.LIVE_ATTRS[n], math.radians(v) if n == 'bump_tilt_deg' else v)
             elif n.startswith('frenet.'):
-                # FrenetFollower 들이 같은 FrenetConfig 객체를 쓰므로 주행 중에도 바로 적용 (기준선 간격/스무딩은 다음 목표부터)
+                # FrenetFollowers share the same FrenetConfig object, so it applies mid-drive (reference spacing/smoothing from the next goal)
                 setattr(self.frenet_cfg, n[7:], v)
             self.get_logger().info(f'파라미터 변경: {n} = {v}')
             self.record_event(f'파라미터 변경: {n} = {v}', param=n, value=v)
@@ -797,7 +798,7 @@ class BridgeNode(Node):
         return SetParametersResult(successful=True)
 
     def set_param_from_web(self, name, value):
-        """웹에서 온 값: 선언된 타입으로 맞춰서 (JSON 은 2.0 을 2 로 보냄) set_parameters → 결과를 웹에 알림."""
+        """Value from the web: cast to the declared type (JSON sends 2.0 as 2), set_parameters → report the result to the web."""
         try:
             cur = self.get_parameter(name)
             t = cur.type_
@@ -813,12 +814,12 @@ class BridgeNode(Node):
                 raise ValueError('숫자가 아닙니다')
             r = self.set_parameters([Parameter(name, value=value)])[0]
             ok, reason = r.successful, r.reason
-        except Exception as e:  # 선언 안 된 이름, 숫자 아님 등
+        except Exception as e:  # undeclared name, not a number, etc.
             ok, reason = False, str(e) or type(e).__name__
         self.server.send({'type': 'param_result', 'name': name, 'ok': ok, 'reason': reason})
 
     def flush_params(self):
-        """바뀐 파라미터 목록을 서버(웹 카드)로. ros2 param set 으로 바꾼 것도 여기로 들어옴."""
+        """Send the changed parameter list to the server (web card). Changes made with ros2 param set also arrive here."""
         if not self.params_dirty:
             return
         self.params_dirty = False
@@ -826,9 +827,9 @@ class BridgeNode(Node):
             {'name': n, 'value': self.get_parameter(n).value, 'start': s} for n, s in self.param_start.items()]})
 
     def set_yolo(self, msg):
-        """웹 버튼: {'enabled': bool} 또는 {'capture': True} (검출 장면 한 장 저장).
-        Pi 카메라는 계속 켜 두고 검출기만 켜고 끈다: 검출기가 꺼져 있으면 영상을 구독하지 않아 Wi-Fi 로 오지 않는다.
-        (카메라도 같이 끄고 켜 봤지만 켜는 데 실제 10~15초 걸려 섹션에서 YOLO 를 못 썼고, 측정상 카메라는 Wi-Fi 끊김 원인이 아니었음)"""
+        """Web button: {'enabled': bool} or {'capture': True} (save one detection frame).
+        The Pi camera stays on and only the detector is toggled: while the detector is off it doesn't subscribe to the image,
+        so nothing comes over Wi-Fi. (Toggling the camera itself is too slow to start to be used per stop.)"""
         if not self.yolo_set.service_is_ready():
             self.get_logger().warn('YOLO 검출기 노드가 없습니다 (scripts/start_yolo.sh 로 실행)')
             self.yolo_enabled = None
@@ -851,7 +852,7 @@ class BridgeNode(Node):
             if ok and 'enabled' in msg:
                 self.yolo_enabled = bool(msg['enabled'])
                 if not self.yolo_enabled:
-                    self.yolo_counts = ('', None)   # 끄면 이전 개수는 지움
+                    self.yolo_counts = ('', None)   # clear the previous counts when turning off
             self.get_logger().info(f'YOLO 설정 {[p.name for p in params]} → {"성공" if ok else "실패"}')
             self.send_yolo()
         fut.add_done_callback(done)
@@ -881,9 +882,9 @@ class BridgeNode(Node):
     def on_scan(self, msg):
         self.scan = msg
         self.send_scan(msg)
-        # AMCL/SLAM/A* 기억에는 평소보다 기울지 않았을 때의 스캔만 넘긴다 (scan_level).
-        # 부딪혀 기울어지면 LiDAR 가 바닥을 벽처럼 보고, 그 스캔으로 AMCL 위치가 수십 cm 튄다.
-        # 단, 기운 채로 3초가 지나면(장애물에 걸쳐 멈춤 등) 다시 넘긴다 - 안 넘기면 위치 추정이 멈춘다
+        # AMCL/SLAM/A* memory only get scans taken while not more tilted than usual (scan_level).
+        # When a bump tilts the robot, the LiDAR sees the floor as a wall and those scans make the AMCL pose jump by tens of cm.
+        # But after 3 s of being tilted (stopped hung up on an obstacle, etc.) scans pass again - otherwise localization would stop
         now = time.monotonic()
         if self.tilt_rel < math.radians(3):
             self.scan_gated_since = None
@@ -892,16 +893,16 @@ class BridgeNode(Node):
         if self.scan_gated_since is None or now - self.scan_gated_since > 3.0:
             self.level_scan_pub.publish(msg)
             self.slam_scan_pub.publish(to_slam_scan(msg))
-            self.update_tracks(msg)   # 기울어진 스캔은 바닥을 보므로 추적/Frenet 에도 쓰지 않음
+            self.update_tracks(msg)   # tilted scans see the floor, so they aren't used for tracking/Frenet either
 
     def send_scan(self, msg):
-        """웹 화면용 실시간 LiDAR: 빔 순서대로 지도 좌표 점 (응답 없는 빔은 None). 웹이 이웃 점끼리 선으로 잇는다.
-        SCAN_SEND_INTERVAL 보다 자주는 안 보냄. 지도/경로 계획에는 쓰지 않음."""
+        """Live LiDAR for the web: map-frame points in beam order (None for beams with no return). The web connects neighbouring points.
+        Not sent more often than SCAN_SEND_INTERVAL. Not used for the map or planning."""
         now = time.monotonic()
         if now - self.last_scan_sent < SCAN_SEND_INTERVAL or not self.server.connected:
             return
-        # 스캔을 찍은 시각의 자세로 지도에 놓는다. 가장 최근 자세(Time())로 놓으면 회전 중에 이미 더 돈 방향으로 그려져
-        # 웹에서 LiDAR 선이 지도와 어긋나 보였음 (1 rad/s 면 0.1초에 6°, 1 m 앞에서 10 cm). 그 시각 TF 가 아직 없으면 최근 것
+        # Place the scan on the map with the pose at the time it was taken. Using the latest pose (Time()) would draw it rotated
+        # further while turning, so the LiDAR lines wouldn't line up with the map on the web. If TF for that time isn't there yet, use the latest
         try:
             t = self.tf_buffer.lookup_transform(self.global_frame, msg.header.frame_id, Time.from_msg(msg.header.stamp))
         except TransformException:
@@ -920,24 +921,24 @@ class BridgeNode(Node):
                           'points': [[float(x), float(y)] if k else None for x, y, k in zip(xs, ys, ok)]})
 
     def on_imu(self, msg):
-        """기울기가 35도를 넘은 채 0.5초 지나면 넘어진 것으로 보고 정지."""
+        """If the tilt stays above 35 degrees for 0.5 s, treat the robot as tipped over and stop."""
         self.imu_wz = round(float(msg.angular_velocity.z), 4)
         q = msg.orientation
-        # 로봇 z축이 수직에서 얼마나 기울었는지
+        # How far the robot z axis is tilted from vertical
         cos_tilt = 1.0 - 2.0 * (q.x * q.x + q.y * q.y)
         self.tilt = math.acos(max(-1.0, min(1.0, cos_tilt)))
         now = time.monotonic()
         if self.tilt_base is None:
             self.tilt_base = self.tilt
         self.tilt_rel = max(0.0, self.tilt - self.tilt_base)
-        # 위쪽(중력 반대) 방향을 로봇 좌표로 본 것. 앞이 들리면 로봇 x 축이 위를 향하므로 up_x > 0
-        # → 수평 성분의 방향이 곧 들린 쪽
+        # Up direction (against gravity) in robot coordinates. If the front is lifted, the robot x axis points up, so up_x > 0
+        # → the direction of the horizontal component is the lifted side
         up_x = 2.0 * (q.x * q.z - q.w * q.y)
         up_y = 2.0 * (q.y * q.z + q.w * q.x)
         if math.hypot(up_x, up_y) > 1e-3:
             self.lift_dir = math.atan2(up_y, up_x)
         if self.tilt_rel < math.radians(2) and self.last_imu_time is not None:
-            # 시간 상수 10초로 평소 기울기를 따라간다 (장애물에 올라탄 동안은 따라가지 않음)
+            # Follow the usual tilt with a 10 s time constant (not while climbing an obstacle)
             a = min(1.0, (now - self.last_imu_time) / 10.0)
             self.tilt_base += a * (self.tilt - self.tilt_base)
         self.last_imu_time = now
@@ -958,8 +959,8 @@ class BridgeNode(Node):
         return self.tipped_since is not None and time.monotonic() - self.tipped_since > 0.5
 
     def front_clearance(self, half_angle=math.radians(25), center=0.0):
-        """center(앞=0, 뒤=pi) 방향 ±half_angle 안에서 가장 가까운 물체까지 거리 (LiDAR 기준).
-        스캔이 없거나 오래되면 0 (= 막힘)."""
+        """Distance (from the LiDAR) to the nearest object within ±half_angle of direction center (front=0, back=pi).
+        0 (= blocked) if there is no scan or it is stale."""
         s = self.scan
         if s is None:
             return 0.0
@@ -973,7 +974,7 @@ class BridgeNode(Node):
         return float(r[ok].min()) if ok.any() else math.inf
 
     def odom_pose(self):
-        """odom 프레임 로봇 위치 (x, y, yaw, 나이[s]) 또는 None. /odom 메시지 (없으면 예전처럼 TF)."""
+        """Robot pose in the odom frame (x, y, yaw, age [s]) or None. From /odom messages (falls back to TF if none)."""
         now = self.get_clock().now()
         if self.odom_msg is not None:
             x, y, yaw, stamp = self.odom_msg
@@ -986,8 +987,8 @@ class BridgeNode(Node):
         return tr.x, tr.y, yaw_from_quaternion(t.transform.rotation), (now - Time.from_msg(t.header.stamp)).nanoseconds / 1e9
 
     def pose_with_age(self):
-        """지도(global_frame) 위치 (x, y, yaw, 나이[s]) 또는 None. 나이는 오도메트리(Pi) 쪽:
-        map→odom(AMCL/SLAM)은 TF 에서 가장 최근 것을 쓴다 (AMCL 은 1초 앞 스탬프라 나이로 따질 게 아님)."""
+        """Pose in the map (global_frame): (x, y, yaw, age [s]) or None. The age is that of the odometry (Pi):
+        map→odom (AMCL/SLAM) uses the latest TF (AMCL stamps 1 s ahead, so its age is not meaningful)."""
         o = self.odom_pose()
         if o is None:
             return None
@@ -1013,7 +1014,7 @@ class BridgeNode(Node):
             self.zone_replan_at = None
             if self.goal is not None:
                 self.get_logger().info('금지 구역이 바뀌어 지금 위치에서 경로를 다시 계산합니다')
-                self.generation += 1      # 지금 따르던 경로/계획 응답은 버림
+                self.generation += 1      # drop the path/plan replies being followed
                 self.stop_following()
                 self.request_plan()
                 return
@@ -1031,9 +1032,9 @@ class BridgeNode(Node):
             self.recovery_step(f, now)
             return
         pose = self.pose_with_age()
-        # 위치 나이 = 오도메트리(Pi → Wi-Fi) 쪽. 늦으면 바로 서되 목표는 버리지 않고 기다렸다가 다시 오면 그 자리에서 이어 간다.
-        # Wi-Fi 지연은 보통 0.3~0.7초라 (실물 측정) 예전처럼 한 번 늦었다고 목표를 실패시키면 사람이 다시 보내야 했음.
-        # pose_lost_timeout(3초) 넘게 계속 안 오면 그때 실패. 서 있는 동안 PC→Pi 명령도 끊기면 Pi 명령 감시가 세운다
+        # Pose age = odometry (Pi → Wi-Fi). If late, stop right away but keep the goal; when the pose returns, continue from there.
+        # Wi-Fi delays are usually short, so failing the goal on a single late pose would make a person resend it.
+        # Fail only if it keeps not arriving beyond pose_lost_timeout. If PC→Pi commands also stop while standing, the Pi watchdog stops the robot
         if pose is None or pose[3] > self.tf_timeout:
             why = '위치 없음' if pose is None else f'위치 나이 {pose[3]:.2f}초'
             if 'pose_wait' not in f:
@@ -1049,7 +1050,7 @@ class BridgeNode(Node):
             self.get_logger().info(f'위치 정보 다시 받음 ({now - f.pop("pose_wait"):.1f}초 기다림), 이어서 감')
         x, y, yaw, _ = pose
         if self.tilt_rel < math.radians(2):
-            f['level_pose'] = (x, y, yaw)   # 부딪힌 자리는 기울기 시작 전 위치/방향으로 계산 (밀리면서 돌아가므로)
+            f['level_pose'] = (x, y, yaw)   # compute bump spots from the pose/heading before tilting started (the robot turns as it gets pushed)
         v, w, state = self.frenet_compute(f['frenet'])
         self.rec_raw = (v, w, state)
 
@@ -1058,21 +1059,21 @@ class BridgeNode(Node):
             self.report('succeeded')
             return
 
-        # 기울었으면(낮은 장애물에 올라탐) 앞이 막힌 것(LiDAR 가 바닥을 봄)보다 먼저 처리한다.
-        # 기울어진 채로 기다리면 기울어진 스캔 때문에 AMCL 위치가 크게 틀어진다
+        # If tilted (climbed a low obstacle), handle that before 'front blocked' (the LiDAR is seeing the floor).
+        # Waiting while tilted lets the tilted scans throw the AMCL pose far off
         if self.tilt_rel > self.bump_tilt:
             self.start_backoff(f, x, y, yaw, now,
                                f'차체가 {math.degrees(self.tilt_rel):.0f}도 기울었습니다 (낮은 장애물에 올라탐).')
             return
         if state == 'blocked':
-            # 안전한 후보 없음 (사람이 막고 있음 등) → 기다리다 오래 막히면 물러나서 장애물을 피하는 경로로 재계획
+            # No safe candidate (a person blocking, etc.) → wait; if blocked too long, back off and replan around the obstacle
             if f['blocked_since'] is None:
                 f['blocked_since'] = now
                 self.get_logger().warn('Frenet: 안전한 궤적 없음, 정지 후 대기')
                 self.record_event('Frenet: 안전한 궤적 없음, 정지 후 대기')
-            # Frenet 이 정적 장애물만으로 막힘 (A* 경로가 아직 몰랐던 물체 옆 좁은 틈으로 남): 기다려도 안 풀리므로 1초 뒤
-            # 바로 A* 재계획 (A* 는 본 장애물을 기억해서 피함). 실물: 5초 대기 + 물러나기 + 재계획에 매번 8초쯤 걸렸음.
-            # 같은 목표에서 4번까지, 그 뒤는 대기/물러나기
+            # Frenet blocked by static obstacles only (the A* path still runs through a narrow gap beside an object it didn't know): waiting
+            # won't help, so replan with A* after 1 s (A* remembers seen obstacles and avoids them), which is much faster than wait + back off + replan.
+            # Up to 4 times per goal, after that wait/back off
             if (f['frenet'].static_blocked and now - f['blocked_since'] > 1.0
                     and self.goal.get('reroutes', 0) < 4):
                 self.goal['reroutes'] = self.goal.get('reroutes', 0) + 1
@@ -1090,17 +1091,17 @@ class BridgeNode(Node):
             self.cmd_vel_pub.publish(Twist())
             return
         if v > 0.0:
-            # 장애물은 Frenet 이 피한다. 여기서는 비상 정지와 '걸침' 만 본다
+            # Frenet avoids obstacles. Only emergency stop and 'hung up' are checked here
             clearance = self.front_clearance()
             if clearance < self.stop_distance and self.tilt_rel > math.radians(3):
-                # 장애물 모서리에 걸쳐 조금 기운 상태: LiDAR 가 아래를 보고 바닥/상자 윗면을 장애물로 본다.
-                # 기다려도 풀리지 않으므로(SLAM 탐색 시험에서 계속 '앞이 막힘') 부딪힘으로 처리해 물러난다
+                # Slightly tilted, hung on an obstacle edge: the LiDAR looks down and sees the floor/box top as an obstacle.
+                # Waiting doesn't resolve it, so treat it as a bump and back off
                 self.start_backoff(f, x, y, yaw, now,
                                    f'차체가 {math.degrees(self.tilt_rel):.0f}도 기운 채 앞이 막혔습니다 (장애물에 걸침).')
                 return
             if clearance < self.estop_distance:
-                # 비상 정지: 앞으로는 안 간다 (회전/후진은 허용). Frenet 은 여유 safety_margin 을 지키므로
-                # 보통 여기까지 오지 않음 → 갑자기 튀어나온 물체, 위치 추정 오차 등
+                # Emergency stop: no forward motion (turning/reversing allowed). Frenet keeps safety_margin, so this is normally
+                # not reached → objects that suddenly appear, localization error, etc.
                 if not f.get('estop'):
                     self.get_logger().warn(f'비상 정지: 앞쪽 {clearance:.2f} m')
                     self.record_event(f'비상 정지: 앞쪽 {clearance:.2f} m')
@@ -1116,8 +1117,8 @@ class BridgeNode(Node):
             self.start_backoff(f, x, y, yaw, now, stall)
             return
 
-        # 제자리 회전 중이 아닌데 오래 진행이 없으면 실패
-        # 제자리 회전이 끝나지 않는 경우(방향 맞추기 실패, 미끄러짐 등) 차단
+        # Fail if there is no progress for long while not turning in place
+        # Cut off in-place turns that never finish (heading alignment failing, slipping, etc.)
         if state == 'rotating':
             f.setdefault('rotate_since', now)
             if now - f['rotate_since'] > self.rotate_timeout:
@@ -1137,9 +1138,9 @@ class BridgeNode(Node):
         cmd.angular.z = w
         self.cmd_vel_pub.publish(cmd)
 
-    # 주행 기록 (tools/drive_replay.py 로 분석) ----------------------
+    # Drive records (analyzed with tools/drive_replay.py) ----------------------
     def record_open(self):
-        """목표를 받으면 기록 파일을 새로 연다 (재시도/재계획은 같은 파일)."""
+        """Open a new record file when a goal arrives (retries/replans use the same file)."""
         self.record_close('replaced')
         if not self.record_enabled:
             return
@@ -1156,7 +1157,7 @@ class BridgeNode(Node):
         now = time.monotonic()
         self.rec = {'file': fh, 't0': now, 'last': 0.0, 'flushed': now, 'path': path}
         params = {n: self.get_parameter(n).value for n in self.tunable_params()}
-        params.update({f'frenet.{k}': v for k, v in vars(self.frenet_cfg).items()})   # 목록 값까지 전부 (다시 계산용)
+        params.update({f'frenet.{k}': v for k, v in vars(self.frenet_cfg).items()})   # all of them, including list values (for re-computation)
         self.record_write({'type': 'start', 'wall': time.strftime('%Y-%m-%d %H:%M:%S'), 'goal': self.goal,
                            'map': self.get_parameter('map_name').value, 'global_frame': self.global_frame,
                            'base_frame': self.base_frame, 'footprint_extra': self.footprint_extra,
@@ -1177,8 +1178,8 @@ class BridgeNode(Node):
             self.record_summarize(os.path.dirname(r['path']))
 
     def record_summarize(self, folder):
-        """끝난 목표 폴더에 요약 글자(summary.txt)와 중요한 순간 그림(plot_*.png)을 따로 프로세스로 만든다.
-        주행(브리지)에 방해되지 않게 nice 19 로, 기다리지 않음. 실패해도 기록(record.jsonl.gz)은 그대로."""
+        """Write a summary text (summary.txt) and key-moment plots (plot_*.png) into the finished goal's folder in a separate process.
+        Runs at nice 19 without waiting so it doesn't disturb driving (the bridge). If it fails, the record (record.jsonl.gz) is unaffected."""
         tool = os.path.join(os.environ.get('WAREHOUSE_HOME', ''), 'tools', 'drive_replay.py')
         if not os.path.isfile(tool):
             return
@@ -1186,8 +1187,8 @@ class BridgeNode(Node):
             out = open(os.path.join(folder, 'summary.txt'), 'w', encoding='utf-8')
             subprocess.Popen(['nice', '-n', '19', 'python3', tool, folder], stdout=out, stderr=subprocess.STDOUT,
                              stdin=subprocess.DEVNULL, start_new_session=True,
-                             env={**os.environ, 'PYTHONWARNINGS': 'ignore'})   # 라이브러리 경고로 요약이 지저분해지지 않게
-            out.close()   # 자식 프로세스가 자기 사본으로 씀
+                             env={**os.environ, 'PYTHONWARNINGS': 'ignore'})   # so library warnings don't clutter the summary
+            out.close()   # the child process writes through its own copy
         except OSError as e:
             self.get_logger().warn(f'주행 기록 요약/그림 실패: {e}')
 
@@ -1199,7 +1200,7 @@ class BridgeNode(Node):
         try:
             r['file'].write(json.dumps(obj, default=_json_default, ensure_ascii=False, separators=(',', ':')) + '\n')
             now = time.monotonic()
-            if now - r['flushed'] > 1.0:   # 주행 중에도 읽을 수 있게 1초마다 내보냄
+            if now - r['flushed'] > 1.0:   # flush every 1 s so it can be read while driving
                 r['file'].flush()
                 r['flushed'] = now
         except (OSError, ValueError, TypeError) as e:
@@ -1210,8 +1211,8 @@ class BridgeNode(Node):
         self.record_write({'type': 'event', 'text': text, **extra})
 
     def record_step(self):
-        """제어 주기마다 (0.1초 간격, Frenet 을 새로 계산한 주기는 항상): 위치/속도/명령/트래킹/스캔.
-        raw 는 Frenet 추종기가 낸 값, cmd 는 비상 정지 등을 거쳐 실제로 낸 값."""
+        """Every control cycle (0.1 s apart, always in cycles where Frenet was recomputed): pose/velocity/command/tracks/scan.
+        raw is what the Frenet follower output, cmd is what was actually sent after emergency stop etc."""
         r = self.rec
         if r is None:
             return
@@ -1236,7 +1237,7 @@ class BridgeNode(Node):
                'wheels': self.wheel_vel, 'imu_wz': self.imu_wz,
                'tracks': [[t.id, *t.x, t.radius, t.hits, t.misses] for t in self.tracks]}
         if fr is not None:
-            out['frenet'] = fr      # 스캔 점은 Frenet 입력 안에
+            out['frenet'] = fr      # scan points are inside the Frenet inputs
         else:
             out['map_to_odom'] = self.xyyaw('odom', self.global_frame)
             out['scan'], out['unmapped'] = self.scan_odom, self.scan_unmapped
@@ -1261,7 +1262,7 @@ class BridgeNode(Node):
         return tr.x, tr.y, yaw_from_quaternion(t.transform.rotation)
 
     def update_tracks(self, scan):
-        """스캔 → odom 점 (Frenet 정적 장애물) + 움직이는 장애물 추적."""
+        """Scan → odom points (Frenet static obstacles) + moving obstacle tracking."""
         c = self.track_cfg
         sensor = self.xyyaw('odom', scan.header.frame_id, Time.from_msg(scan.header.stamp)) \
             or self.xyyaw('odom', scan.header.frame_id)
@@ -1272,16 +1273,16 @@ class BridgeNode(Node):
         ok = np.isfinite(r) & (r >= scan.range_min) & (r <= min(scan.range_max, c['max_range']))
         pts = transform_points(np.column_stack([r[ok] * np.cos(a[ok]), r[ok] * np.sin(a[ok])]), *sensor)
         self.scan_odom = pts
-        # 지도에 없는 물체의 스캔 점 (odom, 기록용). 지도와 못 맞추면 비움
+        # Scan points of objects not in the map (odom, for records). Empty if it can't be matched to the map
         self.scan_unmapped = pts[:0]
         if not self.tracking:
             return
-        # 지도 벽 근처 점은 정적이므로 추적하지 않는다 (판별에만 map 을 쓰므로 AMCL 이 몇 cm 틀려도 속도에는 영향 없음).
-        # 맵 밖/벽 너머/미탐색 칸의 점도 뺀다: 지도의 빈 칸에 있는 점만 추적 (SLAM 도 같음).
-        # SLAM 중에는 아직 지도에 안 들어간 벽이 미탐색 칸에 있어 전부 '장애물' 로 잡혔고(실물 350건 중 345건),
-        # 그 속도 노이즈(중앙값 0.06 m/s)가 움직이는 물체 기준을 넘었음. 미탐색 칸의 물체도 Frenet 은 스캔 점으로 피한다
+        # Points near map walls are static and not tracked (the map is used only for this check, so a few cm of AMCL error doesn't affect velocities).
+        # Points outside the map / beyond walls / in unexplored cells are dropped too: only points in free map cells are tracked (same in SLAM).
+        # During SLAM, walls not yet in the map lie in unexplored cells and would all be caught as 'obstacles',
+        # with velocity noise above the moving-object threshold. Frenet still avoids objects in unexplored cells via the scan points
         if self.map_dist is None:
-            pts = pts[:0]   # 지도가 아직 없으면 추적하지 않음
+            pts = pts[:0]   # no tracking until a map exists
         if self.map_dist is not None and len(pts):
             m_o = self.xyyaw(self.global_frame, 'odom')
             if m_o is not None:
@@ -1312,11 +1313,11 @@ class BridgeNode(Node):
         if msg.info.width == 0 or not self.tracking:
             return
         grid = np.asarray(msg.data, dtype=np.int16).reshape(msg.info.height, msg.info.width)
-        # 미탐색 칸은 벽이 아니다 → 그 안의 점은 움직이는 장애물 후보로 남긴다
+        # Unexplored cells are not walls → points in them stay as moving-obstacle candidates
         self.map_dist = (obstacle_distance(grid >= 65, msg.info.resolution, 0.5), msg.info, grid)
 
     def send_obstacles(self):
-        """추적 중인 장애물을 웹에 (map 좌표, 0.25초마다)."""
+        """Send tracked obstacles to the web (map coords, every 0.25 s)."""
         now = time.monotonic()
         if now - self.last_obstacles_sent < 0.25:
             return
@@ -1328,7 +1329,7 @@ class BridgeNode(Node):
         out = []
         moving = self.get_parameter('tracking.moving_speed').value
         for t in self.tracks:
-            # 추적은 지도의 빈 칸에서만 하므로 멈춘 track 은 '지도에 없는 멈춘 물체' (상자, 서 있는 사람 등)
+            # Tracking only runs in free map cells, so a stopped track is a 'stopped object not in the map' (box, standing person, ...)
             (x, y), = transform_points([t.x[:2]], *m_o)
             out.append({'id': t.id, 'x': round(float(x), 3), 'y': round(float(y), 3),
                         'moving': bool(math.hypot(t.x[2], t.x[3]) >= moving),
@@ -1337,7 +1338,7 @@ class BridgeNode(Node):
         self.server.send({'type': 'obstacles', 'obstacles': out})
 
     def frenet_compute(self, follower):
-        """Frenet 추종기 한 주기. 0.1초마다만 계산하고 그 사이에는 같은 명령 (브리지 한 스레드에서 TF 수신 등과 같이 돌기 때문)."""
+        """One Frenet follower cycle. Computed only every 0.1 s, same command in between (it runs in the bridge's single thread alongside TF reception etc.)."""
         now = time.monotonic()
         last = getattr(follower, 'last_cmd', None)
         if last is not None and now - last[0] < 0.1:
@@ -1348,7 +1349,7 @@ class BridgeNode(Node):
             return 0.0, 0.0, 'blocked'
         dyn = np.array([[t.x[0], t.x[1], t.x[2], t.x[3], t.radius] for t in self.tracks]).reshape(-1, 5)
         moving_speed = self.get_parameter('tracking.moving_speed').value
-        # 기록용: 계산 전 추종기 상태 (같은 입력으로 다시 계산하면 같은 결과가 나오게)
+        # For records: follower state before computing (so re-computing with the same inputs gives the same result)
         pre = {'progress': follower.progress, 'offset': follower.offset, 'turning': follower.turning,
                'arrived': follower.arrived, 'prev_shape': follower.prev_shape}
         result = follower.compute(pose, *self.odom_vw, map_to_odom, self.scan_odom, dyn, moving_speed=moving_speed)
@@ -1362,7 +1363,7 @@ class BridgeNode(Node):
         return result
 
     def send_local_plan(self, follower, result):
-        """Frenet 이 고른 궤적을 웹에 (map 좌표, 0.2초마다). 제자리 회전/막힘이면 빈 궤적."""
+        """Send the trajectory Frenet chose to the web (map coords, every 0.2 s). Empty when turning in place/blocked."""
         now = time.monotonic()
         if now - self.last_plan_sent < 0.2:
             return
@@ -1376,10 +1377,10 @@ class BridgeNode(Node):
         self.server.send({'type': 'local_plan', 'traj': pts, 'v': round(float(v), 3), 'w': round(float(w), 3),
                           'state': state})
 
-    # 막힘 대처 --------------------------------------------------
-    # ① 막히면 blocked_timeout(5초) 동안 기다림 (움직이는 장애물이 지나가길). 정적으로만 막히면 1초 뒤 바로 A* 재계획 (drive_step)
-    # ② 그래도 막히거나 진행이 없으면: 뒤가 비었으면 15cm 물러나고, 뒤도 막혔으면 가장 트인 쪽으로 제자리 회전
-    # ③ A* 로 다시 계획 (fail_or_retry, 최대 max_retries 번)  ④ 그래도 안 되면 실패 보고
+    # Blocked handling --------------------------------------------------
+    # ① When blocked, wait blocked_timeout (for moving obstacles to pass). If blocked only statically, replan with A* after 1 s (drive_step)
+    # ② Still blocked or no progress: back off 15 cm if the rear is clear, otherwise turn in place toward the most open side
+    # ③ Replan with A* (fail_or_retry, up to max_retries)  ④ If that fails too, report failure
     def start_recovery(self, f, now, reason):
         odom = self.odom_xyyaw()
         if odom is None:
@@ -1390,7 +1391,7 @@ class BridgeNode(Node):
             rec = {'mode': 'back', 'speed': -0.05}
             what = '뒤로 15cm 물러난 뒤'
         elif not self.rotation_clear(odom):
-            # 벽에 바짝 붙어 돌 공간이 없음: 돌면 차체 모서리가 벽에 걸려 올라타고 넘어졌다 (sim 강당)
+            # Pressed against a wall with no room to turn: turning would catch a body corner on the wall, climb it and tip over
             if self.front_clearance(math.radians(30)) > 0.35:
                 rec = {'mode': 'forward', 'speed': 0.05}
                 what = '돌 공간이 없어 앞으로 15cm 나온 뒤'
@@ -1399,7 +1400,7 @@ class BridgeNode(Node):
                 self.fail_or_retry(f'{reason} 앞뒤가 막혀 돌 공간도 없습니다.')
                 return
         else:
-            # 가장 트인 방향 (30° 칸마다 가장 가까운 물체 거리 중 가장 먼 쪽)
+            # Most open direction (farthest of the nearest-object distances per 30° sector)
             best = max(range(-150, 181, 30), key=lambda d: self.front_clearance(math.radians(15), center=math.radians(d)))
             turn = math.radians(max(-90, min(90, best)) if abs(best) <= 90 else math.copysign(90, best))
             rec = {'mode': 'turn', 'target': turn}
@@ -1411,7 +1412,7 @@ class BridgeNode(Node):
         self.record_event(f'{reason} {what} 다시 계획합니다')
 
     def rotation_clear(self, odom):
-        """제자리에서 돌아도 차체가 닿지 않는지: 회전 중심에서 차체 끝까지 반경(외곽 모서리) + 여유 안에 스캔 점이 없음."""
+        """Whether turning in place is clear of the body: no scan points within the radius from the rotation center to the body's outer corner + margin."""
         pts = self.scan_odom
         if not len(pts):
             return True
@@ -1419,16 +1420,16 @@ class BridgeNode(Node):
         return float(np.min(np.hypot(pts[:, 0] - odom[0], pts[:, 1] - odom[1]))) > radius
 
     def body_rects(self):
-        """차체 + 붙인 물건 사각형 목록 (x_min, x_max, y_min, y_max), base_footprint 기준."""
+        """List of body + attached object rectangles (x_min, x_max, y_min, y_max), relative to base_footprint."""
         x0, x1, hw = self.frenet_cfg.footprint
         return [(x0, x1, -hw, hw)] + self.footprint_extra
 
     def body_radius(self):
-        """회전 중심(base_footprint)에서 가장 먼 차체 끝까지 거리 = 제자리에서 돌 때 쓸고 지나가는 반경."""
+        """Distance from the rotation center (base_footprint) to the farthest body point = radius swept when turning in place."""
         return max(math.hypot(x, y) for a, b, c, d in self.body_rects() for x in (a, b) for y in (c, d))
 
     def rear_extent(self):
-        """차체(붙인 물건 포함) 뒤 끝 x (음수)."""
+        """Rear end x of the body (incl. attached objects) (negative)."""
         return min(r[0] for r in self.body_rects())
 
     def recovery_step(self, f, now):
@@ -1452,13 +1453,13 @@ class BridgeNode(Node):
         self.cmd_vel_pub.publish(cmd)
 
     def start_backoff(self, f, x, y, yaw, now, reason):
-        """x, y, yaw: 부딪힌 때의 map 좌표 (부딪힌 자리 계산용). 물러난 거리는 odom 으로 잰다
-        (기울어진 동안은 map TF 가 갱신되지 않으므로)."""
+        """x, y, yaw: map pose at the time of the bump (for computing the bump spot). The backed-off distance is measured with odom
+        (the map TF isn't updated while tilted)."""
         self.get_logger().warn(f'부딪힘 감지: {reason} 뒤로 물러납니다')
         self.record_event(f'부딪힘 감지: {reason} 뒤로 물러납니다')
         x, y, yaw = f.get('level_pose', (x, y, yaw))
-        # 기울어서 감지했으면 들린 쪽이 장애물. 앞이 들렸으면 뒤로, 뒤가 들렸으면(회전하다 뒤 모서리가 올라탐) 앞으로
-        # 빠져나온다. 앞으로 가다 막혀서(정지) 감지했으면 앞쪽이 장애물
+        # If detected by tilt, the lifted side is the obstacle. Front lifted → get out backward; rear lifted (rear corner climbed while
+        # turning) → forward. If detected by being stuck while moving forward, the obstacle is in front
         tilted = self.tilt_rel > math.radians(3)
         side = self.lift_dir if tilted else 0.0
         f['backoff'] = {'x': x, 'y': y, 'yaw': yaw, 'side': side,
@@ -1475,7 +1476,7 @@ class BridgeNode(Node):
         return None if o is None else o[:3]
 
     def detect_stall(self, f, x, y, v, state, now):
-        """앞으로 가라고 하는데 못 가고 있으면 이유 문자열, 아니면 None."""
+        """Reason string if commanded forward but not moving, otherwise None."""
         if v >= 0.05 and state != 'rotating':
             t0, x0, y0 = f.setdefault('drive_since', (now, x, y))
             if math.hypot(x - x0, y - y0) > 0.03:
@@ -1487,10 +1488,10 @@ class BridgeNode(Node):
         return None
 
     def backoff_step(self, f, now):
-        """부딪힌 뒤 천천히 빠져나온다 (보통 뒤로). 다 물러나면 부딪힌 자리를 플래너에 알리고 재계획."""
+        """Slowly get out after a bump (usually backward). Once backed off, report the bump spot to the planner and replan."""
         b = f['backoff']
-        # LiDAR 는 차체 뒤 끝에서 0.13 m 앞에 있으므로 뒤쪽 0.3 m 안에 물체가 있으면 더 물러나지 않음 (앞으로 나올 때는 0.25 m).
-        # 뒤에 붙인 물건이 더 나온 만큼 늘림 (기본 8cm → 0.38 m)
+        # The LiDAR is 0.13 m ahead of the body's rear end, so stop backing off if anything is within 0.3 m behind (0.25 m when going forward).
+        # Increased by how far attached objects stick out at the rear (default 8 cm → 0.38 m)
         if b['speed'] < 0:
             blocked = self.front_clearance(math.radians(30), center=math.pi) < 0.3 + max(0.0, -0.197 - self.rear_extent())
         else:
@@ -1499,7 +1500,7 @@ class BridgeNode(Node):
         moved = math.hypot(cur[0] - start[0], cur[1] - start[1]) if cur and start else 0.0
         if moved >= self.backoff_distance or now > b['until'] or blocked:
             self.stop_following()
-            # 로봇 앞 끝(base 에서 약 0.07 m) 앞쪽이 부딪힌 물체 (플래너가 bump_radius 반경을 막음)
+            # The bumped object is ahead of the robot's front end (about 0.07 m from base) (the planner blocks a bump_radius around it)
             pt = PointStamped()
             pt.header.frame_id = self.global_frame
             pt.header.stamp = self.get_clock().now().to_msg()
@@ -1508,8 +1509,8 @@ class BridgeNode(Node):
             self.bump_pub.publish(pt)
             self.goal['bumps'] = self.goal.get('bumps', 0) + 1
             if self.goal['bumps'] >= 2:
-                # 같은 이동에서 두 번 부딪히면 더 시도하지 않는다. LiDAR 에 안 보이는 물체를 자동으로 계속 피하려 하면
-                # 계속 다시 부딪히고 올라타서(sim 에서 충돌 20회 이상, 43도까지 기움) 사람이 보는 게 낫다
+                # After two bumps in the same move, stop trying. Automatically trying to dodge an object the LiDAR can't see
+                # keeps bumping and climbing onto it, so it's better for a person to look
                 self.report('failed', f'{b["reason"]} 두 번 부딪혀 멈췄습니다. LiDAR 에 안 보이는 낮은 장애물이 '
                                       '있을 수 있으니 직접 확인하세요.')
                 return
@@ -1520,14 +1521,14 @@ class BridgeNode(Node):
         self.cmd_vel_pub.publish(cmd)
 
     def relocalize_then_retry(self, reason):
-        """맵 모드: 부딪힌 뒤 스캔 매칭(tools/localize.py)으로 위치를 다시 맞추고 재계획한다.
-        부딪혀 기울어진 동안의 스캔(바닥을 봄) 때문에 AMCL 위치가 수십 cm 틀어지기 때문."""
+        """Map mode: after a bump, re-localize with scan matching (tools/localize.py), then replan.
+        The scans taken while tilted (seeing the floor) throw the AMCL pose off by tens of cm."""
         pose = self.current_pose()
         tool = os.path.join(os.environ.get('WAREHOUSE_HOME', ''), 'tools', 'localize.py')
         gen = self.generation
         if self.mode != 'map' or pose is None or not os.path.isfile(tool) or self.goal is None:
-            # 플래너가 부딪힌 자리(astar/obstacle)를 받은 뒤에 재계획하도록 0.5초 늦춘다
-            # (바로 재계획하면 기억하기 전 경로로 같은 자리에 또 부딪혔다)
+            # Delay the replan by 0.5 s so the planner has received the bump spot (astar/obstacle) first
+            # (replanning immediately would use the path from before it was remembered and hit the same spot again)
             def later():
                 time.sleep(0.5)
                 self.server.inbox.put({'type': '_relocalized', 'gen': gen, 'result': None, 'reason': reason})
@@ -1544,25 +1545,25 @@ class BridgeNode(Node):
                 for line in r.stdout.splitlines():
                     if line.startswith('RESULT'):
                         result = [float(v) for v in line.split()[1:5]]
-            except Exception as e:  # 시간 초과 등
+            except Exception as e:  # timeout etc.
                 self.get_logger().warn(f'위치 다시 맞추기 실패: {e}')
             self.server.inbox.put({'type': '_relocalized', 'gen': gen, 'result': result, 'reason': reason})
         threading.Thread(target=run, daemon=True).start()
 
     def on_relocalized(self, msg):
         if msg['gen'] != self.generation or self.goal is None:
-            return  # 그 사이 취소/새 목표
+            return  # cancelled / new goal in the meantime
         r = msg['result']
-        if r and r[3] >= 0.8:   # 스캔 점 80% 이상이 벽과 20cm 이내로 맞을 때만 믿는다
+        if r and r[3] >= 0.8:   # trust it only if at least 80% of scan points match walls within 20 cm
             self.publish_initial_pose(r[0], r[1], r[2], precise=True)
         elif self.mode == 'map':
             self.get_logger().warn(f'스캔 매칭 결과가 좋지 않아 AMCL 위치를 그대로 씁니다 ({r})')
         self.fail_or_retry(msg['reason'])
 
-    # ---------------------------------------------------------- 기타
+    # ---------------------------------------------------------- misc
     def publish_initial_pose(self, x, y, yaw, precise=False):
-        """precise: 스캔 매칭으로 찾은 위치 → 표준편차 5cm/3°, 아니면(웹에서 찍은 위치) 20cm/15°.
-        예전 값(50cm)은 입자가 너무 퍼져서 출발 후 몇 초 동안 위치가 20cm 넘게 틀렸다."""
+        """precise: pose found by scan matching → std dev 5 cm/3°, otherwise (pose clicked on the web) 20 cm/15°.
+        A larger spread scatters the particles so much that the pose is off for a while after starting."""
         msg = PoseWithCovarianceStamped()
         msg.header = self.make_pose(x, y, yaw).header
         msg.pose.pose = self.make_pose(x, y, yaw).pose
@@ -1571,7 +1572,7 @@ class BridgeNode(Node):
         msg.pose.covariance[7] = sxy ** 2
         msg.pose.covariance[35] = syaw ** 2
         self.initial_pose_pub.publish(msg)
-        # 멈춘 채로도 스캔으로 몇 번 보정하게 한다 (AMCL 은 움직여야만 갱신하므로)
+        # Let AMCL correct with scans a few times even while stopped (AMCL only updates when moving)
         self.nomotion_left = 10
         self.get_logger().info(f'초기 위치 지정 ({x:.2f}, {y:.2f}, {math.degrees(yaw):.0f}°)'
                                f'{" - 스캔 매칭 결과" if precise else ""}')
@@ -1584,8 +1585,8 @@ class BridgeNode(Node):
 
     @staticmethod
     def run_session():
-        """SLAM 실행 번호 = run.sh 가 시작한 시각 (logs/run_mode.env 첫 줄). 브리지만 다시 떠도 같은 값이라
-        서버가 SLAM 지도/위치를 지우지 않는다 (예전에는 브리지 실행마다 달라서 브리지 재시작만으로 위치가 지워졌음)."""
+        """SLAM run ID = the time run.sh started (first line of logs/run_mode.env). It stays the same when only the bridge restarts,
+        so the server doesn't clear the SLAM map/pose."""
         path = os.path.join(os.environ.get('WAREHOUSE_HOME', ''), 'logs', 'run_mode.env')
         try:
             with open(path, encoding='utf-8') as f:
@@ -1597,7 +1598,7 @@ class BridgeNode(Node):
         return f'{int(time.time())}-{os.getpid()}'
 
     def on_teleop(self, v, w):
-        """웹 수동 조작 (서버가 작업 중에는 막는다)."""
+        """Web manual control (the server blocks it while a task is running)."""
         if self.goal is not None or self.follower is not None:
             return
         v = max(-0.1, min(0.2, v))
@@ -1605,9 +1606,9 @@ class BridgeNode(Node):
         self.teleop = (v, w, time.monotonic())
 
     def on_external_teleop(self, msg):
-        """외부 키보드 조작 (ros2 run turtlebot3_teleop teleop_keyboard --ros-args -r cmd_vel:=cmd_vel_teleop).
-        키보드 프로그램은 키를 안 눌러도 0 을 계속 보내므로, 0 이 아닌 명령이 올 때만 수동 조작으로 본다
-        (0 은 이미 수동 조작 중일 때만 = 멈춤). 자동 이동 중에 움직이면 자동 이동을 멈춘다 (수동이 우선)."""
+        """External keyboard control (ros2 run turtlebot3_teleop teleop_keyboard --ros-args -r cmd_vel:=cmd_vel_teleop).
+        The keyboard program keeps sending 0 even with no key pressed, so only non-zero commands count as manual control
+        (0 only while already in manual control = stop). Moving during automatic motion stops the automatic motion (manual has priority)."""
         v, w = msg.linear.x, msg.angular.z
         moving = abs(v) > 1e-3 or abs(w) > 1e-3
         if not moving and self.teleop is None:
@@ -1620,7 +1621,7 @@ class BridgeNode(Node):
         self.on_teleop(v, w)
 
     def teleop_step(self, now):
-        """수동 조작 목표를 선택기에 넣는다 (안전 확인 후). 0.4초 넘게 명령이 없으면 선택기가 부드럽게 멈춘다."""
+        """Feed the manual control target into the selector (after safety checks). If no command for over 0.4 s, the selector stops smoothly."""
         t = self.teleop
         if t is None:
             return
@@ -1628,7 +1629,7 @@ class BridgeNode(Node):
         if now - at > 0.4 or self.goal is not None or self.tipped:
             self.teleop = None
             return
-        # 앞뒤에 물체가 가까우면 그쪽으로는 가지 않는다 (회전은 허용). LiDAR 기준 앞 0.25m / 뒤 0.3m
+        # Don't move toward close objects in front/behind (turning allowed). From LiDAR: 0.25 m front / 0.3 m back
         if v > 0 and self.front_clearance(math.radians(30)) < 0.25:
             v = 0.0
         if v < 0 and self.front_clearance(math.radians(30), center=math.pi) < 0.3:

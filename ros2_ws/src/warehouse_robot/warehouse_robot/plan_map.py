@@ -1,22 +1,24 @@
-"""경로 계획용 지도 가공 (ROS 의존성 없음, numpy만 사용).
+"""Map processing for path planning (no ROS dependency, numpy only).
 
-위치 추정(AMCL)은 SLAM 지도를 그대로 쓰고, A* 는 이 모듈로 가공한 격자를 쓴다 (원본 지도 파일은 그대로).
-강당·교실처럼 책상/의자가 흩어진 곳은 LiDAR(높이 약 13cm)에 다리 단면만 점으로 찍혀서,
-  - 점 사이 빈 칸으로 A* 가 좌석 사이를 지나가는 경로를 만들고
-  - 먼 곳은 빔 간격(1.5°, 3.4m 에서 약 9cm)이 칸(5cm)보다 넓어 빈 칸 사이에 미탐색 줄무늬가 남아 길이 막힌다.
+Localization (AMCL) uses the SLAM map as is; A* uses a grid processed by this module (the map file is unchanged).
+Where desks/chairs are scattered (auditoriums, classrooms), the LiDAR (about 13 cm high) only sees leg cross-sections
+as points, so
+  - A* finds paths between seats through the free cells between the points, and
+  - far away the beam spacing (1.5°, about 9 cm at 3.4 m) is wider than a cell (5 cm), leaving unknown stripes
+    between free cells that block the way.
 
-1. fill_stripes: 빈 칸 사이의 좁은 미탐색 줄무늬(폭 2*cells 칸 미만)를 빈 칸으로. 장애물 칸은 건드리지 않음
-2. inflate_clusters: 작은 장애물 덩어리(다리 점, 가로·세로 모두 max_blob_size 이하)만 inflate 만큼 부풀린다.
-   벽(긴 덩어리)은 그대로.
-   A* 는 로봇 반경(0.25m) 안을 못 지나가므로, 다리 점 사이 틈은 2*(0.25 + inflate) 미만이면 막힌다
-   (기본 0.1 → 0.7m 미만). 다리가 격자로 늘어선 좌석 줄은 한 덩어리처럼 막히고, 0.7m 이상 통로는 남는다.
-   닫힘 연산(점끼리 잇기)은 반경을 0.35m 로 해도 0.5m 격자까지만 이어서 A* 반경과 거의 차이가 없었다.
-   다리 간격이 이보다 넓은 책상 밑 등은 웹의 금지 구역으로 막는다
-3. zone_mask: 웹에서 그린 금지 구역(사각형/선)을 칸으로
-4. with_added: 더한 칸을 격자에 장애물로 넣되, 출발 위치 주변은 빼서 그 안에 서 있는 로봇이 빠져나올 수 있게
-   (출발 위치가 들어 있는 금지 구역은 zone_contains 로 골라 그 계획에서 통째로 뺀다)
+1. fill_stripes: narrow unknown stripes (less than 2*cells wide) between free cells become free. Obstacle cells are untouched
+2. inflate_clusters: only small obstacle clusters (leg points, both width and height <= max_blob_size) are inflated
+   by inflate. Walls (long clusters) stay as they are.
+   A* cannot pass within the robot radius (0.25 m), so a gap between leg points is blocked if it is narrower than
+   2*(0.25 + inflate) (default 0.1 -> under 0.7 m). Seat rows with legs on a grid are blocked like one block, while
+   aisles of 0.7 m or more remain. A closing operation (joining points) is not used: it barely differs from the A* radius.
+   Places with wider leg spacing (e.g. under desks) are blocked with no-go zones on the web
+3. zone_mask: no-go zones drawn on the web (rectangles/lines) -> cells
+4. with_added: add the extra cells to the grid as obstacles, except around the start position so a robot standing
+   inside can get out (a no-go zone containing the start is picked with zone_contains and left out of that plan entirely)
 
-격자 값은 OccupancyGrid 와 같음: -1 미탐색, 0~100 (occupied_threshold 이상 = 장애물), 행 0 = 아래쪽.
+Grid values are as in OccupancyGrid: -1 unknown, 0..100 (>= occupied_threshold = obstacle), row 0 = bottom.
 """
 import math
 from collections import deque
@@ -27,18 +29,18 @@ from .astar import obstacle_distance
 
 try:
     from scipy.ndimage import label as _scipy_label
-except Exception:  # 라즈베리 파이 등 scipy가 없거나 numpy와 버전이 안 맞는 환경
+except Exception:  # environments without scipy or with a mismatched numpy (e.g. Raspberry Pi)
     _scipy_label = None
 
-LINE_WIDTH = 0.1  # m, 선(가상 벽) 금지 구역의 두께
-# 출발 위치가 금지 구역 '안' 이라고 볼 여유 (m). 이 안이면 그 구역을 그 계획에서 뺀다.
-# (예전엔 start_clear_radius 0.35 를 썼더니 구역 옆 통로를 지나다 다시 계획하면 구역 전체가 빠져 가로질렀음.
-#  구역 가장자리 근처는 with_added 의 출발 주변 비우기로 충분)
+LINE_WIDTH = 0.1  # m, thickness of line (virtual wall) no-go zones
+# Margin (m) within which the start counts as 'inside' a no-go zone; such a zone is left out of that plan.
+# Kept small so that replanning while passing next to a zone does not drop the whole zone and cut across it;
+# near a zone's edge, clearing around the start in with_added is enough.
 INSIDE_MARGIN = 0.05
 
 
 def _dilate(mask, k):
-    """8방향 k칸 팽창."""
+    """8-connected dilation by k cells."""
     out = mask.copy()
     for _ in range(k):
         g = out.copy()
@@ -55,7 +57,7 @@ def _dilate(mask, k):
 
 
 def _components(mask):
-    """8방향 연결 성분. (라벨 배열, 성분별 칸 수 배열) - 라벨 0 = 마스크 밖."""
+    """8-connected components. (label array, cell count per component) - label 0 = outside the mask."""
     if _scipy_label is not None:
         labels, n = _scipy_label(mask, structure=np.ones((3, 3), dtype=int))
         return labels, np.bincount(labels.ravel(), minlength=n + 1)
@@ -82,8 +84,8 @@ def _components(mask):
 
 
 def fill_stripes(grid, cells=2, occupied_threshold=65):
-    """빈 칸 사이의 좁은 미탐색 줄무늬를 빈 칸(0)으로 바꾼 새 격자와 바꾼 칸 수.
-    빈 칸 영역의 닫힘 연산(cells 칸)에 들어가는 미탐색 칸만 바꾸므로, 빈 영역 바깥으로 넓어지지 않는다."""
+    """New grid with narrow unknown stripes between free cells set to free (0), and the number of cells changed.
+    Only unknown cells inside the closing (cells) of the free area change, so the free area does not grow outward."""
     grid = np.asarray(grid)
     free = (grid >= 0) & (grid < occupied_threshold)
     if cells <= 0 or not free.any():
@@ -96,9 +98,9 @@ def fill_stripes(grid, cells=2, occupied_threshold=65):
 
 
 def inflate_clusters(grid, resolution, inflate=0.1, max_blob_size=0.4, occupied_threshold=65):
-    """작은 장애물 덩어리를 inflate(m) 만큼 부풀려 새로 막을 칸 (bool 마스크, 원래 장애물 칸은 제외).
-    가로나 세로가 max_blob_size(m)보다 긴 덩어리(벽, 책상 앞판 등)는 부풀리지 않는다.
-    (넓이로 가르면 얇은 벽 조각도 작은 덩어리가 되어 문이 좁아졌음)"""
+    """Cells newly blocked by inflating small obstacle clusters by inflate (m) (bool mask, original obstacle cells excluded).
+    Clusters longer than max_blob_size (m) in width or height (walls, desk front panels, etc.) are not inflated.
+    (Classifying by area instead would make thin wall pieces count as small clusters and narrow doorways.)"""
     grid = np.asarray(grid)
     occ = grid >= occupied_threshold
     if inflate <= 0 or not occ.any():
@@ -115,7 +117,7 @@ def inflate_clusters(grid, resolution, inflate=0.1, max_blob_size=0.4, occupied_
     np.minimum.at(c_min, lab, cols)
     np.maximum.at(c_max, lab, cols)
     extent = (np.maximum(r_max - r_min, c_max - c_min) + 1) * resolution
-    # 해상도는 OccupancyGrid 에서 float32 로 와서(0.0500000007) 경계값 비교가 틀어지므로 칸 크기의 1% 여유
+    # resolution comes from OccupancyGrid as float32 (0.0500000007), which breaks boundary comparisons, so allow 1% of a cell
     eps = 0.01 * resolution
     small = extent <= max_blob_size + eps
     small[0] = False
@@ -126,7 +128,7 @@ def inflate_clusters(grid, resolution, inflate=0.1, max_blob_size=0.4, occupied_
 
 
 def zone_mask(shape, resolution, origin_x, origin_y, zones):
-    """금지 구역 목록을 칸 마스크로. zone: {'shape': 'rect'|'line', 'x1', 'y1', 'x2', 'y2'} (m)."""
+    """No-go zone list -> cell mask. zone: {'shape': 'rect'|'line', 'x1', 'y1', 'x2', 'y2'} (m)."""
     h, w = shape
     mask = np.zeros(shape, dtype=bool)
     if not zones:
@@ -136,7 +138,7 @@ def zone_mask(shape, resolution, origin_x, origin_y, zones):
     for z in zones:
         x1, y1, x2, y2 = (float(z[k]) for k in ('x1', 'y1', 'x2', 'y2'))
         if z.get('shape') == 'line':
-            # 선분에서 LINE_WIDTH/2 (최소 한 칸) 안의 칸
+            # cells within LINE_WIDTH/2 (at least one cell) of the segment
             half = max(LINE_WIDTH / 2, resolution * 0.75)
             c0 = max(0, int((min(x1, x2) - half - origin_x) / resolution))
             c1 = min(w, int(math.ceil((max(x1, x2) + half - origin_x) / resolution)) + 1)
@@ -157,7 +159,7 @@ def zone_mask(shape, resolution, origin_x, origin_y, zones):
 
 
 def zone_contains(z, point, margin=0.0):
-    """금지 구역 z 가 point(x, y) 를 margin 안에 포함하는지."""
+    """Whether no-go zone z contains point (x, y) within margin."""
     x1, y1, x2, y2 = (float(z[k]) for k in ('x1', 'y1', 'x2', 'y2'))
     px, py = point
     if z.get('shape') == 'line':
@@ -169,8 +171,8 @@ def zone_contains(z, point, margin=0.0):
 
 
 def with_added(grid, added, resolution, origin_x, origin_y, start=None, clear_radius=0.35):
-    """grid 에 added 칸을 장애물(100)로 넣은 새 격자. start(x, y) 에서 clear_radius 안의 칸은 넣지 않는다
-    (금지 구역/좌석 덩어리 안에 서 있는 로봇이 출발 칸부터 막혀 꼼짝 못 하지 않게)."""
+    """New grid with the added cells set to obstacle (100). Cells within clear_radius of start (x, y) are not added
+    (so a robot standing inside a no-go zone / seat block is not stuck with its own start cell blocked)."""
     out = np.asarray(grid).copy()
     if added is None or not added.any():
         return out
@@ -191,7 +193,7 @@ def near_mask(shape, resolution, origin_x, origin_y, point, radius):
 
 
 def prepare(grid, resolution, stripe_cells=2, inflate=0.1, max_blob_size=0.4, occupied_threshold=65):
-    """경로 계획용 기본 격자와 더할 칸. (줄무늬 메운 격자, 다리 점을 부풀려 더할 칸 마스크, 통계 dict)."""
+    """Base grid for path planning and cells to add. (stripe-filled grid, mask of cells added by inflating leg points, stats dict)."""
     filled, n_fill = fill_stripes(grid, stripe_cells, occupied_threshold)
     added = inflate_clusters(filled, resolution, inflate, max_blob_size, occupied_threshold)
     return filled, added, {'줄무늬 메움': n_fill, '다리 점 부풀림': int(added.sum())}

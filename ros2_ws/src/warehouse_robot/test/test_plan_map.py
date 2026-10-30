@@ -17,10 +17,10 @@ def cell(m):
 
 
 def hall():
-    """6m x 4m 방. 아래/위에 의자 다리 줄(다리 점 1칸, 0.6m 간격), 두 줄 사이 0.8m 통로."""
+    """6 m x 4 m room. Rows of chair legs at bottom/top (1-cell leg points, 0.6 m apart), 0.8 m aisle between the rows."""
     g = np.zeros((cell(4.0), cell(6.0)), dtype=np.int16)
     g[0, :] = g[-1, :] = g[:, 0] = g[:, -1] = 100
-    for y in (1.0, 1.6, 2.4, 3.0):          # 다리 줄 y (1.6 과 2.4 사이 = 통로 0.8m)
+    for y in (1.0, 1.6, 2.4, 3.0):          # leg row y (between 1.6 and 2.4 = 0.8 m aisle)
         for x in np.arange(1.0, 5.01, 0.6):
             g[cell(y), cell(x)] = 100
     return g
@@ -29,33 +29,33 @@ def hall():
 def test_leg_rows_become_blocks_and_aisle_stays():
     g = hall()
     p = planner(g)
-    # 가공 전: 다리 사이(0.6m) 로 좌석 줄을 세로로 가로지를 수 있음
+    # before processing: can cross the seat rows vertically between legs (0.6 m)
     p.plan((1.3, 0.4), (1.3, 3.6))
     _, added, _ = prepare(g, RES)
     assert added.any()
     p2 = planner(with_added(g, added, RES, 0.0, 0.0))
-    # 가공 후: 좌석 줄 (다리 0.6m 간격) 사이로 못 지나가고 줄 끝(x < 1.0 또는 > 5.0)으로 돌아감
+    # after processing: cannot pass between legs (0.6 m apart), goes around the row ends (x < 1.0 or > 5.0)
     path = p2.plan((1.3, 0.4), (1.3, 3.6))
     crossing = [x for x, y in path if 1.0 <= y <= 1.6 or 2.4 <= y <= 3.0]
     assert all(x < 1.0 or x > 5.0 for x in crossing)
-    # 0.8m 통로는 그대로 다닐 수 있음
+    # the 0.8 m aisle is still passable
     p2.plan((0.5, 2.0), (5.5, 2.0))
     path = p2.plan((1.0, 2.0), (5.0, 2.0))
     assert all(1.7 < y < 2.3 for _, y in path)
 
 
 def test_walls_are_not_inflated():
-    """큰 덩어리(벽)는 부풀리지 않으므로 벽 사이 0.6m 문은 그대로 지나갈 수 있다."""
+    """Large clusters (walls) are not inflated, so a 0.6 m door between walls stays passable."""
     g = np.zeros((cell(3.0), cell(3.0)), dtype=np.int16)
     g[:, cell(1.5)] = 100
-    g[cell(1.2):cell(1.8), cell(1.5)] = 0   # 0.6m 문
+    g[cell(1.2):cell(1.8), cell(1.5)] = 0   # 0.6 m door
     added = inflate_clusters(g, RES)
     assert not added.any()
     planner(with_added(g, added, RES, 0.0, 0.0)).plan((0.5, 1.5), (2.5, 1.5))
 
 
 def test_float32_resolution_gives_same_result():
-    """OccupancyGrid 의 해상도는 float32 (0.05 → 0.0500000007). yaml 의 0.05 와 결과가 같아야 한다."""
+    """OccupancyGrid resolution is float32 (0.05 -> 0.0500000007). Results must match the yaml 0.05."""
     g = hall()
     a = prepare(g, 0.05)[1]
     b = prepare(g, float(np.float32(0.05)))[1]
@@ -65,13 +65,13 @@ def test_float32_resolution_gives_same_result():
 def test_fill_stripes_only_between_free_cells():
     g = np.full((40, 40), -1, dtype=np.int16)
     g[10:30, 10:30] = 0
-    g[10:30, 19:21] = -1        # 빈 칸 사이 폭 2칸 미탐색 줄무늬
-    g[10:30, 25] = 100          # 장애물은 그대로
+    g[10:30, 19:21] = -1        # 2-cell-wide unknown stripe between free cells
+    g[10:30, 25] = 100          # obstacles unchanged
     out, n = fill_stripes(g)
     assert n == 40
     assert (out[10:30, 19:21] == 0).all()
     assert (out[10:30, 25] == 100).all()
-    assert (out[:10] == -1).all() and (out[:, :10] == -1).all()   # 빈 영역 바깥으로 안 넓어짐
+    assert (out[:10] == -1).all() and (out[:, :10] == -1).all()   # does not grow outside the free area
 
 
 def test_zone_rect_and_line():
@@ -92,11 +92,11 @@ def test_zone_blocks_but_robot_inside_can_leave():
         assert False, '금지 구역을 지나가면 안 됨'
     except PlanningError:
         pass
-    # 출발 위치가 들어 있는 금지 구역은 그 계획에서 뺀다 (노드/서버가 zone_contains 로 고름)
+    # a no-go zone containing the start is left out of that plan (node/server pick it with zone_contains)
     z = {'shape': 'rect', 'x1': 1.0, 'y1': 0.0, 'x2': 2.0, 'y2': 3.0}
     assert zone_contains(z, (1.5, 1.5)) and zone_contains(z, (0.9, 1.5), 0.15) and not zone_contains(z, (0.5, 1.5))
     assert zone_contains({'shape': 'line', 'x1': 0, 'y1': 0, 'x2': 1, 'y2': 0}, (0.5, 0.2), 0.2)
-    # 금지 구역 가장자리 안에서 출발하면 출발 주변은 비워서 밖으로 나갈 수 있음
+    # starting just inside a zone edge: the area around the start is cleared so the robot can get out
     start = (1.1, 1.5)
     inside = with_added(g, zone, RES, 0.0, 0.0, start=start)
     path = planner(inside).plan(start, (0.4, 1.5))
@@ -104,12 +104,12 @@ def test_zone_blocks_but_robot_inside_can_leave():
 
 
 def test_robot_beside_zone_does_not_cross_it():
-    """구역 바로 옆(0.2m 밖)에서 다시 계획해도 구역을 빼지 않는다 (출발 주변만 비움) → 구역을 가로지르지 않음.
-    예전엔 0.35m 안이면 구역 전체를 빼서 옆 통로를 지나다 다시 계획하면 구역 위로 경로가 났다."""
+    """Replanning right next to a zone (0.2 m outside) does not drop the zone (only the start area is cleared)
+    -> the path does not cut across the zone."""
     g = np.zeros((cell(3.0), cell(4.0)), dtype=np.int16)
     g[0, :] = g[-1, :] = g[:, 0] = g[:, -1] = 100
-    z = {'shape': 'rect', 'x1': 1.5, 'y1': 0.0, 'x2': 2.5, 'y2': 2.2}   # 위쪽 0.8m 만 열림
-    start = (1.3, 1.0)                                                  # 구역 왼쪽 0.2m 밖
+    z = {'shape': 'rect', 'x1': 1.5, 'y1': 0.0, 'x2': 2.5, 'y2': 2.2}   # only the top 0.8 m is open
+    start = (1.3, 1.0)                                                  # 0.2 m left of the zone
     assert not zone_contains(z, start, INSIDE_MARGIN)
     zone = zone_mask(g.shape, RES, 0.0, 0.0, [z])
     path = planner(with_added(g, zone, RES, 0.0, 0.0, start=start)).plan(start, (3.0, 1.0))

@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
-"""시뮬레이션 로봇의 출력을 실물 Pi(turtlebot3 bringup)와 같은 형식으로 바꾼다. scripts/start_sim.sh 가 로봇과 같이 띄움.
-시뮬레이션 모델(worlds/models/turtlebot3_waffle_pi_real/model.sdf)은 LiDAR 를 scan_gz 로 내고 Gazebo 오도메트리를 끈다.
+"""Converts the simulated robot's output to the same format as the real Pi (turtlebot3 bringup). Started with the robot by scripts/start_sim.sh.
+The sim model (worlds/models/turtlebot3_waffle_pi_real/model.sdf) publishes LiDAR on scan_gz and has Gazebo odometry disabled.
 
-1) LiDAR: scan_gz → /scan. 실물 LDS-02 드라이버처럼 안 맞은 빔(Gazebo 는 inf, 최소 거리 안쪽은 -inf)을 NaN 으로,
-   range_min 0, range_max 100, scan_time / time_increment 를 회전 주기 기준으로 (logs/real_scan_capture 와 같은 형식).
-   그래서 브리지의 scan_level / scan_slam 처리(빔 재배열, inf 만 빈 공간으로)가 실물과 똑같이 동작한다.
-2) 오도메트리: 실물 turtlebot3_node 처럼 이동은 바퀴 엔코더(joint_states), 회전은 IMU 방향 변화로 누적해
-   /odom 과 TF odom → base_footprint 를 20 Hz 로 낸다 (원점 = 출발 자리, 바퀴 미끄러짐만큼 오차가 쌓임).
-   Gazebo 실제 위치를 그대로 쓰던 예전 방식은 오차가 0 이라 실물과 SLAM/AMCL 동작이 달랐다.
+1) LiDAR: scan_gz -> /scan. Like the real LDS-02 driver, no-return beams (inf in Gazebo, -inf below the minimum range) become NaN,
+   range_min 0, range_max 100, scan_time / time_increment based on the rotation period (same format as logs/real_scan_capture).
+   So the bridge's scan_level / scan_slam processing (beam reordering, only inf as free space) behaves exactly as on the real robot.
+2) Odometry: like the real turtlebot3_node, translation is accumulated from wheel encoders (joint_states) and rotation from IMU heading change,
+   publishing /odom and TF odom -> base_footprint at 20 Hz (origin = start pose, error accumulates with wheel slip).
+   Using Gazebo's true pose would have zero error, making SLAM/AMCL behave differently from the real robot.
 """
 import math
 
@@ -20,9 +20,9 @@ from rclpy.qos import qos_profile_sensor_data
 from sensor_msgs.msg import Imu, JointState, LaserScan
 from tf2_ros import TransformBroadcaster
 
-WHEEL_RADIUS = 0.033      # Waffle Pi (turtlebot3_node waffle_pi.yaml 과 같음)
+WHEEL_RADIUS = 0.033      # Waffle Pi (same as turtlebot3_node waffle_pi.yaml)
 WHEELS = ('wheel_left_joint', 'wheel_right_joint')
-MAX_WHEEL_STEP = 2.0      # rad. 한 번에 이보다 크게 바뀌면(Gazebo 월드 초기화로 순간 이동) 누적하지 않고 다시 맞춤
+MAX_WHEEL_STEP = 2.0      # rad. A larger jump in one step (teleport from a Gazebo world reset) is not accumulated; re-sync instead
 
 
 def yaw_of(q):
@@ -39,7 +39,7 @@ class SimRealIO(Node):
         self.create_subscription(JointState, 'joint_states', self.on_joints, 10)
         self.create_subscription(Imu, 'imu', self.on_imu, qos_profile_sensor_data)
         self.x = self.y = self.th = 0.0
-        self.last_wheels = None   # (왼쪽, 오른쪽) 바퀴 각도 rad
+        self.last_wheels = None   # (left, right) wheel angles, rad
         self.last_imu_yaw = None
         self.imu_yaw = None
         self.imu_wz = 0.0

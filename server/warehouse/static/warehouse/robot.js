@@ -1,22 +1,22 @@
-// 로봇 위 태블릿 화면: 지금 할 일을 크게 보여주고, 카메라가 인식하지 못하면 수동 확인 버튼을 띄운다.
-// 관제 화면과 같은 /ws/ui/ 를 쓴다 (snapshot / state / cargo / log 메시지).
+// Robot-mounted tablet page: shows the current task in large text and a manual confirm button if the camera does not recognize it.
+// Uses the same /ws/ui/ as the control page (snapshot / state / cargo / log messages).
 
 const $ = (sel) => document.querySelector(sel);
 const S = { robot: null, task: null, cargo: null, yolo: null, lastLog: '', stateKey: '', stateSince: Date.now(), ws: null,
-            view: null,         // 지금 그린 화면 (버튼이 쓸 동작)
-            dismissed: null };  // "다시 싣기/다시 꺼내기" 로 닫은 YOLO 불일치 질문 (같은 문구면 다시 안 물음)
+            view: null,         // currently drawn view (action the button will use)
+            dismissed: null };  // YOLO mismatch question closed with "reload/unload again" (not asked again for the same text)
 
-// 카메라가 이 시간 안에 인식하지 못하면 수동 버튼을 보여준다 (초)
+// show the manual button if the camera has not recognized within this time (s)
 const MANUAL_AFTER = 20;
 
-// 인식 라벨이 색 이름이면 그 색으로 표시 (관제 화면 app.js 와 같음)
+// if a detection label is a color name, show it in that color (same as app.js)
 const CARGO_COLORS = { red: '#ef4444', green: '#22c55e', blue: '#3b82f6', yellow: '#eab308', white: '#e5e7eb',
                        빨강: '#ef4444', 초록: '#22c55e', 파랑: '#3b82f6', 노랑: '#eab308' };
 const cargoColor = (label) => CARGO_COLORS[(label || '').toLowerCase()] || '#94a3b8';
 
 function connect() {
   const proto = location.protocol === 'https:' ? 'wss' : 'ws';
-  // 로봇에 달린 화면: /robot?robot=tb3_1 처럼 그 로봇 이름을 주소에 (없으면 서버 기본 tb3)
+  // Robot-mounted screen: robot name in the URL, e.g. /robot?robot=tb3_1 (server default tb3 if omitted)
   const name = new URLSearchParams(location.search).get('robot');
   const ws = new WebSocket(`${proto}://${location.host}/ws/ui/${name ? `?robot=${encodeURIComponent(name)}` : ''}`);
   S.ws = ws;
@@ -68,11 +68,11 @@ function currentStep() {
   return S.task.steps.find((s) => s.status !== 'done' && s.status !== 'skipped') || null;
 }
 
-// ---------------------------------------------------------------- 주문 (여러 물건)
+// ---------------------------------------------------------------- orders (multiple items)
 const hasItems = (s) => !!(s && s.items && Object.keys(s.items).length);
 const itemsText = (items) => Object.entries(items).map(([k, v]) => `${k} ${v}개`).join(', ');
 
-// YOLO 개수 글자 "DHT11: 0 / led_red: 1 / ..." → {led_red: 1, ...}
+// YOLO counts text "DHT11: 0 / led_red: 1 / ..." -> {led_red: 1, ...}
 function parseCounts(text) {
   const out = {};
   for (const part of (text || '').split('/')) {
@@ -82,7 +82,7 @@ function parseCounts(text) {
   return out;
 }
 
-// 이 단계에서 확인할 개수 (서버 expected_counts 와 같음): 적재는 이 섹션 물건만, 수령은 주문한 것 모두 0
+// counts to check at this step (same as server expected_counts): load = this section items only, receive = all ordered items at 0
 function expected(step) {
   if (step.action === 'unload') return Object.fromEntries(Object.keys(step.items).map((k) => [k, 0]));
   return { ...step.items };
@@ -119,7 +119,7 @@ function orderView(state, step, r) {
     const base = load
       ? { key: 'LOAD', title: `${itemsText(step.items)} 실어 주세요`, sub: `${step.name} · 다 실으면 "적재 완료"` }
       : { key: 'UNLOAD', title: '물건을 꺼내 주세요', sub: `${itemsText(step.items)} · 다 꺼내면 "꺼냈어요"` };
-    // 버튼을 눌렀는데 서버가 YOLO 와 다르다고 판단함 (적재 잘못 / 꺼내기 덜 됨 / YOLO 개수 없음) → 사람에게 물어봄
+    // Button pressed but the server found a YOLO mismatch (wrong load / not fully unloaded / no YOLO counts) -> ask the person
     const warn = /^(적재 잘못|꺼내기 덜 됨|YOLO)/.test(r.message || '') ? r.message : '';
     if (warn && S.dismissed !== warn) {
       return { ...base, ask: true, warn: `${warn} — 직접 확인하셨으면 보내 주세요`,
@@ -140,7 +140,7 @@ function orderView(state, step, r) {
   return null;
 }
 
-// 지금 화면에 보여줄 내용 {key, title, sub, led, manual, force, warn}
+// content to show now {key, title, sub, led, manual, force, warn}
 function view() {
   const r = S.robot;
   const state = r ? r.state : 'OFFLINE';
@@ -187,7 +187,7 @@ function render() {
     led.style.background = cargoColor(v.led);
     led.textContent = v.led;
   }
-  // 카메라가 다른 물건을 봤다는 등 최근 안내 (적재/수령 대기 중일 때만)
+  // Recent notices, e.g. camera saw a different item (only while waiting to load/receive)
   $('#note').textContent = v.warn || ((v.key === 'LOAD' || v.key === 'UNLOAD') && S.lastLog.startsWith('카메라') ? S.lastLog : '');
   renderCounts(currentStep());
   S.view = v;
@@ -218,7 +218,7 @@ function render() {
 
 $('#btn-manual').addEventListener('click', () => {
   const m = S.view && S.view.manual;
-  if (m && m.check) S.dismissed = null;   // 다시 확인 요청: 또 다르면 다시 물어봄
+  if (m && m.check) S.dismissed = null;   // re-check requested: ask again if it still differs
   if (m && m.extra) send(m.action, m.extra);
   else send($('#btn-manual').dataset.action);
 });
@@ -232,5 +232,5 @@ $('#btn-stop').addEventListener('click', () => {
   if (confirm('로봇을 멈추고 진행 중인 요청을 취소할까요?')) send('estop');
 });
 
-setInterval(render, 1000);  // 수동 버튼이 나타나는 시점 갱신
+setInterval(render, 1000);  // refresh when the manual button appears
 connect();

@@ -1,11 +1,11 @@
-# 강당/교실용 위치 추정 설정 (run.sh --amcl hall). config/amcl_waffle_pi.yaml(작은 방에서 확인한 값)에서 바꾼 것:
-#   책상/의자 다리가 지도에 점으로 찍혀 있고 의자는 매일 움직이므로, 지도와 안 맞는 빔을 더 너그럽게 본다
-#   z_hit/z_rand 0.9/0.1 → 0.75/0.15 : 지도에 없는(옮겨진 의자, 사람 다리) 빔이 위치를 끌고 가지 않게
-#   sigma_hit 0.1 → 0.15             : 다리 점(지름 2~5cm)은 스캔마다 맞는 자리가 조금씩 달라서
-#   laser_likelihood_max_dist 1.0 → 1.5 : 점이 듬성한 지도에서 먼 빔도 가까운 점과 비교되게
-#   laser_max_range 3.5 (그대로)     : 넓은 강당 가운데에서는 먼 벽이 보여야 위치가 잡힌다. 실물 LDS-02 가
-#                                      3.5m 넘게 안정적으로 재는지 tools/scan_check.py 로 먼저 확인한 뒤 늘리세요
-# 나머지는 amcl_waffle_pi.yaml 과 같음 (scan_topic: scan_level 등). 결과가 나쁘면 --amcl 을 빼고 기본값으로 되돌리세요
+# Localization settings for halls/classrooms (run.sh --amcl hall). Differences from config/amcl_waffle_pi.yaml (small-room values):
+#   Desk/chair legs appear as dots in the map and chairs move daily, so beams that don't match the map are treated more leniently
+#   z_hit/z_rand 0.75/0.15 : beams not in the map (moved chairs, people's legs) should not drag the pose
+#   sigma_hit 0.15         : leg dots (2-5 cm diameter) match at slightly different spots each scan
+#   laser_likelihood_max_dist 1.5 : in a sparse map, distant beams are still compared with nearby dots
+#   laser_max_range        : in the middle of a large hall, distant walls must be visible to localize. Check that the real LDS-02
+#                            measures reliably at long range with tools/scan_check.py before raising it
+# Everything else is the same as amcl_waffle_pi.yaml (scan_topic: scan_level etc.). If results are poor, drop --amcl to use the default
 amcl:
   ros__parameters:
     use_sim_time: False
@@ -22,7 +22,7 @@ amcl:
     global_frame_id: "map"
     lambda_short: 0.1
     laser_likelihood_max_dist: 1.5
-    laser_max_range: 5.0     # tools/scan_check.py 로 실물 측정 후 늘릴 수 있음
+    laser_max_range: 5.0     # Can be raised after measuring the real sensor with tools/scan_check.py
     laser_min_range: 0.12
     laser_model_type: "likelihood_field"
     max_beams: 180

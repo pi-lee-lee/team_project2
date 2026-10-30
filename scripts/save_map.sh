@@ -1,13 +1,13 @@
 #!/bin/bash
-# SLAM 으로 만든 맵을 저장하고 정리한다.
-#   사용: scripts/save_map.sh <이름> [--plain | --straighten]
-# 결과: ~/maps/<이름>.yaml/.pgm (원본) + ~/maps/<이름>_clean.yaml/.pgm (정리, 기본 사용)
-#   기본: 기울기 보정 + 벽을 1칸 직선으로 + 모서리 직각 + 물체는 1칸 테두리 (tools/straighten_map.py --auto).
-#         벽 점이 가로/세로 직선에 잘 안 맞으면(대각선 벽, 원기둥) 자동으로 회전 없이 정리만 (1칸 외곽선).
-#         돌렸으면 yaml 에 '# rotation_deg' 가 남고, 웹 '맵 저장' 은 SLAM 중 등록한 위치도 같이 돌린다
-#   --plain:      회전/직선화 없이 정리만 (clean_map.py, 1칸 외곽선)
-#   --straighten: 직선 비율과 상관없이 무조건 직선화 (<이름>_straight)
-# 이후: scripts/run.sh --robot ... --mode map --map ~/maps/<이름>_clean.yaml
+# Save and clean up a map built with SLAM.
+#   Usage: scripts/save_map.sh <name> [--plain | --straighten]
+# Output: ~/maps/<name>.yaml/.pgm (raw) + ~/maps/<name>_clean.yaml/.pgm (cleaned, used by default)
+#   default: tilt correction + 1-cell straight walls + square corners + 1-cell object outlines (tools/straighten_map.py --auto).
+#            If wall points don't fit horizontal/vertical lines well (diagonal walls, round pillars), only clean up without rotating (1-cell outline).
+#            If rotated, '# rotation_deg' is left in the yaml, and the web '맵 저장' also rotates locations registered during SLAM
+#   --plain:      clean up only, no rotation/straightening (clean_map.py, 1-cell outline)
+#   --straighten: always straighten regardless of the straight-line ratio (<name>_straight)
+# Then: scripts/run.sh --robot ... --mode map --map ~/maps/<name>_clean.yaml
 source "$(dirname "$0")/env.sh"
 NAME="$1"
 STYLE=auto
@@ -25,7 +25,7 @@ if [ -e "$MAP_DIR/$NAME.yaml" ]; then
 fi
 
 echo "[save_map] /map 저장 중 → $MAP_DIR/$NAME (도메인 $ROS_DOMAIN_ID)"
-# free_thresh 0.196: 미탐색(205)이 빈 칸으로 읽히지 않게 (0.25 로 저장하면 방 밖이 빈 칸이 됨)
+# free_thresh 0.196: so unknown (205) is not read as free (a higher value makes the area outside the room free)
 if ! timeout 30 ros2 run nav2_map_server map_saver_cli -f "$MAP_DIR/$NAME" \
      --occ 0.65 --free 0.196 --ros-args -p use_sim_time:="$WAREHOUSE_SIM_TIME" -p save_map_timeout:=10.0; then
   echo "[save_map] 저장 실패: /map 을 받지 못했습니다 (SLAM 이 실행 중인지 확인)"
@@ -33,7 +33,7 @@ if ! timeout 30 ros2 run nav2_map_server map_saver_cli -f "$MAP_DIR/$NAME" \
 fi
 [ -f "$MAP_DIR/$NAME.yaml" ] || { echo "[save_map] 저장 실패: 파일이 만들어지지 않았습니다"; exit 1; }
 
-# 로봇이 다니던 공간을 기준으로 정리 (SLAM 원점 = 로봇 시작 위치 근처)
+# Clean up based on the space the robot drove in (SLAM origin = near the robot's start pose)
 SEED_ARGS=()
 if [ -n "$SEED_X" ]; then SEED_ARGS=(--seed "$SEED_X" "$SEED_Y"); fi
 case "$STYLE" in
@@ -45,11 +45,11 @@ if ! python3 "$WAREHOUSE_HOME/tools/${TOOL[0]}" "$MAP_DIR/$NAME.yaml" "${TOOL[@]
   echo "[save_map] 정리 실패, 원본 맵을 사용하세요: $MAP_DIR/$NAME.yaml"
   FINAL="$MAP_DIR/$NAME.yaml"
 fi
-# 시뮬레이션에서 만든 맵은 어느 월드에서 만들었는지 남긴다 (기존 맵 모드에서 같은 월드로 띄우기 위함)
+# Record which world a sim map was built in (so existing-map mode launches the same world)
 if [ "$WAREHOUSE_ROBOT" = sim ] && [ -n "$WAREHOUSE_WORLD" ]; then
   for f in "$MAP_DIR/$NAME.yaml" "$FINAL"; do
     [ -f "$f" ] || continue
-    # 파일 끝에 줄바꿈이 없으면 붙어서 마지막 값이 망가지므로 먼저 줄바꿈을 보장
+    # Ensure a trailing newline first, otherwise the line would be appended to the last value and break it
     [ -n "$(tail -c1 "$f")" ] && echo >> "$f"
     grep -q '^# world:' "$f" || echo "# world: $WAREHOUSE_WORLD" >> "$f"
   done

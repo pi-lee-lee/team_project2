@@ -1,4 +1,4 @@
-"""Frenet 로컬 플래너 (frenet.py): 폐루프로 굴려서 확인 (명령을 가속 한계 안에서 그대로 따르는 로봇)."""
+"""Frenet local planner (frenet.py): checked closed-loop (a robot that follows commands as is within the acceleration limit)."""
 import math
 
 import numpy as np
@@ -10,8 +10,8 @@ def drive(path, pts, start=(0.0, 0.0, 0.0), goal_yaw=0.0, steps=400, moving=None
     f = FrenetFollower(path, goal_yaw, cfg or FrenetConfig())
     x, y, yaw = start
     v = 0.0
-    offs, rad = body_circles(f.cfg.footprint)                # 움직이는 물체 (플래너와 같은 원 모델)
-    body = body_points(f.cfg.footprint, f.cfg.footprint_extra)   # 정적 (차체 + 붙인 물건 둘레)
+    offs, rad = body_circles(f.cfg.footprint)                # moving obstacles (same circle model as the planner)
+    body = body_points(f.cfg.footprint, f.cfg.footprint_extra)   # static (outline of body + attached items)
     pts = np.asarray(pts, dtype=float).reshape(-1, 2)
     log = {'v': [], 'state': [], 'clear': math.inf, 'xy': []}
     for k in range(steps):
@@ -41,7 +41,7 @@ WALLS = [(x, s) for x in np.arange(-0.5, 3.5, 0.03) for s in (-0.46, 0.41)]
 
 
 def test_reference_is_smooth_and_follows_path():
-    # 격자처럼 계단진 A* 경로 → 스플라인 기준선이 점에서 많이 벗어나지 않고 곡률이 작게
+    # staircase A* path on a grid -> spline reference stays close to the points with small curvature
     pts = [(0.05 * i, 0.05 * (i // 6)) for i in range(60)]
     ref = build_reference(pts, 0.05, 0.02)
     d = np.min(np.hypot(ref.x[:, None] - np.array(pts)[None, :, 0], ref.y[:, None] - np.array(pts)[None, :, 1]), axis=1)
@@ -51,7 +51,7 @@ def test_reference_is_smooth_and_follows_path():
 
 
 def test_lateral_shape_ends_parallel_at_offset():
-    # 후보 하나 = 5차 한 구간: D 에서 오프셋에 평행 (유지/복귀 구간 없음, D 너머는 끝 상태 그대로)
+    # one candidate = one polynomial: parallel at the offset at D (no hold/return segment; beyond D the end state holds)
     q = np.arange(0.0, 1.0, 0.05)
     d, dp, dpp = lateral_shape(q, 0.0, 0.0, 0.2, 0.4)
     assert abs(d[0]) < 1e-9 and np.allclose(d[q >= 0.4], 0.2) and np.allclose(dp[q >= 0.4], 0.0)
@@ -60,26 +60,26 @@ def test_lateral_shape_ends_parallel_at_offset():
 def test_drives_straight_at_target_speed():
     f, log = drive(STRAIGHT, [])
     assert log['state'][-1] == 'done'
-    assert np.mean(log['v']) > 0.13                      # 목표 0.15 (가/감속 포함)
+    assert np.mean(log['v']) > 0.13                      # target 0.15 (including accel/decel)
     assert max(abs(y) for _, y in log['xy']) < 0.01
 
 
 def test_passes_obstacle_beside_path_without_slowing():
-    # 실제 기록과 같은 크기: 0.9 m 통로, 경로 4 cm 옆 소화기(반지름 0.066) → 0.5 m 틈으로 감속 없이 지나감
+    # 0.9 m corridor, fire extinguisher (radius 0.066) 4 cm beside the path -> passes the 0.5 m gap without slowing
     ext = [(1.5 + 0.066 * math.cos(a), 0.11 + 0.066 * math.sin(a)) for a in np.linspace(0, 2 * math.pi, 24)]
     f, log = drive(STRAIGHT, WALLS + ext)
     assert log['state'][-1] == 'done'
     assert 'blocked' not in log['state']
     assert log['clear'] >= f.cfg.safety_margin - 0.01
     passing = [v for (x, _), v in zip(log['xy'], log['v']) if 1.2 < x < 1.8]
-    assert min(passing) > 0.12                           # 예전 DWA 는 여기서 0.03 아래로 기어갔음
+    assert min(passing) > 0.12                           # must not creep past the obstacle
 
 
 def test_stops_when_corridor_fully_blocked():
     block = WALLS + [(1.5, s) for s in np.arange(-0.46, 0.42, 0.03)]
     f, log = drive(STRAIGHT, block, steps=200)
     assert log['state'][-1] == 'blocked'
-    assert log['clear'] > 0.2                            # 바로 앞까지 기어가지 않고 미리 섬
+    assert log['clear'] > 0.2                            # stops early instead of creeping right up to it
     assert log['v'][-1] < 1e-3
 
 
@@ -90,15 +90,15 @@ def test_turns_in_place_when_path_is_behind():
 
 
 def test_avoids_crossing_mover():
-    # 경로를 0.1 m/s 로 가로지르는 물체: 등속 예측으로 기다리거나 비켜서 부딪히지 않음
+    # object crossing the path at 0.1 m/s: constant-velocity prediction makes the robot wait or move aside without collision
     f, log = drive(STRAIGHT, WALLS, moving=lambda t: np.array([[1.2, -0.4 + 0.1 * t, 0.0, 0.1, 0.1]]))
     assert log['state'][-1] == 'done'
     assert log['clear'] > 0.0
 
 
 def test_escapes_corner_then_turns():
-    # 실물 기록과 같은 구석: 앞 벽 13 cm, 왼쪽 벽 9 cm, 경로는 뒤쪽 아래 → 제자리에서는 양쪽 다 모서리가 닿음.
-    # 짧게 움직여 돌 자리를 만들고, 돌아서 경로로
+    # Corner: front wall 13 cm, left wall 9 cm, path goes back and down -> turning in place hits a corner either way.
+    # Make room with a short move, then turn onto the path
     walls = ([(x, 0.25) for x in np.arange(-0.6, 0.21, 0.02)] + [(0.2, y) for y in np.arange(-0.65, 0.26, 0.02)]
              + [(x, -0.65) for x in np.arange(-0.6, 0.21, 0.02)])
     path = [(0.0, 0.0)] + [(-0.05 * i, -0.3 * min(i, 6) / 6) for i in range(1, 30)]
@@ -108,7 +108,7 @@ def test_escapes_corner_then_turns():
 
 
 def test_actual_speed_stays_below_max_when_shifting_on_curve():
-    # 커브 바깥쪽으로 비켜 가도 실제 속도는 max_speed 를 넘지 않음 (실물: 0.15 설정에 0.25 m/s 가 나왔음)
+    # shifting to the outside of a curve must not push the actual speed over max_speed
     arc = [(1.0 * math.sin(a), 1.0 - 1.0 * math.cos(a)) for a in np.linspace(0, math.pi / 2, 40)]
     obstacle = [(0.71 + 0.05 * math.cos(a) - 0.0, 0.29 + 0.05 * math.sin(a)) for a in np.linspace(0, 2 * math.pi, 12)]
     f, log = drive(arc, obstacle, steps=300)
@@ -116,21 +116,21 @@ def test_actual_speed_stays_below_max_when_shifting_on_curve():
 
 
 def test_mover_behind_does_not_stop_robot():
-    # 뒤에서 비슷한 속도로 따라오는 물체 (0.12 m/s, 0.45 m 뒤): 예측 여유가 커지며 뒤 끝에 닿는 순간이 있어도 서지 않고 앞으로
+    # object following from behind at a similar speed (0.12 m/s, 0.45 m behind): even when the growing predicted margin touches the rear end, keep going forward
     f, log = drive(STRAIGHT, WALLS, steps=120, moving=lambda t: np.array([[-0.45 + 0.12 * t, 0.0, 0.12, 0.0, 0.1]]))
     assert 'blocked' not in log['state'][:60]
     assert np.mean(log['v'][20:60]) > 0.12
 
 
 def _arrived_at_origin():
-    """목표에 이미 도착한 추종기 (경로 끝 = 원점)."""
+    """Follower already at the goal (path end = origin)."""
     f = FrenetFollower([(-1.0, 0.0), (0.0, 0.0)], 0.0, FrenetConfig())
     f.arrived = True
     return f
 
 
 def _align_clear(f, pts, yaw0, w_steps):
-    """도착 후 회전을 굴려서 (마지막 상태, 회전한 각도, 차체~점 최소 거리)."""
+    """Run the post-arrival turn -> (final state, angle turned, min body-to-point distance)."""
     body = body_points(f.cfg.footprint, f.cfg.footprint_extra)
     pts = np.asarray(pts, dtype=float).reshape(-1, 2)
     yaw, turned, clear, st = yaw0, 0.0, math.inf, None
@@ -149,21 +149,21 @@ def _align_clear(f, pts, yaw0, w_steps):
 
 def test_arrival_turn_in_open_space():
     st, turned, _ = _align_clear(_arrived_at_origin(), [], math.radians(90), 100)
-    assert st == 'done' and turned < -1.3          # 가까운 쪽(오른쪽)으로 약 90°
+    assert st == 'done' and turned < -1.3          # about 90° the near way (right)
 
 
 def test_arrival_turn_takes_far_side_when_near_side_hits():
-    # 위를 보고(90°) 서서 0° 로 맞춰야 함. 가까운 쪽(오른쪽)으로 돌면 뒤 끝(반경 약 0.28 m)이 왼쪽 아래 대각선을 지나며
-    # (-0.23, -0.23) 근처 물체에 4.5 cm 까지 다가감 → 반대쪽(왼쪽)으로 270° 돌아서 맞춤 (끝 자세에서는 8 cm 넘게 떨어짐)
+    # Facing up (90°), must align to 0°. Turning the near way (right) sweeps the rear end (radius ~0.28 m) through the
+    # lower-left diagonal to within 4.5 cm of an object near (-0.23, -0.23) -> turn 270° the other way (left) instead (final pose is over 8 cm away)
     f = _arrived_at_origin()
     chunk = [(-0.23 + dx, -0.23 + dy) for dx in (-0.01, 0.0, 0.01) for dy in (-0.01, 0.0, 0.01)]
     st, turned, clear = _align_clear(f, chunk, math.radians(90), 200)
-    assert st == 'done' and turned > 3.5           # 왼쪽으로 약 270°
+    assert st == 'done' and turned > 3.5           # about 270° to the left
     assert clear >= f.cfg.safety_margin - 1e-3
 
 
 def test_arrival_turn_skipped_in_tight_corner():
-    # 옛 골방처럼 뒤/옆 벽이 회전 반경(약 0.28 m)보다 가까움 → 벽을 긁으며 돌지 않고 지금 방향에서 끝냄
+    # back/side walls closer than the turn radius (~0.28 m), like a small closet -> finish at the current heading instead of scraping the wall
     f = _arrived_at_origin()
     walls = [(-0.30, y) for y in np.arange(-0.5, 0.5, 0.02)] + [(x, 0.27) for x in np.arange(-0.3, 0.5, 0.02)]
     st, turned, clear = _align_clear(f, walls, math.radians(180), 50)
@@ -172,7 +172,7 @@ def test_arrival_turn_skipped_in_tight_corner():
 
 
 def test_lateral_shape_quintic_boundary_conditions():
-    # 시작 (d, d', d'') = 지금 상태, D 에서 (off, 0, 0)
+    # start (d, d', d'') = current state, (off, 0, 0) at D
     d0, dp0, dpp0, off, D = 0.05, 0.1, -0.8, 0.2, 0.4
     for q, want in ((0.0, (d0, dp0, dpp0)), (D, (off, 0.0, 0.0))):
         got = lateral_shape(np.array(q), d0, dp0, off, D, dpp0)
@@ -180,8 +180,8 @@ def test_lateral_shape_quintic_boundary_conditions():
 
 
 def test_offset_switch_keeps_curvature_continuous():
-    # 경로 위 상자를 비켜 갈 때 오프셋을 갈아타는 순간의 w 변화. 새 후보의 시작 d'' = 직전 후보의 그 자리 d'' 라
-    # 곡률이 이어짐 (예전 3차는 시작 d'' 를 안 맞춰 이 주행에서 0.50 rad/s 까지 튐, 5차는 0.25)
+    # Change in w when switching offsets while avoiding a box on the path. The new candidate's start d'' = the previous
+    # candidate's d'' at that point, so curvature stays continuous
     f = FrenetFollower([(0, 0), (4.0, 0.0)], 0.0, FrenetConfig())
     pts = np.array([(1.5 + i * 0.02, j * 0.02) for i in range(6) for j in range(-4, 5)])
     x = y = yaw = v = 0.0
@@ -202,7 +202,7 @@ def test_offset_switch_keeps_curvature_continuous():
 
 
 def test_very_short_paths_build_reference():
-    # 15 cm 안 되는 짧은 경로 (목표가 바로 옆): 예전엔 곡률 평균이 길이가 어긋나 예외 → 브리지가 죽었음 (실물 step-2738)
+    # paths shorter than 15 cm (goal right next to the robot): curvature averaging must not raise on a length mismatch
     for pts in ([(0, 0), (0.05, 0.0), (0.1, 0.02)], [(0, 0), (0.08, 0.0), (0.08, 0.06)], [(0, 0), (0.05, 0.0)],
                 [(0, 0), (0.02, 0.01)]):
         ref = build_reference(np.array(pts, dtype=float))
@@ -213,30 +213,30 @@ def test_very_short_paths_build_reference():
 
 
 def test_projection_ignores_extension_past_path_end():
-    # 지나온 쪽으로 되돌아와 끝나는 경로 (ㄷ자): 끝 너머 연장선이 출발 구간 옆을 지나간다. 연장선이 더 가까워도
-    # 실제 경로 위로 내려야 함 (예전: 끝을 지났다고 보고 1 m 앞에서 멈춤, 실물 2760)
+    # U-shaped path ending back toward where it passed: the extension past the end runs beside the start section.
+    # Even if the extension is closer, project onto the actual path (otherwise the end looks already passed)
     pts = [(x, 0.0) for x in np.arange(0.0, 1.5, 0.05)] + [(1.5, y) for y in np.arange(0.0, 0.4, 0.05)] + \
           [(x, 0.4) for x in np.arange(1.5, 0.89, -0.05)]
     ref = build_reference(np.array(pts, dtype=float))
-    _, s0 = ref.project(0.3, 0.22, 0, 400)        # 출발 구간까지 0.22 m, 연장선까지 0.18 m
+    _, s0 = ref.project(0.3, 0.22, 0, 400)        # 0.22 m to the start section, 0.18 m to the extension
     assert s0 < 0.5 < ref.s_end
 
 
 def _corridor(half_gap):
-    """x 0.3~1.5 m 구간만 좁은 통로 (벽 y = ±half_gap), 나머지는 넓음."""
+    """Narrow corridor only for x 0.3-1.5 m (walls at y = +-half_gap), wide elsewhere."""
     return [(x, s * half_gap) for x in np.arange(0.3, 1.5, 0.02) for s in (-1, 1)]
 
 
 def test_narrow_gap_passed_slowly_with_speed_dependent_margin():
-    # 차체 반폭 0.153 + 0.045 → 가운데로 가도 여유 약 4.5 cm: 빠른 후보(6 cm)는 탈락, 느린 후보(4 cm)만 통과 → 천천히 지나감
+    # half width 0.153 + 0.045 -> about 4.5 cm clearance even in the middle: fast candidates (6 cm) fail, only slow ones (4 cm) pass -> goes through slowly
     walls = _corridor(0.153 + 0.045)
     f, log = drive(STRAIGHT, walls, steps=900)
     assert log['state'][-1] == 'done'
     assert log['clear'] > 0.03
     xs = np.array(log['xy'])[:, 0]
     v_gap = np.array(log['v'])[(xs > 0.5) & (xs < 1.2)]
-    assert v_gap.max() < 0.08                       # 좁은 곳에서는 느리게
-    # 여유를 속도와 상관없이 6 cm 로 두면 같은 통로에서 막힌다 (예전 동작)
+    assert v_gap.max() < 0.08                       # slow in the narrow part
+    # with a speed-independent 6 cm margin the same corridor is blocked
     cfg = FrenetConfig(safety_margin_slow=0.06)
     f2, log2 = drive(STRAIGHT, walls, steps=200, cfg=cfg)
     assert 'blocked' in log2['state'] and log2['state'][-1] != 'done'
@@ -253,4 +253,4 @@ def test_offset_grid_fine_inside_coarse_outside():
     assert np.allclose(g, -g[::-1]) and 0.0 in g
     assert np.allclose(np.diff(g[np.abs(g) <= 0.1 + 1e-9]), 0.025)
     assert np.allclose(np.diff(g[g >= 0.1 - 1e-9]), 0.05) and abs(g[-1] - 0.3) < 1e-9
-    assert len(offset_grid(0.3, 0.05, 0.1, 0.05)) == 13          # 바깥 간격이 안쪽보다 촘촘하지 않으면 균일
+    assert len(offset_grid(0.3, 0.05, 0.1, 0.05)) == 13          # uniform if the outer spacing is not coarser than the inner one

@@ -1,6 +1,6 @@
 'use strict';
 
-// ------------------------------------------------------------------ 상태
+// ------------------------------------------------------------------ state
 const S = {
   ws: null,
   robot: null,
@@ -8,19 +8,19 @@ const S = {
   map: null,          // {resolution, origin:[x,y], width, height, image_url}
   mapImg: null,
   locations: [],
-  zones: [],          // 금지 구역 [{id, name, shape: rect|line, x1, y1, x2, y2}] - A* 가 피함
+  zones: [],          // keep-out zones [{id, name, shape: rect|line, x1, y1, x2, y2}] - avoided by A*
   pose: null,         // {x, y, yaw}
   path: [],           // [[x, y], ...]
   selected: new Set(),
   mode: 'view',       // view | goto | add | initpose | zone | wall
-  view: { scale: 1, ox: 0, oy: 0 },  // scale = 맵 한 칸의 캔버스 픽셀 수, (ox, oy) = 돌린 좌표 (0, 0) 의 캔버스 위치
-  rot: Math.PI / 2,   // 화면 회전 (rad, 반시계): 맵의 x 축이 화면 위쪽, y 축이 왼쪽 (로봇 정면 = x 가 위로 보이게, ROS 관례)
+  view: { scale: 1, ox: 0, oy: 0 },  // scale = canvas pixels per map cell, (ox, oy) = canvas position of rotated coords (0, 0)
+  rot: Math.PI / 2,   // view rotation (rad, CCW): map x axis points up, y axis left (robot front = x shown upward, ROS convention)
   drag: null,
-  robotName: initialRobotName(),   // 이 화면에서 조작하는 로봇 (브리지 이름, 예: tb3, tb3_1)
-  robots: [],         // 웹 로봇 선택 목록 [{name, state, message, bridge}]
+  robotName: initialRobotName(),   // robot controlled from this page (bridge name, e.g. tb3, tb3_1)
+  robots: [],         // robot selection list [{name, state, message, bridge}]
 };
 
-// 주소의 ?robot=, 없으면 지난번에 고른 로봇, 없으면 서버 기본(tb3)
+// ?robot= from the URL, else the last selected robot, else the server default (tb3)
 function initialRobotName() {
   const q = new URLSearchParams(location.search).get('robot');
   if (q) return q;
@@ -39,11 +39,11 @@ function connect() {
   S.ws = ws;
   ws.onopen = () => {
     setWsStatus(true);
-    ws.send(JSON.stringify({ action: 'travel_model' }));  // 이동 시간 모델 요약
+    ws.send(JSON.stringify({ action: 'travel_model' }));  // travel time model summary
   };
   ws.onclose = () => {
     setWsStatus(false);
-    // 서버가 끊기면 로봇 상태를 알 수 없으므로 화면에서 지운다
+    // If the server disconnects the robot state is unknown, so clear it from the view
     clearPose();
     S.health = { bridge: false };
     renderHealth();
@@ -98,7 +98,7 @@ function handle(msg) {
       updateRobotEntry(msg.robot);
       renderPanel();
       break;
-    case 'robot_summary':   // 선택하지 않은 로봇의 상태 변화 (목록 표시만)
+    case 'robot_summary':   // state change of an unselected robot (list display only)
       updateRobotEntry(msg.robot);
       break;
     case 'robots':
@@ -109,7 +109,7 @@ function handle(msg) {
       setMap(msg.map);
       break;
     case 'yolo':
-      // 개수 글자가 새로 온 시각 (bridge 의 age 가 작으면 새 결과)
+      // time the counts text last changed (small bridge age = new result)
       msg.countsAt = msg.counts && msg.age !== null && msg.age < 0.3 ? Date.now()
         : (S.yolo && msg.counts ? S.yolo.countsAt : null);
       S.yolo = msg;
@@ -144,7 +144,7 @@ function handle(msg) {
       for (const id of [...S.selected]) {
         if (!S.locations.some((l) => l.id === id)) S.selected.delete(id);
       }
-      renderPanel();  // 홈 유무에 따라 버튼 상태가 바뀜
+      renderPanel();  // button state depends on whether home exists
       break;
     case 'pose':
       if (msg.lost) {
@@ -152,7 +152,7 @@ function handle(msg) {
         break;
       }
       S.poseAt = Date.now();
-      // 가상 맵인데 로봇이 가장자리(중심에서 3m 이상)로 가면 로봇 중심으로 다시 잡는다
+      // On a virtual map, re-center on the robot when it nears the edge (3 m+ from center)
       if (S.map && S.map.virtual) {
         const c = [S.map.origin[0] + VIRTUAL_SIZE_M / 2, S.map.origin[1] + VIRTUAL_SIZE_M / 2];
         if (!S.pose || Math.hypot(msg.x - c[0], msg.y - c[1]) > 3) {
@@ -162,7 +162,7 @@ function handle(msg) {
       }
       if (!S.pose) {
         S.pose = { x: msg.x, y: msg.y, yaw: msg.yaw };
-        renderPanel();  // 위치를 처음 알게 되면 "현재 위치를 홈으로" 활성화
+        renderPanel();  // enable "set current position as home" once the pose is first known
       }
       S.pose = { x: msg.x, y: msg.y, yaw: msg.yaw };
       draw();
@@ -228,8 +228,8 @@ function handle(msg) {
   }
 }
 
-// 로봇이 사라지면(브리지 종료, Pi 꺼짐, 위치 TF 끊김) 화면에서 로봇과 경로를 지운다
-// ------------------------------------------------------------------ 로봇 선택 (여러 대)
+// When the robot disappears (bridge stopped, Pi off, pose TF lost), remove the robot and path from the view
+// ------------------------------------------------------------------ robot selection (multiple robots)
 const ROBOT_STATE_KO = { OFFLINE: '연결 안 됨', IDLE: '대기', MOVING: '이동 중', WAITING_LOAD: '적재 대기',
                          WAITING_UNLOAD: '수령 대기', ERROR: '오류' };
 function updateRobotEntry(robot) {
@@ -238,7 +238,7 @@ function updateRobotEntry(robot) {
   else S.robots.push({ name: robot.name, state: robot.state, message: robot.message, bridge: false });
   renderRobotSelect();
 }
-// 로봇이 두 대 이상일 때만 위쪽 막대에 선택 칸을 보여 준다 (한 대면 지금과 같은 화면)
+// Show the selector in the top bar only with two or more robots (single robot: no selector)
 function renderRobotSelect() {
   const sel = $('#robot-select');
   const names = S.robots.map((r) => r.name);
@@ -255,8 +255,8 @@ function renderRobotSelect() {
 }
 $('#robot-select').addEventListener('change', (e) => {
   S.robotName = e.target.value;
-  try { localStorage.setItem('robotName', S.robotName); } catch (err) { /* 저장 못 해도 동작 */ }
-  // 이전 로봇의 위치/경로는 바로 지우고, 서버가 새 로봇의 전체 상태(snapshot)를 다시 보낸다
+  try { localStorage.setItem('robotName', S.robotName); } catch (err) { /* works without storage */ }
+  // Clear the previous robot pose/path now; the server resends the full state (snapshot) of the new robot
   clearPose();
   S.scan = null;
   send('select_robot', { robot_name: S.robotName });
@@ -272,12 +272,12 @@ function clearPose() {
   if (had) renderPanel();
 }
 
-// 2초 넘게 위치가 안 오면 사라진 것으로 처리 (서버 연결이 끊긴 경우 포함)
+// Treat the robot as gone if no pose for over 2 s (incl. lost server connection)
 setInterval(() => {
   if (S.pose && Date.now() - (S.poseAt || 0) > 2000) clearPose();
 }, 500);
 
-// 이동 중이면 "약 N초 남음" 을 갱신
+// while moving, refresh "about N s left"
 setInterval(() => {
   if (S.task && S.task.status === 'running' && S.task.steps.some((st) => st.status === 'moving')) renderPanel();
 }, 2000);
@@ -305,23 +305,23 @@ function renderHealth() {
   ].join(' ');
 }
 
-// ------------------------------------------------------------------ 실행 모드
+// ------------------------------------------------------------------ run mode
 const ROBOT_LABEL = { sim: '시뮬레이션', real: '실물' };
 
-// ---------------------------------------------------------- 실행 모드 전환 대기 화면
-// 맵 만들기 / 맵 사용 / 전체 정지: 수십 초 동안 지도·카드는 쓸 일이 없으므로 화면 전체를 덮고 단계와 걸린 시간을 보여 준다.
-// 자동 탐색, 위치 자동 찾기는 지도를 보며 기다려야 하므로 덮지 않는다
+// ---------------------------------------------------------- run-mode switch waiting screen
+// Build map / use map / stop all: the map and cards are unused for tens of seconds, so cover the page and show the steps and elapsed time.
+// Auto exploration and auto localization are not covered, since one waits while watching the map
 function runOverlayJob(job) {
   return job && job !== '자동 탐색' && job !== '위치 자동 찾기';
 }
-function runKey(job) {   // 지난번 걸린 시간 (브라우저에만 저장): 월드 이름 등은 빼고 종류별로
+function runKey(job) {   // last duration (stored in the browser only): keyed by job kind, without world name etc.
   return 'runTime:' + job.replace(/\s*\(.*?\)/, '');
 }
 function runOpen(job, elapsed) {
   clearInterval(S.runTimer);
   S.run = { job, t0: performance.now() - elapsed * 1000, steps: [], hidden: false };
   let prev = null;
-  try { prev = localStorage.getItem(runKey(job)); } catch (e) { /* 저장소 없음 */ }
+  try { prev = localStorage.getItem(runKey(job)); } catch (e) { /* no storage */ }
   $('#run-title').textContent = `${job} 준비 중`;
   $('#run-prev').textContent = prev ? `지난번 ${prev}초` : '';
   $('#run-steps').innerHTML = '';
@@ -345,12 +345,12 @@ function runTick() {
 function runProgress(msg) {
   if (!S.run || S.run.job !== msg.job) {
     if (!runOverlayJob(msg.job)) return;
-    runOpen(msg.job, msg.elapsed || 0);   // 다른 화면에서 시작한 작업
+    runOpen(msg.job, msg.elapsed || 0);   // job started from another page
   }
   if (S.run.hidden) return;
   $('#run-line').textContent = msg.line;
   if (!msg.step || msg.line.startsWith('== 완료')) return;
-  if (msg.line.startsWith('==')) {   // run.sh 첫 줄: 로봇 / 모드 / 도메인 요약
+  if (msg.line.startsWith('==')) {   // first line of run.sh: robot / mode / domain summary
     $('#run-line').textContent = msg.line.replace(/^==\s*/, '');
     return;
   }
@@ -386,7 +386,7 @@ function runDone(msg) {
     if (last) cur.querySelector('.t').textContent = `${(t - last.at).toFixed(1)}초`;
   }
   if (msg.ok) {
-    try { localStorage.setItem(runKey(msg.job), t.toFixed(0)); } catch (e) { /* 저장소 없음 */ }
+    try { localStorage.setItem(runKey(msg.job), t.toFixed(0)); } catch (e) { /* no storage */ }
   }
   $('#run-title').textContent = `${msg.job} ${msg.ok ? '완료' : '실패'}`;
   $('#run-spinner').className = 'spinner big ' + (msg.ok ? 'done' : 'fail');
@@ -409,7 +409,7 @@ function runClose() {
 }
 $('#run-close').addEventListener('click', runClose);
 $('#run-hide').addEventListener('click', () => {
-  // 실행은 계속, 화면만 닫음. 끝나면 알림으로
+  // Job keeps running, only the overlay closes; a notice is shown when it ends
   S.run.hidden = true;
   $('#run-overlay').hidden = true;
 });
@@ -417,7 +417,7 @@ $('#run-hide').addEventListener('click', () => {
 function setRunner(info) {
   S.runnerMode = info.mode || {};
   S.runnerBusy = info.busy || null;
-  // 페이지를 새로 열었는데 전환 중이면 대기 화면을 이어서 (시작부터 지난 시간 포함)
+  // If a switch is in progress when the page opens, resume the waiting screen (incl. elapsed time)
   if (info.busy && runOverlayJob(info.busy) && !S.run) runOpen(info.busy, info.elapsed || 0);
   const sel = $('#runner-map');
   const keep = sel.value;
@@ -432,7 +432,7 @@ function setRunner(info) {
     o.textContent = m.path;
     sel.appendChild(o);
   }
-  // 지금 쓰는 맵을 기본 선택
+  // preselect the map in use
   const cur = (S.runnerMode.map || '').split('/maps/').pop();
   sel.value = keep || ([...sel.options].some((o) => o.value === cur) ? cur : '');
   if (S.runnerMode.robot) $('#runner-robot').value = S.runnerMode.robot;
@@ -446,20 +446,20 @@ function setRunner(info) {
     o.textContent = w.label === w.name ? w.name : `${w.label} · ${w.name}`;
     ws.appendChild(o);
   }
-  // 지금 실행 중인 월드를 기본 선택
+  // preselect the running world
   ws.value = keepWorld || S.runnerMode.world || 'turtlebot3_world';
   renderRunner();
 }
 
-// 선택한 맵을 만든 월드 (시뮬레이션에서 저장한 맵만 기록되어 있음)
+// world the selected map was built in (recorded only for maps saved in simulation)
 function selectedMapWorld() {
   const path = $('#runner-map').value;
-  if (!path) return 'turtlebot3_world';  // 시뮬레이션 기본 맵 = TurtleBot3 기본 월드 맵
+  if (!path) return 'turtlebot3_world';  // default sim map = TurtleBot3 default world map
   const m = (S.runnerMaps || []).find((x) => x.path === path);
   return m ? m.world : '';
 }
 
-// 맵을 고르면 그 맵을 만든 월드로 맞춘다 (다른 월드에서 AMCL 을 쓰면 좌표가 맞지 않음)
+// Selecting a map selects the world it was built in (AMCL in another world would not match)
 function syncWorldToMap() {
   const w = selectedMapWorld();
   if (w && [...$('#runner-world').options].some((o) => o.value === w)) $('#runner-world').value = w;
@@ -529,8 +529,8 @@ function setWsStatus(on) {
   el.className = 'badge ' + (on ? 'on' : 'off');
 }
 
-// ------------------------------------------------------------------ 좌표 변환
-// 월드(m) -> S.rot 만큼 돌린 좌표 -> 캔버스 픽셀 (캔버스 y 는 아래로). 좌표 자체는 그대로, 보기만 돌린다
+// ------------------------------------------------------------------ coordinate transform
+// world (m) -> coords rotated by S.rot -> canvas pixels (canvas y points down). Only the view is rotated, not the coordinates
 function rotXY(x, y, a) {
   const c = Math.cos(a), s = Math.sin(a);
   return [c * x - s * y, s * x + c * y];
@@ -546,9 +546,9 @@ function canvasToWorld(cx, cy) {
   return rotXY((cx - v.ox) / k, -(cy - v.oy) / k, -S.rot);
 }
 
-// ------------------------------------------------------------------ 맵
-// 맵이 아직 없을 때(SLAM 시작 직후 등): 로봇 주변 8m 를 격자로 보여주는 가상 맵.
-// 좌표 변환은 진짜 맵과 똑같이 동작하므로 로봇/경로 표시와 "여기로 이동" 클릭을 그대로 쓸 수 있다
+// ------------------------------------------------------------------ map
+// When there is no map yet (e.g. right after SLAM starts): a virtual map showing an 8 m grid around the robot.
+// The coordinate transform works as with a real map, so robot/path display and "go here" clicks still work
 const VIRTUAL_SIZE_M = 8;
 function useVirtualMap() {
   const p = S.pose || { x: 0, y: 0 };
@@ -572,34 +572,34 @@ function setMap(map) {
   $('#no-map').hidden = true;
   const img = new Image();
   img.onload = () => {
-    // 이미지가 준비된 뒤에 맵을 바꾼다 (원점이 바뀐 새 맵과 이전 이미지가 섞여 그려지지 않게)
+    // Switch the map only after the image is loaded (so a new origin is not drawn with the old image)
     S.map = map;
     const changed = !S.mapImg || S.mapName !== map.name;
     S.mapImg = img;
     S.mapName = map.name;
     const b = knownBounds(img, map);
-    // 화면 범위는 월드 좌표로 기억한다. SLAM 맵은 커질 때 원점이 바뀌므로 픽셀로 기억하면
-    // 갱신(3초)마다 화면 전체가 밀려 로봇/위치가 흔들려 보였다
+    // View bounds are kept in world coordinates. A growing SLAM map changes its origin, so pixel bounds
+    // would shift the whole view on every refresh and make the robot/locations jitter
     const w = S.wbox;
     const inside = w && b.x0 >= w.x0 && b.y0 >= w.y0 && b.x1 <= w.x1 && b.y1 <= w.y1;
     if (wasVirtual && inside) {
-      fitView();  // SLAM 시작 때의 격자 화면(로봇 주변 8m)을 그대로 이어 쓴다
+      fitView();  // keep the grid view from SLAM start (8 m around the robot)
     } else if (changed && !wasVirtual || !inside) {
-      // SLAM 으로 커지는 중이면 0.5m 여유를 두어 자주 바뀌지 않게
+      // while SLAM is growing the map, add 0.5 m slack so the view does not change often
       const g = changed && !wasVirtual ? 0 : 0.5;
       const u = changed || !w ? b : { x0: Math.min(b.x0, w.x0), y0: Math.min(b.y0, w.y0),
                                       x1: Math.max(b.x1, w.x1), y1: Math.max(b.y1, w.y1) };
       S.wbox = { x0: u.x0 - g, y0: u.y0 - g, x1: u.x1 + g, y1: u.y1 + g };
       fitView();
     } else {
-      fitView();  // 범위는 그대로, 새 원점에 맞춰 변환만 다시 계산 (화면상 위치는 변하지 않음)
+      fitView();  // same bounds, only recompute the transform for the new origin (on-screen positions unchanged)
     }
   };
   img.src = map.image_url;
   renderLocations();
 }
 
-// 미탐색(회색 205)이 아닌 영역의 경계 상자 = 실제 방 범위 (월드 좌표, m)
+// bounding box of non-unknown (gray 205) cells = actual room extent (world coords, m)
 function knownBounds(img, map) {
   const c = document.createElement('canvas');
   c.width = img.width;
@@ -619,17 +619,17 @@ function knownBounds(img, map) {
     }
   }
   if (x1 < 0) { x0 = 0; y0 = 0; x1 = img.width - 1; y1 = img.height - 1; }
-  const m = 4;  // 여백(칸)
+  const m = 4;  // margin (cells)
   const r = map.resolution, [ox, oy] = map.origin;
-  // 이미지 y 는 아래로, 월드 y 는 위로
+  // image y points down, world y points up
   return { x0: ox + (x0 - m) * r, x1: ox + (x1 + 1 + m) * r,
            y0: oy + (img.height - (y1 + 1 + m)) * r, y1: oy + (img.height - (y0 - m)) * r };
 }
 
-// 화면을 방 범위에 맞춰 고정 (확대/축소/이동 없음)
+// fix the view to the room extent (no zoom/pan)
 function fitView() {
   if (!S.map) return;
-  // 월드 범위(S.wbox)의 네 모서리를 화면 각도(S.rot)로 돌린 범위에 맞춘다
+  // fit the four corners of the world bounds (S.wbox) rotated by the view angle (S.rot)
   const m = S.map, r = m.resolution;
   const wb = S.wbox || { x0: m.origin[0], y0: m.origin[1],
                          x1: m.origin[0] + m.width * r, y1: m.origin[1] + m.height * r };
@@ -637,12 +637,12 @@ function fitView() {
   const u0 = Math.min(...pts.map((p) => p[0])), u1 = Math.max(...pts.map((p) => p[0]));
   const v0 = Math.min(...pts.map((p) => p[1])), v1 = Math.max(...pts.map((p) => p[1]));
   const w = canvas.clientWidth, h = canvas.clientHeight;
-  const k = Math.min(w / (u1 - u0), h / (v1 - v0));   // 1m 당 캔버스 픽셀
+  const k = Math.min(w / (u1 - u0), h / (v1 - v0));   // canvas pixels per meter
   S.view = { scale: k * r, ox: (w - (u1 - u0) * k) / 2 - u0 * k, oy: (h - (v1 - v0) * k) / 2 + v1 * k };
   draw();
 }
 
-// 맵 이미지 픽셀 (px, py) -> 캔버스: 월드 (ox + px r, oy + (H - py) r) 를 돌려서 그린다
+// map image pixel (px, py) -> canvas: draw world (ox + px r, oy + (H - py) r) rotated
 function drawMapImage() {
   const m = S.map, r = m.resolution, k = pxPerMeter(), v = S.view;
   const c = Math.cos(S.rot), s = Math.sin(S.rot);
@@ -655,7 +655,7 @@ function drawMapImage() {
   ctx.restore();
 }
 
-// 월드 좌표 다각형 채우기/선 (돌린 화면에서도 맞게)
+// fill/stroke a world-coordinate polygon (correct in the rotated view)
 function worldPolygon(points) {
   ctx.beginPath();
   points.forEach(([x, y], i) => {
@@ -674,7 +674,7 @@ function resizeCanvas() {
   draw();
 }
 
-// ------------------------------------------------------------------ 그리기
+// ------------------------------------------------------------------ drawing
 function draw() {
   const w = canvas.clientWidth, h = canvas.clientHeight;
   ctx.clearRect(0, 0, w, h);
@@ -689,7 +689,7 @@ function draw() {
 
   const pxPerM = v.scale / S.map.resolution;
 
-  // 맵 원점 (0, 0) = SLAM을 시작한 위치. 빨간 축 = +x(0°), 초록 축 = +y(90°)
+  // map origin (0, 0) = where SLAM started. Red axis = +x (0°), green axis = +y (90°)
   {
     const [cx, cy] = worldToCanvas(0, 0);
     const len = Math.max(15, 0.3 * pxPerM) / pxPerM;   // m
@@ -704,17 +704,17 @@ function draw() {
     ctx.fillText('원점(0,0)', cx + 4, cy + 14);
   }
 
-  // 금지 구역 (A* 가 피함): 사각형 = 빗금, 선 = 굵은 점선 (가상 벽)
+  // keep-out zones (avoided by A*): rect = hatched, line = thick dashed line (virtual wall)
   for (const z of S.zones) drawZone(z, z.shape, false);
   if (S.drag && S.drag.kind === 'zone') {
     const d = S.drag;
     drawZone({ ...canvasPair(d) }, S.mode === 'wall' ? 'line' : 'rect', true);
   }
 
-  // 실시간 LiDAR: 이웃한 빔 점끼리 가까우면 선으로 이음 (벽은 실선, 떨어진 의자 다리 등은 점)
+  // live LiDAR: connect neighboring beam points when close (walls as lines, isolated chair legs etc. as dots)
   if (S.scan && Date.now() - (S.scanAt || 0) < 1500) drawScan(S.scan, pxPerM);
 
-  // A* 가 기억 중인 장애물: 맵에 없는 LiDAR 장애물 칸(빨간 점, 20초) + 부딪힌 자리(✕, 120초)
+  // obstacles remembered by A*: LiDAR obstacle cells not in the map (red dots, 20 s) + bump points (✕, 120 s)
   if (S.memory) {
     const cell = Math.max(2, 0.05 * pxPerM);
     ctx.fillStyle = 'rgba(220, 38, 38, 0.55)';
@@ -734,11 +734,11 @@ function draw() {
     }
   }
 
-  // 추적 중인 장애물 (LiDAR 군집 + 칼만필터): 주황 원 + 1초 뒤 위치까지 화살표
+  // tracked obstacles (LiDAR clusters + Kalman filter): orange circle + arrow to the position 1 s ahead
   if (S.obstacles && S.obstacles.length && Date.now() - (S.obstaclesAt || 0) < 2000) {
     for (const o of S.obstacles) {
       const [cx, cy] = worldToCanvas(o.x, o.y);
-      // 움직이는 물체: 주황 + 1초 뒤 위치 화살표, 지도에 없는 멈춘 물체: 회색
+      // moving object: orange + arrow to position 1 s ahead; stationary object not in the map: gray
       const moving = o.moving === undefined ? Math.hypot(o.vx, o.vy) > 0.08 : o.moving;
       ctx.beginPath();
       ctx.arc(cx, cy, Math.max(4, o.r * pxPerM), 0, 2 * Math.PI);
@@ -755,7 +755,7 @@ function draw() {
     }
   }
 
-  // 경로
+  // path
   if (S.path.length > 1) {
     ctx.strokeStyle = '#16a34a';
     ctx.lineWidth = 3;
@@ -767,8 +767,8 @@ function draw() {
     ctx.stroke();
   }
 
-  // Frenet 로컬 플래너가 고른 궤적 (앞으로 4초 동안 갈 궤적): 자홍색 굵은 선 + 끝점, 옆에 명령 속도/상태. 1초 넘게 안 오면 숨김
-  // (A* 경로가 초록이라 예전 초록 궤적은 구분이 안 됐음)
+  // trajectory chosen by the Frenet local planner (next 4 s): thick magenta line + end point, with command speed/state. Hidden if not received for over 1 s
+  // (magenta so it stands apart from the green A* path)
   if (S.localPlan && Date.now() - (S.localPlanAt || 0) < 1000) {
     const t = S.localPlan.traj || [];
     const color = '#c026d3';
@@ -795,7 +795,7 @@ function draw() {
     }
   }
 
-  // 위치
+  // locations
   const current = currentStep();
   for (const loc of S.locations) {
     const [cx, cy] = worldToCanvas(loc.x, loc.y);
@@ -808,13 +808,13 @@ function draw() {
     ctx.fillText(locPrefix(loc) + loc.name, cx + 9, cy - 9);
   }
 
-  // 등록된 위치가 아닌 목표(여기로 이동)
+  // goal that is not a registered location (go here)
   if (current && !S.locations.some((l) => l.x === current.x && l.y === current.y)) {
     const [cx, cy] = worldToCanvas(current.x, current.y);
     drawArrow(cx, cy, current.yaw, Math.max(8, 0.25 * pxPerM), '#ea580c', true);
   }
 
-  // 로봇: 실제 외곽 사각형 (차체 + 뒤에 붙인 물건, 브리지 health 의 footprint). 없으면 예전처럼 원
+  // robot: actual outline rectangles (body + rear attachment, footprint from bridge health). Circle if unavailable
   if (S.pose) {
     const [cx, cy] = worldToCanvas(S.pose.x, S.pose.y);
     const r = Math.max(6, 0.22 * pxPerM);
@@ -826,7 +826,7 @@ function draw() {
       const a = S.pose.yaw + S.rot;
       const ca = Math.cos(a);
       const sa = Math.sin(a);
-      for (const [x0, x1, y0, y1] of rects) {   // 로봇 기준 (앞 x, 왼 y) → 화면 (y 는 아래가 +)
+      for (const [x0, x1, y0, y1] of rects) {   // robot frame (x forward, y left) -> screen (y positive down)
         ctx.beginPath();
         [[x0, y0], [x1, y0], [x1, y1], [x0, y1]].forEach(([px, py], i) => {
           const sx = cx + (px * ca - py * sa) * pxPerM;
@@ -837,7 +837,7 @@ function draw() {
         ctx.fill();
         ctx.stroke();
       }
-    } else {   // 너무 작게 보일 때 / 정보 없을 때
+    } else {   // when drawn too small / no footprint info
       ctx.beginPath();
       ctx.arc(cx, cy, r, 0, Math.PI * 2);
       ctx.fill();
@@ -849,7 +849,7 @@ function draw() {
     ctx.stroke();
   }
 
-  // 드래그 중인 방향 표시
+  // heading being dragged
   if (S.drag && S.drag.kind === 'pose') {
     const { sx, sy, cx, cy } = S.drag;
     ctx.strokeStyle = S.mode === 'initpose' ? '#dc2626' : '#2563eb';
@@ -862,8 +862,8 @@ function draw() {
   }
 }
 
-// 이웃 빔 점을 이을 최대 거리 (m): 기본 + 그 거리의 빔 간격 x 배수. 멀수록 빔 사이가 벌어지므로 (3m: 약 0.3m)
-// 의자 다리처럼 따로 떨어진 물체(0.4m 이상)는 잇지 않는다
+// max distance (m) to join neighboring beam points: base + multiple of the beam spacing at that range, since beams spread with distance (3 m: about 0.3 m)
+// isolated objects like chair legs (0.4 m+ apart) are not joined
 const SCAN_JOIN_BASE = 0.1, SCAN_JOIN_BEAMS = 2.5;
 
 function drawScan(scan, pxPerM) {
@@ -917,7 +917,7 @@ function drawZone(z, shape, preview) {
     ctx.setLineDash([Math.max(4, 0.15 * pxPerM), Math.max(3, 0.08 * pxPerM)]);
     ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.stroke();
   } else {
-    // 구역은 맵 축 기준 사각형 → 돌린 화면에서는 네 모서리를 이어서 그림
+    // zones are map-axis rectangles -> draw by joining the four corners in the rotated view
     const corners = [[z.x1, z.y1], [z.x2, z.y1], [z.x2, z.y2], [z.x1, z.y2]];
     const cs = corners.map(([x, y]) => worldToCanvas(x, y));
     const x = Math.min(...cs.map((p) => p[0])), y = Math.min(...cs.map((p) => p[1]));
@@ -927,7 +927,7 @@ function drawZone(z, shape, preview) {
     ctx.fill();
     ctx.lineWidth = 2;
     ctx.stroke();
-    // 빗금
+    // hatching
     worldPolygon(corners);
     ctx.clip();
     ctx.beginPath();
@@ -945,7 +945,7 @@ function drawZone(z, shape, preview) {
   }
 }
 
-// 가상 맵: 1m 격자
+// virtual map: 1 m grid
 function drawGrid() {
   const m = S.map;
   const [x0w, y0w] = m.origin, x1w = x0w + VIRTUAL_SIZE_M, y1w = y0w + VIRTUAL_SIZE_M;
@@ -971,14 +971,14 @@ function drawArrow(cx, cy, yaw, len, color, highlight) {
   ctx.beginPath();
   ctx.arc(cx, cy, highlight ? 7 : 5, 0, Math.PI * 2);
   ctx.fill();
-  const ex = cx + Math.cos(yaw + S.rot) * len, ey = cy - Math.sin(yaw + S.rot) * len;   // yaw: 월드 방향
+  const ex = cx + Math.cos(yaw + S.rot) * len, ey = cy - Math.sin(yaw + S.rot) * len;   // yaw: world heading
   ctx.beginPath();
   ctx.moveTo(cx, cy);
   ctx.lineTo(ex, ey);
   ctx.stroke();
 }
 
-// ------------------------------------------------------------------ 마우스 / 터치
+// ------------------------------------------------------------------ mouse / touch
 function eventPos(ev) {
   const r = canvas.getBoundingClientRect();
   return [ev.clientX - r.left, ev.clientY - r.top];
@@ -987,7 +987,7 @@ function eventPos(ev) {
 canvas.addEventListener('pointerdown', (ev) => {
   if (!S.map) return;
   canvas.setPointerCapture(ev.pointerId);
-  if (S.mode === 'view') return;  // 보기 모드에서는 지도 고정
+  if (S.mode === 'view') return;  // map is fixed in view mode
   const [x, y] = eventPos(ev);
   const kind = S.mode === 'zone' || S.mode === 'wall' ? 'zone' : 'pose';
   S.drag = { kind, sx: x, sy: y, cx: x, cy: y };
@@ -1008,7 +1008,7 @@ canvas.addEventListener('pointerup', () => {
   const d = S.drag;
   S.drag = null;
   if (d && d.kind === 'zone') {
-    // 끌어서 그린 사각형/선을 금지 구역으로 저장 (모드는 그대로 두어 이어서 그릴 수 있게)
+    // save the dragged rect/line as a keep-out zone (mode kept so more can be drawn)
     if (Math.hypot(d.cx - d.sx, d.cy - d.sy) > 5) {
       send('save_zone', { zone: { shape: S.mode === 'wall' ? 'line' : 'rect', ...canvasPair(d) } });
       notifyExploreZones();
@@ -1019,11 +1019,11 @@ canvas.addEventListener('pointerup', () => {
   if (!d || d.kind !== 'pose') { draw(); return; }
   const [wx, wy] = canvasToWorld(d.sx, d.sy);
   const dx = d.cx - d.sx, dy = d.cy - d.sy;
-  // 드래그 없이 클릭만 하면: 이동은 로봇에서 목표를 향하는 방향, 나머지는 0°(맵의 +x 방향)
+  // plain click without drag: goto uses the robot-to-goal direction, others use 0° (map +x)
   let yaw = 0;
-  if (Math.hypot(dx, dy) > 5) yaw = Math.atan2(-dy, dx) - S.rot;   // 화면 방향 → 월드 방향
+  if (Math.hypot(dx, dy) > 5) yaw = Math.atan2(-dy, dx) - S.rot;   // screen direction -> world direction
   else if (S.mode === 'goto' && S.pose) yaw = Math.atan2(wy - S.pose.y, wx - S.pose.x);
-  // 마우스가 두 번 눌리는 경우 같은 명령이 연달아 가지 않도록 무시
+  // ignore mouse double-presses so the same command is not sent twice in a row
   const now = Date.now();
   if (S.mode !== 'add' && now - (S.lastCommandAt || 0) < 800) { draw(); return; }
   if (S.mode === 'initpose') {
@@ -1051,7 +1051,7 @@ const HINTS = {
 
 function setMode(mode) {
   S.mode = mode;
-  // 보기 모드에서는 지도 위를 손가락으로 쓸어도 페이지가 스크롤되게 (다른 모드는 지도에서 찍기/끌기)
+  // in view mode, swiping on the map scrolls the page (other modes tap/drag on the map)
   canvas.classList.toggle('pan', mode === 'view');
   document.querySelectorAll('button.mode').forEach((b) => b.classList.toggle('active', b.dataset.mode === mode));
   $('#mode-hint').textContent = HINTS[mode];
@@ -1059,20 +1059,20 @@ function setMode(mode) {
 
 document.querySelectorAll('button.mode').forEach((b) => b.addEventListener('click', () => setMode(b.dataset.mode)));
 
-// ------------------------------------------------------------------ 패널
+// ------------------------------------------------------------------ panel
 const STATE_LABEL = {
   OFFLINE: '오프라인', IDLE: '대기', MOVING: '이동 중', WAITING_LOAD: '적재 대기', WAITING_UNLOAD: '수령 대기', ERROR: '오류',
 };
 
-// 인식 라벨이 색 이름이면 그 색으로 칩을 칠한다 (주문 카드)
+// if a detection label is a color name, color the chip with it (order card)
 const CARGO_COLORS = { red: '#ef4444', green: '#22c55e', blue: '#3b82f6', yellow: '#eab308', white: '#e5e7eb',
                        빨강: '#ef4444', 초록: '#22c55e', 파랑: '#3b82f6', 노랑: '#eab308' };
 function cargoColor(label) { return CARGO_COLORS[(label || '').toLowerCase()] || '#64748b'; }
 
-// ------------------------------------------------------------------ 주문 (여러 물건)
-// 받을 곳 = 종류 '사람 위치' 인 위치, 물건 = 물류 위치(섹션)의 인식 라벨 (쉼표로 여러 개)
+// ------------------------------------------------------------------ orders (multiple items)
+// destination = locations of kind person, items = detection labels of storage locations (sections; comma-separated)
 function locPrefix(loc) { return loc.kind === 'home' ? '⌂ ' : loc.kind === 'dropoff' ? '👤 ' : ''; }
-S.orderCounts = {};   // 라벨 → 입력한 개수 (목록을 다시 그려도 유지)
+S.orderCounts = {};   // label -> entered count (kept across list redraws)
 function renderOrder() {
   const sel = $('#order-dropoff');
   if (!sel) return;
@@ -1131,12 +1131,12 @@ $('#btn-order').addEventListener('click', () => {
   send('start_order', { dropoff_id: Number(dropoff), items });
 });
 
-// 주행 파라미터: 브리지가 보낸 목록(params: 이름, 지금 값, 시작 값)을 묶음별 입력칸으로.
-// 값을 바꾸면 param_set → 브리지가 ROS 파라미터로 바꾸고 결과(param_result)와 새 목록을 보낸다
+// Drive parameters: the list sent by the bridge (params: name, current value, startup value) as grouped input fields.
+// A change sends param_set -> the bridge sets the ROS parameter and replies with the result (param_result) and the new list
 const PARAM_GROUPS = [['frenet.', 'Frenet 로컬 플래너'], ['tracking.', '움직이는 물체 추적'], ['', '안전 / 회복']];
 const paramGroup = (name) => PARAM_GROUPS.find(([p]) => name.startsWith(p));
-S.paramRows = new Map();      // 이름 → {row, input, item}
-S.paramPending = new Set();   // 이 화면에서 보내고 답을 기다리는 이름
+S.paramRows = new Map();      // name -> {row, input, item}
+S.paramPending = new Set();   // names sent from this page awaiting a reply
 function renderParams() {
   const box = $('#params-list');
   const items = S.health && S.health.bridge ? S.params : null;
@@ -1146,7 +1146,7 @@ function renderParams() {
     return;
   }
   const names = items.map((it) => it.name).join(',');
-  if (box.dataset.names !== names) {   // 목록이 바뀌었을 때만 새로 만든다 (입력 중인 칸 보호)
+  if (box.dataset.names !== names) {   // rebuild only when the list changes (protects fields being edited)
     box.dataset.names = names;
     box.innerHTML = '';
     S.paramRows.clear();
@@ -1212,7 +1212,7 @@ function paramRow(it, prefix) {
   return row;
 }
 function paramResult(msg) {
-  if (!S.paramPending.delete(msg.name)) return;   // 다른 화면이 바꾼 것
+  if (!S.paramPending.delete(msg.name)) return;   // changed by another page
   const r = S.paramRows.get(msg.name);
   if (!msg.ok) {
     toast(`${msg.name} 변경 실패: ${msg.reason || '알 수 없는 이유'}`);
@@ -1228,8 +1228,8 @@ function paramResult(msg) {
   }
 }
 
-let YOLO_NAMES = [];   // 마지막으로 본 /yolo/counts 클래스 이름 (칸 순서)
-// YOLO 검출기: 상태 배지, 켜기/끄기 버튼, /yolo/counts 글자 ("DHT11: 0 / led_red: 1 / ...")
+let YOLO_NAMES = [];   // class names last seen in /yolo/counts (cell order)
+// YOLO detector: state badge, on/off buttons, /yolo/counts text ("DHT11: 0 / led_red: 1 / ...")
 function renderYolo() {
   const y = S.yolo;
   const bridge = S.health && S.health.bridge;
@@ -1245,7 +1245,7 @@ function renderYolo() {
   $('#btn-yolo-on').disabled = !on || y.enabled === true;
   $('#btn-yolo-off').disabled = !on || y.enabled === false;
   $('#btn-yolo-capture').disabled = !on || !y.enabled;
-  // 브리지는 3초 안에 받은 개수만 보내므로, enabled 를 못 읽었어도 개수가 오면 그대로 표시
+  // the bridge only sends counts received within 3 s, so show them even if enabled could not be read
   const counts = (bridge && y && y.counts) || '';
   const items = counts.split('/').map((s) => s.trim().split(':')).filter((p) => p.length === 2)
     .map(([name, n]) => [name.trim(), parseInt(n, 10) || 0]);
@@ -1260,7 +1260,7 @@ function renderYolo() {
     : '카메라 영상을 기다리는 중';
   $('#yolo-counts').textContent = counts;
 }
-// 버튼 위 클래스별 개수 칸. 개수가 안 올 때도 마지막으로 본 클래스 칸은 '-' 로 남겨 자리가 흔들리지 않게
+// per-class count cells above the buttons. When no counts arrive, the last seen classes stay as '-' so the layout does not jump
 function renderYoloClasses(items) {
   const box = $('#yolo-classes');
   const map = new Map(items);
@@ -1278,7 +1278,7 @@ function renderYoloClasses(items) {
     return tile;
   }));
 }
-// 버튼을 누른 뒤 결과까지 걸린 시간 (로딩 표시). 켜기: 설정 응답 → 첫 검출 결과, 끄기: 설정 응답, 캡처: 다음 검출 결과
+// time from button press to result (loading indicator). On: set reply -> first detection, off: set reply, capture: next detection
 const YOLO_JOB = {
   on: { title: 'YOLO 시작 중', limit: 20000 },
   off: { title: 'YOLO 정지 중', limit: 10000 },
@@ -1307,7 +1307,7 @@ function yoloTick() {
   const y = S.yolo || {};
   if (j.ack === null && y.available && ((j.kind === 'on' && y.enabled === true) || (j.kind === 'off' && y.enabled === false)
       || j.kind === 'capture')) j.ack = now;
-  const fresh = y.countsAt && y.countsAt !== j.countsAt;   // 버튼 뒤 새 검출 결과
+  const fresh = y.countsAt && y.countsAt !== j.countsAt;   // new detection result since the button press
   $('#yolo-loading-time').textContent = `${sec(now - j.t0)}초` + (j.ack !== null && j.kind === 'on' ? ` · 설정 ${sec(j.ack - j.t0)}초, 첫 결과 기다리는 중` : '');
   if (j.kind === 'off' && j.ack !== null) return yoloFinish(`정지 완료: ${sec(j.ack - j.t0)}초`);
   if (j.kind !== 'off' && j.ack !== null && fresh) {
@@ -1340,7 +1340,7 @@ function renderPanel() {
   badge.textContent = STATE_LABEL[state] || state;
   badge.className = 'badge ' + state;
   $('#robot-message').textContent = r ? r.message : '';
-  // 휴대폰: 스크롤해도 보이는 위쪽 막대에 로봇 상태와 배터리
+  // phone: robot state and battery in the top bar that stays visible while scrolling
   const top = $('#top-robot');
   top.textContent = (STATE_LABEL[state] || state)
     + (r && r.battery_percentage != null && state !== 'OFFLINE' ? ` · ${Math.round(r.battery_percentage)}%` : '');
@@ -1351,7 +1351,7 @@ function renderPanel() {
     : '';
   bat.className = r && r.battery_percentage != null && r.battery_percentage < 20 ? 'low' : '';
   bat.title = bat.className ? '배터리가 부족합니다. 충전하세요.' : '';
-  // 배터리 막대: 값이 없으면(시뮬레이션 등) 줄 자체를 숨김
+  // battery bar: hide the whole row when there is no value (e.g. simulation)
   const pct = r && r.battery_percentage != null && state !== 'OFFLINE' ? r.battery_percentage : null;
   $('#battery-row').classList.toggle('empty', pct == null && !bat.textContent);
   const fill = $('#battery-fill');
@@ -1449,7 +1449,7 @@ function renderLocations() {
   }
 }
 
-// 자동 탐색 중에 금지 구역을 바꾸면 탐색기(tools/explore.py)가 받아서 목표를 다시 고른다
+// changing keep-out zones during auto exploration makes the explorer (tools/explore.py) re-pick its goal
 function notifyExploreZones() {
   if (S.runnerBusy === '자동 탐색') toast('자동 탐색 중: 바뀐 금지 구역을 반영해 탐색 목표를 다시 고릅니다 (구역 안/뒤로는 가지 않음)');
 }
@@ -1488,7 +1488,7 @@ function addLog(entry) {
   const li = document.createElement('li');
   const t = document.createElement('time');
   t.textContent = new Date(entry.created_at).toLocaleTimeString('ko-KR', { hour12: false });
-  // 로봇이 여러 대면 어느 로봇의 기록인지 앞에 붙인다
+  // with several robots, prefix the robot name to each entry
   const who = S.robots.length > 1 && entry.robot_name ? `[${entry.robot_name}] ` : '';
   li.append(t, who + entry.message);
   const ul = $('#logs');
@@ -1505,7 +1505,7 @@ function toast(text) {
   toastTimer = setTimeout(() => { el.hidden = true; }, 3500);
 }
 
-// ------------------------------------------------------------------ 위치 폼
+// ------------------------------------------------------------------ location form
 const form = $('#loc-form');
 
 function openLocationForm(loc) {
@@ -1539,7 +1539,7 @@ form.addEventListener('submit', (ev) => {
 });
 $('#loc-form-cancel').addEventListener('click', () => { $('#loc-form-card').hidden = true; });
 
-// ------------------------------------------------------------------ 버튼
+// ------------------------------------------------------------------ buttons
 $('#btn-confirm').addEventListener('click', () => {
   const step = currentStep();
   send(step && step.action === 'unload' ? 'confirm_unload' : 'confirm_load');
@@ -1568,7 +1568,7 @@ $('#btn-legend').addEventListener('click', () => {
 $('#btn-reset-robot').addEventListener('click', () => {
   if (confirm('작업을 취소하고 로봇 상태를 초기화할까요?\n(시뮬레이션이면 로봇이 출발 위치로 돌아갑니다)')) send('reset_robot');
 });
-// 선택한 위치 id (목록 순서). 같은 위치들로 "순서 최적화" 를 했으면 그 순서
+// selected location ids (list order), or the optimized order if "optimize order" was run on the same locations
 function selectedIds() {
   const ids = S.locations.filter((l) => S.selected.has(l.id)).map((l) => l.id);
   const p = S.plan;
@@ -1626,13 +1626,13 @@ renderPanel();
 renderHealth();
 connect();
 
-// ------------------------------------------------------------------ 수동 조작 (teleop)
-// 누르고 있는 동안 0.1초마다 {v, w} 를 보낸다. 브리지는 0.4초 넘게 안 오면 멈춘다 (손을 떼거나 창을 벗어나면 정지)
+// ------------------------------------------------------------------ manual control (teleop)
+// While held, send {v, w} every 0.1 s. The bridge stops if nothing arrives for over 0.4 s (stops on release or leaving the window)
 const TELEOP = { v: 0, w: 0, timer: null };
 function teleopSend() { send('teleop', { v: TELEOP.v, w: TELEOP.w }); }
 function teleopStart(dv, dw) {
   const speed = Number($('#teleop-speed').value);
-  TELEOP.v = dv >= 0 ? dv * speed : dv * Math.min(speed, 0.1);   // 뒤로는 최대 0.1 m/s
+  TELEOP.v = dv >= 0 ? dv * speed : dv * Math.min(speed, 0.1);   // reverse at most 0.1 m/s
   TELEOP.w = dw * (speed <= 0.08 ? 0.6 : 1.0);
   $('#teleop-status').textContent = `이동 중: ${TELEOP.v.toFixed(2)} m/s, ${TELEOP.w.toFixed(1)} rad/s`;
   if (!TELEOP.timer) { teleopSend(); TELEOP.timer = setInterval(teleopSend, 100); }

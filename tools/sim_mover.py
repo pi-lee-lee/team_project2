@@ -1,11 +1,11 @@
-"""(sim) 움직이는 장애물: 원기둥(사람 다리 정도)을 두 점 사이로 왕복시킨다. 추적/Frenet 시험용.
+"""(sim) Moving obstacle: moves a cylinder (about the size of a person's leg) back and forth between two points. For testing tracking/Frenet.
 
     source scripts/env.sh
     python3 tools/sim_mover.py --from 1.0 -1.6 --to 2.1 -1.6 --speed 0.2 [--radius 0.12] [--seconds 120]
 
-월드에 gazebo_ros_state 플러그인(/set_entity_state)이 있어야 한다 (worlds/maze_room.world 에는 있음).
-끝나면(Ctrl-C 또는 --seconds) 원기둥을 지우고, 로봇(정답 odom)과 원기둥 사이 최소 여유와 충돌 횟수를 출력한다.
-원기둥은 위치를 강제로 옮기므로(순간 이동) 로봇이 길목에 서 있으면 실제 사람보다 세게 밀어낸다.
+The world needs the gazebo_ros_state plugin (/set_entity_state) (worlds/maze_room.world has it).
+When finished (Ctrl-C or --seconds) the cylinder is deleted and the minimum clearance between the robot (ground-truth odom) and the cylinder and the number of collisions are printed.
+The cylinder's position is set directly (teleported), so if the robot stands in its way it gets pushed harder than by a real person.
 """
 import argparse
 import math
@@ -50,7 +50,7 @@ def main():
     ap.add_argument('--delay', type=float, default=0.0, help='출발 전 대기 (초)')
     args = ap.parse_args()
     rclpy.init()
-    stop = []   # Ctrl-C 로 끝내도 원기둥을 지우고 요약을 출력하도록
+    stop = []   # so the cylinder is deleted and the summary printed even on Ctrl-C
     signal.signal(signal.SIGINT, lambda *_: stop.append(1))
     signal.signal(signal.SIGTERM, lambda *_: stop.append(1))
     node = Node('sim_mover')
@@ -87,7 +87,7 @@ def main():
         if 'o' in odom:
             o = odom['o'].pose.pose
             pose = (o.position.x, o.position.y, yaw_q(o.orientation))
-            # 원기둥을 지름 크기 정사각형으로 근사 (보수적)
+            # approximate the cylinder as a square of its diameter (conservative)
             gap = rect_gap(pose, (mx, my, 2 * args.radius, 2 * args.radius, 0.0))
             if gap < best[0]:
                 best = (gap, (round(pose[0], 2), round(pose[1], 2)), (round(mx, 2), round(my, 2)))

@@ -1,19 +1,19 @@
-"""LiDAR 스캔 한 장으로 기준 위치 주변을 전수 탐색해서 맵과 가장 잘 맞는 위치를 찾고,
-웹 서버를 통해 초기 위치로 지정한다.
+"""Exhaustively search around a reference pose with one LiDAR scan to find the pose that best matches the map,
+and set it as the initial pose via the web server.
 
     source scripts/env.sh
     python3 tools/localize.py [X Y YAW_DEG] [--range 0.4] [--dry-run]
-    python3 tools/localize.py --global [--dry-run]    # 로봇 위치를 모를 때: 맵 전체에서 찾기
+    python3 tools/localize.py --global [--dry-run]    # when the robot pose is unknown: search the whole map
 
-기준 위치를 생략하면 현재 추정 위치(map->base_footprint), 그것도 없으면 (0, 0, 0)을 쓴다.
+If the reference pose is omitted, the current estimate (map->base_footprint) is used, or (0, 0, 0) if there is none.
 
---global (웹 "위치 자동 찾기"): 스캔 한 장으로는 좌석 줄처럼 반복되는 곳에서 옆 줄로 잘못 찾을 수 있어서
-  1. 제자리에서 45° 씩 8번 돌며 멈춰서 스캔을 모음 (돌면서 찍으면 시각 차이로 점이 번짐)
-  2. 오도메트리로 스캔들을 지금 로봇 기준으로 합쳐(5cm 칸으로 솎음) 맵 전체에서 찾음
-  3. 비슷한 다른 후보가 있거나 잘 안 맞으면, 가장 트인 쪽으로 최대 0.8m 가서 다시 모아 찾음 (최대 2번)
-  움직임은 브리지의 수동 조작 입력(cmd_vel_teleop)으로 → 브리지 안전장치(앞 0.25m / 뒤 0.3m)도 같이 적용.
-  이 도구도 LiDAR 로 한 번 더 확인: 로봇 중심 0.30m 안에 물체가 있으면 돌지 않고, 앞 빈 틈 0.35m 미만이면 멈춤.
-  --no-move: 예전처럼 움직이지 않고 스캔 한 장으로만
+--global (web "auto localize"): a single scan can match the neighboring row in repetitive places like seat rows, so
+  1. Turn in place 8 times by 45°, stopping to collect a scan each time (scanning while turning smears points due to timing)
+  2. Merge the scans into the current robot frame using odometry (thinned to 5 cm cells) and search the whole map
+  3. If there is a similar competing candidate or the match is poor, drive up to 0.8 m toward the most open side, collect again and search (up to 2 times)
+  Motion goes through the bridge's manual control input (cmd_vel_teleop) -> the bridge safety (front 0.25 m / rear 0.3 m) also applies.
+  This tool also checks with the LiDAR: it won't turn if anything is within 0.30 m of the robot center, and stops if the front gap is below 0.35 m.
+  --no-move: don't move, use a single scan only
 """
 import argparse
 import json
@@ -34,17 +34,17 @@ from warehouse_robot.astar import obstacle_distance
 from warehouse_robot.astar_planner_node import yaw_from_quaternion
 
 
-MAX_RANGE = 3.5        # m, 이보다 먼 점은 쓰지 않음 (LDS-02 를 넉넉히 믿는 거리, tools/scan_check.py 로 확인)
+MAX_RANGE = 3.5        # m, points farther than this are not used (a range the LDS-02 is comfortably reliable at, checked with tools/scan_check.py)
 ROT_STEP = math.radians(45)
 ROT_SPEED = 0.4        # rad/s
 MOVE_SPEED = 0.1       # m/s
-MOVE_MAX = 0.8         # m, 한 번에 가는 최대 거리
+MOVE_MAX = 0.8         # m, max distance per move
 MAX_MOVES = 2
-ROT_CLEAR = 0.33       # m, 로봇 중심에서 이 안에 물체가 있으면 돌지 않음 (뒤에 붙인 8cm 포함 반경 0.28 + 여유)
-FRONT_CLEAR = 0.35     # m, 앞 빈 틈(로봇 앞면 ~ 물체)이 이보다 작아지면 멈춤
-HALF_WIDTH = 0.22      # m, 앞으로 갈 때 확인하는 통로 반폭 (로봇 0.153 + 여유)
-FRONT_X = 0.07         # m, base_footprint 에서 로봇 앞면까지
-VOXEL = 0.05           # m, 합친 점을 솎는 칸
+ROT_CLEAR = 0.33       # m, don't turn if anything is within this distance of the robot center (radius 0.28 incl. the 8 cm rear attachment + margin)
+FRONT_CLEAR = 0.35     # m, stop when the front gap (robot front ~ object) gets smaller than this
+HALF_WIDTH = 0.22      # m, half-width of the corridor checked when moving forward (robot 0.153 + margin)
+FRONT_X = 0.07         # m, from base_footprint to the robot front
+VOXEL = 0.05           # m, cell size for thinning merged points
 
 
 def score_points(dist, info, px, py):
@@ -57,12 +57,12 @@ def score_points(dist, info, px, py):
 
 
 def search(lx, ly, dist, info, xs, ys, yaws):
-    """후보 위치 (xs[i], ys[i]) 와 방향 yaws 의 모든 조합 점수. 반환: [(평균거리, x, y, yaw), ...]"""
+    """Score every combination of candidate positions (xs[i], ys[i]) and headings yaws. Returns: [(mean distance, x, y, yaw), ...]"""
     out = []
     for yaw in yaws:
         cx = lx * math.cos(yaw) - ly * math.sin(yaw)
         cy = lx * math.sin(yaw) + ly * math.cos(yaw)
-        px = cx[None, :] + xs[:, None]          # (후보, 스캔 점)
+        px = cx[None, :] + xs[:, None]          # (candidate, scan point)
         py = cy[None, :] + ys[:, None]
         d = score_points(dist, info, px.ravel(), py.ravel()).reshape(px.shape)
         mean = d.mean(axis=1)
@@ -71,8 +71,8 @@ def search(lx, ly, dist, info, xs, ys, yaws):
 
 
 def global_search(lx, ly, dist, occ_known_free, info, coarse_points=400):
-    """맵 전체 탐색: 넓게(10cm, 5도) → 상위 후보 주변 정밀(2.5cm, 1도).
-    넓게 찾을 때는 점이 많으면(여러 스캔을 합친 경우) coarse_points 개만 골라 써서 빠르게, 정밀은 전부."""
+    """Whole-map search: coarse (10 cm, 5°) -> fine around the top candidates (2.5 cm, 1°).
+    The coarse pass uses only coarse_points points when there are many (merged scans) for speed; the fine pass uses all."""
     res = info.resolution
     if len(lx) > coarse_points:
         pick = np.linspace(0, len(lx) - 1, coarse_points).astype(int)
@@ -85,7 +85,7 @@ def global_search(lx, ly, dist, occ_known_free, info, coarse_points=400):
     ys = info.origin.position.y + (rr * step + 0.5) * res
     coarse = search(cx_, cy_, dist, info, xs, ys, np.radians(np.arange(0, 360, 5)))
     coarse.sort()
-    # 서로 30cm 이상 떨어진 상위 후보 5곳
+    # top 5 candidates at least 30 cm apart
     picks = []
     for c in coarse:
         if all(math.hypot(c[1] - p[1], c[2] - p[2]) > 0.3 for p in picks):
@@ -104,7 +104,7 @@ def global_search(lx, ly, dist, occ_known_free, info, coarse_points=400):
 
 
 def scan_xy(scan, off):
-    """스캔 → base_footprint 기준 점 (x, y). MAX_RANGE 안의 유효한 빔만."""
+    """Scan -> points (x, y) in base_footprint. Only valid beams within MAX_RANGE."""
     ang = scan.angle_min + np.arange(len(scan.ranges)) * scan.angle_increment
     rng = np.array(scan.ranges)
     ok = np.isfinite(rng) & (rng > scan.range_min) & (rng < MAX_RANGE)
@@ -112,12 +112,12 @@ def scan_xy(scan, off):
 
 
 class Explorer:
-    """위치를 찾으려고 제자리 회전/조금 이동하며 멈춘 스캔을 모은다. 움직임은 cmd_vel_teleop (브리지 안전장치 경유)."""
+    """Collects scans taken while stopped, turning in place / moving a little, to localize. Motion via cmd_vel_teleop (through the bridge safety)."""
 
     def __init__(self, node, buf, off):
         self.node, self.buf, self.off = node, buf, off
-        self.latest = None        # (받은 시각, 스캔)
-        self.records = []         # [(xs, ys, 오도메트리 x, y, yaw)]
+        self.latest = None        # (receive time, scan)
+        self.records = []         # [(xs, ys, odometry x, y, yaw)]
         self.pub = node.create_publisher(Twist, 'cmd_vel_teleop', 10)
         node.create_subscription(LaserScan, 'scan', lambda m: setattr(self, 'latest', (time.monotonic(), m)),
                                  qos_profile_sensor_data)
@@ -132,7 +132,7 @@ class Explorer:
         return t.translation.x, t.translation.y, yaw_from_quaternion(t.rotation)
 
     def points(self):
-        """지금 스캔의 base_footprint 기준 점. 스캔이 1초 넘게 없으면 None (= 위험, 멈춤)."""
+        """Points of the current scan in base_footprint. None if there has been no scan for over 1 s (= unsafe, stop)."""
         if self.latest is None or time.monotonic() - self.latest[0] > 1.0:
             return None
         return scan_xy(self.latest[1], self.off)
@@ -148,7 +148,7 @@ class Explorer:
             self.spin(0.05)
 
     def capture(self):
-        """멈춘 뒤(0.5초) 새로 들어온 스캔 한 장을 오도메트리 위치와 함께 기록."""
+        """Record one fresh scan received after stopping (0.5 s) together with the odometry pose."""
         self.stop()
         self.spin(0.5)
         t0 = time.monotonic()
@@ -165,7 +165,7 @@ class Explorer:
         return p is not None and (len(p[0]) == 0 or float(np.hypot(*p).min()) > ROT_CLEAR)
 
     def front_free(self):
-        """앞 통로(반폭 HALF_WIDTH)의 빈 틈 (m, 로봇 앞면부터). 스캔이 없으면 0."""
+        """Free gap in the front corridor (half-width HALF_WIDTH) (m, from the robot front). 0 if there is no scan."""
         p = self.points()
         if p is None:
             return 0.0
@@ -174,7 +174,7 @@ class Explorer:
         return float(x[sel].min() - FRONT_X) if sel.any() else MAX_RANGE
 
     def rotate(self, angle):
-        """angle(rad) 만큼 제자리 회전. 반환: 다 돌았으면 True (가까운 물체/명령이 안 먹혀서 멈추면 False)."""
+        """Turn in place by angle (rad). Returns True if the full turn was made (False if stopped by a nearby object / the command not taking effect)."""
         if not self.rotate_safe():
             print(f'[위치 찾기] 로봇 주변 {ROT_CLEAR:.2f}m 안에 물체가 있어 돌지 않습니다', flush=True)
             return False
@@ -201,7 +201,7 @@ class Explorer:
         return True
 
     def forward(self, dist):
-        """앞으로 dist(m). 앞이 FRONT_CLEAR 보다 가까워지면 멈춤. 반환: 간 거리."""
+        """Move forward dist (m). Stops when the front gets closer than FRONT_CLEAR. Returns the distance moved."""
         x0, y0, _ = self.odom()
         moved_at = time.monotonic()
         last = 0.0
@@ -225,7 +225,7 @@ class Explorer:
         return math.hypot(x - x0, y - y0)
 
     def open_heading(self):
-        """가장 트인 방향 (로봇 기준 rad, 빈 틈 m). 15° 간격, 같으면 덜 도는 쪽. 없으면 None."""
+        """Most open direction (rad relative to the robot, gap m). 15° steps, ties go to the smaller turn. None if there is none."""
         p = self.points()
         if p is None:
             return None
@@ -243,11 +243,11 @@ class Explorer:
         return best[1:] if best else None
 
     def merged(self):
-        """모은 스캔을 지금 로봇(base_footprint) 기준으로 합친 점 (VOXEL 칸으로 솎음)."""
+        """Collected scans merged into the current robot frame (base_footprint) (thinned to VOXEL cells)."""
         fx, fy, fyaw = self.odom()
         allx, ally = [], []
         for xs, ys, ox, oy, oyaw in self.records:
-            # 스캔 때 로봇 기준 → odom → 지금 로봇 기준
+            # robot frame at scan time -> odom -> current robot frame
             wx = ox + xs * math.cos(oyaw) - ys * math.sin(oyaw)
             wy = oy + xs * math.sin(oyaw) + ys * math.cos(oyaw)
             dx, dy = wx - fx, wy - fy
@@ -259,7 +259,7 @@ class Explorer:
 
 
 def evaluate(lx, ly, dist, info):
-    """맵 전체에서 찾기. 반환: (best=(평균, x, y, yaw, 10cm 비율, 20cm 비율), 비슷한 다른 후보 (x, y) 또는 None)."""
+    """Search the whole map. Returns: (best=(mean, x, y, yaw, 10 cm ratio, 20 cm ratio), similar other candidate (x, y) or None)."""
     grid_v = np.array(evaluate.grid.data, dtype=np.int16).reshape(info.height, info.width)
     found = global_search(lx, ly, dist, (grid_v == 0) & (dist > 0.2), info)
     if not found:
@@ -323,18 +323,18 @@ def main():
     if args.global_search and not args.no_move:
         ex = Explorer(node, buf, off)
         try:
-            # 1. 제자리에서 45° 씩 돌며 멈춰서 모으기
+            # 1. turn in place by 45°, stopping to collect
             ex.capture()
             turned = 0
             while turned < 7 and ex.rotate(ROT_STEP):
                 ex.capture()
                 turned += 1
             print(f'[위치 찾기] 제자리 {turned * 45}° 돌며 스캔 {len(ex.records)}장', flush=True)
-            if turned == 7:   # 315° 돌면 처음보다 오른쪽 45° 라 마저 돌아 처음 방향으로 (그 방향 스캔은 이미 있음)
+            if turned == 7:   # after 315° we are 45° right of the start, so finish the turn back to the start heading (that direction's scan already exists)
                 ex.rotate(ROT_STEP)
             lx, ly = ex.merged()
             best, other = evaluate(lx, ly, dist, info)
-            # 2. 모호하거나 잘 안 맞으면 트인 쪽으로 조금 가서 더 모으기
+            # 2. if ambiguous or a poor match, move a little toward the open side and collect more
             moves = 0
             while (other is not None or best[5] < 0.8) and moves < MAX_MOVES:
                 h = ex.open_heading()
@@ -348,7 +348,7 @@ def main():
                 gone = ex.forward(min(MOVE_MAX, h[1] - FRONT_CLEAR))
                 moves += 1
                 ex.capture()
-                for _ in range(3):   # 새 자리에서 90° 씩 둘러보기
+                for _ in range(3):   # look around in 90° steps at the new spot
                     if not ex.rotate(math.radians(90)):
                         break
                     ex.capture()
@@ -361,7 +361,7 @@ def main():
             print(f'경고: 비슷하게 맞는 다른 위치가 있습니다 ({other[0]:.2f}, {other[1]:.2f}). 결과를 지도에서 확인하세요.')
     elif args.global_search:
         best, other = evaluate(lx, ly, dist, info)
-        # 멀리 떨어진 다른 후보가 거의 같은 점수면 (대칭인 방 등) 모호함
+        # ambiguous if a distant other candidate has almost the same score (symmetric room, etc.)
         if other is not None:
             print(f'경고: 비슷하게 맞는 다른 위치가 있습니다 ({other[0]:.2f}, {other[1]:.2f}). 결과를 지도에서 확인하세요.')
     for dyaw in (np.radians(np.arange(-args.yaw_range, args.yaw_range + 0.1, 2.0))
@@ -377,7 +377,7 @@ def main():
                     best = (s, x0 + dx, y0 + dy, yaw, float(np.mean(d < 0.1)), float(np.mean(d < 0.2)))
 
     if args.fallback_global and not args.global_search and best is not None and best[5] < 0.8:
-        # 맵 좌표계가 예상과 다를 때 (예: Cartographer 맵은 원점이 로봇 출발 위치) 기준 위치가 틀린다
+        # the reference pose is wrong when the map frame differs from what is expected (e.g. a Cartographer map's origin is the robot start pose)
         print(f'기준 위치 주변이 잘 맞지 않아(20cm 이내 {best[5] * 100:.0f}%) 맵 전체에서 다시 찾습니다.')
         grid_v = np.array(grid.data, dtype=np.int16).reshape(info.height, info.width)
         found = global_search(lx, ly, dist, (grid_v == 0) & (dist > 0.2), info)
@@ -391,7 +391,7 @@ def main():
     yaw = math.atan2(math.sin(yaw), math.cos(yaw))
     print(f'가장 잘 맞는 위치: x={x:.3f} y={y:.3f} yaw={math.degrees(yaw):.1f}°  '
           f'(스캔 점 중 벽과 10cm 이내 {p10 * 100:.0f}%, 20cm 이내 {p20 * 100:.0f}%)')
-    print(f'RESULT {x:.3f} {y:.3f} {yaw:.4f} {p20:.3f}')  # 서버가 읽는 줄
+    print(f'RESULT {x:.3f} {y:.3f} {yaw:.4f} {p20:.3f}')  # line parsed by the server
     if p20 < 0.8:
         print('경고: 맞는 정도가 낮습니다. 기준 위치나 탐색 범위를 바꿔 다시 시도하세요.')
     if not args.dry_run:

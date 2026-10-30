@@ -45,7 +45,7 @@ while [ $# -gt 0 ]; do
     --world) WORLD="$2"; WORLD_SET=1; shift ;;
     --gui) GUI=--gui ;;
     --amcl) AMCL="$2"; shift ;;
-    --camera) CAMERA=1 ;;      # 예전 옵션 (지금 기본과 같음)
+    --camera) CAMERA=1 ;;      # Accepted for compatibility (same as the default)
     --no-camera) CAMERA=0 ;;
     -h|--help) sed -n '2,29p' "$0"; exit 0 ;;
     *) echo "알 수 없는 옵션: $1 (scripts/run.sh --help)"; exit 1 ;;
@@ -70,8 +70,8 @@ if [ "$MODE" = map ]; then
   [ -n "$MAP" ] || { echo "--mode map 에는 --map <yaml> 이 필요합니다"; exit 1; }
   MAP="$(realpath "$MAP")"
   [ -f "$MAP" ] || { echo "맵 파일 없음: $MAP"; exit 1; }
-  # 시뮬레이션: --world 를 안 주면 맵 파일에 기록된 월드(# world: ...)로 띄운다.
-  # 다른 월드에서 그 맵으로 위치를 추정하면 AMCL 좌표가 완전히 꼬인다.
+  # Sim: without --world, launch the world recorded in the map file (# world: ...).
+  # Localizing with that map in a different world completely breaks AMCL coordinates.
   MAP_WORLD=$(sed -n 's/^# world: *//p' "$MAP" | head -1)
   if [ "$ROBOT" = sim ] && [ -z "$WORLD_SET" ] && [ -n "$MAP_WORLD" ]; then
     WORLD="$MAP_WORLD"
@@ -85,17 +85,17 @@ if [ "$MODE" = map ]; then
   fi
 fi
 
-# 시뮬레이션 출발 위치 (상태 초기화/초기 위치 자동 지정에 사용)
+# Sim start pose (used for state reset / automatic initial pose)
 case "$WORLD" in
   turtlebot3_world|turtlebot3_house) SPAWN_X=-2.0; SPAWN_Y=-0.5 ;;
-  maze_room) SPAWN_X=0.2; SPAWN_Y=0.0 ;;   # 실제 로봇을 놓던 자리 (worlds/maze_room.world 는 실제 방 맵 좌표 그대로)
-  no_roof_small_warehouse|small_warehouse) SPAWN_X=-3.3; SPAWN_Y=-2.0 ;;   # AWS 창고: 가운데(0,0)는 3.5m 안에 아무것도 없어 LiDAR 가 못 봄 → 선반 근처 빈 통로
+  maze_room) SPAWN_X=0.2; SPAWN_Y=0.0 ;;   # Where the real robot is placed (worlds/maze_room.world uses the real room's map coordinates)
+  no_roof_small_warehouse|small_warehouse) SPAWN_X=-3.3; SPAWN_Y=-2.0 ;;   # AWS warehouse: nothing is within LiDAR range of the center (0,0) -> free aisle near the shelves
   *) SPAWN_X=0.0; SPAWN_Y=0.0 ;;
 esac
 
-# 동시에 두 번 실행되면(웹 실행 + 터미널 등) 둘 다 정리 후 각자 띄워 SLAM/브리지가 두 개씩 뜬다
-# → 같은 /map, map->odom 을 두 SLAM 이 번갈아 내서 지도가 망가짐. 실행 중이면 바로 거절.
-# (잠금은 이 스크립트가 끝나면 풀림. 띄운 노드에는 넘기지 않음: start() 의 9>&-)
+# If run twice at once (web + terminal etc.), both clean up and each starts its own SLAM/bridge
+# -> two SLAMs alternately publish /map and map->odom and corrupt the map. Refuse immediately if already running.
+# (The lock is released when this script exits. It is not inherited by started nodes: 9>&- in start())
 mkdir -p "$LOGS"
 exec 9> "$LOGS/run.lock"
 if ! flock -n 9; then
@@ -103,7 +103,7 @@ if ! flock -n 9; then
   exit 1
 fi
 
-# 이미 떠 있는 노드/시뮬레이션은 먼저 정리 (서버는 유지)
+# Stop already running nodes/simulation first (the server is kept)
 "$DIR/stop_ros.sh" --sim >/dev/null 9>&- || true
 
 cat > "$LOGS/run_mode.env" <<EOF
@@ -121,20 +121,20 @@ EOF
 source "$DIR/env.sh"
 echo "== 로봇 $ROBOT / 모드 $MODE / 도메인 $ROS_DOMAIN_ID"
 
-start() {  # start <로그이름> <명령...>
+start() {  # start <log_name> <command...>
   local log="$LOGS/$1.log"; shift
   setsid "$@" > "$log" 2>&1 < /dev/null 9>&- &
   echo "   시작: $* (로그 logs/$(basename "$log"))"
 }
 
-# 1) 웹 서버
+# 1) Web server
 if curl -s -o /dev/null --max-time 2 http://localhost:8000/; then
   echo "1) 웹 서버: 이미 실행 중"
 else
   echo "1) 웹 서버"; start server "$DIR/start_server.sh"; sleep 3
 fi
 
-# 2) 로봇
+# 2) Robot
 if [ "$ROBOT" = sim ]; then
   echo "2) Gazebo 시뮬레이션 ($WORLD)"; start sim "$DIR/start_sim.sh" "$WORLD" $GUI --x "$SPAWN_X" --y "$SPAWN_Y"
   sleep 12
@@ -148,18 +148,18 @@ else
     export ROS_DOMAIN_ID=44 LDS_MODEL=LDS-02 TURTLEBOT3_MODEL=waffle_pi
     setsid nohup ros2 launch turtlebot3_bringup robot.launch.py > ~/warehouse_bringup.log 2>&1 < /dev/null &
     sleep 12; grep -q "Run!" ~/warehouse_bringup.log && echo "   bringup 시작됨" || echo "   bringup 확인 필요: Pi ~/warehouse_bringup.log"; }'
-  # 명령 감시 (scripts/pi_cmd_watchdog.py): 브리지의 cmd_vel_pc 를 cmd_vel 로 넘기고, 0.5초 넘게 끊기면 로봇을 세움.
-  # 이게 없으면 실물 브리지 명령이 로봇에 안 닿음 (움직이지 않음). 고친 내용이 반영되게 매번 다시 띄움
+  # Cmd watchdog (scripts/pi_cmd_watchdog.py): forwards the bridge's cmd_vel_pc to cmd_vel and stops the robot after a gap over 0.5 s.
+  # Without it the bridge's commands never reach the real robot (it won't move). Restarted every time so edits take effect
   ssh -o BatchMode=yes "$PI_HOST" 'cat > ~/warehouse_cmd_watchdog.py' < "$HOME_DIR/scripts/pi_cmd_watchdog.py"
-  # 끄기와 띄우기를 따로: 한 명령 줄에 파일 이름이 있으면 pkill -f 가 그 원격 셸까지 죽임
+  # Stop and start separately: if the file name is on the same command line, pkill -f also kills that remote shell
   ssh -o BatchMode=yes "$PI_HOST" 'pkill -f "[w]arehouse_cmd_watchdog.py"; sleep 0.5'
   ssh -o BatchMode=yes "$PI_HOST" 'source /opt/ros/humble/setup.bash; export ROS_DOMAIN_ID=44
     setsid nohup python3 ~/warehouse_cmd_watchdog.py > ~/warehouse_cmd_watchdog.log 2>&1 < /dev/null &'
   ssh -o BatchMode=yes "$PI_HOST" 'sleep 3; pgrep -f "[w]arehouse_cmd_watchdog.py" >/dev/null && echo "   명령 감시 시작됨 (통신 0.5초 끊기면 정지)" \
       || echo "   명령 감시 확인 필요: Pi ~/warehouse_cmd_watchdog.log (없으면 로봇이 움직이지 않음)"'
-  # 카메라 (YOLO 검출기 입력 /csi/image_raw/compressed). 계속 켜 둔다: 영상은 검출기가 켜졌을 때(주문 섹션/사람 위치에 서 있을 때)만
-  # 구독되어 Wi-Fi 로 온다. 주행 중에만 끄는 방식은 켜는 데 실제 10~15초 걸려 섹션에서 YOLO 를 못 써서 되돌림 (실물 2026-10-26,
-  # 측정상 카메라는 Wi-Fi 끊김 원인이 아니었음). 켜기/끄기/상태 수동: scripts/pi_camera.sh on|off|status. stop_ros.sh 는 카메라를 건드리지 않음
+  # Camera (YOLO detector input /csi/image_raw/compressed). Kept running: images only cross Wi-Fi while the detector is enabled
+  # (stopped at an order section/person location). It is not toggled per stop because starting the camera takes too long.
+  # Manual on/off/status: scripts/pi_camera.sh on|off|status. stop_ros.sh does not touch the camera
   if [ "$CAMERA" = 1 ]; then
     echo "   $(WAREHOUSE_PI_HOST="$PI_HOST" "$HOME_DIR/scripts/pi_camera.sh" on)"
   else
@@ -167,11 +167,11 @@ else
   fi
 fi
 
-# 2-1) 실물 + 맵 만들기: SLAM 지도 원점 = 오도메트리 원점(= bringup 을 켠 자리)이라, bringup 을 켜 둔 채 로봇을
-#      옮기면 원점이 로봇에서 떨어지고 x 축이 로봇 정면과 틀어진다 (예: 4.9m, -19°).
-#      SLAM 을 켜기 직전에 오도메트리를 0 으로 → 원점 = 지금 로봇 자리, x 축 = 로봇 정면.
-#      (turtlebot3_node 의 /reset_odometry: x, y, 방향을 0 으로. 방향은 IMU 변화량을 더하므로 초기화 후에도 맞음)
-#      Pi 에서 부른다: PC(Cyclone DDS)에서 부르면 요청은 가지만 응답이 돌아오지 않았음 (Pi 는 Fast DDS)
+# 2-1) Real robot + map building: the SLAM map origin = odometry origin (= where bringup was started), so moving the robot
+#      with bringup running puts the origin away from the robot and rotates the x axis off the robot's heading.
+#      Reset odometry to 0 right before starting SLAM -> origin = current robot position, x axis = robot heading.
+#      (turtlebot3_node /reset_odometry zeroes x, y and heading; heading adds IMU deltas so it stays correct after the reset)
+#      Called on the Pi: called from the PC (Cyclone DDS) the request goes out but no response comes back (the Pi uses Fast DDS)
 if [ "$ROBOT" = real ] && [ "$MODE" = slam ]; then
   if ssh -o BatchMode=yes "$PI_HOST" 'source /opt/ros/humble/setup.bash; source ~/turtlebot3_ws/install/setup.bash
        export ROS_DOMAIN_ID=44; timeout 20 ros2 service call /reset_odometry std_srvs/srv/Trigger "{}"' 2>/dev/null \
@@ -182,7 +182,7 @@ if [ "$ROBOT" = real ] && [ "$MODE" = slam ]; then
   fi
 fi
 
-# 3) 위치 추정 또는 SLAM
+# 3) Localization or SLAM
 if [ "$MODE" = slam ]; then
   echo "3) SLAM ($ENGINE)"; start slam "$DIR/start_slam.sh" "$ENGINE"
 else
@@ -191,14 +191,14 @@ else
 fi
 sleep 8
 
-# 4) A* + 브리지
+# 4) A* + bridge
 echo "4) A* 플래너 + 브리지"; start bridge "$DIR/start_bridge.sh" "$NAME"
 sleep 8
 
-# 5) 시뮬레이션 + 기존 맵: 출발 위치를 알고 있으므로 초기 위치 자동 지정
+# 5) Sim + existing map: the start pose is known, so set the initial pose automatically
 if [ "$ROBOT" = sim ] && [ "$MODE" = map ]; then
   echo "5) 초기 위치 자동 지정 ($SPAWN_X, $SPAWN_Y)"
-  # 맵 좌표계가 월드와 다를 수 있으므로(Cartographer 맵 등) 잘 안 맞으면 맵 전체에서 다시 찾는다
+  # The map frame may differ from the world (Cartographer maps etc.), so search the whole map if it doesn't fit well
   python3 "$HOME_DIR/tools/localize.py" "$SPAWN_X" "$SPAWN_Y" 0 --range 0.3 --yaw-range 20 --fallback-global 2>&1 \
     | grep -v -i warn | sed 's/^/   /' || true
 elif [ "$MODE" = map ]; then

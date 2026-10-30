@@ -1,7 +1,7 @@
-"""/tf 로 들어오는 변환별 발행 빈도와 지연(현재 시각 - 스탬프)을 측정한다.
+"""Measure the publish rate and lag (now - stamp) of each transform arriving on /tf.
 
     source scripts/env.sh
-    python3 tools/tf_rates.py [초]
+    python3 tools/tf_rates.py [seconds]
 """
 import sys
 import time

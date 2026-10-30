@@ -1,11 +1,11 @@
-# 위치 추정(map_server + AMCL) 전용 설정. scripts/start_nav2.sh 가 기본으로 사용 (NAV2_PARAMS 를 주면 그 파일)
-# TurtleBot3 기본값(waffle_pi.yaml)에서 바꾼 것:
-#   max_beams 60 → 180       : 작은 방에서 60개 빔으로는 10cm 넘게 어긋난 채 수렴함 (sim 측정: 정지 오차 12cm)
-#   sigma_hit 0.2 → 0.1, z_hit/z_rand 0.5/0.5 → 0.9/0.1, laser_likelihood_max_dist 2.0 → 1.0 : 벽에 더 정확히 맞춤
-#   update_min_d/a 0.25/0.2 → 0.05/0.1 : 조금만 움직여도 갱신 (기본값은 25cm 를 가야 한 번 갱신)
-#   laser_min/max_range      : LDS-02 측정 범위 (0.12 ~ 3.5 m)
-#   scan_topic scan → scan_level : 브리지가 기울지 않았을 때의 스캔만 넘겨준다 (부딪혀 기울면 바닥을 벽으로 봄).
-#                                  브리지 없이 AMCL 만 쓸 때는 scan 으로 바꾸세요
+# Localization-only settings (map_server + AMCL). Used by default by scripts/start_nav2.sh (or the file given in NAV2_PARAMS)
+# Differences from the TurtleBot3 defaults (waffle_pi.yaml):
+#   max_beams 180            : with few beams AMCL converges with a large offset in a small room
+#   sigma_hit 0.1, z_hit/z_rand 0.9/0.1, laser_likelihood_max_dist 1.0 : fit walls more precisely
+#   update_min_d/a 0.05/0.1  : update after small motions (the default only updates every 25 cm)
+#   laser_min/max_range      : LDS-02 measurement range
+#   scan_topic scan_level    : the bridge only forwards scans taken while the robot is not tilted (when tilted by a bump the floor looks like a wall).
+#                              Change to scan when using AMCL without the bridge
 amcl:
   ros__parameters:
     use_sim_time: False

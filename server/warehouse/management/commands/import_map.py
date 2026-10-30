@@ -1,4 +1,4 @@
-"""map_saver로 저장한 map.yaml을 DB에 불러온다.
+"""Import a map.yaml saved by map_saver into the DB.
 
     python manage.py import_map ~/maps/warehouse.yaml [--name warehouse]
 """
@@ -11,7 +11,7 @@ from warehouse.services import save_map
 
 
 def parse_yaml(path):
-    """map.yaml은 단순한 key: value 형식이라 PyYAML 없이 읽는다."""
+    """map.yaml is a simple key: value format, so read it without PyYAML."""
     conf = {}
     with open(path, encoding='utf-8') as f:
         for line in f:

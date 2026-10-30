@@ -1,11 +1,11 @@
-"""A* 플래너 + 서버 브리지 실행.
+"""Launch the A* planner + server bridge.
 
-    ros2 launch warehouse_robot warehouse.launch.py server_url:=ws://<서버IP>:8000/ws/robot/tb3/
+    ros2 launch warehouse_robot warehouse.launch.py server_url:=ws://<server IP>:8000/ws/robot/tb3/
 
-로봇 여러 대: robot_name (서버에 접속하는 이름, 웹 로봇 선택 목록에 나옴) 과 namespace 를 로봇마다 다르게
+Multiple robots: give each robot its own robot_name (name used to connect to the server, shown in the web robot list) and namespace
     ros2 launch warehouse_robot warehouse.launch.py robot_name:=tb3_1 namespace:=tb3_1
-    → 노드/토픽/서비스가 /tb3_1/ 아래로 (cmd_vel, scan, odom, astar/..., yolo/...), TF 는 /tb3_1/tf, /tb3_1/tf_static
-      (프레임 이름은 map/odom/base_footprint 그대로, 로봇마다 TF 토픽을 나눔). server_url 을 비우면 robot_name 으로 만든다
+    -> nodes/topics/services go under /tb3_1/ (cmd_vel, scan, odom, astar/..., yolo/...), TF on /tb3_1/tf, /tb3_1/tf_static
+      (frame names stay map/odom/base_footprint; TF topics are split per robot). An empty server_url is built from robot_name
 """
 import os
 import tempfile
@@ -19,8 +19,8 @@ from launch_ros.actions import Node
 
 
 def namespaced_params(params, namespace):
-    """params.yaml 의 노드 이름 키(astar_planner:, warehouse_bridge:)는 / 바로 아래 노드에만 맞으므로,
-    네임스페이스를 주면 키를 /<ns>/<노드> 로 바꾼 사본을 만들어 쓴다."""
+    """The node-name keys in params.yaml (astar_planner:, warehouse_bridge:) only match nodes directly under /,
+    so with a namespace, use a copy whose keys are rewritten to /<ns>/<node>."""
     with open(params, encoding='utf-8') as f:
         data = yaml.safe_load(f)
     data = {f'/{namespace}/{key.strip("/")}': value for key, value in data.items()}
@@ -39,7 +39,7 @@ def launch_nodes(context):
         params = namespaced_params(params, namespace)
     server_url = arg('server_url') or f'ws://localhost:8000/ws/robot/{robot_name}/'
     use_sim_time = arg('use_sim_time') == 'true'
-    # 네임스페이스를 주면 TF 도 그 로봇 것만 (/tf → /<ns>/tf). 안 주면 지금처럼 /tf
+    # with a namespace, use only that robot's TF (/tf -> /<ns>/tf); otherwise plain /tf
     remaps = [('/tf', 'tf'), ('/tf_static', 'tf_static')] if namespace else []
     nodes = [
         Node(
@@ -52,8 +52,8 @@ def launch_nodes(context):
             parameters=[params, {'use_sim_time': use_sim_time, 'server_url': server_url,
                                  'map_name': arg('map_name'), 'mode': arg('mode')}]),
     ]
-    # YOLO 부품 검출기: 브리지와 같이 뜬다. enabled(추론+검출 영상) 는 false 로 시작, 웹 "YOLO 시작" 버튼이 true 로
-    # 네임스페이스를 주면 검출기도 그 아래로 (/<ns>/component_detector_switch, /<ns>/csi/image_raw → /<ns>/yolo/counts)
+    # YOLO component detector: starts with the bridge. enabled (inference + detection image) starts false; the web "YOLO start" button sets it true
+    # with a namespace the detector goes under it too (/<ns>/component_detector_switch, /<ns>/csi/image_raw -> /<ns>/yolo/counts)
     yolo = arg('yolo')
     if yolo:
         cmd = [yolo] + (['-r', f'__ns:=/{namespace}'] if namespace else [])

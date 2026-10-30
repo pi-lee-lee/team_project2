@@ -1,12 +1,12 @@
-"""실물 LiDAR(LDS-02) 측정 범위 확인. 로봇을 세워 둔 채로 스캔을 모아, 거리대별로 얼마나 안정적으로 돌아오는지 본다.
-AMCL laser_max_range / slam_toolbox max_laser_range 를 3.5m 보다 늘려도 되는지 판단할 때 쓴다.
+"""Check the real LiDAR (LDS-02) measuring range. Collects scans with the robot standing still and shows how reliably returns come back per distance band.
+Used to decide whether AMCL laser_max_range / slam_toolbox max_laser_range can be raised above 3.5 m.
 
     source scripts/env.sh
-    python3 tools/scan_check.py [초=20] [--topic scan]
+    python3 tools/scan_check.py [seconds=20] [--topic scan]
 
-  - 로봇은 움직이지 말고, 강당 가운데처럼 여러 거리에 벽/물체가 보이는 곳에 두세요 (사람이 지나가지 않게)
-  - 1° 방향마다 스캔 사이 값을 비교: 응답률(유효 값이 돌아온 비율)과 흔들림(표준편차)을 거리대별로 집계
-  - 추천 최대 거리 = 응답률 80% 이상, 흔들림 5cm 이하인 가장 먼 거리대의 끝 (드라이버 range_max 를 넘지 않게)
+  - Keep the robot still, somewhere walls/objects are visible at various distances, e.g. the middle of a hall (no people walking by)
+  - Compares values across scans per 1° direction: return rate (fraction of valid values) and jitter (std dev), aggregated per distance band
+  - Recommended max range = end of the farthest band with return rate >= 80% and jitter <= 5 cm (not exceeding the driver range_max)
 """
 import argparse
 import math
@@ -14,14 +14,14 @@ import time
 
 import numpy as np
 
-BAND = 0.5          # m, 거리대 폭
-MIN_RETURN = 0.8    # 추천 기준: 응답률
-MAX_STD = 0.05      # 추천 기준: 흔들림 (m)
+BAND = 0.5          # m, distance band width
+MIN_RETURN = 0.8    # recommendation threshold: return rate
+MAX_STD = 0.05      # recommendation threshold: jitter (m)
 
 
 def analyze(scans):
-    """scans: [(angle_min, angle_increment, ranges, range_min, range_max), ...] (로봇 정지).
-    반환: dict (빔 개수, 무응답 종류 비율, 거리대별 [끝 거리, 방향 수, 응답률, 흔들림], 추천 최대 거리)."""
+    """scans: [(angle_min, angle_increment, ranges, range_min, range_max), ...] (robot stationary).
+    Returns: dict (beam counts, fraction of each no-return kind, per band [end distance, direction count, return rate, jitter], recommended max range)."""
     counts = [len(s[2]) for s in scans]
     all_r = np.concatenate([np.asarray(s[2], dtype=float) for s in scans])
     range_max = max(s[4] for s in scans)
@@ -31,7 +31,7 @@ def analyze(scans):
         'inf': float(np.isinf(all_r).mean()), 'nan': float(np.isnan(all_r).mean()),
         'zero': float((all_r == 0).mean()),
     }
-    # 1° 방향 칸마다 스캔별 값 (빔 개수가 스캔마다 달라도 같은 방향끼리 비교)
+    # per-scan value for each 1° direction bin (compares like directions even if the beam count varies between scans)
     per_dir = [[] for _ in range(360)]
     for amin, inc, ranges, rmin, rmax in scans:
         r = np.asarray(ranges, dtype=float)
@@ -44,12 +44,12 @@ def analyze(scans):
                 v = r[sel & valid]
                 per_dir[d].append(float(np.min(v)) if len(v) else np.nan)
     n_bands = int(math.ceil(range_max / BAND))
-    bands = [[0, 0.0, []] for _ in range(n_bands)]   # [방향 수, 응답률 합, 흔들림 목록]
+    bands = [[0, 0.0, []] for _ in range(n_bands)]   # [direction count, return rate sum, jitter list]
     for vals in per_dir:
         v = np.array(vals)
         ok = np.isfinite(v)
         if ok.sum() < max(3, 0.2 * len(v)):
-            continue   # 대부분 무응답인 방향은 어느 거리대인지 모름
+            continue   # directions with mostly no returns can't be assigned to a band
         med = float(np.median(v[ok]))
         b = min(int(med / BAND), n_bands - 1)
         bands[b][0] += 1

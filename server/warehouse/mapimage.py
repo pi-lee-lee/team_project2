@@ -1,17 +1,17 @@
-"""OccupancyGrid / PGM -> PNG 변환 (Pillow 없이 표준 라이브러리만 사용)."""
+"""OccupancyGrid / PGM -> PNG conversion (standard library only, no Pillow)."""
 import struct
 import zlib
 
 
 def occupancy_to_gray(value):
-    """OccupancyGrid 값(-1, 0~100)을 map_saver와 같은 회색조 값으로 변환."""
+    """Convert an OccupancyGrid value (-1, 0-100) to the same gray value map_saver uses."""
     if value < 0 or value > 100:
         return 205  # unknown
     return 254 - int(value * 254 / 100)
 
 
 def grid_to_rows(data, width, height):
-    """OccupancyGrid(row 0 = 아래쪽)를 이미지 행 순서(row 0 = 위쪽)로 변환."""
+    """Convert an OccupancyGrid (row 0 = bottom) to image row order (row 0 = top)."""
     lut = bytes(occupancy_to_gray(v if v < 128 else v - 256) for v in range(256))
     rows = []
     for r in range(height - 1, -1, -1):
@@ -20,7 +20,7 @@ def grid_to_rows(data, width, height):
 
 
 def encode_png(rows, width, height):
-    """8bit grayscale PNG 인코딩."""
+    """Encode an 8-bit grayscale PNG."""
     raw = b''.join(b'\x00' + row for row in rows)
 
     def chunk(tag, body):
@@ -33,14 +33,14 @@ def encode_png(rows, width, height):
 
 
 def read_pgm(path):
-    """map_saver가 저장한 P5(binary) / P2(ascii) PGM 읽기. (width, height, rows) 반환."""
+    """Read a P5 (binary) / P2 (ascii) PGM saved by map_saver. Returns (width, height, rows)."""
     with open(path, 'rb') as f:
         content = f.read()
 
     tokens = []
     pos = 0
     while len(tokens) < 4:
-        # 공백과 주석 건너뛰기
+        # Skip whitespace and comments
         while content[pos:pos + 1].isspace():
             pos += 1
         if content[pos:pos + 1] == b'#':
@@ -66,8 +66,8 @@ def read_pgm(path):
 
 
 def decode_png(png):
-    """encode_png 로 만든 8bit 회색조 PNG 를 (width, height, rows) 로 되돌린다 (행 0 = 위쪽).
-    필터 0(None) 만 쓰는 이 프로젝트의 PNG 전용."""
+    """Decode an 8-bit grayscale PNG made by encode_png back to (width, height, rows) (row 0 = top).
+    Only for this project's PNGs, which use filter 0 (None) only."""
     pos = 8
     width = height = None
     idat = b''
@@ -93,7 +93,7 @@ def decode_png(png):
 
 
 def gray_to_occupancy(value):
-    """map_saver 회색조 → OccupancyGrid 값 (-1 미탐색, 0~100)."""
+    """map_saver gray value -> OccupancyGrid value (-1 unknown, 0-100)."""
     if value == 205:
         return -1
     return round((254 - min(value, 254)) * 100 / 254)

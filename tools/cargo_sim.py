@@ -1,11 +1,11 @@
-"""카메라 없이 LED 인식 결과를 흉내 낸다: cargo/detected 에 라벨을 몇 초 동안 발행.
+"""Fake the LED detection result without a camera: publish a label on cargo/detected for a few seconds.
 
     source scripts/env.sh
-    python3 tools/cargo_sim.py B            # B 가 실린 것처럼 (3초)
-    python3 tools/cargo_sim.py ''           # 아무것도 없는 것처럼 (꺼냄)
-    python3 tools/cargo_sim.py B --seconds 0   # Ctrl-C 까지 계속
+    python3 tools/cargo_sim.py B            # as if B is loaded (3 s)
+    python3 tools/cargo_sim.py ''           # as if nothing is there (unloaded)
+    python3 tools/cargo_sim.py B --seconds 0   # keep going until Ctrl-C
 
-브리지는 1초 동안 같은 값일 때만 서버에 알리고, 발행이 끝나도 마지막 값을 유지한다.
+The bridge reports to the server only after the value has been stable for 1 s, and keeps the last value after publishing stops.
 """
 import argparse
 import time

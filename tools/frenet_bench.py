@@ -1,21 +1,22 @@
 #!/usr/bin/env python3
-"""실물 주행 기록으로 Frenet 추종기 폐루프 비교 (로봇 없이).
+"""Closed-loop comparison of the Frenet follower on real drive records (no robot needed).
 
-기록(logs/records/**/record.jsonl.gz) 하나마다: 그 주행 동안 본 스캔 점 중 여러 주기(min_hits)에 반복해서 보인 2 cm 칸만
-정적 환경으로 삼고(지나간 사람은 빠짐), 첫 A* 경로와 출발 자세에서 지금 코드의 FrenetFollower 로 다시 달린다
-(명령을 가속 한계 안에서 따르는 로봇, 움직이는 물체 없음. 정적으로 1초 막히면 그 환경으로 A* 재계획(목표당 4번, 브리지와 같음),
-5초 넘게 막히면 '막힘' 으로 끝 — 브리지는 여기서 물러나기).
-서 있던 사람/물건은 남으므로 절대값보다 '코드 바꾸기 전/후 비교' 용.
+For each record (logs/records/**/record.jsonl.gz): of the scan points seen during that drive, only the 2 cm cells seen
+repeatedly over several cycles (min_hits) are taken as the static environment (people passing by drop out), and the drive is
+re-run with the current code's FrenetFollower from the first A* path and start pose
+(a robot that follows commands within acceleration limits, no moving objects. Statically blocked for 1 s -> A* replan on that
+environment (up to 4 per goal, same as the bridge); blocked for more than 5 s -> ends as 'blocked' (the bridge would back off here)).
+People/objects that stood still remain, so it is for before/after comparison of code changes rather than absolute values.
 
-  python3 tools/frenet_bench.py                 오늘(가장 최근 날짜) 기록 전부
-  python3 tools/frenet_bench.py 폴더 [폴더 ...]   그 기록들
-  python3 tools/frenet_bench.py --set frenet.w_change=1.0   파라미터 바꿔서
-  python3 tools/frenet_bench.py --recorded                  기록 당시 파라미터로 (기본은 지금 params.yaml 의 frenet.*)
-  python3 tools/frenet_bench.py --map ~/maps/map2_clean.yaml 폴더   재계획 A* 를 실물처럼 지도 + 지도에 없는 점(기억 장애물)으로
-      (기본은 쌓인 스캔 점만으로 격자 → 벽이 두껍게 쌓여 0.4 m 틈은 경로가 안 나옴. 지도 좌표가 기록과 맞는 날만)
+  python3 tools/frenet_bench.py                 all records from today (the latest date)
+  python3 tools/frenet_bench.py DIR [DIR ...]   those records
+  python3 tools/frenet_bench.py --set frenet.w_change=1.0   with changed parameters
+  python3 tools/frenet_bench.py --recorded                  with the parameters at recording time (default: frenet.* from the current params.yaml)
+  python3 tools/frenet_bench.py --map ~/maps/map2_clean.yaml DIR   replan A* like the real robot: map + points not in the map (remembered obstacles)
+      (default: a grid from accumulated scan points only -> walls build up thick and 0.4 m gaps yield no path. Only when the map frame matches the record)
 
-지표: 도착(done)/시간, 막힘(blocked) 시간, 주행 중 제자리 회전(출발 전 제외) 횟수, 각속도 흔들림(명령 w 의 주기당 변화 합/초),
-오프셋 바뀜 횟수, 최소 여유(차체+부착물, m).
+Metrics: arrival (done)/time, blocked time, in-place turns while driving (excluding before start), angular-velocity jitter
+(sum of per-cycle change of commanded w / s), offset change count, minimum clearance (body + attachments, m).
 """
 import argparse
 import math
@@ -32,15 +33,16 @@ from warehouse_robot.frenet import FrenetFollower, FrenetPlanner, StaticGrid, bo
 
 
 def environment(rec, min_hits=10):
-    """주행 동안 본 스캔 점 (odom) 중 min_hits 주기 넘게 보인 2 cm 칸 (칸마다 점 하나).
-    그 주기 로봇 차체(+부착물) 둘레 3 cm 안의 점은 뺀다 (서 있는 동안 LiDAR 가 본 자기 부착물이 벽처럼 쌓이지 않게)."""
+    """2 cm cells (one point each) seen in more than min_hits cycles among the scan points (odom) seen during the drive.
+    Points within 3 cm of the robot body (+attachments) in that cycle are removed (so the robot's own attachments seen by
+    the LiDAR while standing don't build up like a wall)."""
     cfg = R.make_frenet_cfg(rec.params)
     x0, x1, hw = cfg.footprint
     ex = cfg.footprint_extra
     rects = [(x0, x1, -hw, hw)] + [tuple(ex[i:i + 4]) for i in range(0, len(ex) - 3, 4)]
     cells = {}
     for s in rec.steps:
-        src = s.get('frenet') or s.get('dwa') or s   # 예전 DWA 기록도 스캔은 'dwa' 안에
+        src = s.get('frenet') or s.get('dwa') or s   # old DWA records keep the scan under 'dwa'
         p = R.arr(src.get('scan'))
         pose = src.get('pose') if 'pose' in src and src is not s else s.get('odom')
         if not len(p):
@@ -60,7 +62,7 @@ def environment(rec, min_hits=10):
 
 
 def astar_for(env, pts_extra=(), res=0.05, pad=1.0, robot_radius=0.24):
-    """환경 점으로 만든 점유 격자의 A* (본 적 없는 칸은 빈 칸으로). 브리지/플래너 설정과 같은 반경."""
+    """A* on an occupancy grid built from environment points (unseen cells are free). Same radii as the bridge/planner settings."""
     from warehouse_robot.astar import GridPlanner
     pts = np.vstack([env] + [np.asarray(pts_extra, dtype=float).reshape(-1, 2)])
     ox, oy = pts.min(axis=0) - pad
@@ -72,11 +74,11 @@ def astar_for(env, pts_extra=(), res=0.05, pad=1.0, robot_radius=0.24):
     return GridPlanner(grid.ravel(), w, h, res, ox, oy, robot_radius=robot_radius, inflation_radius=0.55)
 
 
-MAP = None   # --map: (점유 격자 int16 (아래 행부터), 해상도, 원점 x, y) — 지도 프레임
+MAP = None   # --map: (occupancy grid int16 (bottom row first), resolution, origin x, y) - map frame
 
 
 def load_map(path):
-    """map_server 처럼 pgm → -1/0/100 (negate 0, occupied/free_thresh)"""
+    """pgm -> -1/0/100 like map_server (negate 0, occupied/free_thresh)"""
     import yaml
     sys.path.insert(0, os.path.join(HOME, 'tools'))
     from clean_map import read_pgm
@@ -88,8 +90,9 @@ def load_map(path):
 
 
 def replan(env, start, goal, m_o=None):
-    """실물 A* 노드처럼: robot_radius 0.24 로 없으면 fallback_radius 0.20 으로 (0.4 m 틈까지).
-    MAP 이 있으면 지도 + 로봇 2.5 m 안에서 지도 벽과 0.15 m 넘게 떨어진 환경 점(= 기억 장애물) 으로, 지도 프레임에서 계획해 odom 으로 돌려줌."""
+    """Like the real A* node: robot_radius 0.24, falling back to fallback_radius 0.20 if no path (gaps down to 0.4 m).
+    With MAP: plans in the map frame on the map + environment points within 2.5 m of the robot that are more than 0.15 m
+    from map walls (= remembered obstacles), and returns the path in odom."""
     from warehouse_robot.astar import GridPlanner
     if MAP is not None and m_o is not None:
         grid0, res, ox, oy = MAP
@@ -97,13 +100,13 @@ def replan(env, start, goal, m_o=None):
         c, sn = math.cos(th), math.sin(th)
         to_map = lambda P: np.c_[c * (P[:, 0] - tx) + sn * (P[:, 1] - ty), -sn * (P[:, 0] - tx) + c * (P[:, 1] - ty)]  # noqa: E731
         env = np.asarray(env, dtype=float)
-        env = env[np.hypot(env[:, 0] - start[0], env[:, 1] - start[1]) < 2.5]   # 실물 기억도 최근에 본 것만 (20 s)
+        env = env[np.hypot(env[:, 0] - start[0], env[:, 1] - start[1]) < 2.5]   # the real memory also keeps only recently seen points (20 s)
         pm = to_map(env)
         occ = np.argwhere(grid0 >= 65)
         from scipy.spatial import cKDTree
-        far = cKDTree((occ[:, ::-1] + 0.5) * res + [ox, oy]).query(pm)[0] > 0.15   # A* 노드 scan_wall_margin
+        far = cKDTree((occ[:, ::-1] + 0.5) * res + [ox, oy]).query(pm)[0] > 0.15   # A* node scan_wall_margin
         grid = grid0.copy()
-        # 실물 기억처럼 5 cm 칸에 계속 보인 것만: 칸마다 환경 점 2개 이상 (한두 점 번진 것은 빼서 기억 칸 수가 실물(3~5칸)과 비슷하게)
+        # like the real memory, only 5 cm cells seen persistently: at least 2 environment points per cell (stray single points dropped so the remembered cell count resembles the real node)
         cell, cnt = np.unique(np.floor(pm[far] / 0.05).astype(int), axis=0, return_counts=True)
         mem = (cell[cnt >= 2] + 0.5) * 0.05
         j, i = np.floor((mem[:, 0] - ox) / res).astype(int), np.floor((mem[:, 1] - oy) / res).astype(int)
@@ -130,7 +133,7 @@ def replan(env, start, goal, m_o=None):
 
 
 def run(rec, overrides=None, max_time=120.0):
-    """odom 프레임에서 폐루프. 정적으로 1초 넘게 막히면 A* 재계획 (목표당 4번, 브리지와 같음), 5초 넘게 막히면 끝."""
+    """Closed loop in the odom frame. Statically blocked for more than 1 s -> A* replan (up to 4 per goal, same as the bridge); blocked for more than 5 s -> end."""
     first = next((s for s in rec.steps if 'frenet' in s), None)
     if first is None:
         return None
@@ -142,7 +145,7 @@ def run(rec, overrides=None, max_time=120.0):
         path = R.arr(next((r['path'] for r in rec.rows if r['type'] == 'plan'), None))
     if len(path) < 2:
         return None
-    path = R.transform_points(path, *m_o)                      # odom 으로 (재계획도 odom 에서)
+    path = R.transform_points(path, *m_o)                      # to odom (replans are in odom too)
     goal = path[-1]
     goal_yaw = rec.start['goal']['yaw'] + m_o[2]
     f = FrenetFollower(path, goal_yaw, cfg)
@@ -168,7 +171,7 @@ def run(rec, overrides=None, max_time=120.0):
             if newp is not None and len(newp) >= 2:
                 f = FrenetFollower(newp, goal_yaw, cfg)
                 off_prev, blocked_run = None, 0.0
-        if blocked_run > 5.0:          # 실제 브리지는 여기서 물러나기
+        if blocked_run > 5.0:          # the real bridge backs off here
             out['state'] = 'blocked'
             break
         turning = br in ('turn_first', 'make_room')
@@ -197,7 +200,7 @@ def run(rec, overrides=None, max_time=120.0):
 
 
 def current_params():
-    """지금 params.yaml 의 브리지 frenet.* (다음 실험에 쓸 값)."""
+    """The bridge's frenet.* from the current params.yaml (values for the next run)."""
     import yaml
     path = os.path.join(HOME, 'ros2_ws', 'src', 'warehouse_robot', 'config', 'params.yaml')
     p = yaml.safe_load(open(path, encoding='utf-8'))['warehouse_bridge']['ros__parameters']

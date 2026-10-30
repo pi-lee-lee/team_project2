@@ -1,10 +1,10 @@
 #!/bin/bash
-# 로봇 상태 초기화 (웹 "상태 초기화" 버튼이 브리지를 통해 실행, 직접 실행도 가능)
-#   - 정지 명령 1초
-#   - 시뮬레이션: Gazebo /reset_world 로 로봇을 출발 위치에 바로 세움 (넘어졌거나 끼었을 때)
-#     Gazebo 오도메트리는 실제 위치를 따르므로 SLAM 맵/AMCL 위치가 꼬이지 않는다.
-#     기존 맵 모드는 출발 위치 기준으로 초기 위치를 다시 맞춘다.
-#   - 실물: 정지까지만 (넘어진 로봇은 직접 세운 뒤 웹 "초기 위치 지정")
+# Reset robot state (run by the bridge from the web "상태 초기화" button; can also be run directly)
+#   - Stop command for 1 s
+#   - Simulation: Gazebo /reset_world puts the robot back upright at the start pose (if it tipped over or got stuck)
+#     Gazebo odometry follows the true pose, so the SLAM map/AMCL pose don't get corrupted.
+#     In existing-map mode the initial pose is re-aligned around the start pose.
+#   - Real robot: stop only (stand a tipped robot up by hand, then use "초기 위치 지정" on the web)
 source "$(dirname "$0")/env.sh"
 
 echo "[reset] 정지 명령"

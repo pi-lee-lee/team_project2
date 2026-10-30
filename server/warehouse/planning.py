@@ -1,14 +1,15 @@
-"""이동 시간 예측과 방문 순서 최적화.
+"""Travel time prediction and visit order optimization.
 
-- 경로: 지금 활성 맵에서 A*(ros2_ws 의 astar.py, ROS 의존성 없음)로 경로 길이와 회전량을 계산한다.
-  맵이 바뀌면(갱신 시각이 바뀌면) 플래너를 새로 만든다. 저장된 맵은 로봇의 A* 와 같게 plan_map.py 로 가공한다
-  (줄무늬 메움, 책상/의자 다리 점 부풀리기, 금지 구역). 출발점이 금지 구역/부풀린 점 안이면 로봇처럼 그 구역/주변 0.35m 를 빼고 계산.
-- 이동 시간 모델: 시간 = 기본 + 경로 길이 x 거리 계수 + 회전량 x 회전 계수.
-  지난 이동 기록(TaskStep 의 plan_length / plan_turn / 실제 걸린 시간)으로 학습한다.
-  위치가 아니라 로봇의 주행 특성만 배우므로 맵이 바뀌어도 그대로 쓸 수 있다.
-  기록이 적으면 기본값 쪽으로 당기고(릿지), 막혀서 오래 걸린 이동(이상치)은 빼고 다시 맞춘다.
-- 순서 최적화: 출발 위치(로봇) → 선택한 위치들 → (홈) 의 이동 시간 합이 가장 작은 순서.
-  8곳 이하는 전부 계산, 그보다 많으면 가까운 곳부터 + 2-opt.
+- Path: compute path length and total turning with A* (astar.py from ros2_ws, no ROS dependency) on the active map.
+  The planner is rebuilt when the map changes (its update time changes). Saved maps are processed with plan_map.py the same
+  way as the robot's A* (fill stripes, inflate desk/chair leg points, keep-out zones). If the start is inside a zone/inflated
+  point, that zone / 0.35 m around it is excluded, as on the robot.
+- Travel time model: time = base + path length x distance coef + turning x turn coef.
+  Learned from past travel records (TaskStep plan_length / plan_turn / actual time).
+  It learns only the robot's driving characteristics, not locations, so it still applies after the map changes.
+  With few records it is pulled toward the defaults (ridge); slow moves that got blocked (outliers) are dropped and it is refit.
+- Order optimization: the order minimizing total travel time start (robot) -> selected locations -> (home).
+  Exhaustive for 8 or fewer, otherwise nearest-first + 2-opt.
 """
 import itertools
 import math
@@ -26,13 +27,13 @@ sys.path.insert(0, os.path.join(os.path.dirname(settings.BASE_DIR), 'ros2_ws', '
 from warehouse_robot.astar import GridPlanner, PlanningError  # noqa: E402
 from warehouse_robot.plan_map import INSIDE_MARGIN, near_mask, prepare, with_added, zone_contains, zone_mask  # noqa: E402
 
-# 기록이 없을 때 쓰는 기본값: 기본 2초, 0.13 m/s, 회전 0.8 rad/s
+# Defaults when there are no records: base 2 s, 0.13 m/s, turning 0.8 rad/s
 PRIOR = np.array([2.0, 1 / 0.13, 1 / 0.8])
-RIDGE = 5.0        # 기록이 적을 때 기본값 쪽으로 당기는 세기
+RIDGE = 5.0        # Strength of the pull toward the defaults when records are few
 MIN_SAMPLES = 3
 
 _lock = threading.Lock()
-_planner_cache = {}   # (map_id, updated_at, allow_unknown, 금지 구역) -> (플래너, 가공 기본 격자, 부풀린 칸, 금지 구역 목록)
+_planner_cache = {}   # (map_id, updated_at, allow_unknown, zones) -> (planner, processed base grid, inflated cells, zone list)
 START_CLEAR = 0.35    # astar_planner_node start_clear_radius
 
 
@@ -40,9 +41,9 @@ class PlanError(Exception):
     pass
 
 
-# ---------------------------------------------------------------- 경로
+# ---------------------------------------------------------------- path
 def _planner(m):
-    allow_unknown = m.name == 'slam_live'   # 만드는 중인 맵은 미탐색 칸도 지나갈 수 있음 (브리지와 같게)
+    allow_unknown = m.name == 'slam_live'   # A map being built may pass through unknown cells (same as the bridge)
     zones = [z.to_dict() for z in m.zones.all()]
     key = (m.id, m.updated_at, allow_unknown, tuple(tuple(sorted(z.items())) for z in zones))
     with _lock:
@@ -50,9 +51,9 @@ def _planner(m):
         if p is None:
             width, height, rows = decode_png(bytes(m.png))
             lut = [gray_to_occupancy(v) for v in range(256)]
-            grid = np.array([[lut[v] for v in row] for row in rows], dtype=np.int16)[::-1]  # 행 0 = 아래쪽
+            grid = np.array([[lut[v] for v in row] for row in rows], dtype=np.int16)[::-1]  # row 0 = bottom
             inflated = np.zeros(grid.shape, dtype=bool)
-            if not allow_unknown:   # 로봇의 A* 와 같은 가공 (astar_planner_node 기본값)
+            if not allow_unknown:   # Same processing as the robot's A* (astar_planner_node defaults)
                 grid, inflated, _ = prepare(grid, m.resolution)
             added = inflated | zone_mask(grid.shape, m.resolution, m.origin_x, m.origin_y, zones)
             planner = GridPlanner(with_added(grid, added, m.resolution, m.origin_x, m.origin_y).ravel(),
@@ -68,7 +69,7 @@ def _angle(a):
 
 
 def path_metrics(m, start, goal):
-    """start, goal: (x, y, yaw). 반환: (경로 길이 m, 총 회전량 rad). 경로가 없으면 PlanError."""
+    """start, goal: (x, y, yaw). Returns (path length m, total turning rad). PlanError if there is no path."""
     planner, grid, inflated, zones = _planner(m)
     others = [z for z in zones if not zone_contains(z, start[:2], INSIDE_MARGIN)]
     added = inflated | zone_mask(grid.shape, m.resolution, m.origin_x, m.origin_y, others)
@@ -82,21 +83,21 @@ def path_metrics(m, start, goal):
     except PlanningError as e:
         raise PlanError(str(e))
     length = sum(math.hypot(b[0] - a[0], b[1] - a[1]) for a, b in zip(pts, pts[1:]))
-    # 진행 방향은 5칸(약 25cm) 간격으로 봐서 격자 계단에 의한 잔떨림을 줄인다
+    # Headings are taken every 5 cells (~25 cm) to reduce jitter from grid staircasing
     sub = pts[::5] + ([pts[-1]] if (len(pts) - 1) % 5 else [])
     headings = [math.atan2(b[1] - a[1], b[0] - a[0]) for a, b in zip(sub, sub[1:])
                 if math.hypot(b[0] - a[0], b[1] - a[1]) > 1e-6]
     turn = 0.0
     if headings:
-        turn += abs(_angle(headings[0] - start[2]))           # 출발할 때 방향 맞추기
+        turn += abs(_angle(headings[0] - start[2]))           # Align heading at the start
         turn += sum(abs(_angle(b - a)) for a, b in zip(headings, headings[1:]))
-        turn += abs(_angle(goal[2] - headings[-1]))           # 도착 방향 맞추기
+        turn += abs(_angle(goal[2] - headings[-1]))           # Align to the goal heading
     else:
         turn = abs(_angle(goal[2] - start[2]))
     return length, turn
 
 
-# ---------------------------------------------------------------- 이동 시간 모델
+# ---------------------------------------------------------------- travel time model
 def _samples():
     from .models import TaskStep
     rows = TaskStep.objects.filter(status__in=[TaskStep.STATUS_DONE, TaskStep.STATUS_ARRIVED],
@@ -112,21 +113,21 @@ def _samples():
 
 
 def _fit(X, y):
-    """기본값 쪽으로 당기는 최소제곱: min |Xw - y|^2 + RIDGE |w - PRIOR|^2, 계수는 0 이상."""
+    """Least squares pulled toward the defaults: min |Xw - y|^2 + RIDGE |w - PRIOR|^2, coefficients >= 0."""
     A = X.T @ X + RIDGE * np.eye(3)
     b = X.T @ y + RIDGE * PRIOR
     return np.maximum(np.linalg.solve(A, b), 0.0)
 
 
 def travel_model():
-    """학습된 모델과 통계. {'w': [...], 'n': 쓴 기록 수, 'outliers': 뺀 수, 'mae': 평균 오차(초), ...}"""
+    """Learned model and stats. {'w': [...], 'n': records used, 'outliers': records dropped, 'mae': mean error (s), ...}"""
     X, y = _samples()
     info = {'w': PRIOR.tolist(), 'n': 0, 'outliers': 0, 'mae': None, 'learned': False}
     if len(y) >= MIN_SAMPLES:
         w = _fit(X, y)
         resid = y - X @ w
         mad = np.median(np.abs(resid - np.median(resid))) * 1.4826
-        keep = np.abs(resid) <= max(3 * mad, 5.0)      # 막혀서 오래 걸린 이동 등 이상치 제외
+        keep = np.abs(resid) <= max(3 * mad, 5.0)      # Drop outliers such as moves that took long because they were blocked
         if keep.sum() >= MIN_SAMPLES:
             w = _fit(X[keep], y[keep])
         info.update(w=w.tolist(), n=int(keep.sum()), outliers=int((~keep).sum()),
@@ -143,9 +144,9 @@ def predict(model, length, turn):
     return w[0] + w[1] * length + w[2] * turn
 
 
-# ---------------------------------------------------------------- 기록 (services 에서 호출)
+# ---------------------------------------------------------------- records (called from services)
 def record_start(m, step, pose):
-    """이동을 시작할 때: 출발 위치, 경로 길이/회전량, 예측 시간을 기록 (실패해도 이동은 그대로 진행)."""
+    """On departure: record start pose, path length/turning and predicted time (the move proceeds even if this fails)."""
     step.started_at = timezone.now()
     step.finished_at = None
     fields = ['started_at', 'finished_at']
@@ -166,7 +167,7 @@ def record_arrival(step):
     step.save(update_fields=['finished_at'])
 
 
-# ---------------------------------------------------------------- 순서 최적화
+# ---------------------------------------------------------------- order optimization
 def _route_cost(order, cost, start_idx, end_idx):
     total, prev = 0.0, start_idx
     for i in order:
@@ -178,8 +179,8 @@ def _route_cost(order, cost, start_idx, end_idx):
 
 
 def optimize(m, pose, locations, home=None):
-    """pose: 로봇 {'x','y','yaw'}, locations: Location 목록 (선택한 순서), home: 마지막에 갈 Location 또는 None.
-    반환: dict(order=[Location...], legs=[...], total, original_total, model)."""
+    """pose: robot {'x','y','yaw'}, locations: list of Location (in selected order), home: Location to visit last or None.
+    Returns dict(order=[Location...], legs=[...], total, original_total, model)."""
     if pose is None:
         raise PlanError('로봇 위치를 모릅니다. 초기 위치를 먼저 지정하세요.')
     model = travel_model()
@@ -207,7 +208,7 @@ def optimize(m, pose, locations, home=None):
         best = min(itertools.permutations(idx), key=lambda o: _route_cost(o, cost, 0, end))
         best = list(best)
     else:
-        # 가까운 곳부터 고른 뒤 2-opt 로 개선
+        # Pick nearest first, then improve with 2-opt
         best, left, cur = [], set(idx), 0
         while left:
             nxt = min(left, key=lambda j: cost[cur][j])

@@ -1,8 +1,8 @@
-"""웹에서 실행 모드를 바꾸기 위해 scripts/*.sh 와 tools/*.py 를 실행한다.
+"""Runs scripts/*.sh and tools/*.py to switch the run mode from the web.
 
-서버는 ROS 노드와 같은 PC 에서 돌기 때문에 run.sh / stop_ros.sh 를 직접 실행할 수 있다.
-ROS 가 전부 꺼져 있어도 웹에서 켤 수 있도록 브리지가 아니라 서버가 실행한다.
-작업은 한 번에 하나만, 별도 스레드에서 돌리고 결과는 UI 그룹에 알린다.
+The server runs on the same PC as the ROS nodes, so it can run run.sh / stop_ros.sh directly.
+The server (not the bridge) runs them so that modes can be started from the web even when all of ROS is down.
+One job at a time, run in a separate thread; the result is announced to the UI group.
 """
 import glob
 import os
@@ -16,14 +16,14 @@ from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
 from django.conf import settings
 
-HOME = os.path.dirname(settings.BASE_DIR)          # 저장소 최상위 (server/ 의 부모)
+HOME = os.path.dirname(settings.BASE_DIR)          # Repository root (parent of server/)
 SCRIPTS = os.path.join(HOME, 'scripts')
 MAP_DIR = os.path.expanduser('~/maps')
 RUN_MODE_FILE = os.path.join(HOME, 'logs', 'run_mode.env')
-# 시뮬레이션 월드 (scripts/start_sim.sh 가 찾는 곳과 같음)
+# Simulation worlds (same places scripts/start_sim.sh looks)
 AWS_WORLDS = os.path.expanduser('~/sim_ws/src/aws-robomaker-small-warehouse-world/worlds')
 TB3_WORLDS = os.path.expanduser('~/turtlebot3_ws/install/turtlebot3_gazebo/share/turtlebot3_gazebo/worlds')
-if not os.path.isdir(TB3_WORLDS):  # 소스 빌드 대신 apt 로 설치한 PC
+if not os.path.isdir(TB3_WORLDS):  # PC with turtlebot3 installed via apt instead of a source build
     TB3_WORLDS = '/opt/ros/humble/share/turtlebot3_gazebo/worlds'
 WORLD_LABELS = {
     'maze_room': '미로 방 (실제 방 복제)',
@@ -37,9 +37,9 @@ WORLD_LABELS = {
 }
 
 _lock = threading.Lock()
-_running = None  # 실행 중인 작업 이름
-_proc = None     # 실행 중인 프로세스 (중지용)
-_started_at = None  # 실행 중인 작업 시작 시각 (monotonic)
+_running = None  # Name of the running job
+_proc = None     # Running process (for stopping)
+_started_at = None  # Start time of the running job (monotonic)
 EXPLORE_JOB = '자동 탐색'
 
 
@@ -48,8 +48,8 @@ class RunnerError(Exception):
 
 
 def list_maps():
-    """~/maps 아래 맵 yaml 목록 (미리보기 등 제외). 경로는 ~/maps 기준 상대 경로.
-    world: 시뮬레이션에서 만든 맵이면 만든 월드 (yaml 의 '# world:' 줄, scripts/save_map.sh 가 기록)."""
+    """List of map yamls under ~/maps (excluding previews etc.). Paths are relative to ~/maps.
+    world: for a map built in simulation, the world it was built in (the yaml's '# world:' line, written by scripts/save_map.sh)."""
     paths = glob.glob(os.path.join(MAP_DIR, '**', '*.yaml'), recursive=True)
     out = []
     for p in sorted(paths):
@@ -67,7 +67,7 @@ def list_maps():
 
 
 def list_worlds():
-    """시뮬레이션 월드 목록 [{'name', 'label'}]. 이 저장소 worlds/, AWS 창고, TurtleBot3 기본 월드."""
+    """Simulation worlds [{'name', 'label'}]: this repo's worlds/, the AWS warehouse, TurtleBot3 default worlds."""
     names = [os.path.basename(p)[:-6] for p in sorted(glob.glob(os.path.join(HOME, 'worlds', '*.world')))]
     names += [os.path.basename(d) for d in sorted(glob.glob(os.path.join(AWS_WORLDS, '*')))
               if os.path.isfile(os.path.join(d, os.path.basename(d) + '.world'))]
@@ -82,7 +82,7 @@ def list_worlds():
 
 
 def current_mode():
-    """logs/run_mode.env 의 KEY=VALUE."""
+    """KEY=VALUE pairs from logs/run_mode.env."""
     mode = {}
     try:
         with open(RUN_MODE_FILE, encoding='utf-8') as f:
@@ -101,7 +101,7 @@ def busy():
 
 
 def busy_elapsed():
-    """진행 중인 job 이 시작된 뒤 지난 초 (없으면 None). 페이지를 새로 열어도 대기 화면 시간이 이어지게"""
+    """Seconds since the running job started (None if none), so the waiting screen's timer continues after a page reload"""
     return round(time.monotonic() - _started_at, 1) if _running and _started_at else None
 
 
@@ -110,7 +110,7 @@ def _broadcast(msg):
 
 
 def _start(job, cmd, timeout, parse=None):
-    """cmd 를 스레드에서 실행하고 끝나면 {'type': 'runner', ...} 를 UI 에 알린다."""
+    """Run cmd in a thread and announce {'type': 'runner', ...} to the UI when it ends."""
     global _running
     with _lock:
         if _running:
@@ -138,7 +138,7 @@ def _start(job, cmd, timeout, parse=None):
                     pass
             timer = threading.Timer(timeout, kill)
             timer.start()
-            # 출력을 한 줄씩 읽어 웹 대기 화면에 진행 상황으로 보낸다 (run.sh 의 "1) 웹 서버", "2) Gazebo ..." = 단계)
+            # Read output line by line and send it as progress to the web waiting screen (run.sh lines like "1) ...", "2) ..." = steps)
             lines, last_sent = [], 0.0
             for line in proc.stdout:
                 line = line.rstrip()
@@ -162,7 +162,7 @@ def _start(job, cmd, timeout, parse=None):
             message = parse(output, ok) if parse else _last_lines(output)
             if _proc.returncode in (-signal.SIGINT, -signal.SIGTERM, 130):
                 ok, message = False, '중지됨. ' + message
-        except Exception as e:  # 실행 파일 없음 등
+        except Exception as e:  # e.g. executable not found
             message = str(e)
         finally:
             with _lock:
@@ -170,7 +170,7 @@ def _start(job, cmd, timeout, parse=None):
                 _proc = None
         _broadcast({'type': 'runner', 'job': job, 'state': 'done', 'ok': ok, 'message': message,
                     'mode': current_mode(), 'elapsed': round(time.monotonic() - _started_at, 1)})
-        from . import services  # 순환 import 방지
+        from . import services  # avoid circular import
         services.log_runner(job, ok, message)
     threading.Thread(target=run, daemon=True).start()
 
@@ -181,9 +181,9 @@ def _last_lines(output, n=2):
 
 
 def start_mode(robot, mode, map_path=None, world=None, amcl='default'):
-    """robot: sim|real, mode: map|slam. map_path: ~/maps 기준 상대 경로 (map 모드).
-    world: 시뮬레이션 월드. 비우면 SLAM 은 turtlebot3_world, 맵 모드는 맵에 기록된 월드 (run.sh).
-    amcl: default | hall (run.sh --amcl, 강당/교실용 위치 추정 설정)."""
+    """robot: sim|real, mode: map|slam. map_path: path relative to ~/maps (map mode).
+    world: simulation world. Empty = turtlebot3_world for SLAM, the world recorded in the map for map mode (run.sh).
+    amcl: default | hall (run.sh --amcl, localization settings for a lecture hall/classroom)."""
     if robot not in ('sim', 'real') or mode not in ('map', 'slam') or amcl not in ('default', 'hall'):
         raise RunnerError('잘못된 모드입니다.')
     cmd = [os.path.join(SCRIPTS, 'run.sh'), '--robot', robot, '--mode', mode, '--amcl', amcl]
@@ -214,8 +214,8 @@ def stop_all():
 
 
 def auto_localize():
-    """맵 전체에서 스캔과 가장 잘 맞는 위치를 찾아 초기 위치로 지정 (AMCL 모드).
-    로봇이 제자리에서 돌고, 모호하면 조금 이동하며 스캔을 모은다 (tools/localize.py --global, 1~3분)."""
+    """Find the pose on the whole map that best matches the scan and set it as the initial pose (AMCL mode).
+    The robot turns in place and, if ambiguous, moves a little to collect scans (tools/localize.py --global, 1-3 min)."""
     cmd = ['bash', '-c', f'source "{SCRIPTS}/env.sh" && python3 -W ignore "{HOME}/tools/localize.py" --global']
 
     def parse(output, ok):
@@ -228,7 +228,7 @@ def auto_localize():
 
 
 def explore(max_minutes=30):
-    """SLAM 모드 자동 탐색 (tools/explore.py). cancel() 로 중지."""
+    """Autonomous exploration in SLAM mode (tools/explore.py). Stop with cancel()."""
     cmd = ['bash', '-c', f'source "{SCRIPTS}/env.sh" && exec python3 -u -W ignore "{HOME}/tools/explore.py" '
                          f'--max-minutes {int(max_minutes)}']
 
@@ -239,7 +239,7 @@ def explore(max_minutes=30):
 
 
 def cancel(job):
-    """실행 중인 job 이 맞으면 프로세스 그룹에 SIGINT."""
+    """If job is the running one, send SIGINT to its process group."""
     with _lock:
         if _running != job or _proc is None:
             raise RunnerError(f'"{job}" 이(가) 실행 중이 아닙니다.')

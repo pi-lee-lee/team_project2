@@ -17,7 +17,7 @@ case "$1" in
       sleep 4; pgrep -f "[v]4l2_camera_node" >/dev/null && echo "카메라 시작됨" || { echo "카메라 확인 필요: Pi ~/warehouse_camera.log"; exit 1; }; }'
     ;;
   off)
-    # pkill -f 패턴에 [v] 를 써서 이 원격 셸 자신(명령 줄에 패턴이 들어 있음)은 안 죽게
+    # Use [v] in the pkill -f pattern so the remote shell itself (whose command line contains the pattern) isn't killed
     "${SSH[@]}" 'pkill -f "[v]4l2_camera_node"; sleep 1; pgrep -f "[v]4l2_camera_node" >/dev/null && { echo "카메라가 아직 실행 중"; exit 1; } || echo "카메라 꺼짐"'
     ;;
   status)

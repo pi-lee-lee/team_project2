@@ -1,10 +1,10 @@
-"""정리된 맵(pgm + yaml)의 벽을 Gazebo 월드(.world)로 만든다. 실제 방을 시뮬레이션에서 똑같이 시험하기 위함.
+"""Turn the walls of a cleaned map (pgm + yaml) into a Gazebo world (.world), so the real room can be tested identically in simulation.
 
     python3 tools/map_to_world.py ~/maps/backup/backup2/maze_map_straight.yaml -o worlds/maze_room.world
 
-- 벽 칸(점유)을 직사각형 몇 개로 덮어서(같은 행의 연속 구간 → 아래로 같은 구간이면 합침) 각각 상자로 만든다
-- 월드 좌표 = 맵 좌표 (맵 원점 (0,0) 이 월드 원점). 로봇 출발 위치도 맵 좌표 그대로 쓰면 된다
-- 직선으로 정리된 맵(straighten_map.py 결과)을 쓰면 상자 수가 적고 벽이 반듯하다
+- Covers wall (occupied) cells with a few rectangles (runs within a row -> merged downward while the run is identical) and makes each a box
+- World coordinates = map coordinates (map origin (0,0) is the world origin). The robot start pose can use map coordinates as is
+- A straightened map (output of straighten_map.py) gives fewer boxes and straight walls
 """
 import argparse
 import os
@@ -15,7 +15,7 @@ from clean_map import OCC, read_pgm, read_yaml
 
 
 def cover_rectangles(occ):
-    """점유 칸을 겹치지 않는 직사각형들로 덮는다. 반환: [(r0, c0, r1, c1), ...] (끝 포함)"""
+    """Cover occupied cells with non-overlapping rectangles. Returns: [(r0, c0, r1, c1), ...] (inclusive)"""
     h, w = occ.shape
     used = np.zeros_like(occ)
     rects = []
@@ -98,7 +98,7 @@ def main():
     rects = cover_rectangles(img == OCC)
     boxes = []
     for r0, c0, r1, c1 in rects:
-        # 이미지 행 0 = 맵 위쪽(y 최대)
+        # image row 0 = top of the map (max y)
         x0, x1 = ox + c0 * res, ox + (c1 + 1) * res
         y0, y1 = oy + (h - 1 - r1) * res, oy + (h - r0) * res
         boxes.append(((x0 + x1) / 2, (y0 + y1) / 2, x1 - x0, y1 - y0))

@@ -1,9 +1,9 @@
-"""웹 UI와 같은 방식으로 '여기로 이동'을 보내고 진행 상황을 출력한다.
+"""Send 'go here' the same way the web UI does and print the progress.
 
     python3 tools/ui_goto.py X Y [YAW_RAD] [--timeout 60] [--server ws://localhost:8000/ws/ui/]
-    python3 tools/ui_goto.py --home        # "홈 복귀" 버튼과 같음
+    python3 tools/ui_goto.py --home        # same as the "return home" button
 
-시간 안에 끝나지 않으면 비상정지를 보낸다.
+Sends an emergency stop if it does not finish within the timeout.
 """
 import argparse
 import json

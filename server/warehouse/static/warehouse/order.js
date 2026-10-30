@@ -1,14 +1,14 @@
-// 주문하는 사람용 화면: 받을 위치(사람 위치)와 물건 개수를 골라 주문하고, 진행 상황을 본다.
-// 관제 화면과 같은 /ws/ui/ 를 쓴다 (snapshot / state / locations / order_preview / error 메시지).
-// 주소에 ?place=<위치 id> 를 붙이면 그 위치가 처음부터 골라져 있다 (자리마다 즐겨찾기/QR 로 쓰기 좋게).
+// Orderer page: pick the delivery location (person location) and item counts, place the order and watch its progress.
+// Uses the same /ws/ui/ as the control page (snapshot / state / locations / order_preview / error messages).
+// Adding ?place=<location id> to the URL preselects that location (handy as a per-seat bookmark/QR code).
 
 const $ = (sel) => document.querySelector(sel);
 const S = {
   ws: null, robot: null, task: null, locations: [],
-  place: null,        // 고른 사람 위치 id
-  counts: {},         // 라벨 → 개수
-  watching: null,     // 이 화면에서 보고 있는 주문(작업) id: 끝나도 '완료' 를 보여 주려고
-  sent: false,        // 주문을 보내고 답(state)을 기다리는 중
+  place: null,        // selected person location id
+  counts: {},         // label -> count
+  watching: null,     // order (task) id watched on this page: to show 'done' after it ends
+  sent: false,        // order sent, waiting for the reply (state)
 };
 
 const COLORS = { red: '#ef4444', green: '#22c55e', blue: '#3b82f6', yellow: '#eab308', white: '#e5e7eb' };
@@ -17,7 +17,7 @@ const STATE_TEXT = { OFFLINE: '로봇 꺼짐', IDLE: '주문 가능', MOVING: '�
                      WAITING_UNLOAD: '받는 중', ERROR: '문제 발생' };
 
 function store(key, value) {
-  try { value === null ? localStorage.removeItem(key) : localStorage.setItem(key, value); } catch (e) { /* 저장 안 돼도 됨 */ }
+  try { value === null ? localStorage.removeItem(key) : localStorage.setItem(key, value); } catch (e) { /* fine if it cannot be stored */ }
 }
 function load(key) {
   try { return localStorage.getItem(key); } catch (e) { return null; }
@@ -88,7 +88,7 @@ function fmtSec(sec) {
 const isOrder = (task) => !!(task && task.steps.some((s) => s.items && Object.keys(s.items).length));
 const itemsText = (items) => Object.entries(items).map(([k, v]) => `${k} ${v}개`).join(', ');
 
-// ---------------------------------------------------------------- 주문 입력
+// ---------------------------------------------------------------- order form
 function places() { return S.locations.filter((l) => l.kind === 'dropoff'); }
 function labels() {
   const all = S.locations.filter((l) => l.kind === 'pickup')
@@ -171,7 +171,7 @@ $('#btn-order').addEventListener('click', () => {
   render();
 });
 
-// ---------------------------------------------------------------- 진행 상황
+// ---------------------------------------------------------------- progress
 function stepLine(s, now, state) {
   const what = s.action === 'load' ? `${itemsText(s.items)} 싣기`
     : s.action === 'unload' ? `받기 (${itemsText(s.items)})` : '로봇 복귀';
@@ -223,7 +223,7 @@ function renderStatus() {
     li.querySelector('.what').textContent = l.what;
     ol.appendChild(li);
   }
-  // 섹션에서 YOLO 와 개수가 다르다는 등 서버의 안내
+  // Server notices, e.g. YOLO count mismatch at a section
   $('#status-note').textContent = running && /^(적재 잘못|꺼내기 덜 됨|YOLO)/.test((r && r.message) || '') ? r.message : '';
   $('#btn-cancel').hidden = !running;
   $('#btn-new').hidden = running;
@@ -238,13 +238,13 @@ $('#btn-new').addEventListener('click', () => {
   render();
 });
 
-// ---------------------------------------------------------------- 화면
+// ---------------------------------------------------------------- view
 function render() {
   const state = S.robot ? S.robot.state : 'OFFLINE';
   const pill = $('#robot-state');
   pill.textContent = S.robot ? STATE_TEXT[state] || state : '연결 중';
   pill.className = `pill ${state}`;
-  // 진행 중인 주문이 있거나, 이 화면에서 보던 주문이 방금 끝났으면 진행 상황
+  // Show progress if an order is running or the one watched here just finished
   const showStatus = isOrder(S.task) && (S.task.status === 'running' || S.task.id === S.watching);
   $('#form-view').hidden = showStatus;
   $('#status-view').hidden = !showStatus;
@@ -252,6 +252,6 @@ function render() {
   else renderForm();
 }
 
-setInterval(() => { if (!$('#status-view').hidden) render(); }, 1000);   // 남은 시간 갱신
+setInterval(() => { if (!$('#status-view').hidden) render(); }, 1000);   // refresh remaining time
 render();
 connect();
