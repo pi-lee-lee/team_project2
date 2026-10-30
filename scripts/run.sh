@@ -12,6 +12,7 @@
 #   --name NAME    (map) 서버 DB 맵 이름 (등록 위치가 묶임). 기본: 파일 이름에서 _straight/_clean 뺀 것
 #   --slam ENGINE  (slam) slam_toolbox(기본) | cartographer
 #   --world WORLD  (sim) turtlebot3_world(기본) | turtlebot3_house | empty_world | maze_room(worlds/, 실제 방 복제) | lecture_hall(강당)
+#                  | map2_room (worlds/, 실물 map2 방 복제. ~/maps/map2_clean.yaml 에 기록돼 있어 --map 만 주면 자동)
 #                  | no_roof_small_warehouse (AWS 창고, ~/sim_ws 에 받아야 함) ...
 #                  실물과 비슷한 강당은 --world lecture_hall_real (책상 앞판 없음, 의자 무작위 배치)
 #   --gui          (sim) Gazebo 화면 표시
@@ -89,6 +90,7 @@ fi
 case "$WORLD" in
   turtlebot3_world|turtlebot3_house) SPAWN_X=-2.0; SPAWN_Y=-0.5 ;;
   maze_room) SPAWN_X=0.2; SPAWN_Y=0.0 ;;   # Where the real robot is placed (worlds/maze_room.world uses the real room's map coordinates)
+  map2_room) SPAWN_X=0.0; SPAWN_Y=0.0 ;;   # map2's home location (worlds/map2_room.world uses map2 coordinates)
   no_roof_small_warehouse|small_warehouse) SPAWN_X=-3.3; SPAWN_Y=-2.0 ;;   # AWS warehouse: nothing is within LiDAR range of the center (0,0) -> free aisle near the shelves
   *) SPAWN_X=0.0; SPAWN_Y=0.0 ;;
 esac
