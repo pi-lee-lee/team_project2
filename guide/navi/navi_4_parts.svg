@@ -1,0 +1,342 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1230" width="1600" height="1230">
+<defs>
+
+    <style>
+      text { font-family: "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", sans-serif; fill: #1f2937; }
+      .mono { font-family: Menlo, Consolas, monospace; }
+      .halo { paint-order: stroke; stroke: #ffffff; stroke-width: 5px; stroke-linejoin: round; }
+    </style>
+    <marker id="m059669" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#059669"/></marker><marker id="m111827" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#111827"/></marker><marker id="m2563eb" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#2563eb"/></marker><marker id="m6b7280" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#6b7280"/></marker><marker id="m7c3aed" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#7c3aed"/></marker><marker id="m94a3b8" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#94a3b8"/></marker><marker id="md97706" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#d97706"/></marker><marker id="mdc2626" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#dc2626"/></marker><marker id="mea580c" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#ea580c"/></marker>
+</defs>
+<rect width="1600" height="1230" fill="#f4f6fb"/>
+<rect x="30" y="28" width="8" height="56" rx="3" fill="#2563eb"/>
+<text x="52.0" y="62.0" text-anchor="start" style="font-size:34px;font-weight:800;fill:#111827">직접 만든 주행 4 — 직접 만들 때 필요한 것</text>
+<text x="54.0" y="88.0" text-anchor="start" style="font-size:15.5px;font-weight:400;fill:#4b5563">입력 셋을 받아 속도 명령 하나를 내는 네 부분과, 지키지 않으면 조용히 문제가 생기는 규칙 여섯</text>
+<rect x="1100.0" y="22.0" width="470.0" height="66.0" rx="10" fill="#ffffff" stroke="#e5e7eb" stroke-width="1.2"/>
+<rect x="1114.0" y="33.0" width="14.0" height="14.0" rx="3" fill="#ecfdf5" stroke="#059669" stroke-width="1.6"/>
+<text x="1136.0" y="44.5" text-anchor="start" style="font-size:12px;font-weight:500;fill:#374151">Nav2 에서 가져다 씀</text>
+<rect x="1264.0" y="33.0" width="14.0" height="14.0" rx="3" fill="#eff6ff" stroke="#2563eb" stroke-width="1.6"/>
+<text x="1286.0" y="44.5" text-anchor="start" style="font-size:12px;font-weight:500;fill:#374151">직접 만듦</text>
+<rect x="1414.0" y="33.0" width="14.0" height="14.0" rx="3" fill="#fff7ed" stroke="#ea580c" stroke-width="1.6"/>
+<text x="1436.0" y="44.5" text-anchor="start" style="font-size:12px;font-weight:500;fill:#374151">로봇(Pi) 쪽</text>
+<rect x="1114.0" y="59.0" width="14.0" height="14.0" rx="3" fill="#f5f3ff" stroke="#7c3aed" stroke-width="1.6"/>
+<text x="1136.0" y="70.5" text-anchor="start" style="font-size:12px;font-weight:500;fill:#374151">관제 (서버)</text>
+<rect x="1264.0" y="59.0" width="14.0" height="14.0" rx="3" fill="#f3f4f6" stroke="#6b7280" stroke-width="1.6"/>
+<text x="1286.0" y="70.5" text-anchor="start" style="font-size:12px;font-weight:500;fill:#374151">쓰지 않음 · 참고</text>
+<rect x="1414.0" y="59.0" width="14.0" height="14.0" rx="3" fill="#fef2f2" stroke="#dc2626" stroke-width="1.6"/>
+<text x="1436.0" y="70.5" text-anchor="start" style="font-size:12px;font-weight:500;fill:#374151">주의</text>
+<rect x="30.0" y="128.0" width="1540.0" height="328.0" rx="12" fill="#ffffff" stroke="#1f2937" stroke-width="2"/>
+<path d="M30,170 L30,140 Q30,128 42,128 L1558,128 Q1570,128 1570,140 L1570,170 Z" fill="#1f2937"/>
+<text x="48.0" y="155.0" text-anchor="start" style="font-size:17px;font-weight:800;fill:#ffffff">네 부분의 연결</text>
+<text x="1554.0" y="154.0" text-anchor="end" style="font-size:12px;font-weight:600;fill:#ffffff">입력 3 → 부분 4 → 출력 1</text>
+<rect x="52.0" y="196.0" width="170.0" height="54.0" rx="10" fill="#ecfdf5" stroke="#059669" stroke-width="1.5"/>
+<text x="66.0" y="219.0" class="mono" text-anchor="start" style="font-size:13px;font-weight:700;fill:#111827">/map</text>
+<text x="66.0" y="238.0" text-anchor="start" style="font-size:12px;font-weight:400;fill:#4b5563">지도 (map_server)</text>
+<rect x="52.0" y="260.0" width="170.0" height="54.0" rx="10" fill="#ecfdf5" stroke="#059669" stroke-width="1.5"/>
+<text x="66.0" y="283.0" class="mono" text-anchor="start" style="font-size:13px;font-weight:700;fill:#111827">/scan</text>
+<text x="66.0" y="302.0" text-anchor="start" style="font-size:12px;font-weight:400;fill:#4b5563">라이다 거리값</text>
+<rect x="52.0" y="324.0" width="170.0" height="54.0" rx="10" fill="#ecfdf5" stroke="#059669" stroke-width="1.5"/>
+<text x="66.0" y="347.0" class="mono" text-anchor="start" style="font-size:13px;font-weight:700;fill:#111827">TF</text>
+<text x="66.0" y="366.0" text-anchor="start" style="font-size:12px;font-weight:400;fill:#4b5563">map → odom → base</text>
+<rect x="268.0" y="214.0" width="212.0" height="118.0" rx="12" fill="#ffffff" stroke="#2563eb" stroke-width="1.8"/>
+<path d="M269,249 L269,226 Q269,215 280,215 L468,215 Q479,215 479,226 L479,249 Z" fill="#eff6ff"/>
+<line x1="269" y1="249" x2="479" y2="249" stroke="#bfdbfe"/>
+<circle cx="290" cy="232" r="11" fill="#2563eb"/>
+<text x="290.0" y="236.5" text-anchor="middle" style="font-size:12.5px;font-weight:800;fill:#ffffff">1</text>
+<text x="308.0" y="237.0" text-anchor="start" style="font-size:14.5px;font-weight:800;fill:#111827">목표 받기</text>
+<text x="282.0" y="273.0" text-anchor="start" style="font-size:12.5px;font-weight:400;fill:#374151">관제가 준 좌표를 받고</text>
+<text x="282.0" y="292.0" text-anchor="start" style="font-size:12.5px;font-weight:400;fill:#374151">도착 · 실패를 돌려준다</text>
+<text x="374.0" y="354.0" class="mono" text-anchor="middle" style="font-size:11.5px;font-weight:600;fill:#2563eb">bridge_node</text>
+<rect x="504.0" y="214.0" width="212.0" height="118.0" rx="12" fill="#ffffff" stroke="#2563eb" stroke-width="1.8"/>
+<path d="M505,249 L505,226 Q505,215 516,215 L704,215 Q715,215 715,226 L715,249 Z" fill="#eff6ff"/>
+<line x1="505" y1="249" x2="715" y2="249" stroke="#bfdbfe"/>
+<circle cx="526" cy="232" r="11" fill="#2563eb"/>
+<text x="526.0" y="236.5" text-anchor="middle" style="font-size:12.5px;font-weight:800;fill:#ffffff">2</text>
+<text x="544.0" y="237.0" text-anchor="start" style="font-size:14.5px;font-weight:800;fill:#111827">장애물 격자</text>
+<text x="518.0" y="273.0" text-anchor="start" style="font-size:12.5px;font-weight:400;fill:#374151">/map + /scan 을 칸으로</text>
+<text x="518.0" y="292.0" text-anchor="start" style="font-size:12.5px;font-weight:400;fill:#374151">로봇 반지름만큼 부풀린다</text>
+<text x="610.0" y="354.0" class="mono" text-anchor="middle" style="font-size:11.5px;font-weight:600;fill:#2563eb">astar_planner_node</text>
+<line x1="482" y1="273" x2="501" y2="273" stroke="#2563eb" stroke-width="2.2" marker-end="url(#m2563eb)"/>
+<rect x="740.0" y="214.0" width="212.0" height="118.0" rx="12" fill="#ffffff" stroke="#2563eb" stroke-width="1.8"/>
+<path d="M741,249 L741,226 Q741,215 752,215 L940,215 Q951,215 951,226 L951,249 Z" fill="#eff6ff"/>
+<line x1="741" y1="249" x2="951" y2="249" stroke="#bfdbfe"/>
+<circle cx="762" cy="232" r="11" fill="#2563eb"/>
+<text x="762.0" y="236.5" text-anchor="middle" style="font-size:12.5px;font-weight:800;fill:#ffffff">3</text>
+<text x="780.0" y="237.0" text-anchor="start" style="font-size:14.5px;font-weight:800;fill:#111827">경로 계획</text>
+<text x="754.0" y="273.0" text-anchor="start" style="font-size:12.5px;font-weight:400;fill:#374151">격자 위 A* 로</text>
+<text x="754.0" y="292.0" text-anchor="start" style="font-size:12.5px;font-weight:400;fill:#374151">출발 → 목표 경로</text>
+<text x="846.0" y="354.0" class="mono" text-anchor="middle" style="font-size:11.5px;font-weight:600;fill:#2563eb">astar.py</text>
+<line x1="718" y1="273" x2="737" y2="273" stroke="#2563eb" stroke-width="2.2" marker-end="url(#m2563eb)"/>
+<rect x="976.0" y="214.0" width="212.0" height="118.0" rx="12" fill="#ffffff" stroke="#2563eb" stroke-width="1.8"/>
+<path d="M977,249 L977,226 Q977,215 988,215 L1176,215 Q1187,215 1187,226 L1187,249 Z" fill="#eff6ff"/>
+<line x1="977" y1="249" x2="1187" y2="249" stroke="#bfdbfe"/>
+<circle cx="998" cy="232" r="11" fill="#2563eb"/>
+<text x="998.0" y="236.5" text-anchor="middle" style="font-size:12.5px;font-weight:800;fill:#ffffff">4</text>
+<text x="1016.0" y="237.0" text-anchor="start" style="font-size:14.5px;font-weight:800;fill:#111827">경로 추종</text>
+<text x="990.0" y="273.0" text-anchor="start" style="font-size:12.5px;font-weight:400;fill:#374151">경로를 따라갈 속도 계산</text>
+<text x="990.0" y="292.0" text-anchor="start" style="font-size:12.5px;font-weight:400;fill:#374151">막히면 서거나 비켜 간다</text>
+<text x="1082.0" y="354.0" class="mono" text-anchor="middle" style="font-size:11.5px;font-weight:600;fill:#2563eb">frenet.py</text>
+<line x1="954" y1="273" x2="973" y2="273" stroke="#2563eb" stroke-width="2.2" marker-end="url(#m2563eb)"/>
+<line x1="224" y1="273" x2="264" y2="273" stroke="#059669" stroke-width="2.2" marker-end="url(#m059669)"/>
+<line x1="1214" y1="273" x2="1250" y2="273" stroke="#2563eb" stroke-width="2.2" marker-end="url(#m2563eb)"/>
+<rect x="1254.0" y="247.0" width="104.0" height="52.0" rx="10" fill="#fff7ed" stroke="#ea580c" stroke-width="1.5"/>
+<text x="1306.0" y="269.0" class="mono" text-anchor="middle" style="font-size:12.5px;font-weight:700;fill:#111827">/cmd_vel</text>
+<text x="1306.0" y="288.0" text-anchor="middle" style="font-size:12px;font-weight:400;fill:#4b5563">→ 로봇</text>
+<rect x="1382" y="202" width="15" height="15" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1397" y="202" width="15" height="15" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1412" y="202" width="15" height="15" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1427" y="202" width="15" height="15" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1442" y="202" width="15" height="15" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1457" y="202" width="15" height="15" fill="#fecaca" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1472" y="202" width="15" height="15" fill="#111827" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1487" y="202" width="15" height="15" fill="#fecaca" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1502" y="202" width="15" height="15" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1517" y="202" width="15" height="15" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1532" y="202" width="15" height="15" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1547" y="202" width="15" height="15" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1382" y="217" width="15" height="15" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1397" y="217" width="15" height="15" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1412" y="217" width="15" height="15" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1427" y="217" width="15" height="15" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1442" y="217" width="15" height="15" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1457" y="217" width="15" height="15" fill="#fecaca" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1472" y="217" width="15" height="15" fill="#111827" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1487" y="217" width="15" height="15" fill="#fecaca" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1502" y="217" width="15" height="15" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1517" y="217" width="15" height="15" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1532" y="217" width="15" height="15" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1547" y="217" width="15" height="15" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1382" y="232" width="15" height="15" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1397" y="232" width="15" height="15" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1412" y="232" width="15" height="15" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1427" y="232" width="15" height="15" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1442" y="232" width="15" height="15" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1457" y="232" width="15" height="15" fill="#fecaca" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1472" y="232" width="15" height="15" fill="#111827" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1487" y="232" width="15" height="15" fill="#fecaca" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1502" y="232" width="15" height="15" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1517" y="232" width="15" height="15" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1532" y="232" width="15" height="15" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1547" y="232" width="15" height="15" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1382" y="247" width="15" height="15" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1397" y="247" width="15" height="15" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1412" y="247" width="15" height="15" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1427" y="247" width="15" height="15" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1442" y="247" width="15" height="15" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1457" y="247" width="15" height="15" fill="#fecaca" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1472" y="247" width="15" height="15" fill="#111827" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1487" y="247" width="15" height="15" fill="#fecaca" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1502" y="247" width="15" height="15" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1517" y="247" width="15" height="15" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1532" y="247" width="15" height="15" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1547" y="247" width="15" height="15" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1382" y="262" width="15" height="15" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1397" y="262" width="15" height="15" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1412" y="262" width="15" height="15" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1427" y="262" width="15" height="15" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1442" y="262" width="15" height="15" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1457" y="262" width="15" height="15" fill="#fecaca" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1472" y="262" width="15" height="15" fill="#111827" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1487" y="262" width="15" height="15" fill="#fecaca" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1502" y="262" width="15" height="15" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1517" y="262" width="15" height="15" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1532" y="262" width="15" height="15" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1547" y="262" width="15" height="15" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1382" y="277" width="15" height="15" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1397" y="277" width="15" height="15" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1412" y="277" width="15" height="15" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1427" y="277" width="15" height="15" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1442" y="277" width="15" height="15" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1457" y="277" width="15" height="15" fill="#fecaca" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1472" y="277" width="15" height="15" fill="#111827" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1487" y="277" width="15" height="15" fill="#fecaca" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1502" y="277" width="15" height="15" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1517" y="277" width="15" height="15" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1532" y="277" width="15" height="15" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1547" y="277" width="15" height="15" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1382" y="292" width="15" height="15" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1397" y="292" width="15" height="15" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1412" y="292" width="15" height="15" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1427" y="292" width="15" height="15" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1442" y="292" width="15" height="15" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1457" y="292" width="15" height="15" fill="#fecaca" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1472" y="292" width="15" height="15" fill="#111827" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1487" y="292" width="15" height="15" fill="#fecaca" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1502" y="292" width="15" height="15" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1517" y="292" width="15" height="15" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1532" y="292" width="15" height="15" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1547" y="292" width="15" height="15" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1382" y="307" width="15" height="15" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1397" y="307" width="15" height="15" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1412" y="307" width="15" height="15" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1427" y="307" width="15" height="15" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1442" y="307" width="15" height="15" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1457" y="307" width="15" height="15" fill="#fecaca" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1472" y="307" width="15" height="15" fill="#111827" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1487" y="307" width="15" height="15" fill="#fecaca" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1502" y="307" width="15" height="15" fill="#fecaca" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1517" y="307" width="15" height="15" fill="#fecaca" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1532" y="307" width="15" height="15" fill="#fecaca" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1547" y="307" width="15" height="15" fill="#fecaca" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1382" y="322" width="15" height="15" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1397" y="322" width="15" height="15" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1412" y="322" width="15" height="15" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1427" y="322" width="15" height="15" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1442" y="322" width="15" height="15" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1457" y="322" width="15" height="15" fill="#fecaca" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1472" y="322" width="15" height="15" fill="#fecaca" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1487" y="322" width="15" height="15" fill="#fecaca" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1502" y="322" width="15" height="15" fill="#fecaca" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1517" y="322" width="15" height="15" fill="#111827" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1532" y="322" width="15" height="15" fill="#111827" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1547" y="322" width="15" height="15" fill="#111827" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1382" y="337" width="15" height="15" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1397" y="337" width="15" height="15" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1412" y="337" width="15" height="15" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1427" y="337" width="15" height="15" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1442" y="337" width="15" height="15" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1457" y="337" width="15" height="15" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1472" y="337" width="15" height="15" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1487" y="337" width="15" height="15" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1502" y="337" width="15" height="15" fill="#fecaca" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1517" y="337" width="15" height="15" fill="#fecaca" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1532" y="337" width="15" height="15" fill="#fecaca" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1547" y="337" width="15" height="15" fill="#fecaca" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1382" y="352" width="15" height="15" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1397" y="352" width="15" height="15" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1412" y="352" width="15" height="15" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1427" y="352" width="15" height="15" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1442" y="352" width="15" height="15" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1457" y="352" width="15" height="15" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1472" y="352" width="15" height="15" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1487" y="352" width="15" height="15" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1502" y="352" width="15" height="15" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1517" y="352" width="15" height="15" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1532" y="352" width="15" height="15" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1547" y="352" width="15" height="15" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1382" y="367" width="15" height="15" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1397" y="367" width="15" height="15" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1412" y="367" width="15" height="15" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1427" y="367" width="15" height="15" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1442" y="367" width="15" height="15" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1457" y="367" width="15" height="15" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1472" y="367" width="15" height="15" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1487" y="367" width="15" height="15" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1502" y="367" width="15" height="15" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1517" y="367" width="15" height="15" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1532" y="367" width="15" height="15" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"/>
+<rect x="1547" y="367" width="15" height="15" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.6"/>
+<path d="M1419.5,239.5 L1434.5,299.5 L1464.5,359.5 L1509.5,359.5 L1533.5,299.5 L1539.5,239.5" fill="none" stroke="#2563eb" stroke-width="3" stroke-linejoin="round"/>
+<circle cx="1419.5" cy="239.5" r="5.5" fill="#ea580c"/>
+<circle cx="1539.5" cy="239.5" r="5.5" fill="#7c3aed"/>
+<text x="1382.0" y="400.0" text-anchor="start" style="font-size:11.5px;font-weight:500;fill:#4b5563">검은 칸 = 벽, 붉은 칸 = 부풀린 범위</text>
+<text x="1382.0" y="416.0" text-anchor="start" style="font-size:11.5px;font-weight:500;fill:#4b5563">파란 선 = A* 경로 (붉은 칸을 피한다)</text>
+<circle cx="57" cy="401.7" r="2.6" fill="#111827"/>
+<text x="70.0" y="406.0" text-anchor="start" style="font-size:13px;font-weight:400;fill:#374151">각 부분은 노드 하나씩 만들어도 되고, 한 노드 안에 함께 넣어도 된다</text>
+<circle cx="57" cy="425.7" r="2.6" fill="#111827"/>
+<text x="70.0" y="430.0" text-anchor="start" style="font-size:13px;font-weight:400;fill:#374151">이 프로젝트는 2 · 3 을 astar_planner_node 에, 1 · 4 를 bridge_node 에 두었다</text>
+<rect x="30.0" y="487.0" width="4.0" height="20.0" rx="2" fill="#111827"/>
+<text x="42.0" y="502.0" text-anchor="start" style="font-size:16px;font-weight:800;fill:#111827">지킬 규칙 여섯</text>
+<text x="161.6" y="502.0" text-anchor="start" style="font-size:12.5px;font-weight:400;fill:#4b5563">Nav2 를 쓰면 Nav2 가 대신 지켜 주던 것들이다</text>
+<path d="M30,556 L30,528 Q30,518 40,518 L86,518 Q86,518 86,518 L86,556 Z" fill="#1f2937"/>
+<text x="43.0" y="542.0" text-anchor="start" style="font-size:13.5px;font-weight:800;fill:#ffffff">#</text>
+<path d="M86,556 L86,518 Q86,518 86,518 L486,518 Q486,518 486,518 L486,556 Z" fill="#1f2937"/>
+<text x="99.0" y="542.0" text-anchor="start" style="font-size:13.5px;font-weight:800;fill:#ffffff">규칙</text>
+<path d="M486,556 L486,518 Q486,518 486,518 L1246,518 Q1246,518 1246,518 L1246,556 Z" fill="#1f2937"/>
+<text x="499.0" y="542.0" text-anchor="start" style="font-size:13.5px;font-weight:800;fill:#ffffff">안 지키면 생기는 일</text>
+<path d="M1246,556 L1246,518 Q1246,518 1246,518 L1560,518 Q1570,518 1570,528 L1570,556 Z" fill="#2563eb"/>
+<text x="1259.0" y="542.0" text-anchor="start" style="font-size:13.5px;font-weight:800;fill:#ffffff">이 프로젝트에서</text>
+<rect x="30.0" y="556.0" width="1540.0" height="62.0" rx="0" fill="#ffffff"/>
+<text x="45.0" y="582.0" text-anchor="start" style="font-size:13px;font-weight:700;fill:#111827">1</text>
+<rect x="101.0" y="571.5" width="12.0" height="12.0" rx="3" fill="#059669"/>
+<text x="121.0" y="582.0" text-anchor="start" style="font-size:13px;font-weight:700;fill:#111827">/map 은 TRANSIENT_LOCAL 로 받는다</text>
+<text x="501.0" y="582.0" text-anchor="start" style="font-size:13px;font-weight:400;fill:#374151">map_server 는 지도를 한 번만 보낸다. 받는 쪽 QoS 가 다르면 지도가 안 오는데 오류도 나지 않는다</text>
+<text x="1261.0" y="582.0" class="mono" text-anchor="start" style="font-size:13px;font-weight:400;fill:#374151">astar_planner_node</text>
+<text x="1261.0" y="601.0" class="mono" text-anchor="start" style="font-size:13px;font-weight:400;fill:#374151">bridge_node (map_qos)</text>
+<rect x="30.0" y="618.0" width="1540.0" height="62.0" rx="0" fill="#f9fafb"/>
+<text x="45.0" y="644.0" text-anchor="start" style="font-size:13px;font-weight:700;fill:#111827">2</text>
+<rect x="101.0" y="633.5" width="12.0" height="12.0" rx="3" fill="#2563eb"/>
+<text x="121.0" y="644.0" text-anchor="start" style="font-size:13px;font-weight:700;fill:#111827">장애물을 로봇 반지름만큼 부풀린다</text>
+<text x="501.0" y="644.0" text-anchor="start" style="font-size:13px;font-weight:400;fill:#374151">A* 는 로봇을 점 하나로 본다. 부풀리지 않으면 벽에 바짝 붙은 경로가 나와 차체가 벽에 긁힌다</text>
+<text x="1261.0" y="644.0" class="mono" text-anchor="start" style="font-size:13px;font-weight:400;fill:#374151">robot_radius 0.24 m</text>
+<text x="1261.0" y="663.0" class="mono" text-anchor="start" style="font-size:13px;font-weight:400;fill:#374151">inflation_radius 0.55 m</text>
+<rect x="30.0" y="680.0" width="1540.0" height="62.0" rx="0" fill="#ffffff"/>
+<text x="45.0" y="706.0" text-anchor="start" style="font-size:13px;font-weight:700;fill:#111827">3</text>
+<rect x="101.0" y="695.5" width="12.0" height="12.0" rx="3" fill="#7c3aed"/>
+<text x="121.0" y="706.0" text-anchor="start" style="font-size:13px;font-weight:700;fill:#111827">속도 명령은 한 곳에서만 낸다</text>
+<text x="501.0" y="706.0" text-anchor="start" style="font-size:13px;font-weight:400;fill:#374151">두 노드가 번갈아 내면 로봇이 끊기듯 움직인다. 여러 명령은 한 노드가 우선순위로 골라 내보낸다</text>
+<text x="1261.0" y="706.0" class="mono" text-anchor="start" style="font-size:13px;font-weight:400;fill:#374151">cmd_mux.py</text>
+<text x="1261.0" y="725.0" text-anchor="start" style="font-size:13px;font-weight:400;fill:#374151">정지 &gt; 수동 &gt; 자동</text>
+<rect x="30.0" y="742.0" width="1540.0" height="62.0" rx="0" fill="#f9fafb"/>
+<text x="45.0" y="768.0" text-anchor="start" style="font-size:13px;font-weight:700;fill:#111827">4</text>
+<rect x="101.0" y="757.5" width="12.0" height="12.0" rx="3" fill="#dc2626"/>
+<text x="121.0" y="768.0" text-anchor="start" style="font-size:13px;font-weight:700;fill:#111827">앞이 막히면 스스로 선다</text>
+<text x="501.0" y="768.0" text-anchor="start" style="font-size:13px;font-weight:400;fill:#374151">Nav2 에서는 local costmap 과 controller 가 하던 일이다. 직접 만들면 이것도 직접 넣어야 한다</text>
+<text x="1261.0" y="768.0" class="mono" text-anchor="start" style="font-size:13px;font-weight:400;fill:#374151">estop_distance 0.2 m</text>
+<text x="1261.0" y="787.0" text-anchor="start" style="font-size:13px;font-weight:400;fill:#374151">앞쪽 ±25° 범위</text>
+<rect x="30.0" y="804.0" width="1540.0" height="62.0" rx="0" fill="#ffffff"/>
+<text x="45.0" y="830.0" text-anchor="start" style="font-size:13px;font-weight:700;fill:#111827">5</text>
+<rect x="101.0" y="819.5" width="12.0" height="12.0" rx="3" fill="#ea580c"/>
+<text x="121.0" y="830.0" text-anchor="start" style="font-size:13px;font-weight:700;fill:#111827">명령 · 위치가 늦게 오면 선다</text>
+<text x="501.0" y="830.0" text-anchor="start" style="font-size:13px;font-weight:400;fill:#374151">로봇 보드는 마지막으로 받은 속도를 계속 실행한다. 명령이 끊기면 로봇 쪽에서 0 을 내야 한다</text>
+<text x="1261.0" y="830.0" class="mono" text-anchor="start" style="font-size:13px;font-weight:400;fill:#374151">tf_timeout 0.5 s</text>
+<text x="1261.0" y="849.0" text-anchor="start" style="font-size:13px;font-weight:400;fill:#374151">Pi 명령 감시 0.5 s</text>
+<path d="M30,866 L1570,866 L1570,918 Q1570,928 1560,928 L40,928 Q30,928 30,918 Z" fill="#f9fafb"/>
+<text x="45.0" y="892.0" text-anchor="start" style="font-size:13px;font-weight:700;fill:#111827">6</text>
+<rect x="101.0" y="881.5" width="12.0" height="12.0" rx="3" fill="#6b7280"/>
+<text x="121.0" y="892.0" text-anchor="start" style="font-size:13px;font-weight:700;fill:#111827">위치가 순간 이동할 수 있다</text>
+<text x="501.0" y="892.0" text-anchor="start" style="font-size:13px;font-weight:400;fill:#374151">amcl 이 map → odom 을 고치면 지도 위 위치가 한 번에 몇 cm 바뀐다. Nav2 는 그래서 가까운 장애물을 odom 기준으로 본다</text>
+<text x="1261.0" y="892.0" class="mono" text-anchor="start" style="font-size:13px;font-weight:400;fill:#374151">pose_with_age()</text>
+<text x="1261.0" y="911.0" text-anchor="start" style="font-size:13px;font-weight:400;fill:#374151">→ 그림 5</text>
+<line x1="30" y1="618" x2="1570" y2="618" stroke="#e5e7eb"/>
+<line x1="30" y1="680" x2="1570" y2="680" stroke="#e5e7eb"/>
+<line x1="30" y1="742" x2="1570" y2="742" stroke="#e5e7eb"/>
+<line x1="30" y1="804" x2="1570" y2="804" stroke="#e5e7eb"/>
+<line x1="30" y1="866" x2="1570" y2="866" stroke="#e5e7eb"/>
+<line x1="86" y1="556" x2="86" y2="928" stroke="#e5e7eb"/>
+<line x1="486" y1="556" x2="486" y2="928" stroke="#e5e7eb"/>
+<line x1="1246" y1="556" x2="1246" y2="928" stroke="#e5e7eb"/>
+<rect x="30.0" y="518.0" width="1540.0" height="410.0" rx="10" fill="none" stroke="#d1d5db" stroke-width="1.2"/>
+<rect x="30.0" y="959.0" width="4.0" height="20.0" rx="2" fill="#111827"/>
+<text x="42.0" y="974.0" text-anchor="start" style="font-size:16px;font-weight:800;fill:#111827">navigation_launch.py 를 켜지 않으면 함께 빠지는 것</text>
+<text x="462.4" y="974.0" text-anchor="start" style="font-size:12.5px;font-weight:400;fill:#4b5563">필요하면 직접 만든다</text>
+<path d="M30,1028 L30,1000 Q30,990 40,990 L220,990 Q220,990 220,990 L220,1028 Z" fill="#1f2937"/>
+<text x="43.0" y="1014.0" text-anchor="start" style="font-size:13.5px;font-weight:800;fill:#ffffff">기능</text>
+<path d="M220,1028 L220,990 Q220,990 220,990 L560,990 Q560,990 560,990 L560,1028 Z" fill="#6b7280"/>
+<text x="233.0" y="1014.0" text-anchor="start" style="font-size:13.5px;font-weight:800;fill:#ffffff">Nav2 에서 맡던 노드</text>
+<path d="M560,1028 L560,990 Q560,990 560,990 L950,990 Q950,990 950,990 L950,1028 Z" fill="#1f2937"/>
+<text x="573.0" y="1014.0" text-anchor="start" style="font-size:13.5px;font-weight:800;fill:#ffffff">하는 일</text>
+<path d="M950,1028 L950,990 Q950,990 950,990 L1560,990 Q1570,990 1570,1000 L1570,1028 Z" fill="#2563eb"/>
+<text x="963.0" y="1014.0" text-anchor="start" style="font-size:13.5px;font-weight:800;fill:#ffffff">이 프로젝트에서 맡은 곳</text>
+<rect x="30.0" y="1028.0" width="1540.0" height="43.0" rx="0" fill="#ffffff"/>
+<text x="45.0" y="1054.0" text-anchor="start" style="font-size:13px;font-weight:700;fill:#111827">막힘 복구</text>
+<text x="235.0" y="1054.0" class="mono" text-anchor="start" style="font-size:13px;font-weight:400;fill:#374151">behavior_server</text>
+<text x="575.0" y="1054.0" text-anchor="start" style="font-size:13px;font-weight:400;fill:#374151">막혔을 때 회전 · 후진 · 대기</text>
+<rect x="965.0" y="1043.5" width="12.0" height="12.0" rx="3" fill="#2563eb"/>
+<text x="985.0" y="1054.0" text-anchor="start" style="font-size:13px;font-weight:400;fill:#374151">bridge_node — 물러나기 · 5 초 뒤 재계획 · 실패 판정</text>
+<rect x="30.0" y="1071.0" width="1540.0" height="43.0" rx="0" fill="#f9fafb"/>
+<text x="45.0" y="1097.0" text-anchor="start" style="font-size:13px;font-weight:700;fill:#111827">속도 다듬기</text>
+<text x="235.0" y="1097.0" class="mono" text-anchor="start" style="font-size:13px;font-weight:400;fill:#374151">velocity_smoother</text>
+<text x="575.0" y="1097.0" text-anchor="start" style="font-size:13px;font-weight:400;fill:#374151">가감속을 부드럽게</text>
+<rect x="965.0" y="1086.5" width="12.0" height="12.0" rx="3" fill="#2563eb"/>
+<text x="985.0" y="1097.0" text-anchor="start" style="font-size:13px;font-weight:400;fill:#374151">Frenet 이 후보 궤적을 고를 때 가속 한계를 둔다</text>
+<rect x="30.0" y="1114.0" width="1540.0" height="43.0" rx="0" fill="#ffffff"/>
+<text x="45.0" y="1140.0" text-anchor="start" style="font-size:13px;font-weight:700;fill:#111827">장애물 격자</text>
+<text x="235.0" y="1140.0" class="mono" text-anchor="start" style="font-size:13px;font-weight:400;fill:#374151">local · global costmap</text>
+<text x="575.0" y="1140.0" text-anchor="start" style="font-size:13px;font-weight:400;fill:#374151">센서 · 지도를 칸으로 만들고 부풀린다</text>
+<rect x="965.0" y="1129.5" width="12.0" height="12.0" rx="3" fill="#2563eb"/>
+<text x="985.0" y="1140.0" text-anchor="start" style="font-size:13px;font-weight:400;fill:#374151">astar_planner_node (부풀리기) · frenet.py (차체 충돌 검사)</text>
+<path d="M30,1157 L1570,1157 L1570,1190 Q1570,1200 1560,1200 L40,1200 Q30,1200 30,1190 Z" fill="#f9fafb"/>
+<text x="45.0" y="1183.0" text-anchor="start" style="font-size:13px;font-weight:700;fill:#111827">켜는 순서</text>
+<text x="235.0" y="1183.0" class="mono" text-anchor="start" style="font-size:13px;font-weight:400;fill:#374151">lifecycle_manager_navigation</text>
+<text x="575.0" y="1183.0" text-anchor="start" style="font-size:13px;font-weight:400;fill:#374151">노드를 순서대로 활성화</text>
+<rect x="965.0" y="1172.5" width="12.0" height="12.0" rx="3" fill="#2563eb"/>
+<text x="985.0" y="1183.0" text-anchor="start" style="font-size:13px;font-weight:400;fill:#374151">scripts/run.sh — Django → Pi → AMCL → 브리지 순서</text>
+<line x1="30" y1="1071" x2="1570" y2="1071" stroke="#e5e7eb"/>
+<line x1="30" y1="1114" x2="1570" y2="1114" stroke="#e5e7eb"/>
+<line x1="30" y1="1157" x2="1570" y2="1157" stroke="#e5e7eb"/>
+<line x1="220" y1="1028" x2="220" y2="1200" stroke="#e5e7eb"/>
+<line x1="560" y1="1028" x2="560" y2="1200" stroke="#e5e7eb"/>
+<line x1="950" y1="1028" x2="950" y2="1200" stroke="#e5e7eb"/>
+<rect x="30.0" y="990.0" width="1540.0" height="210.0" rx="10" fill="none" stroke="#d1d5db" stroke-width="1.2"/>
+</svg>

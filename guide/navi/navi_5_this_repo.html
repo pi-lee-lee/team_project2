@@ -1,0 +1,256 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>직접 만든 주행 5 — 프로젝트 코드로 보면</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #f4f6fb; }
+  body { display: flex; align-items: center; justify-content: center; }
+  svg { width: min(100vw, calc(100vh * 1600 / 1373)); height: auto; display: block; }
+</style>
+</head>
+<body>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1373">
+<defs>
+
+    <style>
+      text { font-family: "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", sans-serif; fill: #1f2937; }
+      .mono { font-family: Menlo, Consolas, monospace; }
+      .halo { paint-order: stroke; stroke: #ffffff; stroke-width: 5px; stroke-linejoin: round; }
+    </style>
+    <marker id="m059669" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#059669"/></marker><marker id="m111827" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#111827"/></marker><marker id="m2563eb" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#2563eb"/></marker><marker id="m6b7280" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#6b7280"/></marker><marker id="m7c3aed" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#7c3aed"/></marker><marker id="m94a3b8" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#94a3b8"/></marker><marker id="md97706" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#d97706"/></marker><marker id="mdc2626" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#dc2626"/></marker><marker id="mea580c" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#ea580c"/></marker>
+</defs>
+<rect width="1600" height="1373" fill="#f4f6fb"/>
+<rect x="30" y="28" width="8" height="56" rx="3" fill="#2563eb"/>
+<text x="52.0" y="62.0" text-anchor="start" style="font-size:34px;font-weight:800;fill:#111827">직접 만든 주행 5 — 프로젝트 코드로 보면</text>
+<text x="54.0" y="88.0" text-anchor="start" style="font-size:15.5px;font-weight:400;fill:#4b5563">목표 하나가 들어와서 바퀴가 돌 때까지의 순서와, 각 일을 맡은 파일</text>
+<rect x="1100.0" y="22.0" width="470.0" height="66.0" rx="10" fill="#ffffff" stroke="#e5e7eb" stroke-width="1.2"/>
+<rect x="1114.0" y="33.0" width="14.0" height="14.0" rx="3" fill="#ecfdf5" stroke="#059669" stroke-width="1.6"/>
+<text x="1136.0" y="44.5" text-anchor="start" style="font-size:12px;font-weight:500;fill:#374151">Nav2 에서 가져다 씀</text>
+<rect x="1264.0" y="33.0" width="14.0" height="14.0" rx="3" fill="#eff6ff" stroke="#2563eb" stroke-width="1.6"/>
+<text x="1286.0" y="44.5" text-anchor="start" style="font-size:12px;font-weight:500;fill:#374151">직접 만듦</text>
+<rect x="1414.0" y="33.0" width="14.0" height="14.0" rx="3" fill="#fff7ed" stroke="#ea580c" stroke-width="1.6"/>
+<text x="1436.0" y="44.5" text-anchor="start" style="font-size:12px;font-weight:500;fill:#374151">로봇(Pi) 쪽</text>
+<rect x="1114.0" y="59.0" width="14.0" height="14.0" rx="3" fill="#f5f3ff" stroke="#7c3aed" stroke-width="1.6"/>
+<text x="1136.0" y="70.5" text-anchor="start" style="font-size:12px;font-weight:500;fill:#374151">관제 (서버)</text>
+<rect x="1264.0" y="59.0" width="14.0" height="14.0" rx="3" fill="#f3f4f6" stroke="#6b7280" stroke-width="1.6"/>
+<text x="1286.0" y="70.5" text-anchor="start" style="font-size:12px;font-weight:500;fill:#374151">쓰지 않음 · 참고</text>
+<rect x="1414.0" y="59.0" width="14.0" height="14.0" rx="3" fill="#fef2f2" stroke="#dc2626" stroke-width="1.6"/>
+<text x="1436.0" y="70.5" text-anchor="start" style="font-size:12px;font-weight:500;fill:#374151">주의</text>
+<rect x="30.0" y="128.0" width="1540.0" height="280.0" rx="12" fill="#ffffff" stroke="#1f2937" stroke-width="2"/>
+<path d="M30,170 L30,140 Q30,128 42,128 L1558,128 Q1570,128 1570,140 L1570,170 Z" fill="#1f2937"/>
+<text x="48.0" y="155.0" text-anchor="start" style="font-size:17px;font-weight:800;fill:#ffffff">목표 하나가 처리되는 순서</text>
+<text x="1554.0" y="154.0" text-anchor="end" style="font-size:12px;font-weight:600;fill:#ffffff">웹 클릭 → 바퀴 회전</text>
+<rect x="52.0" y="194.0" width="163.0" height="104.0" rx="12" fill="#ffffff" stroke="#7c3aed" stroke-width="1.8"/>
+<path d="M53,229 L53,206 Q53,195 64,195 L203,195 Q214,195 214,206 L214,229 Z" fill="#f5f3ff"/>
+<line x1="53" y1="229" x2="214" y2="229" stroke="#ddd6fe"/>
+<circle cx="74" cy="212" r="11" fill="#7c3aed"/>
+<text x="74.0" y="216.5" text-anchor="middle" style="font-size:12.5px;font-weight:800;fill:#ffffff">1</text>
+<text x="92.0" y="217.0" text-anchor="start" style="font-size:14.5px;font-weight:800;fill:#111827">웹 지도 클릭</text>
+<text x="66.0" y="253.0" text-anchor="start" style="font-size:12.5px;font-weight:400;fill:#374151">목표 좌표 (x, y)</text>
+<line x1="217" y1="246" x2="239" y2="246" stroke="#111827" stroke-width="2.2" marker-end="url(#m111827)"/>
+<text x="228.5" y="322.0" class="mono" text-anchor="middle" style="font-size:11px;font-weight:600;fill:#7c3aed">WebSocket</text>
+<rect x="242.0" y="194.0" width="163.0" height="104.0" rx="12" fill="#ffffff" stroke="#7c3aed" stroke-width="1.8"/>
+<path d="M243,229 L243,206 Q243,195 254,195 L393,195 Q404,195 404,206 L404,229 Z" fill="#f5f3ff"/>
+<line x1="243" y1="229" x2="404" y2="229" stroke="#ddd6fe"/>
+<circle cx="264" cy="212" r="11" fill="#7c3aed"/>
+<text x="264.0" y="216.5" text-anchor="middle" style="font-size:12.5px;font-weight:800;fill:#ffffff">2</text>
+<text x="282.0" y="217.0" text-anchor="start" style="font-size:14.5px;font-weight:800;fill:#111827">Django 서버</text>
+<text x="256.0" y="253.0" text-anchor="start" style="font-size:12.5px;font-weight:400;fill:#374151">goto 를 브리지로</text>
+<line x1="407" y1="246" x2="429" y2="246" stroke="#111827" stroke-width="2.2" marker-end="url(#m111827)"/>
+<text x="418.5" y="322.0" class="mono" text-anchor="middle" style="font-size:11px;font-weight:600;fill:#7c3aed">WebSocket</text>
+<rect x="432.0" y="194.0" width="163.0" height="104.0" rx="12" fill="#ffffff" stroke="#2563eb" stroke-width="1.8"/>
+<path d="M433,229 L433,206 Q433,195 444,195 L583,195 Q594,195 594,206 L594,229 Z" fill="#eff6ff"/>
+<line x1="433" y1="229" x2="594" y2="229" stroke="#bfdbfe"/>
+<circle cx="454" cy="212" r="11" fill="#2563eb"/>
+<text x="454.0" y="216.5" text-anchor="middle" style="font-size:12.5px;font-weight:800;fill:#ffffff">3</text>
+<text x="472.0" y="217.0" text-anchor="start" style="font-size:14.5px;font-weight:800;fill:#111827">브리지</text>
+<text x="446.0" y="253.0" text-anchor="start" style="font-size:12.5px;font-weight:400;fill:#374151">경로를 요청한다</text>
+<line x1="597" y1="246" x2="619" y2="246" stroke="#111827" stroke-width="2.2" marker-end="url(#m111827)"/>
+<text x="608.5" y="322.0" class="mono" text-anchor="middle" style="font-size:11px;font-weight:600;fill:#2563eb">get_plan</text>
+<rect x="622.0" y="194.0" width="163.0" height="104.0" rx="12" fill="#ffffff" stroke="#2563eb" stroke-width="1.8"/>
+<path d="M623,229 L623,206 Q623,195 634,195 L773,195 Q784,195 784,206 L784,229 Z" fill="#eff6ff"/>
+<line x1="623" y1="229" x2="784" y2="229" stroke="#bfdbfe"/>
+<circle cx="644" cy="212" r="11" fill="#2563eb"/>
+<text x="644.0" y="216.5" text-anchor="middle" style="font-size:12.5px;font-weight:800;fill:#ffffff">4</text>
+<text x="662.0" y="217.0" text-anchor="start" style="font-size:14.5px;font-weight:800;fill:#111827">A*</text>
+<text x="636.0" y="253.0" text-anchor="start" style="font-size:12.5px;font-weight:400;fill:#374151">경로를 돌려준다</text>
+<line x1="787" y1="246" x2="809" y2="246" stroke="#111827" stroke-width="2.2" marker-end="url(#m111827)"/>
+<text x="798.5" y="322.0" class="mono" text-anchor="middle" style="font-size:11px;font-weight:600;fill:#2563eb">Path</text>
+<rect x="812.0" y="194.0" width="163.0" height="104.0" rx="12" fill="#ffffff" stroke="#2563eb" stroke-width="1.8"/>
+<path d="M813,229 L813,206 Q813,195 824,195 L963,195 Q974,195 974,206 L974,229 Z" fill="#eff6ff"/>
+<line x1="813" y1="229" x2="974" y2="229" stroke="#bfdbfe"/>
+<circle cx="834" cy="212" r="11" fill="#2563eb"/>
+<text x="834.0" y="216.5" text-anchor="middle" style="font-size:12.5px;font-weight:800;fill:#ffffff">5</text>
+<text x="852.0" y="217.0" text-anchor="start" style="font-size:14.5px;font-weight:800;fill:#111827">Frenet</text>
+<text x="826.0" y="253.0" text-anchor="start" style="font-size:12.5px;font-weight:400;fill:#374151">0.05 초마다</text>
+<text x="826.0" y="272.0" text-anchor="start" style="font-size:12.5px;font-weight:400;fill:#374151">속도 계산</text>
+<line x1="977" y1="246" x2="999" y2="246" stroke="#111827" stroke-width="2.2" marker-end="url(#m111827)"/>
+<rect x="1002.0" y="194.0" width="163.0" height="104.0" rx="12" fill="#ffffff" stroke="#7c3aed" stroke-width="1.8"/>
+<path d="M1003,229 L1003,206 Q1003,195 1014,195 L1153,195 Q1164,195 1164,206 L1164,229 Z" fill="#f5f3ff"/>
+<line x1="1003" y1="229" x2="1164" y2="229" stroke="#ddd6fe"/>
+<circle cx="1024" cy="212" r="11" fill="#7c3aed"/>
+<text x="1024.0" y="216.5" text-anchor="middle" style="font-size:12.5px;font-weight:800;fill:#ffffff">6</text>
+<text x="1042.0" y="217.0" text-anchor="start" style="font-size:14.5px;font-weight:800;fill:#111827">cmd_mux</text>
+<text x="1016.0" y="253.0" text-anchor="start" style="font-size:12.5px;font-weight:400;fill:#374151">하나를 골라</text>
+<text x="1016.0" y="272.0" text-anchor="start" style="font-size:12.5px;font-weight:400;fill:#374151">내보낸다</text>
+<line x1="1167" y1="246" x2="1189" y2="246" stroke="#111827" stroke-width="2.2" marker-end="url(#m111827)"/>
+<text x="1178.5" y="322.0" class="mono" text-anchor="middle" style="font-size:11px;font-weight:600;fill:#7c3aed">cmd_vel_pc</text>
+<rect x="1192.0" y="194.0" width="163.0" height="104.0" rx="12" fill="#ffffff" stroke="#ea580c" stroke-width="1.8"/>
+<path d="M1193,229 L1193,206 Q1193,195 1204,195 L1343,195 Q1354,195 1354,206 L1354,229 Z" fill="#fff7ed"/>
+<line x1="1193" y1="229" x2="1354" y2="229" stroke="#fed7aa"/>
+<circle cx="1214" cy="212" r="11" fill="#ea580c"/>
+<text x="1214.0" y="216.5" text-anchor="middle" style="font-size:12.5px;font-weight:800;fill:#ffffff">7</text>
+<text x="1232.0" y="217.0" text-anchor="start" style="font-size:14.5px;font-weight:800;fill:#111827">Pi 명령 감시</text>
+<text x="1206.0" y="253.0" text-anchor="start" style="font-size:12.5px;font-weight:400;fill:#374151">그대로 넘긴다</text>
+<text x="1206.0" y="272.0" text-anchor="start" style="font-size:12.5px;font-weight:400;fill:#374151">0.5 초 끊기면 0</text>
+<line x1="1357" y1="246" x2="1379" y2="246" stroke="#111827" stroke-width="2.2" marker-end="url(#m111827)"/>
+<text x="1368.5" y="322.0" class="mono" text-anchor="middle" style="font-size:11px;font-weight:600;fill:#ea580c">cmd_vel</text>
+<rect x="1382.0" y="194.0" width="163.0" height="104.0" rx="12" fill="#ffffff" stroke="#ea580c" stroke-width="1.8"/>
+<path d="M1383,229 L1383,206 Q1383,195 1394,195 L1533,195 Q1544,195 1544,206 L1544,229 Z" fill="#fff7ed"/>
+<line x1="1383" y1="229" x2="1544" y2="229" stroke="#fed7aa"/>
+<circle cx="1404" cy="212" r="11" fill="#ea580c"/>
+<text x="1404.0" y="216.5" text-anchor="middle" style="font-size:12.5px;font-weight:800;fill:#ffffff">8</text>
+<text x="1422.0" y="217.0" text-anchor="start" style="font-size:14.5px;font-weight:800;fill:#111827">로봇 보드</text>
+<text x="1396.0" y="253.0" text-anchor="start" style="font-size:12.5px;font-weight:400;fill:#374151">바퀴 회전</text>
+<circle cx="57" cy="353.7" r="2.6" fill="#111827"/>
+<text x="70.0" y="358.0" text-anchor="start" style="font-size:13px;font-weight:400;fill:#374151">도착: 목표에서 0.08 m 안에 들어오면 멈추고, 브리지가 nav_status 를 서버로 보낸다</text>
+<circle cx="57" cy="377.7" r="2.6" fill="#111827"/>
+<text x="70.0" y="382.0" text-anchor="start" style="font-size:13px;font-weight:400;fill:#374151">막힘: 앞이 5 초 넘게 막히면 그 자리를 A* 에 알리고, 그 자리를 피하는 경로로 다시 계획한다</text>
+<rect x="30.0" y="439.0" width="4.0" height="20.0" rx="2" fill="#111827"/>
+<text x="42.0" y="454.0" text-anchor="start" style="font-size:16px;font-weight:800;fill:#111827">일을 맡은 파일</text>
+<path d="M30,508 L30,480 Q30,470 40,470 L410,470 Q410,470 410,470 L410,508 Z" fill="#1f2937"/>
+<text x="43.0" y="494.0" text-anchor="start" style="font-size:13.5px;font-weight:800;fill:#ffffff">파일</text>
+<path d="M410,508 L410,470 Q410,470 410,470 L580,470 Q580,470 580,470 L580,508 Z" fill="#1f2937"/>
+<text x="423.0" y="494.0" text-anchor="start" style="font-size:13.5px;font-weight:800;fill:#ffffff">맡은 일</text>
+<path d="M580,508 L580,470 Q580,470 580,470 L1020,470 Q1030,470 1030,480 L1030,508 Z" fill="#1f2937"/>
+<text x="593.0" y="494.0" text-anchor="start" style="font-size:13.5px;font-weight:800;fill:#ffffff">하는 일</text>
+<rect x="30.0" y="508.0" width="1000.0" height="43.0" rx="0" fill="#ffffff"/>
+<text x="45.0" y="534.0" class="mono" text-anchor="start" style="font-size:12.5px;font-weight:400;fill:#374151">scripts/start_nav2.sh</text>
+<rect x="425.0" y="523.5" width="12.0" height="12.0" rx="3" fill="#059669"/>
+<text x="445.0" y="534.0" text-anchor="start" style="font-size:12.5px;font-weight:400;fill:#374151">Nav2 위치 추정</text>
+<text x="595.0" y="534.0" text-anchor="start" style="font-size:12.5px;font-weight:400;fill:#374151">localization_launch.py 만 켠다. 지도 파일이 없으면 시작하지 않는다</text>
+<rect x="30.0" y="551.0" width="1000.0" height="43.0" rx="0" fill="#f9fafb"/>
+<text x="45.0" y="577.0" class="mono" text-anchor="start" style="font-size:12.5px;font-weight:400;fill:#374151">config/amcl_waffle_pi.yaml</text>
+<rect x="425.0" y="566.5" width="12.0" height="12.0" rx="3" fill="#059669"/>
+<text x="445.0" y="577.0" text-anchor="start" style="font-size:12.5px;font-weight:400;fill:#374151">Nav2 위치 추정</text>
+<text x="595.0" y="577.0" text-anchor="start" style="font-size:12.5px;font-weight:400;fill:#374151">amcl 설정. 넓은 공간은 config/amcl_hall.yaml</text>
+<rect x="30.0" y="594.0" width="1000.0" height="43.0" rx="0" fill="#ffffff"/>
+<text x="45.0" y="620.0" class="mono" text-anchor="start" style="font-size:12.5px;font-weight:400;fill:#374151">warehouse_robot/astar.py</text>
+<rect x="425.0" y="609.5" width="12.0" height="12.0" rx="3" fill="#2563eb"/>
+<text x="445.0" y="620.0" text-anchor="start" style="font-size:12.5px;font-weight:400;fill:#374151">경로 계획</text>
+<text x="595.0" y="620.0" text-anchor="start" style="font-size:12.5px;font-weight:400;fill:#374151">A* 계산. ROS 없이 돌아가서 단위 테스트가 쉽다</text>
+<rect x="30.0" y="637.0" width="1000.0" height="43.0" rx="0" fill="#f9fafb"/>
+<text x="45.0" y="663.0" class="mono" text-anchor="start" style="font-size:12.5px;font-weight:400;fill:#374151">warehouse_robot/astar_planner_node.py</text>
+<rect x="425.0" y="652.5" width="12.0" height="12.0" rx="3" fill="#2563eb"/>
+<text x="445.0" y="663.0" text-anchor="start" style="font-size:12.5px;font-weight:400;fill:#374151">경로 계획</text>
+<text x="595.0" y="663.0" text-anchor="start" style="font-size:12.5px;font-weight:400;fill:#374151">/map 을 받아 부풀리고, A* 를 astar/get_plan 서비스로 제공한다</text>
+<rect x="30.0" y="680.0" width="1000.0" height="43.0" rx="0" fill="#ffffff"/>
+<text x="45.0" y="706.0" class="mono" text-anchor="start" style="font-size:12.5px;font-weight:400;fill:#374151">warehouse_robot/frenet.py</text>
+<rect x="425.0" y="695.5" width="12.0" height="12.0" rx="3" fill="#2563eb"/>
+<text x="445.0" y="706.0" text-anchor="start" style="font-size:12.5px;font-weight:400;fill:#374151">경로 추종</text>
+<text x="595.0" y="706.0" text-anchor="start" style="font-size:12.5px;font-weight:400;fill:#374151">옆으로 비켜 가는 후보 궤적 중 하나를 골라 속도를 낸다</text>
+<rect x="30.0" y="723.0" width="1000.0" height="43.0" rx="0" fill="#f9fafb"/>
+<text x="45.0" y="749.0" class="mono" text-anchor="start" style="font-size:12.5px;font-weight:400;fill:#374151">warehouse_robot/tracker.py</text>
+<rect x="425.0" y="738.5" width="12.0" height="12.0" rx="3" fill="#2563eb"/>
+<text x="445.0" y="749.0" text-anchor="start" style="font-size:12.5px;font-weight:400;fill:#374151">경로 추종</text>
+<text x="595.0" y="749.0" text-anchor="start" style="font-size:12.5px;font-weight:400;fill:#374151">움직이는 장애물을 칼만 필터로 추적해 Frenet 에 넘긴다</text>
+<rect x="30.0" y="766.0" width="1000.0" height="43.0" rx="0" fill="#ffffff"/>
+<text x="45.0" y="792.0" class="mono" text-anchor="start" style="font-size:12.5px;font-weight:400;fill:#374151">warehouse_robot/cmd_mux.py</text>
+<rect x="425.0" y="781.5" width="12.0" height="12.0" rx="3" fill="#7c3aed"/>
+<text x="445.0" y="792.0" text-anchor="start" style="font-size:12.5px;font-weight:400;fill:#374151">명령 선택</text>
+<text x="595.0" y="792.0" text-anchor="start" style="font-size:12.5px;font-weight:400;fill:#374151">정지 &gt; 수동 &gt; 자동 순서로 속도 명령 하나를 고른다</text>
+<rect x="30.0" y="809.0" width="1000.0" height="43.0" rx="0" fill="#f9fafb"/>
+<text x="45.0" y="835.0" class="mono" text-anchor="start" style="font-size:12.5px;font-weight:400;fill:#374151">warehouse_robot/bridge_node.py</text>
+<rect x="425.0" y="824.5" width="12.0" height="12.0" rx="3" fill="#2563eb"/>
+<text x="445.0" y="835.0" text-anchor="start" style="font-size:12.5px;font-weight:400;fill:#374151">연결 · 안전</text>
+<text x="595.0" y="835.0" text-anchor="start" style="font-size:12.5px;font-weight:400;fill:#374151">서버 연결, 경로 추종 실행, 앞 막힘 정지, 막힘 복구, 주행 기록</text>
+<path d="M30,852 L1030,852 L1030,885 Q1030,895 1020,895 L40,895 Q30,895 30,885 Z" fill="#ffffff"/>
+<text x="45.0" y="878.0" class="mono" text-anchor="start" style="font-size:12.5px;font-weight:400;fill:#374151">scripts/pi_cmd_watchdog.py</text>
+<rect x="425.0" y="867.5" width="12.0" height="12.0" rx="3" fill="#ea580c"/>
+<text x="445.0" y="878.0" text-anchor="start" style="font-size:12.5px;font-weight:400;fill:#374151">로봇 쪽 안전</text>
+<text x="595.0" y="878.0" text-anchor="start" style="font-size:12.5px;font-weight:400;fill:#374151">cmd_vel_pc → cmd_vel 로 넘기고, 명령이 0.5 초 끊기면 0 을 낸다</text>
+<line x1="30" y1="551" x2="1030" y2="551" stroke="#e5e7eb"/>
+<line x1="30" y1="594" x2="1030" y2="594" stroke="#e5e7eb"/>
+<line x1="30" y1="637" x2="1030" y2="637" stroke="#e5e7eb"/>
+<line x1="30" y1="680" x2="1030" y2="680" stroke="#e5e7eb"/>
+<line x1="30" y1="723" x2="1030" y2="723" stroke="#e5e7eb"/>
+<line x1="30" y1="766" x2="1030" y2="766" stroke="#e5e7eb"/>
+<line x1="30" y1="809" x2="1030" y2="809" stroke="#e5e7eb"/>
+<line x1="30" y1="852" x2="1030" y2="852" stroke="#e5e7eb"/>
+<line x1="410" y1="508" x2="410" y2="895" stroke="#e5e7eb"/>
+<line x1="580" y1="508" x2="580" y2="895" stroke="#e5e7eb"/>
+<rect x="30.0" y="470.0" width="1000.0" height="425.0" rx="10" fill="none" stroke="#d1d5db" stroke-width="1.2"/>
+<rect x="1050.0" y="440.0" width="520.0" height="455.0" rx="12" fill="#ffffff" stroke="#6b7280" stroke-width="2"/>
+<path d="M1050,482 L1050,452 Q1050,440 1062,440 L1558,440 Q1570,440 1570,452 L1570,482 Z" fill="#6b7280"/>
+<text x="1068.0" y="467.0" text-anchor="start" style="font-size:17px;font-weight:800;fill:#ffffff">지도 위 내 위치를 만드는 방법</text>
+<text x="1554.0" y="466.0" class="mono" text-anchor="end" style="font-size:12px;font-weight:600;fill:#ffffff">pose_with_age()</text>
+<text x="1072.0" y="510.0" text-anchor="start" style="font-size:12.5px;font-weight:600;fill:#4b5563">bridge_node 는 두 값을 이어 붙여 지도 위 위치를 만든다</text>
+<rect x="1072.0" y="532.0" width="110.0" height="34.0" rx="17" fill="#ffffff" stroke="#111827" stroke-width="1.5"/>
+<text x="1127.0" y="554.0" class="mono" text-anchor="middle" style="font-size:12.5px;font-weight:700;fill:#111827">map</text>
+<rect x="1226.0" y="532.0" width="110.0" height="34.0" rx="17" fill="#ffffff" stroke="#111827" stroke-width="1.5"/>
+<text x="1281.0" y="554.0" class="mono" text-anchor="middle" style="font-size:12.5px;font-weight:700;fill:#111827">odom</text>
+<rect x="1380.0" y="532.0" width="168.0" height="34.0" rx="17" fill="#ffffff" stroke="#111827" stroke-width="1.5"/>
+<text x="1464.0" y="554.0" class="mono" text-anchor="middle" style="font-size:12.5px;font-weight:700;fill:#111827">base_footprint</text>
+<line x1="1184" y1="549" x2="1222" y2="549" stroke="#059669" stroke-width="2.2" marker-end="url(#m059669)"/>
+<line x1="1338" y1="549" x2="1376" y2="549" stroke="#ea580c" stroke-width="2.2" marker-end="url(#mea580c)"/>
+<text x="1203.0" y="590.0" text-anchor="middle" style="font-size:11.5px;font-weight:700;fill:#059669">TF (amcl)</text>
+<text x="1203.0" y="606.0" text-anchor="middle" style="font-size:11px;font-weight:400;fill:#4b5563">가끔 바뀐다</text>
+<text x="1357.0" y="590.0" text-anchor="middle" style="font-size:11.5px;font-weight:700;fill:#ea580c">/odom 메시지</text>
+<text x="1357.0" y="606.0" text-anchor="middle" style="font-size:11px;font-weight:400;fill:#4b5563">자주 온다</text>
+<circle cx="1077" cy="637.7" r="2.6" fill="#111827"/>
+<text x="1090.0" y="642.0" text-anchor="start" style="font-size:13px;font-weight:400;fill:#374151">최신 map → odom 에 /odom 을 이어 붙인다</text>
+<circle cx="1077" cy="661.7" r="2.6" fill="#111827"/>
+<text x="1090.0" y="666.0" text-anchor="start" style="font-size:13px;font-weight:400;fill:#374151">/odom 이 자주 오므로 지도 위 위치도 자주 갱신된다</text>
+<circle cx="1077" cy="685.7" r="2.6" fill="#111827"/>
+<text x="1090.0" y="690.0" text-anchor="start" style="font-size:13px;font-weight:400;fill:#374151">amcl 이 map → odom 을 고치면 이 값도 그만큼 바로 바뀐다</text>
+<text x="1090.0" y="710.0" text-anchor="start" style="font-size:11.5px;font-weight:400;fill:#4b5563">그림 4 의 규칙 6</text>
+<circle cx="1077" cy="728.7" r="2.6" fill="#111827"/>
+<text x="1090.0" y="733.0" text-anchor="start" style="font-size:13px;font-weight:400;fill:#374151">/odom 이 0.5 초 넘게 늦으면 선다 (tf_timeout)</text>
+<text x="1090.0" y="753.0" text-anchor="start" style="font-size:11.5px;font-weight:400;fill:#4b5563">3 초 넘게 안 오면 목표 실패 (pose_lost_timeout)</text>
+<circle cx="1077" cy="771.7" r="2.6" fill="#111827"/>
+<text x="1090.0" y="776.0" text-anchor="start" style="font-size:13px;font-weight:400;fill:#374151">지도를 만들면서 다닐 때는 map → odom 을 slam_toolbox 가 낸다</text>
+<text x="1090.0" y="796.0" text-anchor="start" style="font-size:11.5px;font-weight:400;fill:#4b5563">계산 방법은 같다</text>
+<rect x="30.0" y="926.0" width="4.0" height="20.0" rx="2" fill="#111827"/>
+<text x="42.0" y="941.0" text-anchor="start" style="font-size:16px;font-weight:800;fill:#111827">다른 로봇 · 프로젝트로 옮길 때 확인할 것</text>
+<path d="M30,995 L30,967 Q30,957 40,957 L250,957 Q250,957 250,957 L250,995 Z" fill="#1f2937"/>
+<text x="43.0" y="981.0" text-anchor="start" style="font-size:13.5px;font-weight:800;fill:#ffffff">항목</text>
+<path d="M250,995 L250,957 Q250,957 250,957 L950,957 Q950,957 950,957 L950,995 Z" fill="#2563eb"/>
+<text x="263.0" y="981.0" text-anchor="start" style="font-size:13.5px;font-weight:800;fill:#ffffff">이 프로젝트</text>
+<path d="M950,995 L950,957 Q950,957 950,957 L1560,957 Q1570,957 1570,967 L1570,995 Z" fill="#d97706"/>
+<text x="963.0" y="981.0" text-anchor="start" style="font-size:13.5px;font-weight:800;fill:#ffffff">옮길 때</text>
+<rect x="30.0" y="995.0" width="1540.0" height="43.0" rx="0" fill="#ffffff"/>
+<text x="45.0" y="1021.0" text-anchor="start" style="font-size:13px;font-weight:700;fill:#111827">목표 받는 방식</text>
+<text x="265.0" y="1021.0" text-anchor="start" style="font-size:13px;font-weight:400;fill:#374151">WebSocket 으로 goto 를 받고, get_plan 서비스로 경로를 얻는다</text>
+<text x="965.0" y="1021.0" text-anchor="start" style="font-size:13px;font-weight:400;fill:#374151">다른 쪽이 NavigateToPose 액션을 쓰면 둘 중 하나를 맞춘다</text>
+<rect x="30.0" y="1038.0" width="1540.0" height="43.0" rx="0" fill="#f9fafb"/>
+<text x="45.0" y="1064.0" text-anchor="start" style="font-size:13px;font-weight:700;fill:#111827">한 파일에 몰린 일</text>
+<text x="265.0" y="1064.0" text-anchor="start" style="font-size:13px;font-weight:400;fill:#374151">bridge_node 하나에 서버 연결, 경로 추종, 안전장치, 명령 선택, 기록이 함께 있다</text>
+<text x="965.0" y="1064.0" text-anchor="start" style="font-size:13px;font-weight:400;fill:#374151">역할별로 나누면 하나씩 시험하기 쉽다</text>
+<rect x="30.0" y="1081.0" width="1540.0" height="43.0" rx="0" fill="#ffffff"/>
+<text x="45.0" y="1107.0" text-anchor="start" style="font-size:13px;font-weight:700;fill:#111827">실행 위치</text>
+<text x="265.0" y="1107.0" text-anchor="start" style="font-size:13px;font-weight:400;fill:#374151">Pi 는 센서 · 바퀴만 맡고, A* · Frenet 은 PC 에서 돈다 (Wi-Fi 경유)</text>
+<text x="965.0" y="1107.0" text-anchor="start" style="font-size:13px;font-weight:400;fill:#374151">로봇 컴퓨터 하나에서 다 돌리면 Wi-Fi 지연이 없다</text>
+<path d="M30,1124 L1570,1124 L1570,1157 Q1570,1167 1560,1167 L40,1167 Q30,1167 30,1157 Z" fill="#f9fafb"/>
+<text x="45.0" y="1150.0" text-anchor="start" style="font-size:13px;font-weight:700;fill:#111827">구동 방식</text>
+<text x="265.0" y="1150.0" text-anchor="start" style="font-size:13px;font-weight:400;fill:#374151">2 바퀴 차동 구동. 속도 명령 아래는 로봇 보드가 맡는다</text>
+<text x="965.0" y="1150.0" text-anchor="start" style="font-size:13px;font-weight:400;fill:#374151">A* · Frenet 은 그대로 쓰고 차체 크기 값 (footprint) 만 바꾼다</text>
+<line x1="30" y1="1038" x2="1570" y2="1038" stroke="#e5e7eb"/>
+<line x1="30" y1="1081" x2="1570" y2="1081" stroke="#e5e7eb"/>
+<line x1="30" y1="1124" x2="1570" y2="1124" stroke="#e5e7eb"/>
+<line x1="250" y1="995" x2="250" y2="1167" stroke="#e5e7eb"/>
+<line x1="950" y1="995" x2="950" y2="1167" stroke="#e5e7eb"/>
+<rect x="30.0" y="957.0" width="1540.0" height="210.0" rx="10" fill="none" stroke="#d1d5db" stroke-width="1.2"/>
+<rect x="30.0" y="1197.0" width="1540.0" height="146.0" rx="12" fill="#ffffff" stroke="#2563eb" stroke-width="2"/>
+<path d="M30,1239 L30,1209 Q30,1197 42,1197 L1558,1197 Q1570,1197 1570,1209 L1570,1239 Z" fill="#2563eb"/>
+<text x="48.0" y="1224.0" text-anchor="start" style="font-size:17px;font-weight:800;fill:#ffffff">정리</text>
+<circle cx="57" cy="1264.7" r="2.6" fill="#111827"/>
+<text x="70.0" y="1269.0" text-anchor="start" style="font-size:13px;font-weight:400;fill:#374151">Nav2 에서 가져다 쓴 것은 위치 추정 (map_server + amcl) 하나다. 경로 계획 (A*) 과 경로 추종 (Frenet) 은 직접 구현했다</text>
+<circle cx="57" cy="1288.7" r="2.6" fill="#111827"/>
+<text x="70.0" y="1293.0" text-anchor="start" style="font-size:13px;font-weight:400;fill:#374151">둘 사이는 TF map → odom 으로만 이어진다. 그래서 위치 추정을 slam_toolbox 로 바꿔도 주행 코드는 같다</text>
+<circle cx="57" cy="1312.7" r="2.6" fill="#111827"/>
+<text x="70.0" y="1317.0" text-anchor="start" style="font-size:13px;font-weight:400;fill:#374151">직접 만든 만큼, Nav2 가 하던 앞 막힘 정지 · 막힘 복구 · 명령 끊김 처리도 이 프로젝트 코드 안에 있다</text>
+</svg>
+</body>
+</html>
