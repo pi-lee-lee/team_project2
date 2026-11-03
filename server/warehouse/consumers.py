@@ -1,8 +1,8 @@
-"""WebSocket 엔드포인트.
+"""WebSocket endpoints.
 
-/ws/robot/<name>/ : ROS 2 브리지 노드가 접속 (name = 로봇 이름, 예: tb3, tb3_1, tb3_2)
-/ws/ui/[?robot=<name>] : 웹 브라우저가 접속. 연결마다 '선택한 로봇' 이 있어, 그 로봇의 위치/경로/상태만 받고
-                         요청(이동, 정지 등)도 그 로봇으로 간다 (요청에 robot_name 을 주면 그 로봇). 기본 tb3
+/ws/robot/<name>/ : the ROS 2 bridge node connects here (name = robot name, e.g. tb3, tb3_1, tb3_2)
+/ws/ui/[?robot=<name>] : web browsers connect here. Each connection has a 'selected robot': it receives only that robot's
+                         pose/path/state, and requests (move, stop, ...) go to that robot (or to robot_name if given). Default tb3
 """
 import logging
 import time
@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 UI_GROUP = 'ui'
 
-# 위치·경로처럼 자주 오는 값은 DB에 저장하지 않고 메모리에만 둔다 (live.py)
+# High-rate values such as pose and path are kept only in memory, not in the DB (live.py)
 from .live import LIVE  # noqa: E402
 
 
@@ -26,7 +26,7 @@ def robot_group(name):
 
 
 def robot_of(msg):
-    """메시지가 어느 로봇 것인지 (pose 등은 'robot': 이름, state/snapshot 은 'robot': {name, ...}). 없으면 None."""
+    """Which robot a message belongs to (pose etc. have 'robot': name, state/snapshot have 'robot': {name, ...}). None if absent."""
     r = msg.get('robot')
     if isinstance(r, dict):
         return r.get('name')
@@ -34,7 +34,7 @@ def robot_of(msg):
 
 
 async def broadcast_robots(channel_layer):
-    """웹 로봇 선택 목록 갱신 (브리지 접속/끊김 때)."""
+    """Refresh the web robot selection list (on bridge connect/disconnect)."""
     robots = await database_sync_to_async(services.robot_list)()
     await channel_layer.group_send(UI_GROUP, {'type': 'send.msg', 'msg': {'type': 'robots', 'robots': robots}})
 
@@ -103,7 +103,7 @@ class RobotConsumer(AsyncJsonWebsocketConsumer):
                       'footprint': msg.get('footprint')}
             live['health'] = health
             await self.broadcast({'type': 'health', 'robot': self.robot_name, **health})
-            # 로봇(Pi)이 응답할 때/안 할 때가 바뀔 때만 DB 상태를 바꾼다
+            # Change the DB state only when the robot (Pi) switches between responding and not responding
             robot_ok = bool(msg.get('robot_ok'))
             if live.get('robot_ok') != robot_ok:
                 live['robot_ok'] = robot_ok
@@ -125,40 +125,40 @@ class RobotConsumer(AsyncJsonWebsocketConsumer):
         elif kind == 'map':
             await self.run(services.handle_map, self.robot_name, msg)
         elif kind == 'cargo':
-            # 카메라 인식 결과 (브리지가 1초 이상 같을 때만 보냄). '' = 아무것도 안 보임
+            # Camera detection result (the bridge sends it only after it stays the same for 1 s or more). '' = nothing seen
             live['cargo'] = str(msg.get('label') or '')
             await self.broadcast({'type': 'cargo', 'robot': self.robot_name, 'label': live['cargo']})
             await self.run(services.handle_cargo, self.robot_name, live['cargo'])
         elif kind == 'yolo':
-            # YOLO 부품 검출기 상태 (available, enabled, counts 글자) - 화면 표시용, DB 에 저장하지 않음
+            # YOLO component detector state (available, enabled, counts text) - display only, not stored in the DB
             live['yolo'] = {k: msg.get(k) for k in ('available', 'enabled', 'counts', 'age')}
-            # 주문 적재 확인용: 최근 개수 글자 (services.yolo_counts 가 가장 많이 나온 값을 씀)
+            # For order load checks: recent counts texts (services.yolo_counts uses the most frequent one)
             now = time.monotonic()
             hist = [h for h in live.get('yolo_hist', []) if now - h[0] <= 10.0]
             hist.append((now, str(msg.get('counts') or '')))
             live['yolo_hist'] = hist
             await self.broadcast({'type': 'yolo', 'robot': self.robot_name, **live['yolo']})
         elif kind == 'params':
-            # 실행 중에 바꿀 수 있는 브리지 파라미터 (이름, 지금 값, 시작 값) - 웹 '주행 파라미터' 카드, DB 에 저장하지 않음
+            # Bridge parameters changeable at runtime (name, current value, startup value) - web driving-parameters card, not stored in the DB
             live['params'] = msg.get('items', [])
             await self.broadcast({'type': 'params', 'robot': self.robot_name, 'items': live['params']})
         elif kind == 'param_result':
             await self.broadcast({'type': 'param_result', 'robot': self.robot_name, 'name': msg.get('name'),
                                   'ok': bool(msg.get('ok')), 'reason': msg.get('reason', '')})
         elif kind == 'scan':
-            # 실시간 LiDAR (지도 좌표 점, 초당 4번) - 화면 표시용, DB 에 저장하지 않음
+            # Live LiDAR (points in map coordinates, 4 per second) - display only, not stored in the DB
             await self.broadcast({'type': 'scan', 'robot': self.robot_name, 'origin': msg.get('origin'),
                                   'inc': msg.get('inc'), 'points': msg.get('points', [])})
         elif kind == 'obstacles':
-            # 추적 중인 움직이는 장애물 (map 좌표, 위치+속도) - 화면 표시용, DB 에 저장하지 않음
+            # Tracked moving obstacles (map coordinates, position + velocity) - display only, not stored in the DB
             live['obstacles'] = msg.get('obstacles', [])
             await self.broadcast({'type': 'obstacles', 'robot': self.robot_name, 'obstacles': live['obstacles']})
         elif kind == 'local_plan':
-            # Frenet 로컬 플래너가 고른 궤적 (map 좌표) + 명령 속도/상태 (초당 5번) - 화면 표시용, 저장/스냅샷 안 함
+            # Trajectory chosen by the Frenet local planner (map coordinates) + commanded velocity/state (5 per second) - display only, not stored or included in snapshots
             await self.broadcast({'type': 'local_plan', 'robot': self.robot_name, 'traj': msg.get('traj', []),
                                   'v': msg.get('v'), 'w': msg.get('w'), 'state': msg.get('state')})
         elif kind == 'memory':
-            # A* 가 기억 중인 장애물: remembered = 맵에 없는 LiDAR 장애물 칸, bumps = 부딪힌 자리
+            # Obstacles remembered by A*: remembered = LiDAR obstacle cells not in the map, bumps = places where the robot bumped
             live['memory'] = {'remembered': msg.get('remembered', []), 'bumps': msg.get('bumps', [])}
             await self.broadcast({'type': 'memory', 'robot': self.robot_name, **live['memory']})
         elif kind == 'battery':
@@ -181,16 +181,16 @@ class UIConsumer(AsyncJsonWebsocketConsumer):
         await self.send_snapshot()
 
     async def send_snapshot(self):
-        """선택한 로봇의 전체 상태 (처음 접속, 로봇을 바꿨을 때)."""
+        """Full state of the selected robot (on first connect and when the robot is switched)."""
         self.robot_name = await database_sync_to_async(services.known_robot)(self.robot_name)
         snap = await database_sync_to_async(services.snapshot)(self.robot_name)
         snap['robots'] = await database_sync_to_async(services.robot_list)()
         live = LIVE.get(snap['robot']['name'], {})
         snap['pose'] = live.get('pose')
-        snap['cargo'] = live.get('cargo')   # None = 인식 노드 없음
+        snap['cargo'] = live.get('cargo')   # None = no detection node
         snap['memory'] = live.get('memory')
-        snap['yolo'] = live.get('yolo')     # None = 브리지 없음
-        snap['params'] = live.get('params')  # None = 브리지 없음
+        snap['yolo'] = live.get('yolo')     # None = no bridge
+        snap['params'] = live.get('params')  # None = no bridge
         snap['obstacles'] = live.get('obstacles', [])
         snap['path'] = live.get('path', [])
         snap['health'] = live.get('health', {'bridge': False})
@@ -202,14 +202,14 @@ class UIConsumer(AsyncJsonWebsocketConsumer):
         await self.channel_layer.group_discard(UI_GROUP, self.channel_name)
 
     async def handle_runner(self, action, msg):
-        """실행 모드 전환 (서버가 scripts/run.sh 등을 실행)."""
+        """Switch run mode (the server runs scripts/run.sh etc.)."""
         try:
             if action == 'list_maps':
                 await self.send_json({'type': 'runner_info', 'maps': runner.list_maps(), 'worlds': runner.list_worlds(),
                                       'mode': runner.current_mode(), 'busy': runner.busy(), 'elapsed': runner.busy_elapsed()})
                 return
             if action in ('runner_start', 'runner_stop'):
-                # 노드를 다시 띄우기 전에 주행 중인 로봇은 모두 멈춘다
+                # Stop all moving robots before restarting the nodes
                 for name in await database_sync_to_async(services.moving_robots)():
                     await dispatch(self.channel_layer, await database_sync_to_async(services.estop)(name))
             if action == 'runner_start':
@@ -224,14 +224,14 @@ class UIConsumer(AsyncJsonWebsocketConsumer):
                 await database_sync_to_async(runner.explore)()
             elif action == 'explore_stop':
                 await database_sync_to_async(runner.cancel)(runner.EXPLORE_JOB)
-                # 탐색이 보낸 이동도 멈춘다
+                # Also stop the move sent by exploration
                 robot = await database_sync_to_async(services.get_robot)(self.robot_name)
                 if robot.state == 'MOVING':
                     await dispatch(self.channel_layer, await database_sync_to_async(services.cancel_task)(robot.name))
             elif action == 'auto_localize':
                 if LIVE.get(self.robot_name, {}).get('mode') != 'map':
                     raise runner.RunnerError('위치 자동 찾기는 "저장된 맵으로 위치 추정(AMCL)" 모드에서 쓸 수 있습니다.')
-                # 로봇이 제자리에서 돌고 조금 움직이므로, 작업 중이면 하지 않는다
+                # The robot turns in place and moves a little, so refuse while a task is running
                 robot = await database_sync_to_async(services.get_robot)(self.robot_name)
                 if robot.state not in ('IDLE', 'ERROR'):
                     raise runner.RunnerError('작업 중에는 위치 자동 찾기를 할 수 없습니다. 작업을 끝내거나 취소하세요.')
@@ -243,7 +243,7 @@ class UIConsumer(AsyncJsonWebsocketConsumer):
         msg = event['msg']
         name = robot_of(msg)
         if name and name != self.robot_name:
-            # 선택하지 않은 로봇의 위치/경로 등은 보내지 않는다. 상태 변화만 목록 표시용으로 줄여서
+            # Don't send pose/path etc. of robots that aren't selected; only state changes, reduced to a summary for the list
             if msg.get('type') == 'state':
                 await self.send_json({'type': 'robot_summary', 'robot': msg['robot']})
             return
@@ -257,10 +257,10 @@ class UIConsumer(AsyncJsonWebsocketConsumer):
                 await self.send_json({'type': 'error', 'message': f'잘못된 로봇 이름: {name}'})
                 return
             self.robot_name = name
-            self.teleop_checked_until = 0.0   # 수동 조작 허용 여부를 새 로봇으로 다시 확인
+            self.teleop_checked_until = 0.0   # Re-check teleop permission for the new robot
             await self.send_snapshot()
             return
-        # 요청 대상 로봇: robot_name 을 주면 그 로봇, 아니면 이 화면에서 선택한 로봇 ('robot' 은 실행 모드의 real/sim)
+        # Target robot: robot_name if given, else the robot selected on this screen ('robot' is real/sim for run mode)
         robot = str(msg.get('robot_name') or self.robot_name)
         if not services.ROBOT_NAME_RE.match(robot):
             await self.send_json({'type': 'error', 'message': f'잘못된 로봇 이름: {robot}'})
@@ -269,8 +269,8 @@ class UIConsumer(AsyncJsonWebsocketConsumer):
             await self.handle_runner(action, msg)
             return
         if action == 'teleop':
-            # 웹 수동 조작: 누르는 동안 0.1초마다 온다. DB 에 쓰지 않고 브리지로 바로 보낸다.
-            # 허용 여부(연결됨, 작업 없음)는 1초에 한 번만 DB 로 확인
+            # Web teleop: arrives every 0.1 s while a button is held. Sent straight to the bridge without touching the DB.
+            # Permission (connected, no task) is checked against the DB only once per second
             now = time.monotonic()
             if now > getattr(self, 'teleop_checked_until', 0.0):
                 try:
@@ -286,7 +286,7 @@ class UIConsumer(AsyncJsonWebsocketConsumer):
                     'type': 'teleop', 'v': float(msg.get('v', 0.0)), 'w': float(msg.get('w', 0.0))}})
             return
         if action == 'yolo_set':
-            # 웹 YOLO 버튼: 검출기 enabled 켜기/끄기, 장면 캡처. DB 에 쓰지 않고 브리지로 바로 보낸다
+            # Web YOLO buttons: toggle detector enabled, capture a frame. Sent straight to the bridge without touching the DB
             target = robot
             if not LIVE.get(target, {}).get('health', {}).get('bridge'):
                 await self.send_json({'type': 'error', 'message': '브리지가 연결되어 있지 않습니다.'})
@@ -299,7 +299,7 @@ class UIConsumer(AsyncJsonWebsocketConsumer):
             await self.channel_layer.group_send(robot_group(target), {'type': 'send.msg', 'msg': out})
             return
         if action == 'param_set':
-            # 웹 '주행 파라미터' 카드: 브리지가 ROS 파라미터로 바꾸고 결과(param_result)와 새 목록(params)을 보낸다
+            # Web driving-parameters card: the bridge sets the ROS parameter and replies with param_result and the new params list
             if not LIVE.get(robot, {}).get('health', {}).get('bridge'):
                 await self.send_json({'type': 'error', 'message': '브리지가 연결되어 있지 않습니다.'})
                 return
@@ -307,7 +307,7 @@ class UIConsumer(AsyncJsonWebsocketConsumer):
                 'type': 'param_set', 'name': str(msg.get('name', '')), 'value': msg.get('value')}})
             return
         if action in ('plan_order', 'travel_model', 'preview_order'):
-            # 계산 결과는 요청한 화면에만 돌려준다 (DB 를 바꾸지 않음)
+            # Results go back only to the requesting screen (DB is not changed)
             try:
                 if action == 'plan_order':
                     reply = await database_sync_to_async(services.plan_order)(
@@ -324,7 +324,7 @@ class UIConsumer(AsyncJsonWebsocketConsumer):
                 await self.send_json({'type': 'error', 'message': f'잘못된 요청: {e}'})
             return
         if action == 'set_home_here':
-            # 로봇의 현재 위치는 DB가 아니라 메모리(LIVE)에 있으므로 여기서 꺼내 넘긴다
+            # The robot's current pose lives in memory (LIVE), not the DB, so take it from there
             pose = LIVE.get(robot, {}).get('pose')
             if pose is None:
                 await self.send_json({'type': 'error', 'message': '로봇 위치를 모릅니다. 초기 위치를 먼저 지정하세요.'})

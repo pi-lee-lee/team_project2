@@ -1,18 +1,18 @@
-"""직접 구현한 A*를 ROS 2 서비스로 제공하는 노드.
+"""Node that exposes the hand-written A* as a ROS 2 service.
 
-구독:  map (nav_msgs/OccupancyGrid, transient local)
-       scan_level (sensor_msgs/LaserScan, 브리지가 기울지 않았을 때만 발행) - 맵에 없는 장애물(새로 놓인 상자, 사람 등)을 잠시 기억해 경로 계획에 반영
-       astar/obstacle (geometry_msgs/PointStamped) - 브리지가 부딪힘을 감지한 자리 (LiDAR 에 안 보이는 낮은 물체)
-       astar/zones (std_msgs/String, JSON 목록, transient local) - 웹에서 그린 금지 구역 (브리지가 서버에서 받아 발행)
-발행:  astar/remembered (geometry_msgs/PoseArray) - 지금 기억 중인 LiDAR 장애물 칸 (1초마다, 웹 표시용)
-       astar/bumps (geometry_msgs/PoseArray) - 기억 중인 부딪힌 자리 중심
-서비스: astar/get_plan (nav_msgs/srv/GetPlan)
-발행:  astar/plan (nav_msgs/Path)  - RViz 확인용
-       astar/plan_map (nav_msgs/OccupancyGrid, transient local) - 실제로 계획에 쓰는 격자 (가공 + 금지 구역, RViz 확인용)
-       astar/fail_reason (std_msgs/String) - 경로 계획 실패 이유 (금지 구역 때문인지 등). 브리지가 실패 메시지에 붙임
+Subscribes: map (nav_msgs/OccupancyGrid, transient local)
+       scan_level (sensor_msgs/LaserScan, published by the bridge only while not tilted) - briefly remembers obstacles not in the map (newly placed boxes, people, ...) and plans around them
+       astar/obstacle (geometry_msgs/PointStamped) - spots where the bridge detected a bump (low objects the LiDAR can't see)
+       astar/zones (std_msgs/String, JSON list, transient local) - keep-out zones drawn on the web (the bridge receives them from the server and publishes)
+Publishes: astar/remembered (geometry_msgs/PoseArray) - LiDAR obstacle cells currently remembered (every 1 s, for web display)
+       astar/bumps (geometry_msgs/PoseArray) - centers of remembered bump spots
+Service: astar/get_plan (nav_msgs/srv/GetPlan)
+Publishes: astar/plan (nav_msgs/Path)  - for checking in RViz
+       astar/plan_map (nav_msgs/OccupancyGrid, transient local) - the grid actually used for planning (processed + keep-out zones, for RViz)
+       astar/fail_reason (std_msgs/String) - why planning failed (e.g. keep-out zones). The bridge appends it to the failure message
 
-기존 맵 모드에서는 맵을 plan_map.py 로 가공해서 쓴다 (미탐색 줄무늬 메움, 의자/책상 다리 점 부풀리기).
-AMCL 은 원본 맵을 그대로 쓰므로 위치 추정에는 영향 없음.
+In saved-map mode the map is processed with plan_map.py before planning (fills unexplored stripes, inflates chair/desk leg dots).
+AMCL uses the original map, so localization is not affected.
 """
 import json
 import math
@@ -53,43 +53,44 @@ class AStarPlannerNode(Node):
         self.declare_parameter('inflation_radius', 0.55)
         self.declare_parameter('cost_weight', 3.0)
         self.declare_parameter('occupied_threshold', 65)
-        self.declare_parameter('allow_unknown', False)   # SLAM 모드에서는 true (미탐색 칸도 지나감)
+        self.declare_parameter('allow_unknown', False)   # true in SLAM mode (unexplored cells are passable)
         self.declare_parameter('unknown_cost', 2.0)
         self.declare_parameter('goal_tolerance', 0.3)
-        # 맵에 없는 장애물 기억: LiDAR 로 본 점 중 맵의 벽에서 떨어진 것만, 이 시간 동안 장애물로 취급
+        # Remember obstacles not in the map: LiDAR points away from the map's walls are treated as obstacles for this long
         self.declare_parameter('scan_obstacles', True)
         self.declare_parameter('scan_memory', 20.0)      # s
-        self.declare_parameter('scan_max_range', 5.0)    # m, 이보다 먼 점은 무시
-        self.declare_parameter('scan_wall_margin', 0.15)  # m, 맵 벽에서 이 거리 안의 점은 벽으로 보고 무시
-        # 같은 5cm 칸에서 이 시간 넘게 계속 보여야 기억한다. 지나가는 사람/물체(한 칸에 1~2초)는 기억하지 않음
-        # (움직이는 원기둥이 지나간 궤적 전체가 727칸의 가짜 벽이 되어 통로가 막혔었음)
+        self.declare_parameter('scan_max_range', 5.0)    # m, points farther than this are ignored
+        self.declare_parameter('scan_wall_margin', 0.15)  # m, points within this distance of a map wall are treated as the wall and ignored
+        # Only remembered after being seen continuously in the same 5 cm cell for longer than this. Passing people/objects
+        # (1-2 s per cell) are not remembered, otherwise a moving object's whole trail becomes a fake wall that blocks passages
         self.declare_parameter('scan_persist', 2.5)       # s
-        # 기억한 장애물 때문에 경로가 없을 때: 장애물은 그대로 두고 반경만 이만큼으로 줄여 다시 (차체 반폭 0.153 + Frenet 느릴 때
-        # 여유 0.04). 그래도 없으면 최근 scan_recent 초 안에 다시 본 장애물만으로 (지나간 사람, 회전 중 번진 스캔 같은 틀린 기억을 뺌).
-        # 그래도 없으면 실패 (예전: 기억을 통째로 빼고 맵만으로 → 소화기 4 cm 옆 경로를 내 Frenet 이 멈추고 재계획마다 반복, 실물 2761/2771)
+        # When remembered obstacles leave no path: keep the obstacles but retry with the radius reduced to this (body half-width
+        # + Frenet's slow margin). If still none, use only obstacles seen again within the last scan_recent s (drops wrong memories
+        # such as people who walked past or scans smeared while turning). If still none, fail. Planning on the map alone would give
+        # a path through the gap the obstacle blocks, which the Frenet follower then refuses on every replan.
         self.declare_parameter('fallback_radius', 0.20)  # m
         self.declare_parameter('scan_recent', 3.0)        # s
-        self.declare_parameter('bump_memory', 120.0)     # s, 부딪힌 자리를 장애물로 기억하는 시간
-        self.declare_parameter('bump_radius', 0.15)      # m, 부딪힌 자리 주변을 이 반경만큼 막음
-        # 경로 계획용 맵 가공 (기존 맵 모드만, plan_map.py). 0 이면 끔
-        self.declare_parameter('stripe_cells', 2)            # 빈 칸 사이 폭 2*N 칸 미만 미탐색 줄무늬 → 빈 칸
-        self.declare_parameter('cluster_inflate', 0.1)       # m, 작은 덩어리(다리 점)를 부풀림 → 2*(반경+이 값) 미만 틈이 막힘
-        self.declare_parameter('cluster_max_size', 0.4)      # m, 가로/세로가 이보다 긴 장애물 덩어리(벽)는 부풀리지 않음
-        self.declare_parameter('start_clear_radius', 0.35)   # m, 출발 위치 주변은 가공/금지 구역에서 뺌 (빠져나올 수 있게)
+        self.declare_parameter('bump_memory', 120.0)     # s, how long a bump spot is remembered as an obstacle
+        self.declare_parameter('bump_radius', 0.15)      # m, radius blocked around a bump spot
+        # Map processing for planning (saved-map mode only, plan_map.py). 0 disables
+        self.declare_parameter('stripe_cells', 2)            # unexplored stripes narrower than 2*N cells between free cells → free
+        self.declare_parameter('cluster_inflate', 0.1)       # m, inflate small clusters (leg dots) → gaps narrower than 2*(radius + this) are closed
+        self.declare_parameter('cluster_max_size', 0.4)      # m, obstacle clusters longer than this in x/y (walls) are not inflated
+        self.declare_parameter('start_clear_radius', 0.35)   # m, area around the start is excluded from processing/keep-out zones (so the robot can get out)
 
         self.planner = None
         self.map_msg = None
-        self.base_grid = None     # 계획용 기본 격자 (2차원, 줄무늬 메움)
-        self.added = None         # 기본 격자에 장애물로 더할 칸 (부풀린 다리 점 | 금지 구역)
+        self.base_grid = None     # base grid for planning (2D, stripes filled)
+        self.added = None         # cells added to the base grid as obstacles (inflated leg dots | keep-out zones)
         self.cluster_added = None
         self.zones = []
         self.frame_id = 'map'
-        self.scan_points = deque()   # (시각, xs, ys) map 좌표 - 오래 머문(정지한) 장애물만
-        self.cell_seen = {}          # 5cm 칸 -> [처음 본 시각, 마지막 본 시각, 본 횟수]
-        self.bump_points = deque()   # (시각, xs, ys) 부딪힌 자리 주변 점
+        self.scan_points = deque()   # (time, xs, ys) map coords - only obstacles that stayed (stationary)
+        self.cell_seen = {}          # 5 cm cell -> [first seen, last seen, times seen]
+        self.bump_points = deque()   # (time, xs, ys) points around bump spots
         self.last_scan_time = 0.0
-        self.last_remember_time = None   # 마지막으로 기억에 넣은 시각 (로그: 기억이 비어 있을 때 이유)
-        self.last_clear_time = None      # 웹 '상태 초기화' 로 지운 시각
+        self.last_remember_time = None   # last time something was added to memory (logged to explain an empty memory)
+        self.last_clear_time = None      # time it was cleared by the web 'reset state'
 
         map_qos = QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL,
                              reliability=ReliabilityPolicy.RELIABLE)
@@ -98,7 +99,7 @@ class AStarPlannerNode(Node):
         self.path_pub = self.create_publisher(Path, 'astar/plan', 1)
         self.create_service(GetPlan, 'astar/get_plan', self.on_get_plan)
         self.tf_buffer = Buffer()
-        TransformListener(self.tf_buffer, self)   # 구독 콜백이 리스너를 붙잡고 있어 참조를 따로 안 들어도 됨
+        TransformListener(self.tf_buffer, self)   # the subscription callback holds the listener, so no separate reference is needed
         self.create_subscription(PointStamped, 'astar/obstacle', self.on_bump, 10)
         self.create_service(Empty, 'astar/clear_obstacles', self.on_clear)
         self.create_subscription(String, 'astar/zones', self.on_zones, map_qos)
@@ -106,7 +107,7 @@ class AStarPlannerNode(Node):
         self.fail_pub = self.create_publisher(String, 'astar/fail_reason', 10)
         self.remembered_pub = self.create_publisher(PoseArray, 'astar/remembered', 1)
         self.bumps_pub = self.create_publisher(PoseArray, 'astar/bumps', 1)
-        self.bump_centers = deque()   # (시각, x, y) 웹 표시용
+        self.bump_centers = deque()   # (time, x, y) for web display
         self.create_timer(1.0, self.publish_memory)
         if self.get_parameter('scan_obstacles').value:
             self.create_subscription(LaserScan, 'scan_level', self.on_scan, qos_profile_sensor_data)
@@ -131,7 +132,7 @@ class AStarPlannerNode(Node):
         grid = np.asarray(msg.data, dtype=np.int16).reshape(info.height, info.width)
         stats = None
         if p('allow_unknown'):
-            # SLAM 모드: 맵이 계속 자라는 중이라 가공하지 않는다 (미탐색 칸도 지나가므로 줄무늬도 문제없음)
+            # SLAM mode: the map is still growing, so it is not processed (unexplored cells are passable, so stripes don't matter)
             self.base_grid, self.cluster_added = grid, None
         else:
             self.base_grid, self.cluster_added, stats = prepare(
@@ -153,7 +154,7 @@ class AStarPlannerNode(Node):
             self.rebuild()
 
     def rebuild(self):
-        """기본 격자 + 부풀린 다리 점 + 금지 구역으로 계획용 격자를 다시 만든다 (맵/금지 구역이 바뀔 때)."""
+        """Rebuild the planning grid from base grid + inflated leg dots + keep-out zones (when the map/zones change)."""
         info = self.map_msg.info
         ox, oy = info.origin.position.x, info.origin.position.y
         zones = zone_mask(self.base_grid.shape, info.resolution, ox, oy, self.zones)
@@ -167,10 +168,10 @@ class AStarPlannerNode(Node):
         self.plan_map_pub.publish(out)
 
     def on_scan(self, msg):
-        """0.5초마다 LiDAR 점을 map 좌표로 바꿔, 맵의 벽이 아닌 점만 기억한다."""
+        """Every 0.5 s convert LiDAR points to map coords and remember only those that are not map walls."""
         now = time.monotonic()
-        # SLAM 모드(allow_unknown)는 SLAM 맵 자체가 몇 초마다 장애물을 반영하므로 기억하지 않는다.
-        # (맵이 계속 자라는 중이라 벽 밖 점이 전부 '맵에 없는 장애물'로 쌓여 통로가 막혔음: 998칸)
+        # SLAM mode (allow_unknown) doesn't remember: the SLAM map itself reflects obstacles every few seconds, and since the
+        # map is still growing, every point beyond the walls would pile up as an 'obstacle not in the map' and block passages.
         if self.get_parameter('allow_unknown').value:
             return
         if self.planner is None or now - self.last_scan_time < 0.5:
@@ -198,7 +199,7 @@ class AStarPlannerNode(Node):
         self.remember_persistent(now, xs[keep], ys[keep])
 
     def remember_persistent(self, now, xs, ys):
-        """이번 스캔의 맵에 없는 점 중, 같은 칸에서 scan_persist 초 넘게 계속 보인 것만 기억에 넣는다."""
+        """Of this scan's points not in the map, remember only those seen continuously in the same cell for more than scan_persist s."""
         persist = self.get_parameter('scan_persist').value
         cells = set(map(tuple, np.floor(np.column_stack([xs, ys]) / 0.05).astype(int).tolist()))
         for c in cells:
@@ -207,10 +208,10 @@ class AStarPlannerNode(Node):
                 self.cell_seen[c] = [now, now, 1]
             else:
                 seen[1], seen[2] = now, seen[2] + 1
-        # 1초 넘게 안 보인 칸은 처음부터 다시 센다 (지나간 물체)
+        # Cells not seen for over 1 s start counting again (object passed by)
         self.cell_seen = {c: s for c, s in self.cell_seen.items() if now - s[1] <= 1.0}
         steady = [c for c in cells if now - self.cell_seen[c][0] >= persist
-                  and self.cell_seen[c][2] >= 0.6 * persist / 0.5]   # 스캔은 0.5초마다
+                  and self.cell_seen[c][2] >= 0.6 * persist / 0.5]   # scans come every 0.5 s
         if steady:
             pts = (np.array(steady, dtype=float) + 0.5) * 0.05
             self.scan_points.append((now, pts[:, 0], pts[:, 1]))
@@ -226,7 +227,7 @@ class AStarPlannerNode(Node):
         return response
 
     def publish_memory(self):
-        """기억 중인 장애물을 발행 (브리지가 웹으로 보냄). LiDAR 점은 5cm 칸으로 묶는다."""
+        """Publish remembered obstacles (the bridge sends them to the web). LiDAR points are grouped into 5 cm cells."""
         now = time.monotonic()
         while self.scan_points and now - self.scan_points[0][0] > self.get_parameter('scan_memory').value:
             self.scan_points.popleft()
@@ -259,10 +260,10 @@ class AStarPlannerNode(Node):
         self.get_logger().warn(f'부딪힌 자리 ({msg.point.x:.2f}, {msg.point.y:.2f}) 를 장애물로 기억')
 
     def planners_for(self, start, goal):
-        """(맵 + 부딪힌 자리 플래너, with_scan(반경, since) → (여기에 기억 장애물까지 더한 플래너 또는 None, 더한 칸 수)).
+        """(map + bump-spot planner, with_scan(radius, since) → (planner with remembered obstacles added or None, cells added)).
 
-        부딪힌 자리(LiDAR 에 안 보이는 낮은 물체)는 LiDAR 장애물 때문에 경로가 없어 다시 계획할 때도 빼지 않는다.
-        SLAM 모드(allow_unknown)에서 출발/목표가 아직 맵 밖이면 맵을 미탐색 칸으로 넓힌다.
+        Bump spots (low objects the LiDAR can't see) are kept even when replanning because LiDAR obstacles left no path.
+        In SLAM mode (allow_unknown), if the start/goal is still outside the map, the map is extended with unknown cells.
         """
         now = time.monotonic()
         memory = self.get_parameter('scan_memory').value
@@ -272,8 +273,8 @@ class AStarPlannerNode(Node):
             self.bump_points.popleft()
         info = self.map_msg.info
         res, ox, oy = info.resolution, info.origin.position.x, info.origin.position.y
-        # 출발 위치가 금지 구역 안이면 그 구역은 이번 계획에서 빼고, 구역 가장자리/부풀린 다리 점 근처면
-        # 출발 주변(start_clear_radius)만 빼고 다시 만든다 (그 안에 서 있는 로봇이 빠져나올 수 있게)
+        # If the start is inside a keep-out zone, that zone is left out of this plan; if it is near a zone edge or an
+        # inflated leg dot, only the area around the start (start_clear_radius) is cleared (so a robot standing there can get out)
         clear = self.get_parameter('start_clear_radius').value
         added = self.added
         start_zones = [z for z in self.zones if zone_contains(z, start, INSIDE_MARGIN)]
@@ -305,11 +306,11 @@ class AStarPlannerNode(Node):
         plain = (self.make_planner(grid.ravel(), w, h, ox, oy)
                  if start_inside or (w, h) != (info.width, info.height) else self.planner)
         base = self.make_planner(grid.ravel(), w, h, ox, oy) if mark(list(self.bump_points)) else plain
-        self.plain_planner = plain   # 부딪힌 자리를 빼고 맵만 (실패 메시지 구분용)
-        no_scan = grid.copy()        # 맵 + 부딪힌 자리 (다시 계획할 때 기억 장애물을 골라 넣는 바탕)
+        self.plain_planner = plain   # map only, without bump spots (to tell failure messages apart)
+        no_scan = grid.copy()        # map + bump spots (base onto which remembered obstacles are added when replanning)
 
         def with_scan(radius, since=None):
-            """바탕 격자 + 기억 장애물 (since 이후에 넣은 것만) 플래너, 더한 칸 수. 더한 칸이 없으면 (None, 0)."""
+            """Planner with base grid + remembered obstacles (only those added after since), and number of cells added. (None, 0) if none added."""
             grid[:] = no_scan
             n = mark([q for q in self.scan_points if since is None or q[0] >= since])
             if not n:
@@ -320,7 +321,7 @@ class AStarPlannerNode(Node):
         return base, with_scan
 
     def log_memory(self):
-        """계획마다 기억 장애물 상태를 로그로 (비어 있으면 왜인지: 지움 / 만료 / 아직 없음)."""
+        """Log the remembered-obstacle state for each plan (if empty, why: cleared / expired / none yet)."""
         now = time.monotonic()
         if self.scan_points:
             cells = len(set().union(*(set(zip(np.floor(q[1] / 0.05).astype(int).tolist(),
@@ -337,7 +338,7 @@ class AStarPlannerNode(Node):
             self.get_logger().info('기억 장애물 없음: 아직 기억한 것 없음')
 
     def fail_reason(self, start, goal, tolerance, error):
-        """경로가 없을 때 금지 구역 때문인지. 반환: 설명 문자열 또는 None (금지 구역과 상관없음)."""
+        """Whether keep-out zones are why there is no path. Returns a description string or None (unrelated to zones)."""
         if not self.zones:
             return None
         if any(zone_contains(z, goal, 0.0) for z in self.zones):
@@ -357,7 +358,7 @@ class AStarPlannerNode(Node):
         return '금지 구역에 막혀 갈 수 있는 경로가 없습니다'
 
     def dump_grid(self, start, goal):
-        """진단용: LiDAR 장애물 때문에 경로가 없었을 때의 격자를 logs/astar_fail.npz 로 남긴다."""
+        """Diagnostics: save the grid to logs/astar_fail.npz when LiDAR obstacles left no path."""
         home = os.environ.get('WAREHOUSE_HOME')
         if not home or not hasattr(self, 'last_grid'):
             return
@@ -389,7 +390,7 @@ class AStarPlannerNode(Node):
         for r, since, what in tries:
             planner, extra = with_scan(r, since)
             if planner is None:
-                # 넣을 장애물이 없음 (처음부터 기억이 비었거나, 막던 것을 최근에 다시 못 봄) → 아래에서 맵(+부딪힌 자리)만으로
+                # No obstacles to add (memory empty from the start, or the blocking ones weren't seen recently) → plan below on map (+ bump spots) only
                 if tried:
                     self.get_logger().warn(f'막던 기억 장애물을 최근 {self.get_parameter("scan_recent").value:.0f}초 안에 '
                                            '다시 보지 못함 (지나간 물체로 보고) → 맵만으로 계획')
@@ -403,8 +404,8 @@ class AStarPlannerNode(Node):
                 self.get_logger().warn(f'{what} {extra}칸 포함 경로 없음 ({e})')
                 self.dump_grid(start, goal)
         if points is None and tried and planner is not None:
-            # 맵만으로는 길이 있으면(= 기억 장애물이 막음) 그 경로를 쓰지 않는다: 막고 있는 물체를 지나가서 Frenet 이 못 감.
-            # 맵만으로도 없으면 아래에서 원래 이유(금지 구역 등)로 실패
+            # If the map alone has a path (= remembered obstacles block it), don't use it: it passes through the blocking object and Frenet can't follow it.
+            # If the map alone has none either, fail below with the original reason (keep-out zones, etc.)
             try:
                 base.plan(start, goal, goal_tolerance=tolerance)
                 reason = '맵에 없는 장애물(LiDAR 로 본 물체)에 막혀 지나갈 틈이 없습니다'
@@ -417,8 +418,8 @@ class AStarPlannerNode(Node):
             try:
                 points = base.plan(start, goal, goal_tolerance=tolerance)
             except PlanningError as e:
-                # 부딪혔던 자리를 지나는 경로는 쓰지 않는다 (맵만으로 다시 계획하면 같은 물체에 계속 부딪혔음).
-                # 기억은 bump_memory 초 뒤 또는 웹 '상태 초기화'(astar/clear_obstacles)로 지워진다
+                # Don't use a path through a former bump spot (planning on the map alone would hit the same object again).
+                # The memory is cleared after bump_memory s or by the web 'reset state' (astar/clear_obstacles)
                 reason = self.fail_reason(start, goal, tolerance, e)
                 if reason is None and base is not self.plain_planner:
                     reason = '부딪혔던 자리 때문일 수 있음'

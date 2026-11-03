@@ -1,8 +1,8 @@
-"""LiDAR 점 군집화 + 칼만필터 다중 객체 추적. ROS 의존성 없음.
-(~/tb3_nav_ws/src/tb3_nav/tb3_nav/core/tracker.py 에서 가져옴)
+"""LiDAR point clustering + Kalman filter multi-object tracking. No ROS dependency.
+(taken from ~/tb3_nav_ws/src/tb3_nav/tb3_nav/core/tracker.py)
 
-흐름: 스캔 점(map frame) -> 지도 벽에 붙은 점 제거 -> 연속 점끼리 묶기(segment)
-      -> 각 덩어리의 중심 = 관측(detection) -> 기존 track 과 매칭 -> KF 갱신
+Flow: scan points (map frame) -> remove points on map walls -> group consecutive points (segment)
+      -> each cluster's center = detection -> match with existing tracks -> KF update
 """
 from dataclasses import dataclass, field
 from itertools import count
@@ -11,12 +11,12 @@ import numpy as np
 
 
 def segment_points(points, gap):
-    """스캔 순서대로 정렬된 점 (N,2) 를 인접 거리 gap 기준으로 끊어 덩어리 리스트로."""
+    """Split points (N,2) in scan order into a list of clusters wherever neighbors are more than gap apart."""
     if len(points) == 0:
         return []
     jumps = np.linalg.norm(np.diff(points, axis=0), axis=1) > gap
     segments = np.split(points, np.nonzero(jumps)[0] + 1)
-    # 360도 스캔은 마지막 점과 첫 점이 이웃이다
+    # in a 360-degree scan the last and first points are neighbors
     if len(segments) > 1 and np.linalg.norm(points[-1] - points[0]) <= gap:
         segments[0] = np.vstack([segments[-1], segments[0]])
         segments.pop()
@@ -24,10 +24,10 @@ def segment_points(points, gap):
 
 
 def detect_clusters(points, gap, min_points, max_diameter, min_radius, sensor_xy=None):
-    """덩어리 -> (cx, cy, radius) 리스트. 너무 큰 덩어리(벽 등)는 버린다.
+    """Clusters -> list of (cx, cy, radius). Clusters that are too large (walls etc.) are dropped.
 
-    라이다는 물체의 앞면(호)만 보므로 점 평균은 실제 중심보다 센서 쪽으로 치우친다.
-    sensor_xy 를 주면 중심을 센서 반대 방향으로 반지름만큼 밀어 보정한다.
+    The LiDAR only sees the front arc of an object, so the point mean is biased toward the sensor.
+    If sensor_xy is given, the center is pushed away from the sensor by the radius to correct this.
     """
     detections = []
     for seg in segment_points(points, gap):
@@ -51,7 +51,7 @@ _ids = count(1)
 @dataclass
 class Track:
     x: np.ndarray                # [px, py, vx, vy]
-    P: np.ndarray                # 4x4 공분산
+    P: np.ndarray                # 4x4 covariance
     radius: float
     id: int = field(default_factory=lambda: next(_ids))
     hits: int = 1
@@ -63,7 +63,7 @@ class Track:
 
 
 class MultiObjectTracker:
-    """등속(CV) 모델 칼만필터 + 최근접(greedy) 매칭."""
+    """Constant-velocity (CV) Kalman filter + greedy nearest matching."""
 
     H = np.array([[1.0, 0, 0, 0], [0, 1.0, 0, 0]])
 
@@ -93,20 +93,20 @@ class MultiObjectTracker:
         K = track.P @ self.H.T @ np.linalg.inv(S)
         track.x = track.x + K @ y
         track.P = (np.eye(4) - K @ self.H) @ track.P
-        # 비현실적인 속도는 자른다 (매칭 실수로 튀는 것 방지)
+        # clip unrealistic speeds (prevents jumps from mismatches)
         speed = np.linalg.norm(track.x[2:])
         if speed > self.max_speed:
             track.x[2:] *= self.max_speed / speed
         track.radius = 0.7 * track.radius + 0.3 * radius
 
     def update(self, detections, stamp):
-        """detections: [(cx, cy, r)], stamp: 초 단위 시간. 확정된 track 리스트 반환."""
+        """detections: [(cx, cy, r)], stamp: time in seconds. Returns the list of confirmed tracks."""
         dt = 0.0 if self.last_time is None else max(0.0, stamp - self.last_time)
         self.last_time = stamp
         if dt > 0.0:
             self._predict(dt)
 
-        # greedy 매칭: 거리 작은 쌍부터
+        # greedy matching: closest pairs first
         pairs = []
         for ti, t in enumerate(self.tracks):
             for di, (cx, cy, _) in enumerate(detections):

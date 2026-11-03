@@ -1,22 +1,22 @@
-"""맵의 기울기를 바로잡고 벽을 곧은 선으로 다시 그린다. 원본은 건드리지 않는다.
+"""Correct the map's tilt and redraw walls as straight lines. The original is not modified.
 
     python3 tools/straighten_map.py ~/maps/maze_map.yaml [-o ~/maps/maze_map_straight] [--seed 0 0]
 
-순서
-  1. clean_map.py 와 같은 정리 (방 밖 노이즈 제거 등)
-  2. 기울기 추정: 벽 점들을 돌려 보며 가로/세로 줄에 가장 잘 모이는 각도 탐색
-  3. 그 각도만큼 반대로 회전 (맵 원점 (0,0) 은 그대로 유지)
-  4. 가로/세로 벽 구간을 찾아 1칸 두께 직선으로 다시 그림, 모서리 끝점 맞물림
-     (두꺼운 벽에서 나란히 겹쳐 나온 짧은 직선은 버림)
-  5. 방 안 = 빈 칸, 밖 = 미탐색, 바깥 경계 봉합. 방 안에 갇힌 물체는 1칸 사각형 테두리,
-     방과 맞닿지 않은 벽 조각(방 밖 노이즈)은 지움
+Steps
+  1. Same cleanup as clean_map.py (removing noise outside the room, etc.)
+  2. Tilt estimate: rotate the wall points and search for the angle at which they line up best on rows/columns
+  3. Rotate back by that angle (the map origin (0,0) stays fixed)
+  4. Find horizontal/vertical wall segments and redraw them as 1-cell-thick straight lines, snapping corner endpoints together
+     (short parallel lines duplicated from thick walls are dropped)
+  5. Inside the room = free, outside = unknown, outer border sealed. Objects enclosed in the room get a 1-cell rectangular outline,
+     wall fragments not touching the room (noise outside the room) are removed
 
---auto: 벽 점 중 직선에 맞는 비율이 --min-coverage 보다 낮으면(대각선 벽, 원기둥 등) 회전/직선화 없이
-        clean_map.py 정리(1칸 외곽선)로 저장한다. scripts/save_map.sh 의 기본 (<이름>_clean)
+--auto: if the fraction of wall points fitting straight lines is below --min-coverage (diagonal walls, cylinders, etc.), save
+        the clean_map.py cleanup (1-cell outline) without rotating/straightening. Default of scripts/save_map.sh (<name>_clean)
 
-회전했으므로 이 맵에서 등록한 위치 좌표도 같은 각도로 돌려야 한다. yaml 에 '# rotation_deg: <각도>' 로 남기고,
-웹 '맵 저장' 은 SLAM 중 등록한 위치/금지 구역을 이 각도로 돌려 복사한다 (services.carry_over_locations).
-이미 등록된 맵을 나중에 돌렸다면 서버에서:  python manage.py rotate_locations <각도>
+Because the map is rotated, location coordinates registered on it must be rotated by the same angle. The angle is kept in the yaml as
+'# rotation_deg: <angle>', and the web 'save map' copies locations/no-go zones registered during SLAM rotated by it (services.carry_over_locations).
+If an already registered map is rotated afterwards, on the server:  python manage.py rotate_locations <angle>
 """
 import argparse
 import math
@@ -26,18 +26,18 @@ import numpy as np
 
 from clean_map import FREE, OCC, UNKNOWN, clean, components, dilate, preview, read_pgm, read_yaml, write_pgm
 
-MIN_LEN = 6        # 이 칸 수(30cm) 이상 이어진 것만 벽 직선으로 인정
-SNAP = 3           # 모서리 끝점을 맞물리게 붙이는 거리(칸)
-MIN_ROTATE_DEG = 0.2   # 이보다 작게 기울었으면 돌리지 않음 (5m 벽 끝에서 2cm 미만 = 반 칸 미만, 좌표를 그대로 두는 편이 나음)
+MIN_LEN = 6        # only runs of at least this many cells (30 cm) count as straight walls
+SNAP = 3           # distance (cells) within which corner endpoints are snapped together
+MIN_ROTATE_DEG = 0.2   # don't rotate if tilted less than this (under 2 cm at the end of a 5 m wall = under half a cell; better to keep coordinates unchanged)
 
 
 def estimate_angle(points, res, max_deg=15.0, step=0.05):
-    """벽 점들이 가로/세로 줄에 가장 잘 모이는 회전 각도(rad). 이 각도만큼 -회전하면 반듯해진다."""
+    """Rotation angle (rad) at which wall points line up best on rows/columns. Rotating by minus this angle straightens the map."""
     best = (-1, 0.0)
     for deg in np.arange(-max_deg, max_deg + 1e-9, step):
         t = math.radians(deg)
         c, s = math.cos(t), math.sin(t)
-        x = c * points[:, 0] + s * points[:, 1]      # R(-t) 적용
+        x = c * points[:, 0] + s * points[:, 1]      # apply R(-t)
         y = -s * points[:, 0] + c * points[:, 1]
         hx = np.bincount(np.floor((x - x.min()) / res).astype(int))
         hy = np.bincount(np.floor((y - y.min()) / res).astype(int))
@@ -48,11 +48,11 @@ def estimate_angle(points, res, max_deg=15.0, step=0.05):
 
 
 def rotate_grid(img, res, origin, theta, margin=5):
-    """img(행 0 = 위쪽)를 월드 원점 기준 -theta 회전. (새 이미지, 새 origin) 반환."""
+    """Rotate img (row 0 = top) by -theta about the world origin. Returns (new image, new origin)."""
     h, w = img.shape
     known = img != UNKNOWN
     rows, cols = np.nonzero(known)
-    # 아는 영역 모서리를 돌려서 새 범위 결정
+    # rotate the corners of the known area to determine the new extent
     xs = origin[0] + np.array([cols.min(), cols.max() + 1]) * res
     ys = origin[1] + (h - np.array([rows.max() + 1, rows.min()])) * res
     corners = np.array([(x, y) for x in xs for y in ys])
@@ -64,7 +64,7 @@ def rotate_grid(img, res, origin, theta, margin=5):
     nw = int(math.ceil((nx.max() - ox) / res)) + margin
     nh = int(math.ceil((ny.max() - oy) / res)) + margin
 
-    # 새 칸 중심 → 원래 월드 좌표(R(theta)) → 원래 칸 (최근접)
+    # new cell center -> original world coordinates (R(theta)) -> original cell (nearest)
     cc, rr = np.meshgrid(np.arange(nw), np.arange(nh))
     wx = ox + (cc + 0.5) * res
     wy = oy + (nh - rr - 0.5) * res
@@ -79,7 +79,7 @@ def rotate_grid(img, res, origin, theta, margin=5):
 
 
 def runs(mask_1d, max_gap=2):
-    """True 구간을 max_gap 이하 틈은 이어서 (시작, 끝) 목록으로."""
+    """True runs as a list of (start, end), bridging gaps of up to max_gap."""
     idx = np.flatnonzero(mask_1d)
     if len(idx) == 0:
         return []
@@ -94,8 +94,8 @@ def runs(mask_1d, max_gap=2):
 
 
 def extract_segments(occ):
-    """벽 점에서 가로/세로 직선 구간을 큰 것부터 차례로 뽑는다.
-    반환: [('h', row, c0, c1) | ('v', col, r0, r1)], 남은 점(직선에 안 속한 것)"""
+    """Extract horizontal/vertical straight segments from wall points, largest first.
+    Returns: [('h', row, c0, c1) | ('v', col, r0, r1)], remaining points (not part of any line)"""
     remaining = occ.copy()
     segments = []
     h, w = occ.shape
@@ -119,14 +119,14 @@ def extract_segments(occ):
         lo = max(0, r - 1)
         band = grid[lo:r + 2, a:b + 1]
         rr, _ = np.nonzero(band)
-        line = int(round(np.median(rr))) + lo   # 점들이 가장 많이 몰린 줄
-        band[:] = False                          # 이 구간의 점은 사용함 (view라 remaining에 반영)
+        line = int(round(np.median(rr))) + lo   # the line where most points are concentrated
+        band[:] = False                          # mark this segment's points as used (a view, so it updates remaining)
         segments.append((axis, line, a, b))
     return segments, remaining
 
 
 def drop_parallel(segments):
-    """두꺼운 벽에서 나란히(2줄 이내) 겹쳐 나온 직선 중 짧은 쪽을 버린다 (벽 안쪽에 생기던 짧은 선)."""
+    """Drop the shorter of parallel lines (within 2 rows) duplicated from a thick wall (short lines inside the wall)."""
     kept = []
     for s in sorted(segments, key=lambda s: abs(s[3] - s[2]), reverse=True):
         if not any(t[0] == s[0] and abs(t[1] - s[1]) <= 2
@@ -137,13 +137,13 @@ def drop_parallel(segments):
 
 
 def snap_segments(segments):
-    """끝점이 수직 벽 근처(SNAP 칸 이내)면 그 벽까지 늘리거나 줄여 모서리를 맞물리게."""
+    """If an endpoint is near a perpendicular wall (within SNAP cells), extend or trim it to that wall so the corner meets."""
     segs = [list(s) for s in segments]
     for s in segs:
         for t in segs:
             if s[0] == t[0]:
                 continue
-            # s의 끝점 좌표축 값(s[2], s[3])을 t의 위치(t[1])에 맞추기. t가 s의 줄(s[1])을 덮는지 확인
+            # snap s's endpoint coordinates (s[2], s[3]) to t's position (t[1]). Check that t covers s's line (s[1])
             if t[2] - SNAP <= s[1] <= t[3] + SNAP:
                 if abs(s[2] - t[1]) <= SNAP:
                     s[2] = t[1]
@@ -153,8 +153,8 @@ def snap_segments(segments):
 
 
 def extend_segments(segments, rot, max_ext=20):
-    """끝점에서 같은 방향으로 max_ext 칸 안에 수직 벽이 있고, 그 사이에 빈 칸이 없으면 그 벽까지 늘린다.
-    (물체 뒤처럼 LiDAR가 못 본 곳 때문에 끊긴 바깥 벽을 잇기 위함)"""
+    """If there is a perpendicular wall within max_ext cells beyond an endpoint in the same direction, with no free cells in between, extend to that wall.
+    (To join outer walls broken by areas the LiDAR could not see, e.g. behind objects)"""
     free = rot == FREE
     segs = [list(s) for s in segments]
     for s in segs:
@@ -174,7 +174,7 @@ def extend_segments(segments, rot, max_ext=20):
 
 
 def fill_enclosed(region, walls, max_cells=400):
-    """방 안에 갇힌 미탐색 영역(물체 안쪽 등)을 감싸는 사각형을 1칸 테두리 벽으로 (안쪽은 미탐색 = 경로 계획에서 장애물)."""
+    """Turn the bounding rectangle of unknown areas enclosed in the room (inside objects, etc.) into a 1-cell outline wall (the inside stays unknown = obstacle for path planning)."""
     unknown = ~region & ~walls
     labels, sizes = components(unknown)
     h, w = unknown.shape
@@ -184,9 +184,9 @@ def fill_enclosed(region, walls, max_cells=400):
             continue
         rr, cc = np.nonzero(labels == label)
         if rr.min() == 0 or cc.min() == 0 or rr.max() == h - 1 or cc.max() == w - 1:
-            continue  # 바깥과 이어진 미탐색
+            continue  # unknown connected to the outside
         r0, r1, c0, c1 = rr.min(), rr.max(), cc.min(), cc.max()
-        # 사각형 바로 바깥 줄에 붙은 벽 조각(돌기)이 있으면 그 줄까지 넓혀 흡수 (최대 2줄)
+        # if wall fragments (bumps) stick to the row just outside the rectangle, widen it to absorb them (up to 2 rows)
         for _ in range(2):
             if r1 + 1 < h and walls[r1 + 1, c0:c1 + 1].any():
                 r1 += 1
@@ -215,12 +215,12 @@ def draw_segments(shape, segments):
 
 
 def flood(passable, seed):
-    """seed에서 4방향으로 passable을 따라 퍼진 영역."""
+    """Region reached from seed by 4-connected flood fill over passable."""
     from collections import deque
     region = np.zeros_like(passable)
     r0, c0 = seed
     if not passable[r0, c0]:
-        # seed가 벽 위면 가까운 통과 가능 칸에서 시작
+        # if seed is on a wall, start from a nearby passable cell
         rr, cc = np.nonzero(passable)
         i = int(np.argmin((rr - r0) ** 2 + (cc - c0) ** 2))
         r0, c0 = rr[i], cc[i]
@@ -274,10 +274,10 @@ def main():
         raw = 255 - raw
     h = raw.shape[0]
 
-    # 1. 정리 (봉합은 마지막에 다시 하므로 생략)
+    # 1. Cleanup (sealing is skipped since it is redone at the end)
     cleaned, _ = clean(raw, world_to_rc(args.seed[0], args.seed[1], origin, res, h), 2, 30, 3, False)
 
-    # 2. 기울기
+    # 2. Tilt
     rows, cols = np.nonzero(cleaned == OCC)
     pts = np.column_stack([origin[0] + (cols + 0.5) * res, origin[1] + (h - rows - 0.5) * res])
     theta = math.radians(args.angle) if args.angle is not None else estimate_angle(pts, res)
@@ -287,13 +287,13 @@ def main():
     else:
         print(f'기울기: {math.degrees(theta):+.2f}° → 반대로 돌려서 바로잡음 (rotation_deg = {-math.degrees(theta):+.2f})')
 
-    # 3. 회전
+    # 3. Rotation
     rot, new_origin = rotate_grid(cleaned, res, origin, theta)
     nh = rot.shape[0]
     occ = rot == OCC
     known = rot != UNKNOWN
 
-    # 4. 벽 직선화
+    # 4. Wall straightening
     segments, leftover = extract_segments(occ)
     segments = drop_parallel(segments)
     coverage = float((occ & dilate(draw_segments(occ.shape, segments), 1)).sum()) / max(int(occ.sum()), 1)
@@ -308,13 +308,13 @@ def main():
         return
     segments = snap_segments(extend_segments(segments, rot))
     walls = draw_segments(occ.shape, segments)
-    # 직선에 안 속한 점 중 직선 바로 옆(2칸)은 들쑥날쑥한 벽 조각이므로 버리고, 떨어진 것(물체)은 유지
+    # of the points not on any line, those right next to a line (2 cells) are jagged wall bits and are dropped; separate ones (objects) are kept
     leftover &= ~dilate(walls, 2)
     walls |= leftover
     print(f'벽 직선 {len(segments)}개 (가로 {sum(s[0] == "h" for s in segments)}, '
           f'세로 {sum(s[0] == "v" for s in segments)}), 직선 밖 물체 점 {int(leftover.sum())}칸')
 
-    # 5. 방 안 다시 채우기 + 봉합
+    # 5. Refill the room + seal
     seed_rc = world_to_rc(args.seed[0], args.seed[1], new_origin, res, nh)
     region = flood(known & ~walls, seed_rc)
     enclosed = fill_enclosed(region, walls)
@@ -323,7 +323,7 @@ def main():
         print(f'갇힌 미탐색 영역 {enclosed}칸 → 사각형 장애물로 채움')
     border = dilate(region, 1) & ~region & ~walls
     walls |= border
-    stray = walls & ~dilate(region, 1)          # 방과 맞닿지 않은 벽 조각 (방 밖 노이즈, 바깥으로 삐져나간 직선 끝)
+    stray = walls & ~dilate(region, 1)          # wall fragments not touching the room (noise outside the room, line ends sticking outward)
     walls &= ~stray
     out = np.full(rot.shape, UNKNOWN, dtype=np.uint8)
     out[region] = FREE
@@ -332,7 +332,7 @@ def main():
           f'방 밖 벽 조각 제거 {int(stray.sum())}칸')
 
     write_map(base, out, res, new_origin, -math.degrees(theta), os.path.basename(yaml_path))
-    # 비교 이미지: 회전 전 정리본과 결과를 같은 크기로
+    # comparison image: the cleaned map before rotation and the result at the same size
     pad_h, pad_w = max(cleaned.shape[0], out.shape[0]), max(cleaned.shape[1], out.shape[1])
 
     def pad(a):

@@ -34,10 +34,6 @@ header #battery { flex: 1; }
 .conn { padding: 4px 10px; border-radius: 999px; font-size: 14px; font-weight: 600; }
 .conn.on { background: #dcfce7; color: #15803d; }
 .conn.off { background: #fee2e2; color: #b91c1c; }
-.stop {
-  font-size: 18px; font-weight: 800; padding: 10px 18px; border: 0; border-radius: 12px;
-  background: #dc2626; color: #fff;
-}
 
 main {
   flex: 1;

@@ -1,54 +1,54 @@
-"""강당 월드(lecture_hall) 만들기: 위쪽 강단(공터) + 가로 복도 6 × 세로 복도 5, 가로 복도 사이 좌석 줄에 칸마다 책상 1개 + 의자 2개.
+"""Build the lecture hall world (lecture_hall): stage (open area) at the top + 6 horizontal x 5 vertical aisles, with 1 desk + 2 chairs per cell in the seat rows between horizontal aisles.
 
     python3 tools/make_hall_world.py [-o worlds/lecture_hall.world]
-    python3 tools/make_hall_world.py --real        # 실제 학원과 비슷하게 → worlds/lecture_hall_real.world
+    python3 tools/make_hall_world.py --real        # similar to the real classroom -> worlds/lecture_hall_real.world
            (= --no-panel --no-side-aisles --row-gap 0.25 --jitter 0.12 --yaw-jitter 15 --seed 1 --name lecture_hall_real)
 
-실제 학원과 다른 점 (lecture_hall 기본): 책상 앞판이 LiDAR 에 막힌 선으로 보이고, 의자가 줄을 맞춰 놓여 있다.
-  --no-panel     책상 앞판 없음 → 실물처럼 좌석 줄이 다리 점으로만 보임
-  --no-side-aisles  맨 왼쪽/오른쪽 세로 복도 없음 → 좌우 끝 열 좌석이 벽에 붙음 (실제 학원). 실내 폭 8.3m,
-                 원점(출발 위치) = 가로 6 / 세로 2 교차점
-  --row-gap M    좌석 줄 사이(의자 등받이 ~ 다음 줄 책상) 빈 틈을 M m 로 → 0.31m(로봇 폭)보다 좁으면 로봇은 좌석 줄 사이로
-                 못 다니고 세로 복도와 맨 앞(강단 쪽)/맨 뒤(출발) 가로 복도만 다님 (실제 학원). 맨 앞/뒤 가로 복도는 0.9m 그대로
-  --jitter M     의자를 ±M m 안에서 무작위로 옮김 (사람이 쓰고 난 뒤처럼), --yaw-jitter 도(°) 만큼 돌림
-  --seed N       무작위 배치 번호 (같은 번호면 같은 배치)
+Differences from the real classroom (lecture_hall default): desk front panels show up as solid lines to the LiDAR, and chairs are neatly aligned.
+  --no-panel     no desk front panel -> seat rows appear only as leg points, like the real thing
+  --no-side-aisles  no leftmost/rightmost vertical aisle -> the end-column seats touch the walls (real classroom). Interior width 8.3 m,
+                 origin (start pose) = intersection of horizontal 6 / vertical 2
+  --row-gap M    gap between seat rows (chair back ~ next row's desk) of M m -> if narrower than 0.31 m (robot width) the robot cannot
+                 pass between seat rows and only uses vertical aisles and the front (stage side)/back (start) horizontal aisles (real classroom). Front/back horizontal aisles stay 0.9 m
+  --jitter M     randomly move chairs within ±M m (as if people had used them), rotate by --yaw-jitter degrees
+  --seed N       random layout number (same number gives the same layout)
 
-- 복도 0.9m, 좌석 줄(가로 복도 사이 띠) 1.0m, 세로 복도 사이 칸 1.4m, 강단 깊이 2.0m → 실내 10.1 x 12.4m
-- 좌석 줄 = 북쪽(강단 쪽) 책상 + 남쪽 의자 2개 (의자는 강단을 바라봄)
-- 책상 1.15 x 0.4m, 높이 0.72m: 다리 4개 + 상판 + 앞판(바닥 0.1m ~ 0.7m, LiDAR 에 막힌 선으로 보임 → 좌석 줄이 빈 공간으로 안 보임)
-- 의자 0.45m: 다리 4개(지름 5cm, LiDAR 에 점 4개로 보임) + 상판(높이 0.45m, LiDAR/로봇보다 높음) + 등받이
-- 칸 안 의자 두 개 사이 틈 0.25m: 보이지만 로봇(폭 0.31m)은 못 지나감
-- 원점(0,0) = 가로 6(맨 아래) / 세로 1(맨 왼쪽) 교차점 가운데 = 로봇 출발 위치 (start_sim.sh/run.sh 기본값)
+- Aisles 0.9 m, seat rows (bands between horizontal aisles) 1.0 m, cells between vertical aisles 1.4 m, stage depth 2.0 m -> interior 10.1 x 12.4 m
+- Seat row = desk on the north (stage) side + 2 chairs on the south side (chairs face the stage)
+- Desk 1.15 x 0.4 m, height 0.72 m: 4 legs + top + front panel (0.1 m ~ 0.7 m above the floor, seen by the LiDAR as a solid line -> seat rows don't look like free space)
+- Chair 0.45 m: 4 legs (5 cm diameter, seen by the LiDAR as 4 points) + seat (0.45 m high, above the LiDAR/robot) + backrest
+- Gap between the two chairs in a cell 0.25 m: visible, but the robot (0.31 m wide) cannot pass
+- Origin (0,0) = center of the intersection of horizontal 6 (bottom) / vertical 1 (leftmost) = robot start pose (start_sim.sh/run.sh default)
 """
 import argparse
 import math
 import os
 import random
 
-L = 0.9       # 복도 폭
-B = 1.0       # 좌석 줄 폭 (책상 + 의자)
-S = 1.4       # 세로 복도 사이 칸 길이
-C = 0.45      # 의자 크기
-G = 0.25      # 의자 사이 틈
+L = 0.9       # aisle width
+B = 1.0       # seat row width (desk + chairs)
+S = 1.4       # cell length between vertical aisles
+C = 0.45      # chair size
+G = 0.25      # gap between chairs
 LEG_R = 0.025
 SEAT_Z = 0.45
 STAGE = 2.0
-DESK_D, DESK_Z = 0.4, 0.72   # 책상 깊이, 높이 (길이는 의자 두 개 + 틈 = 1.15m)
-PANEL_Z0 = 0.1               # 앞판 아래 끝 (LiDAR 높이 약 0.17m 보다 낮게)
-EDGE = 0.05                  # 좌석 줄 가장자리와 책상/의자 사이 여백
+DESK_D, DESK_Z = 0.4, 0.72   # desk depth, height (length = two chairs + gap = 1.15 m)
+PANEL_Z0 = 0.1               # bottom edge of the front panel (below the LiDAR height of about 0.17 m)
+EDGE = 0.05                  # margin between the seat row edge and desk/chairs
 NH, NV = 6, 5
 WALL_T, WALL_H = 0.1, 0.5
 
 W = NV * L + (NV - 1) * S        # 10.1
-HA = NH * L + (NH - 1) * B       # 좌석 구역 10.4
+HA = NH * L + (NH - 1) * B       # seating area 10.4
 H = HA + STAGE                   # 12.4
-X0, Y0 = -L / 2, -L / 2          # 실내 왼쪽 아래 모서리 (원점이 출발 교차점 가운데가 되게)
+X0, Y0 = -L / 2, -L / 2          # interior bottom-left corner (so the origin is the center of the start intersection)
 
 
 def layout(row_gap=None):
-    """(가로 복도 폭 목록 [위(강단 쪽) → 아래], 좌석 구역 높이, 실내 높이).
-    row_gap: 좌석 줄 사이 빈 틈 (의자 등받이 ~ 다음 줄 책상, m). 의자/책상이 좌석 줄 끝에서 EDGE 씩 들어가 있으므로
-    줄 사이 띠 폭 = row_gap - 2 x EDGE. None 이면 모든 가로 복도 L."""
+    """(horizontal aisle widths [top (stage side) -> bottom], seating area height, interior height).
+    row_gap: free gap between seat rows (chair back ~ next row's desk, m). Chairs/desks are inset by EDGE from the seat row edges, so
+    the band between rows = row_gap - 2 x EDGE. None means all horizontal aisles are L."""
     aisles = [L] * NH
     if row_gap is not None:
         aisles[1:-1] = [max(0.0, row_gap - 2 * EDGE)] * (NH - 2)
@@ -57,8 +57,8 @@ def layout(row_gap=None):
 
 
 def room(side_aisles=True):
-    """(좌석 열 기준 x0, 실내 왼쪽 끝 x, 실내 폭, 출발 세로 복도 번호).
-    side_aisles=False: 맨 왼쪽/오른쪽 세로 복도를 없애 끝 열 좌석이 벽에 붙음. 원점은 세로 2 위에 오도록 옮긴다."""
+    """(seat column reference x0, interior left edge x, interior width, start vertical aisle number).
+    side_aisles=False: removes the leftmost/rightmost vertical aisles so the end-column seats touch the walls. The origin is moved onto vertical 2."""
     if side_aisles:
         return X0, X0, W, 1
     x0 = -(L + S + L / 2)
@@ -99,7 +99,7 @@ def walls(xl=X0, w=W, ha=HA, h=H):
     body += part('n', (cx, Y0 + h + WALL_T / 2, z), box(w + 2 * WALL_T, WALL_T, WALL_H), GRAY)
     body += part('w', (xl - WALL_T / 2, cy, z), box(WALL_T, h, WALL_H), GRAY)
     body += part('e', (xl + w + WALL_T / 2, cy, z), box(WALL_T, h, WALL_H), GRAY)
-    # 강단 바닥 표시 (얇은 색칠, 충돌 없음)
+    # stage floor marking (thin colored layer, no collision)
     body += part('stage', (cx, Y0 + ha + STAGE / 2, 0.002), box(w, STAGE, 0.004), STAGE_MAT, collide=False)
     return f'''    <model name="walls">
       <static>true</static>
@@ -110,7 +110,7 @@ def walls(xl=X0, w=W, ha=HA, h=H):
 
 
 def chair(name, x, y, back_north, yaw=0.0):
-    """다리 4개 + 상판 + 등받이. back_north: 등받이가 북쪽(강단 반대가 앞) = 강단을 바라봄. yaw: 돌린 각도(rad)."""
+    """4 legs + seat + backrest. back_north: backrest to the north (front faces away from the stage) = faces the stage. yaw: rotation (rad)."""
     h = C / 2 - LEG_R
     body = ''
     for i, (dx, dy) in enumerate(((-h, -h), (-h, h), (h, -h), (h, h))):
@@ -129,7 +129,7 @@ def chair(name, x, y, back_north, yaw=0.0):
 
 
 def desk(name, x, y, panel=True):
-    """다리 4개 + 상판 + 앞판(북쪽, 강단 쪽, panel=False 면 없음). (x, y) = 책상 가운데."""
+    """4 legs + top + front panel (north, stage side; omitted if panel=False). (x, y) = desk center."""
     length = 2 * C + G
     hx, hy = length / 2 - LEG_R, DESK_D / 2 - LEG_R
     legz = DESK_Z - 0.03
@@ -151,26 +151,26 @@ def desk(name, x, y, panel=True):
 
 
 def seats(panel=True, jitter=0.0, yaw_jitter=0.0, seed=0, x0=X0, row_gap=None):
-    """좌석 줄마다, 세로 복도 사이 칸마다 책상 1개(북쪽) + 의자 2개(남쪽). 반환: (sdf, 책상 수, 의자 수)
-    jitter/yaw_jitter(rad): 의자를 무작위로 옮기고 돌림. 책상 쪽(북쪽)으로는 앞 다리가 책상에 닿지 않을 만큼만."""
+    """For each seat row and each cell between vertical aisles: 1 desk (north) + 2 chairs (south). Returns: (sdf, desk count, chair count)
+    jitter/yaw_jitter(rad): randomly move and rotate chairs. Toward the desk (north) only as far as the front legs stay clear of the desk."""
     rnd = random.Random(seed)
     out, nd, nc = [], 0, 0
     aisles, ha, _ = layout(row_gap)
-    # 의자가 남쪽으로 밀려도 다음 줄 책상과 겹치지 않게 (좁은 줄 사이에서)
+    # keep chairs pushed south from overlapping the next row's desk (with narrow row gaps)
     south = min(jitter, aisles[1] + 2 * EDGE - 0.02) if row_gap is not None else jitter
     top = Y0 + ha - aisles[0]
-    for i in range(NH - 1):                       # 가로 i+1 과 i+2 사이 좌석 줄
+    for i in range(NH - 1):                       # seat row between horizontal i+1 and i+2
         bottom = top - B
         desk_y = top - EDGE - DESK_D / 2
         chair_y = bottom + EDGE + C / 2
-        for j in range(NV - 1):                   # 세로 j+1 과 j+2 사이 칸
+        for j in range(NV - 1):                   # cell between vertical j+1 and j+2
             xc = x0 + j * (L + S) + L + S / 2
             out.append(desk(f'desk_{i + 1}_{j + 1}', xc, desk_y, panel))
             nd += 1
             for k, off in enumerate((-(C + G) / 2, (C + G) / 2)):
-                # 의자는 강단을 바라본다: 등받이가 남쪽(로봇 출발 쪽)
+                # chairs face the stage: backrest to the south (robot start side)
                 dx = rnd.uniform(-jitter, jitter)
-                dy = rnd.uniform(-south, min(jitter, 0.03))   # 책상 쪽으로는 거의 안 밀림
+                dy = rnd.uniform(-south, min(jitter, 0.03))   # barely moved toward the desk
                 out.append(chair(f'chair_{i + 1}_{j + 1}_{k + 1}', xc + off + dx, chair_y + dy, back_north=True,
                                  yaw=rnd.uniform(-yaw_jitter, yaw_jitter)))
                 nc += 1

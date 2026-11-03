@@ -9,7 +9,7 @@ STATIC_DIR = os.path.join(os.path.dirname(__file__), 'static', 'warehouse')
 
 
 def static_version(*files):
-    # 정적 파일이 바뀌면 주소가 바뀌어 브라우저 캐시 대신 새 파일을 받도록
+    # Changes the URL when a static file changes, so the browser fetches the new file instead of its cache
     return int(max(os.path.getmtime(os.path.join(STATIC_DIR, f)) for f in files))
 
 
@@ -18,12 +18,12 @@ def index(request):
 
 
 def robot_screen(request):
-    """로봇 위에 올린 태블릿/휴대폰용 화면 (같은 와이파이에서 http://<PC>:8000/robot)."""
+    """Screen for the tablet/phone mounted on the robot (http://<PC>:8000/robot on the same Wi-Fi)."""
     return render(request, 'warehouse/robot.html', {'static_version': static_version('robot.js', 'robot.css')})
 
 
 def order_screen(request):
-    """사용자(주문하는 사람)용 화면: 내 위치와 물건 개수를 골라 주문하고 진행 상황을 본다 (http://<PC>:8000/order)."""
+    """Screen for the orderer: pick your location and item counts, place an order and follow its progress (http://<PC>:8000/order)."""
     return render(request, 'warehouse/order.html', {'static_version': static_version('order.js', 'order.css')})
 
 

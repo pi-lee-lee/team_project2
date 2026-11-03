@@ -1,18 +1,18 @@
-"""SLAM으로 만든 맵(pgm + yaml)을 정리해서 새 파일로 저장한다. 원본은 건드리지 않는다.
+"""Clean up a SLAM-built map (pgm + yaml) and save it as a new file. The original is not modified.
 
     python3 tools/clean_map.py ~/maps/maze_map.yaml [-o ~/maps/maze_map_clean] [--seed 0 0]
 
-정리 내용
-  0. 열림 연산으로 폭 2칸 이하의 가느다란 빈 칸 줄무늬 제거 (탐색을 덜 한 SLAM 맵의 LiDAR 빛줄기, --open)
-  1. 로봇이 다니는 빈 공간(seed 위치가 속한 영역, 없으면 가장 큰 영역)만 남기고 나머지 빈 칸은 미탐색으로
-  2. 그 영역에서 2칸보다 멀리 떨어진 장애물 점은 미탐색으로 (방 밖 노이즈)
-  3. 빈 공간 안에 홀로 있는 작은 장애물 점(--speck 칸 이하)은 빈 칸으로 (센서 노이즈)
-  4. 빈 공간에 둘러싸인 작은 미탐색 구멍(--hole 칸 이하)은 빈 칸으로
-  5. 같은 행/열에서 벽 사이 --gap 칸 이하 틈 메우기 (점선처럼 끊긴 벽)
-  6. 경계 봉합: 빈 공간과 맞닿은 미탐색 칸을 벽으로 (바깥 벽이 끊김 없이 이어짐, --no-seal 로 끔)
-  7. 1칸 외곽선: 벽 = 빈 공간을 둘러싼 1칸 테두리만. 두꺼운 벽의 바깥쪽과 물체 안쪽은 미탐색으로
-     (경로 계획은 미탐색도 장애물로 보므로 지나갈 곳은 그대로, --thick 로 끔)
-비교 이미지(<출력>_preview.png): 왼쪽 원본, 오른쪽 정리본
+Cleanup steps
+  0. Opening removes thin free-cell stripes up to 2 cells wide (LiDAR rays in an under-explored SLAM map, --open)
+  1. Keep only the free space the robot drives in (the region containing the seed point, else the largest region); other free cells become unknown
+  2. Obstacle points more than 2 cells away from that region become unknown (noise outside the room)
+  3. Small isolated obstacle points inside free space (up to --speck cells) become free (sensor noise)
+  4. Small unknown holes surrounded by free space (up to --hole cells) become free
+  5. Fill gaps of up to --gap cells between walls in the same row/column (walls broken like dotted lines)
+  6. Border sealing: unknown cells touching free space become walls (outer walls become continuous, disabled by --no-seal)
+  7. 1-cell outline: walls = only the 1-cell border around free space. The outside of thick walls and the inside of objects become unknown
+     (path planning treats unknown as an obstacle too, so drivable space is unchanged, disabled by --thick)
+Comparison image (<output>_preview.png): left original, right cleaned
 """
 import argparse
 import math
@@ -61,7 +61,7 @@ def write_pgm(path, img):
 
 
 def components(mask):
-    """4방향 연결 성분. (라벨 배열, 성분별 크기 리스트) 반환. 라벨 0 = 마스크 밖."""
+    """4-connected components. Returns (label array, list of component sizes). Label 0 = outside the mask."""
     h, w = mask.shape
     labels = np.zeros((h, w), dtype=np.int32)
     sizes = [0]
@@ -103,20 +103,20 @@ def erode(mask, k=1):
 
 
 def clean(img, seed_rc, speck, hole, max_gap=3, seal=True, opening=1, thin=False):
-    # map_saver 값: 254 빈 칸, 205 미탐색, 0 장애물.
-    # 주의: free_thresh가 0.196보다 크면(예: 0.25) map_server가 205(미탐색)를 빈 칸으로 읽는다
+    # map_saver values: 254 free, 205 unknown, 0 obstacle.
+    # Note: if free_thresh is above 0.196 (e.g. 0.25), map_server reads 205 (unknown) as free
     occ = img < 89            # occupied_thresh 0.65
-    free = img > 210          # 205(미탐색)는 빈 칸이 아님
+    free = img > 210          # 205 (unknown) is not free
     stats = {}
 
-    # 0. 열림 연산: 탐색을 덜 한 SLAM 맵의 LiDAR 빛줄기 모양 가느다란 빈 칸(폭 2*opening 칸 이하) 제거
-    #    로봇이 지나갈 수 없는 폭이므로 주행 공간은 그대로
+    # 0. Opening: remove thin ray-shaped free cells (up to 2*opening cells wide) from an under-explored SLAM map.
+    #    The robot can't pass through that width, so drivable space is unchanged
     if opening > 0:
         opened = dilate(erode(free, opening), opening) & free
         stats['가느다란 빈 칸 제거'] = int((free & ~opened).sum())
         free = opened
 
-    # 1. 로봇이 다니는 빈 공간
+    # 1. Free space the robot drives in
     labels, sizes = components(free)
     main = 0
     if seed_rc is not None:
@@ -128,12 +128,12 @@ def clean(img, seed_rc, speck, hole, max_gap=3, seal=True, opening=1, thin=False
     region = labels == main
     stats['떨어진 빈 칸 제거'] = int((free & ~region).sum())
 
-    # 2. 방 밖 장애물 점
+    # 2. Obstacle points outside the room
     near = dilate(region, 2)
     stats['방 밖 장애물 점 제거'] = int((occ & ~near).sum())
     occ &= near
 
-    # 3. 빈 공간 안의 작은 장애물 점
+    # 3. Small obstacle points inside free space
     olabels, osizes = components(occ)
     removed = 0
     for label, size in enumerate(osizes):
@@ -147,7 +147,7 @@ def clean(img, seed_rc, speck, hole, max_gap=3, seal=True, opening=1, thin=False
             removed += size
     stats['방 안 노이즈 점 제거'] = removed
 
-    # 4. 빈 공간에 둘러싸인 작은 미탐색 구멍
+    # 4. Small unknown holes surrounded by free space
     unknown = ~occ & ~region
     ulabels, usizes = components(unknown)
     filled = 0
@@ -164,8 +164,8 @@ def clean(img, seed_rc, speck, hole, max_gap=3, seal=True, opening=1, thin=False
             filled += size
     stats['작은 구멍 메움'] = filled
 
-    # 5. 같은 행/열에서 벽 사이 max_gap 칸 이하 틈 메우기 (점선처럼 끊긴 벽).
-    #    로봇이 지나갈 수 없는 폭이므로 주행 공간은 줄지 않는다
+    # 5. Fill gaps of up to max_gap cells between walls in the same row/column (walls broken like dotted lines).
+    #    The robot can't pass through that width, so drivable space does not shrink
     gap = np.zeros_like(occ)
     for grid, out_view in ((occ, gap), (occ.T, gap.T)):
         for r in range(grid.shape[0]):
@@ -178,13 +178,13 @@ def clean(img, seed_rc, speck, hole, max_gap=3, seal=True, opening=1, thin=False
     occ |= gap
     region &= ~occ
 
-    # 6. 경계 봉합: 빈 공간과 맞닿은(대각선 포함) 미탐색 칸을 벽으로 → 바깥 벽이 끊김 없이 이어짐
+    # 6. Border sealing: unknown cells touching free space (incl. diagonally) become walls -> continuous outer walls
     if seal:
         border = dilate(region, 1) & ~region & ~occ
         stats['바깥 경계 봉합'] = int(border.sum())
         occ |= border
 
-    # 7. 1칸 외곽선: 빈 공간과 맞닿은(대각선 포함) 칸만 벽. LiDAR 가 실제로 닿는 면이 이 줄이다
+    # 7. 1-cell outline: only cells touching free space (incl. diagonally) are walls. This line is the surface the LiDAR actually hits
     if thin:
         outline = dilate(region, 1) & ~region
         stats['두꺼운 벽 1칸으로'] = int((occ & ~outline).sum())

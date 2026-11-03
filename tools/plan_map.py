@@ -1,13 +1,13 @@
-"""경로 계획용 지도 미리 보기/확인. 로봇의 A* 플래너가 맵을 받을 때 하는 가공(plan_map.py)을 똑같이 해서 보여 준다.
-원본 맵은 건드리지 않는다 (AMCL 은 원본을 그대로 씀). A* 는 실행 중에 직접 가공하므로 이 파일을 map_server 에 줄 필요는 없다.
+"""Preview/check the planning map. Applies the same processing (plan_map.py) the robot's A* planner does when it receives the map, and shows the result.
+The original map is not modified (AMCL uses it as is). A* does the processing itself at runtime, so this file need not be given to map_server.
 
     python3 tools/plan_map.py ~/maps/hall_clean.yaml [--inflate 0.1] [--stripe 2] [--max-size 0.4]
-           [--check X1 Y1 X2 Y2] ...      두 점 사이 경로가 가공 전/후 모두 있는지 (홈 ↔ LED 위치 등)
-           [-o 출력경로]                  가공한 맵을 pgm/yaml 로도 저장 (확인용)
+           [--check X1 Y1 X2 Y2] ...      whether a path between two points exists both before/after processing (home <-> LED location, etc.)
+           [-o OUTPUT_PATH]              also save the processed map as pgm/yaml (for inspection)
 
-비교 이미지(<맵>_plan_preview.png): 왼쪽 원본, 오른쪽 가공본 (빨강 = 다리 점을 부풀려 막은 칸, 하늘색 = 메운 줄무늬)
-값을 바꿔 보고 마음에 들면 ros2_ws/src/warehouse_robot/config/params.yaml 의 astar_planner 값(stripe_cells,
-cluster_inflate, cluster_max_size)을 같게 바꾸고 브리지를 다시 실행하세요.
+Comparison image (<map>_plan_preview.png): left original, right processed (red = cells blocked by inflating leg points, light blue = filled stripes).
+Try values, and when satisfied set the same astar_planner values (stripe_cells, cluster_inflate,
+cluster_max_size) in ros2_ws/src/warehouse_robot/config/params.yaml and restart the bridge.
 """
 import argparse
 import os
@@ -32,12 +32,12 @@ def load(yaml_path):
         img = 255 - img
     occ_t = float(conf.get('occupied_thresh', 0.65))
     free_t = float(conf.get('free_thresh', 0.196))
-    p = (255 - img.astype(float)) / 255.0       # map_server trinary 방식
+    p = (255 - img.astype(float)) / 255.0       # map_server trinary mode
     grid = np.full(img.shape, -1, dtype=np.int16)
     grid[p > occ_t] = 100
     grid[p < free_t] = 0
     origin = [float(v) for v in conf['origin'].strip('[]').split(',')]
-    return grid[::-1].copy(), float(conf['resolution']), origin, img   # 행 0 = 아래쪽 (OccupancyGrid 와 같게)
+    return grid[::-1].copy(), float(conf['resolution']), origin, img   # row 0 = bottom (same as OccupancyGrid)
 
 
 def to_img(grid):

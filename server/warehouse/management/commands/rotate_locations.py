@@ -1,8 +1,8 @@
-"""맵을 원점 기준으로 회전했을 때(tools/straighten_map.py), 등록된 위치 좌표도 같은 각도로 돌린다.
+"""When a map has been rotated about its origin (tools/straighten_map.py), rotate the registered location coordinates by the same angle.
 
     python manage.py rotate_locations 2.40 [--map maze_map] [--dry-run]
 
-각도는 straighten_map.py 가 출력한 rotation_deg (반시계 방향 +).
+The angle is the rotation_deg printed by straighten_map.py (counterclockwise positive).
 """
 import math
 

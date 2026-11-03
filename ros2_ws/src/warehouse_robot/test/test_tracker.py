@@ -1,4 +1,4 @@
-"""추적(tracker.py) 테스트. ~/tb3_nav_ws/src/tb3_nav/test/test_core.py 에서 가져옴."""
+"""Tracking (tracker.py) tests. Taken from ~/tb3_nav_ws/src/tb3_nav/test/test_core.py."""
 import numpy as np
 
 from warehouse_robot.tracker import MultiObjectTracker, detect_clusters
@@ -14,12 +14,12 @@ def test_tracker_estimates_velocity():
                         for i in range(11)])
         tracks = tr.update(detect_clusters(arc, 0.15, 3, 0.8, 0.08), t)
     assert len(tracks) == 1
-    assert abs(tracks[0].x[2] - 0.3) < 0.05   # 상태 [x, y, vx, vy]
+    assert abs(tracks[0].x[2] - 0.3) < 0.05   # state [x, y, vx, vy]
     assert abs(tracks[0].x[3]) < 0.05
 
 
 def test_cluster_center_corrected_away_from_sensor():
-    # 반지름 0.12 원기둥을 원점의 센서가 볼 때 보이는 앞면 호 (중심 (1.0, 0))
+    # front arc of a radius-0.12 cylinder (center (1.0, 0)) as seen by a sensor at the origin
     ang = np.linspace(np.pi - 0.9, np.pi + 0.9, 15)
     arc = np.column_stack([1.0 + 0.12 * np.cos(ang), 0.12 * np.sin(ang)])
     raw = detect_clusters(arc, 0.15, 3, 0.8, 0.08)[0]

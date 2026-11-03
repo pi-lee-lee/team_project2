@@ -1,18 +1,17 @@
 #!/bin/bash
-# SLAM 실행 (맵을 새로 만들 때). /map 과 map->odom TF 를 낸다. AMCL(start_nav2.sh)과 같이 띄우면 안 된다.
-#   사용: scripts/start_slam.sh [slam_toolbox|cartographer]
-#     slam_toolbox (기본): 맵 갱신 약 5초, 루프 클로저 안정적
-#     cartographer       : TurtleBot3 공식 예제 방식, 맵 갱신 약 1초
-# 만든 맵 저장: scripts/save_map.sh <이름>  (또는 웹의 "맵 저장")
+# Start SLAM (when building a new map). Publishes /map and the map->odom TF. Must not run together with AMCL (start_nav2.sh).
+#   Usage: scripts/start_slam.sh [slam_toolbox|cartographer]
+#     slam_toolbox (default): map update about every 5 s, stable loop closure
+#     cartographer          : TurtleBot3 official example setup, map update about every 1 s
+# Save the map: scripts/save_map.sh <name>  (or "맵 저장" on the web)
 source "$(dirname "$0")/env.sh"
 ENGINE="${1:-slam_toolbox}"
 echo "[start_slam] $ENGINE, 시뮬레이션 시간 $WAREHOUSE_SIM_TIME, 도메인 $ROS_DOMAIN_ID"
 
 case "$ENGINE" in
   slam_toolbox)
-    # config/slam_toolbox.yaml: 수평일 때 스캔(/scan_slam, 브리지가 발행, inf 빔 → 빈 공간)만 사용
-    # 실물·시뮬레이션 같은 설정. 시뮬레이션 로봇도 실물 LDS-02 사양(10 m, 약 1.45°, 안 맞은 빔 NaN)이라 따로 바꾸지 않는다
-    # (예전에는 시뮬레이션 LiDAR 가 3.5 m 라 max_laser_range 를 3.4 로, 스캔 개수 기준 값도 따로 바꿔 띄웠음)
+    # config/slam_toolbox.yaml: only scans taken while level (/scan_slam, published by the bridge, inf beams -> free space)
+    # Same settings for real and sim: the sim robot also has the real LDS-02 spec (10 m, about 1.45°, no-return = NaN), so nothing is overridden
     PARAMS="$WAREHOUSE_HOME/config/slam_toolbox.yaml"
     grep -E '^\s*(max_laser_range|minimum_travel_distance|minimum_travel_heading|scan_buffer_size|loop_match_minimum_chain_size):' "$PARAMS" \
       | sed 's/#.*//; s/^\s*/[start_slam] /'

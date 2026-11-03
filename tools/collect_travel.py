@@ -1,10 +1,10 @@
-"""이동 시간 모델 학습용 기록 모으기: 맵의 빈 곳으로 무작위 이동을 반복한다 (웹 "여기로 이동" 과 같은 요청).
+"""Collect records for training the travel-time model: repeatedly drive to random free spots on the map (same request as the web "go here").
 
     source scripts/env.sh
     python3 tools/collect_travel.py [--count 30] [--min-dist 0.5] [--max-dist 2.5] [--seed 1]
 
-각 이동은 서버가 출발 위치 / A* 경로 길이 / 회전량 / 걸린 시간을 기록한다 (planning.py).
-기록이 쌓이면 웹 위치 카드의 "이동 시간 모델" 이 학습된 값으로 바뀐다.
+For each move the server records the start pose / A* path length / amount of turning / elapsed time (planning.py).
+Once enough records exist, the "travel-time model" on the web locations card switches to the learned values.
 """
 import argparse
 import json

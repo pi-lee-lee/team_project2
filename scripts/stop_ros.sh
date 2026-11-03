@@ -15,13 +15,13 @@ for arg in "$@"; do
     --server) STOP_SERVER=1 ;;
     --daemon) STOP_DAEMON=1 ;;
     --all) STOP_SERVER=1; STOP_DAEMON=1 ;;
-    --sim) ;;  # 예전 호환 (Gazebo 는 항상 정리)
+    --sim) ;;  # Accepted for compatibility (Gazebo is always stopped)
     -h|--help) sed -n '2,9p' "$0"; exit 0 ;;
     *) echo "알 수 없는 옵션: $arg"; exit 1 ;;
   esac
 done
 
-# 이 스크립트 자신과 겹치지 않도록 실행 파일 경로로 시작하는 패턴만 쓴다
+# Only use patterns anchored at the executable path so they don't match this script itself
 PATTERNS=(
   '^/bin/bash (\S*/)?scripts/start_(nav2|bridge|slam|sim)\.sh( |$)'
   '^/usr/bin/python3 /opt/ros/humble/bin/ros2 launch'
@@ -33,16 +33,16 @@ PATTERNS=(
   '^(/usr/bin/)?python3 /opt/ros/humble/lib/gazebo_ros/'
   '^/opt/ros/humble/lib/robot_state_publisher/robot_state_publisher'
   '^/opt/ros/humble/lib/nav2_map_server/map_saver_cli'
-  '^\S*python\S* -u \S*/yolo/yolo_training/infer_ros'   # scripts/start_yolo.sh (YOLO 검출기)
-  '^\S*python3 \S*/scripts/(sim_real_io|pi_cmd_watchdog)\.py'   # start_sim.sh (시뮬레이션 실물 형식 출력, 명령 감시)
+  '^\S*python\S* -u \S*/yolo/yolo_training/infer_ros'   # scripts/start_yolo.sh (YOLO detector)
+  '^\S*python3 \S*/scripts/(sim_real_io|pi_cmd_watchdog)\.py'   # start_sim.sh (sim output in real-robot format, cmd watchdog)
 )
 if [ "$STOP_SERVER" = 1 ]; then
   PATTERNS+=('^/bin/bash (\S*/)?scripts/start_server\.sh( |$)' '^(\S*/)?\.venv/bin/python manage\.py runserver')
 fi
 REGEX=$(IFS='|'; echo "${PATTERNS[*]}")
 
-# 이 프로젝트 노드만: ROS_DOMAIN_ID 가 44(실물)/77(시뮬레이션)이거나 없는(웹 서버 등) 프로세스.
-# 같은 PC 의 다른 프로젝트 Gazebo/노드(다른 도메인)는 건드리지 않는다.
+# Only this project's processes: ROS_DOMAIN_ID 44 (real) / 77 (sim) or unset (web server etc.).
+# Gazebo/nodes of other projects on the same PC (other domains) are left alone.
 ours() {
   local d
   d=$(tr '\0' '\n' < "/proc/$1/environ" 2>/dev/null | sed -n 's/^ROS_DOMAIN_ID=//p')

@@ -1,8 +1,8 @@
-"""격자 맵 위의 A* 경로 계획 (ROS 의존성 없음, numpy만 사용).
+"""A* path planning on a grid map (no ROS dependency, numpy only).
 
-1. 장애물까지의 거리를 계산해 로봇 반경 안쪽은 통과 불가(lethal)로 만든다.
-2. 반경 바깥 inflation_radius까지는 벽에 가까울수록 비용을 더해 통로 가운데로 가게 한다.
-3. 8방향 이동, octile 휴리스틱으로 A* 탐색.
+1. Compute the distance to obstacles; cells within the robot radius are impassable (lethal).
+2. From the radius out to inflation_radius, add cost the closer to a wall, to keep to the middle of aisles.
+3. A* search with 8-connected moves and an octile heuristic.
 """
 import heapq
 import math
@@ -11,14 +11,14 @@ import numpy as np
 
 try:
     from scipy.ndimage import distance_transform_edt
-except Exception:  # 라즈베리 파이 등 scipy가 없거나 numpy와 버전이 안 맞는 환경
+except Exception:  # environments without scipy or with a mismatched numpy (e.g. Raspberry Pi)
     distance_transform_edt = None
 
 SQRT2 = math.sqrt(2.0)
-# (drow, dcol, 이동 거리)
+# (drow, dcol, move distance)
 NEIGHBORS = [(-1, 0, 1.0), (1, 0, 1.0), (0, -1, 1.0), (0, 1, 1.0),
              (-1, -1, SQRT2), (-1, 1, SQRT2), (1, -1, SQRT2), (1, 1, SQRT2)]
-ESCAPE_PENALTY = 20.0  # 로봇이 벽에 붙어 있을 때 lethal 영역을 빠져나가는 비용
+ESCAPE_PENALTY = 20.0  # cost of leaving the lethal area when the robot starts against a wall
 
 
 class PlanningError(Exception):
@@ -26,12 +26,12 @@ class PlanningError(Exception):
 
 
 def obstacle_distance(obstacle, resolution, max_dist):
-    """각 셀에서 가장 가까운 장애물까지의 거리(m)."""
+    """Distance (m) from each cell to the nearest obstacle."""
     if not obstacle.any():
         return np.full(obstacle.shape, np.inf)
     if distance_transform_edt is not None:
         return distance_transform_edt(~obstacle) * resolution
-    # scipy가 없으면 팽창을 반복해서 근사 (max_dist까지만)
+    # without scipy, approximate by repeated dilation (up to max_dist)
     dist = np.full(obstacle.shape, np.inf)
     dist[obstacle] = 0.0
     reached = obstacle.copy()
@@ -48,9 +48,9 @@ def obstacle_distance(obstacle, resolution, max_dist):
 
 
 def pad_grid(data, width, height, resolution, origin_x, origin_y, points, margin=1.0):
-    """points(월드 좌표)가 모두 들어가도록 격자를 미탐색(-1) 칸으로 넓힌다 (SLAM 중 아직 맵 밖인 목표용).
+    """Grow the grid with unknown (-1) cells until all points (world coords) fit (for goals still outside the map during SLAM).
 
-    반환: (data 1차원 배열, width, height, origin_x, origin_y)
+    Returns: (data 1-D array, width, height, origin_x, origin_y)
     """
     grid = np.asarray(data, dtype=np.int16).reshape(height, width)
     xs = [p[0] for p in points]
@@ -71,9 +71,9 @@ def pad_grid(data, width, height, resolution, origin_x, origin_y, points, margin
 
 
 class GridPlanner:
-    """OccupancyGrid 데이터로 만든 A* 플래너.
+    """A* planner built from OccupancyGrid data.
 
-    data: 길이 width*height, row 0 = 맵 아래쪽 (OccupancyGrid와 같은 순서), 값 -1 또는 0~100
+    data: length width*height, row 0 = map bottom (same order as OccupancyGrid), values -1 or 0..100
     """
 
     def __init__(self, data, width, height, resolution, origin_x, origin_y,
@@ -93,21 +93,21 @@ class GridPlanner:
         self.dist = obstacle_distance(self.obstacle, resolution, inflation_radius)
         self.lethal = self.obstacle | (self.dist < robot_radius)
 
-        # 셀에 들어갈 때 이동 거리에 곱하는 비용 배율 (1 이상)
+        # cost factor multiplied by the move distance when entering a cell (>= 1)
         span = max(inflation_radius - robot_radius, 1e-6)
         closeness = np.clip((inflation_radius - self.dist) / span, 0.0, 1.0)
         self.cost = 1.0 + cost_weight * closeness ** 2
         if allow_unknown:
-            # 미탐색 칸은 지나갈 수 있지만, 아는 빈 칸을 우선 지나가도록 비용을 더한다 (SLAM 중 탐색용)
+            # unknown cells are passable but cost extra so known free cells are preferred (for exploring during SLAM)
             self.cost = self.cost + unknown_cost * (grid < 0)
 
-        # 탐색 루프 속도를 위해 1차원 리스트로 변환
+        # convert to 1-D lists for search loop speed
         self._obstacle = self.obstacle.ravel().tolist()
         self._lethal = self.lethal.ravel().tolist()
         self._dist = self.dist.ravel().tolist()
         self._cost = self.cost.ravel().tolist()
 
-    # -------------------------------------------------------------- 좌표 변환
+    # -------------------------------------------------------------- coordinate conversion
     def world_to_cell(self, x, y):
         col = int(math.floor((x - self.origin_x) / self.resolution))
         row = int(math.floor((y - self.origin_y) / self.resolution))
@@ -125,7 +125,7 @@ class GridPlanner:
         return self.inside(row, col) and not self.lethal[row, col]
 
     def nearest_free(self, row, col, max_cells):
-        """(row, col) 주변 max_cells 안에서 가장 가까운 통과 가능 셀."""
+        """Nearest passable cell within max_cells of (row, col)."""
         r0, r1 = max(0, row - max_cells), min(self.height, row + max_cells + 1)
         c0, c1 = max(0, col - max_cells), min(self.width, col + max_cells + 1)
         free = ~self.lethal[r0:r1, c0:c1]
@@ -138,9 +138,9 @@ class GridPlanner:
             return None
         return int(rr[i] + r0), int(cc[i] + c0)
 
-    # -------------------------------------------------------------- 탐색
+    # -------------------------------------------------------------- search
     def plan(self, start, goal, goal_tolerance=0.3, smooth=True):
-        """start, goal: (x, y) [m]. 반환: [(x, y), ...] (start -> goal)."""
+        """start, goal: (x, y) [m]. Returns: [(x, y), ...] (start -> goal)."""
         sr, sc = self.world_to_cell(*start)
         gr, gc = self.world_to_cell(*goal)
         if not self.inside(sr, sc):
@@ -203,14 +203,13 @@ class GridPlanner:
                     continue
                 extra = 0.0
                 if lethal[nxt]:
-                    # lethal 영역은 시작점이 이미 그 안에 있을 때 빠져나가는 용도로만: 장애물에서 멀어지는 칸으로만 간다.
-                    # (예전: lethal 안에서 lethal 로 자유롭게 → 장애물 옆에서 출발하면 lethal 띠를 따라 좁은 틈을 지나는
-                    #  경로를 냈음. 소화기 옆으로 물러난 뒤 '기억 장애물을 피한' 경로가 소화기 4 cm 옆, 실물 2771)
+                    # The lethal area is only for escaping when the start is already inside it: only move to cells farther
+                    # from obstacles (moving freely inside it would let paths run along the lethal band through narrow gaps).
                     if not cur_lethal or dist[nxt] <= dist[cur]:
                         continue
                     extra = ESCAPE_PENALTY
                 if dr and dc and (obstacle[r * w + nc] or obstacle[nr * w + c]):
-                    continue  # 대각선으로 장애물 모서리를 가로지르지 않기
+                    continue  # do not cut obstacle corners diagonally
                 ng = gc_cur + step * cost[nxt] + extra
                 if ng < g[nxt]:
                     g[nxt] = ng
@@ -231,7 +230,7 @@ class GridPlanner:
 
 
 def smooth_path(points, window=2):
-    """양 끝점은 고정하고 이동 평균으로 계단 모양을 완화."""
+    """Smooth staircase shapes with a moving average, keeping both end points fixed."""
     if len(points) <= 2 * window + 1:
         return points
     arr = np.asarray(points)
@@ -242,7 +241,7 @@ def smooth_path(points, window=2):
 
 
 def path_yaws(points, goal_yaw):
-    """경로 각 점의 진행 방향. 마지막 점은 goal_yaw."""
+    """Heading at each path point. The last point gets goal_yaw."""
     yaws = []
     for i in range(len(points) - 1):
         (x0, y0), (x1, y1) = points[i], points[i + 1]

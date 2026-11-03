@@ -9,14 +9,14 @@
   <link rel="stylesheet" href="{% static 'warehouse/order.css' %}?v={{ static_version }}">
 </head>
 <body>
-<!-- 주문하는 사람용 화면 (휴대폰/PC). 같은 와이파이에서 http://<PC>:8000/order -->
+<!-- Orderer's page (phone/PC). On the same Wi-Fi: http://<PC>:8000/order -->
 <header>
   <h1>물건 주문</h1>
   <span id="robot-state" class="pill">연결 중</span>
 </header>
 
 <main>
-  <!-- 주문 입력 (진행 중인 주문이 없을 때) -->
+  <!-- Order form (when no order is in progress) -->
   <section id="form-view">
     <div class="card">
       <h2>1. 받을 위치</h2>
@@ -34,7 +34,7 @@
     </div>
   </section>
 
-  <!-- 진행 상황 (주문이 진행 중이거나 방금 끝났을 때) -->
+  <!-- Progress (when an order is in progress or just finished) -->
   <section id="status-view" hidden>
     <div class="card">
       <h2 id="status-title">주문 진행 중</h2>

@@ -1,11 +1,11 @@
-"""작업 흐름(상태 머신) 로직.
+"""Task flow (state machine) logic.
 
-consumer에서 database_sync_to_async로 호출한다. 각 함수는 DB를 바꾸고
-보낼 메시지를 Outbox에 담아 돌려준다. 실제 전송은 consumer가 맡는다.
+Called from the consumers via database_sync_to_async. Each function changes the DB and
+returns the messages to send in an Outbox; the consumer does the actual sending.
 
-    로봇 상태: OFFLINE / IDLE / MOVING / WAITING_LOAD / ERROR
-    작업 흐름: 물류 위치(load) ... → 홈 복귀(move) → 완료
-    주문 (start_order): 홈 → 물건 구역들(load, YOLO 개수 확인) → 사람 위치(unload) → 홈
+    Robot states: OFFLINE / IDLE / MOVING / WAITING_LOAD / ERROR
+    Task flow: pickup locations (load) ... -> return home (move) -> done
+    Order (start_order): home -> item sections (load, YOLO count check) -> dropoff (unload) -> home
 """
 import base64
 import math
@@ -27,13 +27,13 @@ DEFAULT_ROBOT = 'tb3'
 
 
 class ServiceError(Exception):
-    """요청한 UI에만 돌려줄 오류."""
+    """Error returned only to the requesting UI."""
 
 
 class Outbox:
     def __init__(self):
         self.robot = []  # (robot_name, message)
-        self.ui = []     # message (모든 UI에 브로드캐스트)
+        self.ui = []     # message (broadcast to all UIs)
 
     def to_robot(self, robot, msg):
         self.robot.append((robot.name, msg))
@@ -42,25 +42,25 @@ class Outbox:
         self.ui.append(msg)
 
 
-# ---------------------------------------------------------------- 공통
+# ---------------------------------------------------------------- common
 
 def get_robot(name=None):
     robot, _ = Robot.objects.get_or_create(name=name or DEFAULT_ROBOT)
     return robot
 
 
-ROBOT_NAME_RE = re.compile(r'^[A-Za-z0-9_-]{1,50}$')   # 로봇 이름 = 브리지 접속 주소 /ws/robot/<이름>/ (예: tb3, tb3_1)
+ROBOT_NAME_RE = re.compile(r'^[A-Za-z0-9_-]{1,50}$')   # robot name = bridge URL /ws/robot/<name>/ (e.g. tb3, tb3_1)
 
 
 def robot_list():
-    """웹 로봇 선택 목록: DB 에 있는 로봇 전부 (한 번이라도 브리지가 접속한 이름) + 브리지 연결 여부."""
+    """Web robot selection list: every robot in the DB (any name a bridge has ever connected with) + whether its bridge is connected."""
     return [{'name': r.name, 'state': r.state, 'message': r.message,
              'bridge': bool(LIVE.get(r.name, {}).get('health', {}).get('bridge'))}
             for r in Robot.objects.order_by('name')]
 
 
 def known_robot(name):
-    """웹이 고른 로봇 이름이 DB 에 있으면 그 이름, 없으면 기본 로봇 (지난번에 고른 로봇이 지금은 없을 때 빈 로봇을 만들지 않게)."""
+    """The web-selected robot name if it is in the DB, else the default robot (so a previously selected robot that no longer exists doesn't create an empty one)."""
     return name if name and Robot.objects.filter(name=name).exists() else DEFAULT_ROBOT
 
 
@@ -76,7 +76,7 @@ def active_task(robot):
     return robot.tasks.filter(status=Task.STATUS_RUNNING).first()
 
 
-LOG_DEDUP_SEC = 10   # 같은 문구는 이 시간 안에 한 번만 기록 (같은 실패가 빠르게 반복될 때 로그가 넘치지 않게)
+LOG_DEDUP_SEC = 10   # Log the same text only once within this time (so rapidly repeated failures don't flood the log)
 
 
 def log(out, robot, message):
@@ -87,9 +87,9 @@ def log(out, robot, message):
     out.to_ui({'type': 'log', 'log': entry.to_dict()})
 
 
-# 같은 지점 반복 실패 막기: 이 시간 안에 같은 곳(반경 안) 이동이 이만큼 실패하면 그 지점 요청을 잠시 거절
+# Prevent repeated failures at the same point: if moves to the same place (within the radius) fail this many times within this time, reject requests to that point for a while
 REPEAT_FAIL_SEC, REPEAT_FAIL_COUNT, REPEAT_FAIL_RADIUS = 30.0, 3, 0.3
-RECENT_FAILS = {}   # robot_name -> [(시각, x, y)]
+RECENT_FAILS = {}   # robot_name -> [(time, x, y)]
 
 
 def recent_fails(robot_name, x, y):
@@ -100,7 +100,7 @@ def recent_fails(robot_name, x, y):
 
 
 def check_goal_allowed(robot, x, y):
-    """금지 구역 안 목표, 같은 곳 반복 실패를 플래너까지 보내지 않고 바로 거절."""
+    """Reject goals inside keep-out zones or repeatedly failing points immediately, without sending them to the planner."""
     m = active_map()
     zone = next((z for z in m.zones.all() if planning.zone_contains(z.to_dict(), (x, y))), None) if m else None
     if zone is not None:
@@ -133,16 +133,16 @@ def zones_of(m):
 
 
 def push_zones(out, m=None):
-    """금지 구역을 UI 와 로봇(A* 플래너)에 보낸다."""
+    """Send keep-out zones to the UI and the robots (A* planner)."""
     m = m or active_map()
     zones = zones_of(m)
     out.to_ui({'type': 'zones', 'zones': zones})
-    for robot in Robot.objects.all():   # 같은 맵을 쓰는 로봇 모두의 A* 플래너에
+    for robot in Robot.objects.all():   # to the A* planner of every robot using the same map
         out.to_robot(robot, {'type': 'zones', 'zones': zones})
 
 
 def snapshot(robot_name=None):
-    """UI가 처음 접속했을 때 보낼 전체 상태."""
+    """Full state sent when a UI first connects."""
     robot = get_robot(robot_name)
     m = active_map()
     task = active_task(robot) or robot.tasks.first()
@@ -165,7 +165,7 @@ def require_online(robot):
 def send_goal(out, robot, step):
     step.status = TaskStep.STATUS_MOVING
     step.save(update_fields=['status'])
-    # 이동 시간 학습용 기록 (출발 위치, 경로 길이/회전량, 예측 시간)
+    # Record for travel time learning (start pose, path length/turning, predicted time)
     planning.record_start(active_map(), step, LIVE.get(robot.name, {}).get('pose'))
     out.to_robot(robot, {'type': 'goto', 'goal_id': step.goal_id,
                          'x': step.x, 'y': step.y, 'yaw': step.yaw})
@@ -178,18 +178,18 @@ def finish_task(out, robot, task, status, message):
     task.finished_at = timezone.now()
     task.save(update_fields=['status', 'finished_at'])
     log(out, robot, message)
-    if is_order(task):   # 주문이 켠 YOLO 는 주문이 끝나면 끈다 (웹 YOLO 버튼으로 켠 것은 그대로)
+    if is_order(task):   # Turn off YOLO that an order turned on when the order ends (leave it if it was turned on with the web YOLO button)
         yolo_power(out, robot, False)
 
 
 def yolo_power(out, robot, on):
-    """주문: YOLO 는 섹션/사람 위치에 서 있을 때만 켠다. 주행 중에는 꺼서 카메라 영상이 Wi-Fi 를 안 쓰고
-    (검출기는 켜져 있을 때만 영상을 구독) PC CPU 도 주행 계산에 양보한다."""
+    """Orders: YOLO is on only while stopped at a section/dropoff. It is off while driving so the camera stream doesn't use Wi-Fi
+    (the detector subscribes to the image only while enabled) and the PC CPU is left to the driving computations."""
     out.to_robot(robot, {'type': 'yolo_set', 'enabled': bool(on)})
 
 
 def advance(out, robot, task):
-    """다음 단계로 진행. 남은 단계가 없으면 작업 완료."""
+    """Advance to the next step. If no steps remain, the task is done."""
     step = task.current_step()
     if step is None:
         finish_task(out, robot, task, Task.STATUS_DONE, f'작업 #{task.id} 완료')
@@ -231,7 +231,7 @@ def cancel_active(out, robot, reason):
     finish_task(out, robot, task, Task.STATUS_CANCELED, f'작업 #{task.id} 취소: {reason}')
 
 
-# ---------------------------------------------------------------- 로봇 → 서버
+# ---------------------------------------------------------------- robot -> server
 
 @transaction.atomic
 def robot_connected(name, active_goal_id, mode='map', session=''):
@@ -240,8 +240,8 @@ def robot_connected(name, active_goal_id, mode='map', session=''):
     if mode == 'slam' and session:
         start_slam_session(out, robot, session)
     robot.last_seen = timezone.now()
-    # 이전 연결(예: 어제 실물 로봇)의 배터리 값이 남아 보이지 않도록 지운다.
-    # 브리지가 /battery_state 를 받으면 다시 채운다 (시뮬레이션은 배터리 정보가 없어 비어 있음)
+    # Clear the battery values so a previous connection's values aren't shown.
+    # The bridge fills them again when it receives /battery_state (simulation has no battery info, so they stay empty)
     robot.battery_voltage = None
     robot.battery_percentage = None
     robot.save(update_fields=['last_seen', 'battery_voltage', 'battery_percentage'])
@@ -249,7 +249,7 @@ def robot_connected(name, active_goal_id, mode='map', session=''):
     task = active_task(robot)
     step = task.current_step() if task else None
     if step is not None and step.status == TaskStep.STATUS_ARRIVED and step.items:
-        yolo_power(out, robot, True)   # 브리지를 다시 켜면 검출기도 꺼진 채로 뜸 → 기다리는 중이면 다시 켬
+        yolo_power(out, robot, True)   # The detector starts disabled when the bridge restarts -> turn it back on if waiting
     if step is None:
         set_state(robot, Robot.STATE_IDLE)
     elif step.status == TaskStep.STATUS_ARRIVED and step.action == TaskStep.ACTION_UNLOAD:
@@ -259,7 +259,7 @@ def robot_connected(name, active_goal_id, mode='map', session=''):
     elif step.status == TaskStep.STATUS_MOVING and active_goal_id == step.goal_id:
         set_state(robot, Robot.STATE_MOVING, f'{step.name}(으)로 이동 중')
     elif task.steps.count() == 1:
-        # 단일 이동은 목표를 잃었으면 실패로 끝내서 다음 명령을 막지 않는다
+        # A single move that lost its goal ends as failed so it doesn't block the next command
         step.status = TaskStep.STATUS_FAILED
         step.save(update_fields=['status'])
         finish_task(out, robot, task, Task.STATUS_FAILED, f'작업 #{task.id} 실패: 재연결로 이동이 끊김')
@@ -273,7 +273,7 @@ def robot_connected(name, active_goal_id, mode='map', session=''):
 
 @transaction.atomic
 def robot_health(name, robot_ok):
-    """브리지는 연결돼 있지만 로봇(Pi)의 LiDAR/오도메트리가 끊기거나 돌아왔을 때."""
+    """When the bridge is connected but the robot's (Pi) LiDAR/odometry drops out or comes back."""
     out = Outbox()
     robot = get_robot(name)
     if not robot_ok:
@@ -281,7 +281,7 @@ def robot_health(name, robot_ok):
             set_state(robot, Robot.STATE_OFFLINE, '로봇(Pi) 응답 없음: LiDAR/오도메트리가 들어오지 않습니다')
             log(out, robot, '로봇(Pi) 응답 없음')
     elif robot.state == Robot.STATE_OFFLINE:
-        # 진행 중이던 작업 상태에 맞춰 복귀 (브리지 재연결과 같은 처리)
+        # Restore according to the running task's state (same handling as a bridge reconnect)
         goal_step = None
         task = active_task(robot)
         step = task.current_step() if task else None
@@ -304,10 +304,10 @@ def robot_disconnected(name):
 
 @transaction.atomic
 def start_slam_session(out, robot, session):
-    """새 SLAM 실행이면 이전 SLAM 맵과 그 위에 등록한 위치를 지운다.
-    SLAM 맵의 원점은 SLAM 을 시작한 순간의 로봇 위치라 실행(월드/출발 위치)마다 좌표계가 다르다.
-    지우지 않으면 이전 실행의 위치가 새 지도 위 엉뚱한 곳에 보인다. 저장한 맵의 위치는 저장할 때 복사되어 남아 있다.
-    브리지가 재연결만 한 것(같은 실행 번호)이면 그대로 둔다."""
+    """On a new SLAM run, delete the previous SLAM map and the locations registered on it.
+    The SLAM map's origin is the robot pose when SLAM started, so the frame differs per run (world/start pose).
+    Otherwise the previous run's locations would show up in the wrong places on the new map. Locations of saved maps were copied on save and remain.
+    If the bridge merely reconnected (same run ID), leave it as is."""
     SLAM_SESSION[robot.name] = session
     m = Map.objects.filter(name=SLAM_MAP).first()
     if m is None or m.session == session:
@@ -321,11 +321,11 @@ def start_slam_session(out, robot, session):
 
 @transaction.atomic
 def handle_map(name, msg):
-    """브리지가 보낸 OccupancyGrid를 PNG로 저장하고 활성 맵으로 지정."""
+    """Store the OccupancyGrid sent by the bridge as PNG and make it the active map."""
     out = Outbox()
     width, height = int(msg['width']), int(msg['height'])
     if width == 0 or height == 0:
-        return out  # SLAM 시작 직후의 빈 맵은 저장하지 않는다
+        return out  # Don't store the empty map right after SLAM starts
     data = zlib.decompress(base64.b64decode(msg['data']))
     if len(data) != width * height:
         raise ServiceError('맵 데이터 크기가 맞지 않습니다.')
@@ -337,7 +337,7 @@ def handle_map(name, msg):
         m.save(update_fields=['session'])
     out.to_ui({'type': 'map', 'map': m.to_dict()})
     push_locations(out)
-    # 브리지가 (재)연결하면 맵부터 보내므로, 여기서 그 맵의 금지 구역을 로봇에 알린다
+    # The bridge sends the map first on (re)connect, so send that map's keep-out zones to the robot here
     zones = zones_of(m)
     out.to_ui({'type': 'zones', 'zones': zones})
     out.to_robot(get_robot(name), {'type': 'zones', 'zones': zones})
@@ -375,7 +375,7 @@ def handle_nav_status(name, goal_id, status, message=''):
     task = active_task(robot)
     step = task.current_step() if task else None
     if step is None or step.goal_id != goal_id or step.status != TaskStep.STATUS_MOVING:
-        return out  # 이미 취소됐거나 지난 목표에 대한 응답
+        return out  # Reply to an already canceled or old goal
 
     if status == 'succeeded':
         planning.record_arrival(step)
@@ -389,7 +389,7 @@ def handle_nav_status(name, goal_id, status, message=''):
             elif step.cargo:
                 set_state(robot, Robot.STATE_WAITING_LOAD, f'{step.name} 도착, {step.cargo} 을(를) 실어 주세요')
                 log(out, robot, f'{step.name} 도착 - {step.cargo} 적재 대기 (카메라 인식 또는 "실었어요")')
-                # 이미 실려 있으면 (도착 전에 실음) 바로 확인
+                # If already loaded (loaded before arrival), confirm right away
                 if cargo_matches(LIVE.get(robot.name, {}).get('cargo'), step.cargo):
                     complete_cargo_step(out, robot, task, step, f'카메라: {step.cargo} 적재 확인')
             else:
@@ -414,18 +414,18 @@ def handle_nav_status(name, goal_id, status, message=''):
         RECENT_FAILS.setdefault(robot.name, []).append((time.monotonic(), step.x, step.y))
         log(out, robot, f'{step.name} 이동 실패: {message}')
         if task.steps.count() == 1:
-            # 단일 이동("여기로 이동", 위치 하나로 이동)은 바로 실패로 끝내서 다음 명령을 막지 않는다
+            # A single move (move-here, move to one location) ends as failed right away so it doesn't block the next command
             finish_task(out, robot, task, Task.STATUS_FAILED, f'작업 #{task.id} 실패')
             set_state(robot, Robot.STATE_IDLE, f'직전 이동 실패: {message}')
         else:
-            # 여러 위치 작업은 재시도/건너뛰기/취소를 기다린다
+            # Multi-location tasks wait for retry/skip/cancel
             set_state(robot, Robot.STATE_ERROR, f'{step.name} 이동 실패: {message}')
-    # canceled는 서버가 요청한 경우이므로 무시
+    # canceled was requested by the server, so ignore it
     push_state(out, robot)
     return out
 
 
-# ---------------------------------------------------------------- UI → 서버
+# ---------------------------------------------------------------- UI -> server
 
 @transaction.atomic
 def start_task(robot_name, location_ids, with_home=True):
@@ -448,9 +448,9 @@ def start_task(robot_name, location_ids, with_home=True):
 
 @transaction.atomic
 def goto_point(robot_name, x, y, yaw, replace=False):
-    """등록하지 않은 임의의 지점으로 이동 (도착하면 바로 완료).
-    replace: 진행 중인 작업이 '지정 지점' 이동 하나뿐이면 그것을 이 목표로 바꾼다. 로봇에는 취소를 보내지 않으므로
-    멈추지 않고 이어서 간다 (브리지는 새 goto 를 받으면 이전 목표를 버림). 자동 탐색이 씀."""
+    """Move to an arbitrary unregistered point (done on arrival).
+    replace: if the running task is a single point move, replace it with this goal. No cancel is sent to the robot,
+    so it keeps going without stopping (the bridge drops the previous goal when it receives a new goto). Used by autonomous exploration."""
     out = Outbox()
     robot = get_robot(robot_name)
     require_online(robot)
@@ -500,7 +500,7 @@ def confirm_load(robot_name):
     step.save(update_fields=['status'])
     log(out, robot, f'{step.name} 적재 완료')
     if step.items:
-        yolo_power(out, robot, False)   # 다음 목적지로 출발: 주행 중에는 끔
+        yolo_power(out, robot, False)   # Leaving for the next destination: off while driving
     advance(out, robot, task)
     push_state(out, robot)
     return out
@@ -508,7 +508,7 @@ def confirm_load(robot_name):
 
 @transaction.atomic
 def confirm_unload(robot_name):
-    """수동 수령 확인 (카메라가 인식하지 못할 때 태블릿의 "꺼냈어요")."""
+    """Manual unload confirmation (the tablet's unload button, when the camera doesn't detect it)."""
     out = Outbox()
     robot = get_robot(robot_name)
     task = active_task(robot)
@@ -522,9 +522,9 @@ def confirm_unload(robot_name):
     return out
 
 
-# ---------------------------------------------------------------- LED 배달
-# 받는 사람이 LED 를 요청 → 로봇이 LED 위치로 가서 사람이 실어 줌(카메라로 확인) → 요청 위치로 가서
-# 받는 사람이 꺼냄(카메라에서 사라짐) → 홈. 한 번에 한 건만 받고, 진행 중이면 새 요청은 거절한다.
+# ---------------------------------------------------------------- LED delivery
+# Recipient requests an LED -> robot goes to the LED location and a person loads it (checked by camera) -> robot goes to the
+# requested point and the recipient takes it out (disappears from the camera) -> home. One request at a time; new ones are rejected while running.
 
 def cargo_matches(label, expected):
     return bool(label) and bool(expected) and label.strip().lower() == expected.strip().lower()
@@ -535,13 +535,13 @@ def complete_cargo_step(out, robot, task, step, message):
     step.save(update_fields=['status'])
     log(out, robot, message)
     if step.items:
-        yolo_power(out, robot, False)   # 다음 목적지로 출발: 주행 중에는 끔
+        yolo_power(out, robot, False)   # Leaving for the next destination: off while driving
     advance(out, robot, task)
 
 
 @transaction.atomic
 def start_delivery(robot_name, location_id, x, y, yaw):
-    """location_id: LED 가 놓인 위치, (x, y, yaw): 받을 사람이 지도에서 찍은 자리."""
+    """location_id: location where the LED is placed, (x, y, yaw): point the recipient clicked on the map."""
     out = Outbox()
     robot = get_robot(robot_name)
     require_online(robot)
@@ -573,13 +573,13 @@ def start_delivery(robot_name, location_id, x, y, yaw):
 
 @transaction.atomic
 def handle_cargo(name, label):
-    """카메라 인식 결과가 바뀌었을 때 (label: 보이는 물건 라벨, '' = 아무것도 없음)."""
+    """When the camera detection result changes (label: visible item label, '' = nothing)."""
     out = Outbox()
     robot = get_robot(name)
     task = active_task(robot)
     step = task.current_step() if task else None
     if step is None or step.status != TaskStep.STATUS_ARRIVED or not step.cargo or step.items:
-        return out  # 주문 단계는 버튼으로만 넘어간다 (YOLO 개수는 버튼을 누를 때 확인)
+        return out  # Order steps advance only by button (YOLO counts are checked when the button is pressed)
     if step.action == TaskStep.ACTION_LOAD:
         if cargo_matches(label, step.cargo):
             complete_cargo_step(out, robot, task, step, f'카메라: {step.cargo} 적재 확인')
@@ -591,13 +591,14 @@ def handle_cargo(name, label):
     return out
 
 
-# ---------------------------------------------------------------- 주문 (여러 물건)
-# 사람이 받을 자리(dropoff)와 {라벨: 개수} 를 주문 → 라벨마다 그 물건이 있는 섹션(Location.cargo 에
-# 쉼표로 여러 라벨)을 찾아 섹션 단위로 묶고 가장 빠른 순서로 돈다. 섹션에 도착하면 그곳 사람이 그 섹션 물건을 다 싣고 "적재 완료"
-# → YOLO 개수가 맞으면 다음, 틀리면 "적재 잘못" (태블릿이 사람에게 물어보고, 확인했으면 force_next(confirmed)로 보냄).
-# 사람 위치에서는 꺼내고 "꺼냈어요" → 주문한 물건이 안 보이면 홈, 보이면 같은 방식으로 물어봄.
+# ---------------------------------------------------------------- orders (multiple items)
+# Order = dropoff point + {label: count} -> for each label find the section holding that item (Location.cargo, several
+# comma-separated labels), group by section and visit in the fastest order. At a section, the person there loads all of that
+# section's items and presses load-done -> next if the YOLO counts match, otherwise "wrong load" (the tablet asks the person;
+# if they confirm, force_next(confirmed) sends it on). At the dropoff the items are taken out and unload-done is pressed ->
+# home if no ordered item is visible, otherwise asked the same way.
 
-YOLO_WINDOW = 3.0   # 버튼을 누를 때 최근 이 시간(초) 동안 가장 많이 나온 개수로 판단 (한 프레임 흔들림 방지)
+YOLO_WINDOW = 3.0   # On a button press, judge by the most frequent counts over the last this many seconds (guards against single-frame flicker)
 
 
 def is_order(task):
@@ -609,7 +610,7 @@ def items_text(items):
 
 
 def parse_counts(text):
-    """YOLO 개수 글자 "DHT11: 0 / led_red: 1 / ..." → {'DHT11': 0, 'led_red': 1, ...}"""
+    """YOLO counts text "DHT11: 0 / led_red: 1 / ..." -> {'DHT11': 0, 'led_red': 1, ...}"""
     out = {}
     for part in (text or '').split('/'):
         name, sep, n = part.partition(':')
@@ -619,7 +620,7 @@ def parse_counts(text):
 
 
 def yolo_counts(robot_name):
-    """최근 YOLO_WINDOW 초 동안 받은 개수 글자 중 가장 많이 나온 것 (dict). 없으면 None (YOLO 꺼짐/영상 없음)."""
+    """The most frequent counts text received in the last YOLO_WINDOW seconds (dict). None if none (YOLO off / no image)."""
     now = time.monotonic()
     texts = [t for at, t in LIVE.get(robot_name, {}).get('yolo_hist', []) if now - at <= YOLO_WINDOW and t]
     if not texts:
@@ -628,22 +629,22 @@ def yolo_counts(robot_name):
 
 
 def expected_counts(task, step):
-    """이 단계에서 확인할 개수. 적재: 이 섹션에서 실을 물건만 (앞 섹션 물건은 보이든 말든 안 봄 — 앞에서 덜 싣고 넘겨도
-    다음 섹션 판단에 영향 없음), 수령: 주문한 라벨이 모두 0."""
+    """Counts to check at this step. Load: only the items to load at this section (earlier sections' items are ignored, so an
+    under-loaded earlier section doesn't affect this one), unload: all ordered labels are 0."""
     if step.action == TaskStep.ACTION_UNLOAD:
         return {k: 0 for k in step.items}
     return {k: int(v) for k, v in step.items.items()}
 
 
 def check_counts(expected, counts):
-    """판단 기준은 여기 한 곳. 지금은 주문한 라벨만, 정확히 같아야 맞음 (다른 물건/초과는 아직 안 봄).
-    반환: (맞음, '라벨 보임/기대 ...')."""
+    """The single place for the match rule: only ordered labels are checked and must match exactly (other items/excess are not checked).
+    Returns (ok, 'label seen/expected ...')."""
     lower = {k.lower(): v for k, v in counts.items()}
     ok, parts = True, []
     for label, want in expected.items():
         have = lower.get(label.lower(), 0)
         ok &= have == want
-        if want == 0:   # 수령: 남은 것만 적는다
+        if want == 0:   # unload: list only what remains
             if have:
                 parts.append(f'{label} {have}개 남음')
         else:
@@ -652,7 +653,7 @@ def check_counts(expected, counts):
 
 
 def order_check(out, robot, task, step):
-    """버튼(적재 완료/꺼냈어요)을 눌렀을 때 YOLO 개수 확인. 틀리면 상태 메시지로 알리고 False."""
+    """Check the YOLO counts when the load-done/unload-done button is pressed. On mismatch report it in the state message and return False."""
     counts = yolo_counts(robot.name)
     is_load = step.action == TaskStep.ACTION_LOAD
     state = Robot.STATE_WAITING_LOAD if is_load else Robot.STATE_WAITING_UNLOAD
@@ -674,12 +675,12 @@ def order_check(out, robot, task, step):
 
 
 def area_labels(loc):
-    """섹션에 있는 물건 라벨들 (인식 라벨 칸에 쉼표로 여러 개, 비우면 위치 이름 하나)."""
+    """Item labels at a section (comma-separated in the detection label field; empty = the location name)."""
     return [x.strip() for x in loc.cargo_label().split(',') if x.strip()]
 
 
 def find_area(m, label):
-    """그 물건이 있는 섹션 (여러 곳이면 처음 찾은 곳 — 지금은 섹션끼리 물건이 겹치지 않는다는 전제)."""
+    """The section holding that item (the first one found if several; assumes sections don't share items)."""
     for loc in m.locations.filter(kind=Location.KIND_PICKUP):
         if label.strip().lower() in (x.lower() for x in area_labels(loc)):
             return loc
@@ -687,7 +688,7 @@ def find_area(m, label):
 
 
 def order_route(robot, dropoff_id, items):
-    """주문 검사 + 경유 순서. 반환: (사람 위치, [(구역, 라벨, 개수) 순서대로], optimize 결과, 홈)."""
+    """Validate an order and compute the visit order. Returns (dropoff, [(section, label, count) in order], optimize result, home)."""
     m = active_map()
     if m is None:
         raise ServiceError('맵이 없습니다.')
@@ -718,7 +719,7 @@ def order_route(robot, dropoff_id, items):
 
 
 def preview_order(robot_name, dropoff_id, items):
-    """주문 경유 순서와 예상 시간 (DB 를 바꾸지 않음). 사람 위치 → 홈 구간은 순서와 상관없어 시간에 넣지 않는다."""
+    """Order visit sequence and estimated time (does not change the DB). The dropoff -> home leg doesn't depend on the order, so it isn't counted."""
     robot = get_robot(robot_name)
     dropoff, route, r, home = order_route(robot, dropoff_id, items)
     names = [home.name] + [loc.name for loc, _ in route] + [dropoff.name, home.name]
@@ -746,7 +747,7 @@ def start_order(robot_name, dropoff_id, items):
                             name=dropoff.name, x=dropoff.x, y=dropoff.y, yaw=dropoff.yaw, items=all_items)
     TaskStep.objects.create(task=task, order=n + 1, action=TaskStep.ACTION_MOVE, location=home,
                             name=home.name, x=home.x, y=home.y, yaw=home.yaw)
-    yolo_power(out, robot, False)   # 출발: 섹션에 도착하면 켬
+    yolo_power(out, robot, False)   # Departing: turned on on arrival at a section
     if not (LIVE.get(robot.name, {}).get('yolo') or {}).get('available'):
         log(out, robot, '주의: YOLO 검출기가 없습니다. 개수 확인 없이 "다음 경유지로/강제 보내기"로만 진행됩니다')
     log(out, robot, f'주문 (작업 #{task.id}) {dropoff.name}: {items_text(all_items)} - '
@@ -758,8 +759,8 @@ def start_order(robot_name, dropoff_id, items):
 
 @transaction.atomic
 def force_next(robot_name, confirmed=False):
-    """주문 단계에서 YOLO 확인 없이 다음으로. confirmed: YOLO 가 다르다고 물어본 뒤 사람이 확인하고 보냄,
-    아니면 "다음 경유지로" 버튼 (YOLO 꺼짐 등). 그때 개수를 기록에 남긴다."""
+    """Advance an order step without the YOLO check. confirmed: a person checked after being asked about a YOLO mismatch;
+    otherwise the next-stop button (YOLO off etc.). The counts at that moment are logged."""
     out = Outbox()
     robot = get_robot(robot_name)
     task = active_task(robot)
@@ -846,7 +847,7 @@ def reset_error(robot_name):
 
 @transaction.atomic
 def set_initial_pose(robot_name, x, y, yaw, precise=False):
-    """precise: 스캔 매칭으로 찾은 위치 (자동 위치 추정) → AMCL 불확실성을 작게 준다."""
+    """precise: pose found by scan matching (auto localization) -> give AMCL a small uncertainty."""
     out = Outbox()
     robot = get_robot(robot_name)
     require_online(robot)
@@ -858,7 +859,7 @@ def set_initial_pose(robot_name, x, y, yaw, precise=False):
 
 @transaction.atomic
 def save_location(data):
-    """data에 id가 있으면 수정, 없으면 추가."""
+    """Update if data has an id, otherwise add."""
     out = Outbox()
     m = active_map()
     if m is None:
@@ -871,9 +872,9 @@ def save_location(data):
         raise ServiceError('잘못된 위치 종류입니다.')
     fields = dict(name=name, kind=kind, x=float(data['x']), y=float(data['y']),
                   yaw=float(data.get('yaw', 0.0)))
-    if 'cargo' in data:  # 카메라 인식 라벨 (비우면 위치 이름)
+    if 'cargo' in data:  # camera detection label (empty = location name)
         fields['cargo'] = str(data.get('cargo') or '').strip()[:200]
-    if kind == Location.KIND_PICKUP:   # 같은 물건은 한 섹션에만 (주문이 갈 섹션을 하나로 정하려고)
+    if kind == Location.KIND_PICKUP:   # An item may be in only one section (so an order maps to a single section)
         old = Location.objects.filter(map=m, id=data['id']).first() if data.get('id') else None
         cargo = fields['cargo'] if 'cargo' in fields else (old.cargo if old else '')
         mine = {x.lower() for x in area_labels(Location(name=name, cargo=cargo))}
@@ -890,7 +891,7 @@ def save_location(data):
         loc.save()
     else:
         loc = Location.objects.create(map=m, **fields)
-    if kind == Location.KIND_HOME:  # 홈은 하나만
+    if kind == Location.KIND_HOME:  # only one home
         m.locations.filter(kind=Location.KIND_HOME).exclude(pk=loc.pk) \
             .update(kind=Location.KIND_PICKUP)
     push_locations(out)
@@ -899,7 +900,7 @@ def save_location(data):
 
 @transaction.atomic
 def set_home(x, y, yaw):
-    """홈 위치를 (x, y, yaw)로 지정. 이미 있으면 위치만 바꾼다."""
+    """Set the home location to (x, y, yaw). If it exists, only move it."""
     out = Outbox()
     m = active_map()
     if m is None:
@@ -924,7 +925,7 @@ def delete_location(location_id):
 
 @transaction.atomic
 def save_zone(data):
-    """금지 구역 추가. data: {shape: rect|line, x1, y1, x2, y2, name?}"""
+    """Add a keep-out zone. data: {shape: rect|line, x1, y1, x2, y2, name?}"""
     out = Outbox()
     m = active_map()
     if m is None:
@@ -958,12 +959,12 @@ def delete_zone(zone_id):
     return out
 
 
-# ---------------------------------------------------------------- 맵 만들기 (SLAM 모드)
+# ---------------------------------------------------------------- map building (SLAM mode)
 
 MAP_NAME_RE = re.compile(r'^[A-Za-z0-9_-]{1,50}$')
-PENDING_SAVE = {}  # robot_name -> 저장 요청한 맵 이름
+PENDING_SAVE = {}  # robot_name -> map name requested for saving
 SLAM_MAP = 'slam_live'
-SLAM_SESSION = {}  # robot_name -> 지금 연결된 브리지의 SLAM 실행 번호
+SLAM_SESSION = {}  # robot_name -> SLAM run ID of the currently connected bridge
 
 
 @transaction.atomic
@@ -993,9 +994,9 @@ def map_saved(robot_name, ok, message):
 
 
 def carry_over_locations(name):
-    """저장한 SLAM 맵 파일을 DB 맵으로 등록하고(활성화는 안 함), slam_live 에 등록한 위치를 복사한다.
-    같은 SLAM 좌표계에서 저장한 맵이므로 좌표를 그대로 쓰되, 저장 때 기울기를 바로잡아 돌린 맵
-    (yaml 의 '# rotation_deg: <각도>', tools/straighten_map.py)이면 위치/금지 구역도 원점 기준으로 같이 돌린다."""
+    """Register a saved SLAM map file as a DB map (not activated) and copy the locations registered on slam_live.
+    The map was saved in the same SLAM frame, so coordinates are reused as is; but if the map was rotated on save to straighten it
+    (the yaml's '# rotation_deg: <deg>', tools/straighten_map.py), locations/zones are rotated about the origin as well."""
     import math
     import os
     import re
@@ -1028,7 +1029,7 @@ def carry_over_locations(name):
         _, created = Location.objects.update_or_create(
             map=m, name=loc.name, defaults=dict(kind=loc.kind, x=x, y=y, yaw=yaw, cargo=loc.cargo))
         copied += 1
-    for z in src.zones.all():   # 금지 구역도 같은 좌표계. 사각형은 맵 축 기준이라 돌린 네 꼭짓점을 감싸는 사각형으로
+    for z in src.zones.all():   # Zones share the frame. Rectangles are map-axis aligned, so use the box enclosing the four rotated corners
         if z.shape == Zone.SHAPE_RECT and t:
             xs, ys = zip(*(rot(x, y) for x in (z.x1, z.x2) for y in (z.y1, z.y2)))
             x1, y1, x2, y2 = min(xs), min(ys), max(xs), max(ys)
@@ -1039,11 +1040,11 @@ def carry_over_locations(name):
     return copied
 
 
-# ---------------------------------------------------------------- 상태 초기화
+# ---------------------------------------------------------------- state reset
 
 @transaction.atomic
 def reset_robot(robot_name):
-    """진행 중인 작업 취소, 상태를 대기로, 로봇에 초기화 요청 (시뮬레이션은 출발 위치로 되돌림)."""
+    """Cancel the running task, set state to idle, and ask the robot to reset (simulation returns it to the start pose)."""
     out = Outbox()
     robot = get_robot(robot_name)
     require_online(robot)
@@ -1066,20 +1067,20 @@ def reset_done(robot_name, ok, message):
     return out
 
 
-# ---------------------------------------------------------------- 실행 모드 (runner.py)
+# ---------------------------------------------------------------- run mode (runner.py)
 
 def log_runner(job, ok, message):
-    """runner 스레드에서 호출: 결과를 기록에 남기고 UI 에 알린다."""
+    """Called from the runner thread: log the result and notify the UI."""
     from asgiref.sync import async_to_sync
     from channels.layers import get_channel_layer
     entry = EventLog.objects.create(robot=get_robot(), message=f'{job} {"완료" if ok else "실패"}: {message}'[:255])
     async_to_sync(get_channel_layer().group_send)('ui', {'type': 'send.msg', 'msg': {'type': 'log', 'log': entry.to_dict()}})
 
 
-# ---------------------------------------------------------------- 방문 순서 최적화 (planning.py)
+# ---------------------------------------------------------------- visit order optimization (planning.py)
 
 def plan_order(robot_name, location_ids, with_home):
-    """선택한 위치들을 가장 빨리 도는 순서와 예상 시간. DB 를 바꾸지 않는다."""
+    """Fastest order to visit the selected locations and its estimated time. Does not change the DB."""
     robot = get_robot(robot_name)
     m = active_map()
     if m is None:
@@ -1107,7 +1108,7 @@ def travel_model_info():
 
 
 def teleop_check(robot_name):
-    """웹 수동 조작 허용 여부. 허용이면 로봇 이름, 아니면 ServiceError."""
+    """Whether web teleop is allowed. Returns the robot name if allowed, otherwise ServiceError."""
     robot = get_robot(robot_name)
     require_online(robot)
     task = active_task(robot)
